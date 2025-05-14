@@ -14,51 +14,100 @@ import AdminReportsPage from "./pages/AdminReportsPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
+import { useAuth } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
-// This component is outside the routes so that `useAuth` can be used
-const AppRoutes = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-      <Route path="/check-in" element={<PrivateRoute><CheckInPage /></PrivateRoute>} />
-      <Route path="/report" element={<PrivateRoute><ReportPage /></PrivateRoute>} />
-      <Route path="/employees" element={<AdminRoute><AdminEmployeesPage /></AdminRoute>} />
-      <Route path="/reports" element={<AdminRoute><AdminReportsPage /></AdminRoute>} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
-// Use React component syntax for these components
+// Private route component to protect routes that require authentication
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  // We'll access AuthContext directly in the component
-  // This solves the auto-refresh issue by properly evaluating auth state
-  return children;
+  const { isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
 };
 
+// Admin route component to protect routes that require admin role
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  // We'll access AuthContext directly in the component
-  // This solves the auto-refresh issue by properly evaluating auth state
-  return children;
+  const { user, isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user?.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// This component is outside the BrowserRouter but inside the other providers
+const AppWithAuth = () => {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <CheckInProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/check-in" 
+              element={
+                <PrivateRoute>
+                  <CheckInPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/report" 
+              element={
+                <PrivateRoute>
+                  <ReportPage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/employees" 
+              element={
+                <AdminRoute>
+                  <AdminEmployeesPage />
+                </AdminRoute>
+              } 
+            />
+            <Route 
+              path="/reports" 
+              element={
+                <AdminRoute>
+                  <AdminReportsPage />
+                </AdminRoute>
+              } 
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+          <Sonner />
+        </CheckInProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 };
 
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <CheckInProvider>
-              <AppRoutes />
-              <Toaster />
-              <Sonner />
-            </CheckInProvider>
-          </AuthProvider>
-        </BrowserRouter>
+        <AppWithAuth />
       </TooltipProvider>
     </QueryClientProvider>
   );

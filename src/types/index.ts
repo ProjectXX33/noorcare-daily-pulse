@@ -12,7 +12,7 @@ export type User = {
 
 export type Department = 'Engineering' | 'IT' | 'Doctor' | 'Manager';
 
-export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing';
+export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer';
 
 export type CheckIn = {
   id: string;

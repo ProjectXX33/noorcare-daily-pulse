@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CheckIn, User, WorkReport } from '../types';
 import { mockCheckIns, mockWorkReports } from '../data/mockData';
@@ -16,6 +15,7 @@ interface CheckInContextType {
   hasCheckedInToday: (userId: string) => boolean;
   hasCheckedOutToday: (userId: string) => boolean;
   hasSubmittedReportToday: (userId: string) => boolean;
+  resetDailyCheckIns: () => void;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
@@ -25,12 +25,54 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [workReports, setWorkReports] = useState<WorkReport[]>(mockWorkReports);
   const { user } = useAuth();
 
+  // Check if it's past 3 AM Egypt time and reset daily check-ins if needed
   useEffect(() => {
-    // In a real app, we would fetch this data from an API
-    // For now, we're using the mock data
-    setCheckIns(mockCheckIns);
-    setWorkReports(mockWorkReports);
+    const checkResetTime = () => {
+      // Convert current time to Egypt time (UTC+2)
+      const now = new Date();
+      const egyptTime = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
+      const hours = egyptTime.getUTCHours();
+      
+      // If it's just past 3 AM Egypt time, reset the check-ins for today
+      if (hours === 3 && egyptTime.getUTCMinutes() === 0) {
+        resetDailyCheckIns();
+      }
+    };
+
+    // Check once on load
+    checkResetTime();
+    
+    // Then check every minute
+    const interval = setInterval(checkResetTime, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
+
+  const resetDailyCheckIns = () => {
+    console.log("Resetting daily check-ins at 3 AM Egypt time");
+    
+    // Keep all check-ins, but mark today's check-ins as checked out
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    setCheckIns(prev => 
+      prev.map(checkIn => {
+        const checkInDate = new Date(checkIn.timestamp);
+        checkInDate.setHours(0, 0, 0, 0);
+        
+        // If check-in is from today and has no checkout time, add checkout time
+        if (checkInDate.getTime() === today.getTime() && !checkIn.checkOutTime) {
+          return {
+            ...checkIn,
+            checkOutTime: new Date()
+          };
+        }
+        return checkIn;
+      })
+    );
+    
+    toast.info('Daily check-ins have been reset for the new day');
+  };
 
   const addCheckIn = (userId: string, userName: string, department: string, position: string) => {
     const newCheckIn: CheckIn = {
@@ -137,7 +179,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         getUserWorkReports,
         hasCheckedInToday,
         hasCheckedOutToday,
-        hasSubmittedReportToday
+        hasSubmittedReportToday,
+        resetDailyCheckIns
       }}
     >
       {children}

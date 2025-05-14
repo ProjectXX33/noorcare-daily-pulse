@@ -47,6 +47,8 @@ const AdminEmployeesPage = () => {
     password: ''
   });
   const [newPassword, setNewPassword] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   if (!user || user.role !== 'admin') {
     return null;
@@ -89,11 +91,20 @@ const AdminEmployeesPage = () => {
       return;
     }
 
+    const updatedEmployee = {...selectedEmployee};
+    
+    if (showEditPassword && editPassword) {
+      // In a real app, this would involve a secure password update
+      toast.success(`Password updated for ${selectedEmployee.name}`);
+    }
+
     setEmployees(prev => prev.map(emp => 
-      emp.id === selectedEmployee.id ? selectedEmployee : emp
+      emp.id === updatedEmployee.id ? updatedEmployee : emp
     ));
     
     setIsEditEmployeeOpen(false);
+    setShowEditPassword(false);
+    setEditPassword('');
     toast.success("Employee updated successfully!");
   };
 
@@ -111,6 +122,8 @@ const AdminEmployeesPage = () => {
 
   const openEditDialog = (employee: User) => {
     setSelectedEmployee({...employee});
+    setShowEditPassword(false);
+    setEditPassword('');
     setIsEditEmployeeOpen(true);
   };
 
@@ -293,6 +306,7 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="Designer">Designer</SelectItem>
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                   <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                  <SelectItem value="Web Developer">Web Developer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -375,9 +389,53 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="Designer">Designer</SelectItem>
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                     <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                    <SelectItem value="Web Developer">Web Developer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-role" className="text-right">
+                  Role
+                </Label>
+                <Select
+                  value={selectedEmployee.role}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee'} : null)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="employee">Employee</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="change-password" 
+                  checked={showEditPassword} 
+                  onChange={() => setShowEditPassword(!showEditPassword)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="change-password">Set New Password</Label>
+              </div>
+              
+              {showEditPassword && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-password" className="text-right">
+                    New Password
+                  </Label>
+                  <Input
+                    id="edit-password"
+                    type="password"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
