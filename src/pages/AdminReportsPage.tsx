@@ -111,7 +111,7 @@ const AdminReportsPage = () => {
                     <SelectValue placeholder="All Departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Departments</SelectItem>
+                    <SelectItem value="all">All Departments</SelectItem>
                     <SelectItem value="Engineering">Engineering</SelectItem>
                     <SelectItem value="IT">IT</SelectItem>
                     <SelectItem value="Doctor">Doctor</SelectItem>

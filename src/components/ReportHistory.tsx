@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WorkReport } from '@/types';
 import { format } from 'date-fns';
+import { useCheckIn } from '@/contexts/CheckInContext';
 
 interface ReportHistoryProps {
   reports: WorkReport[];
@@ -13,10 +14,42 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
   reports,
   title = "Recent Reports" 
 }) => {
+  const { checkIns } = useCheckIn();
+  
   // Sort reports by date (most recent first)
   const sortedReports = [...reports].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
+
+  // Function to find check-in/check-out times for a specific user and date
+  const getCheckInOutTimes = (userId: string, date: Date) => {
+    const reportDate = new Date(date);
+    reportDate.setHours(0, 0, 0, 0);
+    
+    const checkInRecord = checkIns.find(checkIn => {
+      const checkInDate = new Date(checkIn.timestamp);
+      checkInDate.setHours(0, 0, 0, 0);
+      return checkIn.userId === userId && checkInDate.getTime() === reportDate.getTime();
+    });
+
+    if (checkInRecord) {
+      return {
+        checkInTime: format(new Date(checkInRecord.timestamp), 'h:mm a'),
+        checkOutTime: checkInRecord.checkOutTime 
+          ? format(new Date(checkInRecord.checkOutTime), 'h:mm a') 
+          : 'Not checked out',
+        totalHours: checkInRecord.checkOutTime 
+          ? ((new Date(checkInRecord.checkOutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
+          : 'N/A'
+      };
+    }
+    
+    return {
+      checkInTime: 'No check-in record',
+      checkOutTime: 'No check-out record',
+      totalHours: 'N/A'
+    };
+  };
 
   return (
     <Card className="col-span-3">
@@ -29,42 +62,53 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
           <p className="text-sm text-gray-500">No report history found.</p>
         ) : (
           <div className="space-y-8">
-            {sortedReports.map((report) => (
-              <div key={report.id} className="border-b pb-6">
-                <div className="flex justify-between mb-2">
-                  <div>
-                    <p className="font-medium">{format(new Date(report.date), 'EEEE, MMMM d, yyyy')}</p>
-                    <p className="text-sm text-gray-500">{report.userName} - {report.department}</p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  <div>
-                    <h4 className="text-sm font-medium text-primary">Tasks Completed</h4>
-                    <p className="text-sm mt-1">{report.tasksDone}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-primary">Issues Faced</h4>
-                    <p className="text-sm mt-1">{report.issuesFaced || 'None reported'}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-primary">Plans for Tomorrow</h4>
-                    <p className="text-sm mt-1">{report.plansForTomorrow}</p>
-                  </div>
-                  {report.fileAttachments && report.fileAttachments.length > 0 && (
+            {sortedReports.map((report) => {
+              const { checkInTime, checkOutTime, totalHours } = getCheckInOutTimes(report.userId, report.date);
+              
+              return (
+                <div key={report.id} className="border-b pb-6">
+                  <div className="flex justify-between mb-2">
                     <div>
-                      <h4 className="text-sm font-medium text-primary">Attachments</h4>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {report.fileAttachments.map((file, index) => (
-                          <div key={index} className="text-sm bg-gray-100 px-2 py-1 rounded">
-                            {file}
-                          </div>
-                        ))}
+                      <p className="font-medium">{format(new Date(report.date), 'EEEE, MMMM d, yyyy')}</p>
+                      <p className="text-sm text-gray-500">{report.userName} - {report.department}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="bg-gray-100 rounded px-3 py-1">
+                        <p className="text-sm font-medium">Check-in: <span className="text-primary">{checkInTime}</span></p>
+                        <p className="text-sm font-medium">Check-out: <span className="text-primary">{checkOutTime}</span></p>
+                        <p className="text-sm font-medium">Hours: <span className="text-primary">{totalHours}</span></p>
                       </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <h4 className="text-sm font-medium text-primary">Tasks Completed</h4>
+                      <p className="text-sm mt-1">{report.tasksDone}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-primary">Issues Faced</h4>
+                      <p className="text-sm mt-1">{report.issuesFaced || 'None reported'}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-primary">Plans for Tomorrow</h4>
+                      <p className="text-sm mt-1">{report.plansForTomorrow}</p>
+                    </div>
+                    {report.fileAttachments && report.fileAttachments.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-primary">Attachments</h4>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {report.fileAttachments.map((file, index) => (
+                            <div key={index} className="text-sm bg-gray-100 px-2 py-1 rounded">
+                              {file}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
