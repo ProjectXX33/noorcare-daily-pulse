@@ -25,6 +25,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
+        // Update admin user to have IT - Web Developer if it's the admin
+        if (parsedUser.username === 'ProjectX') {
+          parsedUser.department = 'IT';
+          parsedUser.position = 'Web Developer';
+          localStorage.setItem('noorcare_user', JSON.stringify(parsedUser));
+        }
         setUser(parsedUser);
         setIsAuthenticated(true);
       } catch (error) {
@@ -48,6 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (foundUser.username === 'ProjectX' && password !== 'Prototype77') {
         toast.error('Invalid password');
         return false;
+      }
+      
+      // Update admin user to have IT - Web Developer
+      if (foundUser.username === 'ProjectX') {
+        foundUser.department = 'IT';
+        foundUser.position = 'Web Developer';
       }
       
       setUser(foundUser);

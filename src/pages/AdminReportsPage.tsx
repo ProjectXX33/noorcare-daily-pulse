@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -67,7 +68,7 @@ const AdminReportsPage = () => {
   };
 
   const handleDepartmentChange = (value: string) => {
-    setFilters(prev => ({ ...prev, department: value }));
+    setFilters(prev => ({ ...prev, department: value === "all" ? "" : value }));
   };
 
   const clearFilters = () => {
@@ -77,6 +78,48 @@ const AdminReportsPage = () => {
       dateFrom: '',
       dateTo: '',
     });
+  };
+
+  // Function to handle file download
+  const handleFileDownload = (fileName: string) => {
+    // In a real implementation, this would make a request to your MySQL server
+    // to fetch the actual file content and trigger a download
+    
+    const dummyContent = "This is a simulated file content for " + fileName;
+    const blob = new Blob([dummyContent], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportReports = () => {
+    // In a real app, this would generate a CSV or PDF with the filtered reports
+    // For now, we'll create a simple CSV string
+    let csvContent = "Date,Employee,Department,Position,Tasks Done,Issues Faced,Plans for Tomorrow\n";
+    
+    sortedReports.forEach(report => {
+      csvContent += `${format(new Date(report.date), 'yyyy-MM-dd')},`;
+      csvContent += `"${report.userName}",`;
+      csvContent += `"${report.department}",`;
+      csvContent += `"${report.position}",`;
+      csvContent += `"${report.tasksDone.replace(/"/g, '""')}",`;
+      csvContent += `"${report.issuesFaced ? report.issuesFaced.replace(/"/g, '""') : ''}",`;
+      csvContent += `"${report.plansForTomorrow.replace(/"/g, '""')}"\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `reports_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -104,7 +147,7 @@ const AdminReportsPage = () => {
               <div>
                 <Label htmlFor="department">Department</Label>
                 <Select
-                  value={filters.department}
+                  value={filters.department || "all"}
                   onValueChange={handleDepartmentChange}
                 >
                   <SelectTrigger>
@@ -148,7 +191,10 @@ const AdminReportsPage = () => {
               >
                 Clear Filters
               </Button>
-              <Button className="bg-primary hover:bg-primary/90">
+              <Button 
+                className="bg-primary hover:bg-primary/90"
+                onClick={exportReports}
+              >
                 Export Reports
               </Button>
             </div>
@@ -200,8 +246,16 @@ const AdminReportsPage = () => {
                           <h4 className="text-sm font-medium text-primary">Attachments</h4>
                           <div className="flex flex-wrap gap-2 mt-1">
                             {report.fileAttachments.map((file, index) => (
-                              <div key={index} className="text-sm bg-gray-100 px-2 py-1 rounded">
-                                {file}
+                              <div key={index} className="flex items-center text-sm bg-gray-100 px-2 py-1 rounded">
+                                <span className="mr-2">{file}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="p-1 h-auto"
+                                  onClick={() => handleFileDownload(file)}
+                                >
+                                  <Download className="h-3 w-3" />
+                                </Button>
                               </div>
                             ))}
                           </div>

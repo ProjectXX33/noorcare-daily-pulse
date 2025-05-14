@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { WorkReport } from '@/types';
 import { format } from 'date-fns';
 import { useCheckIn } from '@/contexts/CheckInContext';
@@ -51,6 +53,24 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
     };
   };
 
+  // Function to simulate file download
+  const handleFileDownload = (fileName: string) => {
+    // In a real implementation, this would make a request to your MySQL server
+    // to fetch the actual file content and trigger a download
+    
+    // For now, we'll simulate the download with a fake blob
+    const dummyContent = "This is a simulated file content for " + fileName;
+    const blob = new Blob([dummyContent], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card className="col-span-3">
       <CardHeader>
@@ -98,8 +118,16 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
                         <h4 className="text-sm font-medium text-primary">Attachments</h4>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {report.fileAttachments.map((file, index) => (
-                            <div key={index} className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {file}
+                            <div key={index} className="flex items-center text-sm bg-gray-100 px-2 py-1 rounded">
+                              <span className="mr-2">{file}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="p-1 h-auto"
+                                onClick={() => handleFileDownload(file)}
+                              >
+                                <Download className="h-3 w-3" />
+                              </Button>
                             </div>
                           ))}
                         </div>

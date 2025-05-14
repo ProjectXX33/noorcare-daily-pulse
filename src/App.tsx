@@ -16,7 +16,14 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { useAuth } from "./contexts/AuthContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevents queries from refetching when the window regains focus
+      staleTime: 5 * 60 * 1000, // Data is considered fresh for 5 minutes
+    },
+  },
+});
 
 // Private route component to protect routes that require authentication
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
