@@ -49,7 +49,8 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 13, 9, 15), // Yesterday
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer'
+    position: 'Designer',
+    checkOutTime: new Date(2025, 4, 13, 17, 30) // Added checkout time for yesterday
   },
   {
     id: '2',
@@ -57,7 +58,8 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 14, 8, 30), // Today
     userName: 'Ahmed Ali',
     department: 'Manager',
-    position: 'Customer Service'
+    position: 'Customer Service',
+    checkOutTime: null // Hasn't checked out yet today
   },
   {
     id: '3',
@@ -65,7 +67,8 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 12, 9, 45), // Day before yesterday
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer'
+    position: 'Designer',
+    checkOutTime: new Date(2025, 4, 12, 18, 15) // Added checkout time
   },
   {
     id: '4',
@@ -73,7 +76,8 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 11, 8, 50), // 3 days ago
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer'
+    position: 'Designer',
+    checkOutTime: new Date(2025, 4, 11, 17, 45) // Added checkout time
   }
 ];
 
