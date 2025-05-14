@@ -21,6 +21,7 @@ export type CheckIn = {
   userName: string;
   department: Department;
   position: Position;
+  checkOutTime: Date | null;
 };
 
 export type WorkReport = {

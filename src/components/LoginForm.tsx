@@ -75,11 +75,6 @@ const LoginForm = () => {
           </Button>
         </form>
       </CardContent>
-      <CardFooter className="flex flex-col items-center">
-        <p className="text-sm text-gray-500 mt-4">
-          Demo credentials: ProjectX / password
-        </p>
-      </CardFooter>
     </Card>
   );
 };

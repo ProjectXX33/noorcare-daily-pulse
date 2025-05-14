@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +39,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant={isActive('/dashboard') ? "default" : "ghost"}
             className={`w-full justify-start ${isActive('/dashboard') ? 'bg-primary' : ''}`}
             onClick={() => navigate('/dashboard')}
+            type="button"
           >
             Dashboard
           </Button>
@@ -46,6 +47,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant={isActive('/check-in') ? "default" : "ghost"}
             className={`w-full justify-start ${isActive('/check-in') ? 'bg-primary' : ''}`}
             onClick={() => navigate('/check-in')}
+            type="button"
           >
             Check-In
           </Button>
@@ -53,6 +55,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant={isActive('/report') ? "default" : "ghost"}
             className={`w-full justify-start ${isActive('/report') ? 'bg-primary' : ''}`}
             onClick={() => navigate('/report')}
+            type="button"
           >
             Daily Report
           </Button>
@@ -62,6 +65,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 variant={isActive('/employees') ? "default" : "ghost"}
                 className={`w-full justify-start ${isActive('/employees') ? 'bg-primary' : ''}`}
                 onClick={() => navigate('/employees')}
+                type="button"
               >
                 Employees
               </Button>
@@ -69,6 +73,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 variant={isActive('/reports') ? "default" : "ghost"}
                 className={`w-full justify-start ${isActive('/reports') ? 'bg-primary' : ''}`}
                 onClick={() => navigate('/reports')}
+                type="button"
               >
                 All Reports
               </Button>
@@ -89,6 +94,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant="outline" 
             className="w-full justify-start text-red-500" 
             onClick={logout}
+            type="button"
           >
             <LogOut size={16} className="mr-2" /> Logout
           </Button>
@@ -106,7 +112,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             />
             <h1 className="font-bold text-primary">NoorCare</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={logout}>
+          <Button variant="outline" size="sm" onClick={logout} type="button">
             <LogOut size={16} />
           </Button>
         </div>
@@ -115,6 +121,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant="ghost"
             className={`flex-1 rounded-none ${isActive('/dashboard') ? 'border-b-2 border-primary' : ''}`}
             onClick={() => navigate('/dashboard')}
+            type="button"
           >
             Dashboard
           </Button>
@@ -122,6 +129,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant="ghost"
             className={`flex-1 rounded-none ${isActive('/check-in') ? 'border-b-2 border-primary' : ''}`}
             onClick={() => navigate('/check-in')}
+            type="button"
           >
             Check-In
           </Button>
@@ -129,6 +137,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             variant="ghost"
             className={`flex-1 rounded-none ${isActive('/report') ? 'border-b-2 border-primary' : ''}`}
             onClick={() => navigate('/report')}
+            type="button"
           >
             Report
           </Button>

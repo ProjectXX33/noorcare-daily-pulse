@@ -9,10 +9,12 @@ interface CheckInContextType {
   checkIns: CheckIn[];
   workReports: WorkReport[];
   addCheckIn: (userId: string, userName: string, department: string, position: string) => void;
+  addCheckOut: (userId: string) => void;
   addWorkReport: (report: Omit<WorkReport, 'id'>) => void;
   getUserCheckIns: (userId: string) => CheckIn[];
   getUserWorkReports: (userId: string) => WorkReport[];
   hasCheckedInToday: (userId: string) => boolean;
+  hasCheckedOutToday: (userId: string) => boolean;
   hasSubmittedReportToday: (userId: string) => boolean;
 }
 
@@ -38,10 +40,33 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       userName,
       department: department as any,
       position: position as any,
+      checkOutTime: null
     };
 
     setCheckIns(prev => [newCheckIn, ...prev]);
     toast.success('Check-in recorded successfully!');
+  };
+
+  const addCheckOut = (userId: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    setCheckIns(prev => 
+      prev.map(checkIn => {
+        const checkInDate = new Date(checkIn.timestamp);
+        checkInDate.setHours(0, 0, 0, 0);
+        
+        if (checkIn.userId === userId && checkInDate.getTime() === today.getTime() && !checkIn.checkOutTime) {
+          return {
+            ...checkIn,
+            checkOutTime: new Date()
+          };
+        }
+        return checkIn;
+      })
+    );
+    
+    toast.success('Check-out recorded successfully!');
   };
 
   const addWorkReport = (report: Omit<WorkReport, 'id'>) => {
@@ -74,6 +99,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const hasCheckedOutToday = (userId: string): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return checkIns.some(checkIn => {
+      const checkInDate = new Date(checkIn.timestamp);
+      checkInDate.setHours(0, 0, 0, 0);
+      
+      return checkIn.userId === userId && 
+        checkInDate.getTime() === today.getTime() && 
+        checkIn.checkOutTime !== null;
+    });
+  };
+
   const hasSubmittedReportToday = (userId: string): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -92,10 +131,12 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         checkIns, 
         workReports, 
         addCheckIn, 
+        addCheckOut,
         addWorkReport, 
         getUserCheckIns, 
         getUserWorkReports,
         hasCheckedInToday,
+        hasCheckedOutToday,
         hasSubmittedReportToday
       }}
     >

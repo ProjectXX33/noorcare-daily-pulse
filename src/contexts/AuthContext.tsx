@@ -35,8 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // In a real app, this would be an API call to verify credentials
-    // For demo, just check if username exists in our mockUsers and assume password is correct
+    // For demo, check if username exists and validate admin password
     // In production, we'd use Laravel's API to authenticate
 
     // Simulate API call delay
@@ -45,7 +44,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const foundUser = mockUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
     
     if (foundUser) {
-      // In a real app, we would validate the password here
+      // Only validate password for admin user
+      if (foundUser.username === 'ProjectX' && password !== 'Prototype77') {
+        toast.error('Invalid password');
+        return false;
+      }
+      
       setUser(foundUser);
       setIsAuthenticated(true);
       localStorage.setItem('noorcare_user', JSON.stringify(foundUser));
