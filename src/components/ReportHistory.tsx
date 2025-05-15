@@ -6,6 +6,8 @@ import { Download } from "lucide-react";
 import { WorkReport } from '@/types';
 import { format } from 'date-fns';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface ReportHistoryProps {
   reports: WorkReport[];
@@ -53,22 +55,46 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
     };
   };
 
-  // Function to simulate file download
-  const handleFileDownload = (fileName: string) => {
-    // In a real implementation, this would make a request to your MySQL server
-    // to fetch the actual file content and trigger a download
-    
-    // For now, we'll simulate the download with a fake blob
-    const dummyContent = "This is a simulated file content for " + fileName;
-    const blob = new Blob([dummyContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Function to download file from Supabase storage
+  const handleFileDownload = async (reportId: string, fileName: string) => {
+    try {
+      // Get file path from database
+      const { data: fileData, error: fileError } = await supabase
+        .from('file_attachments')
+        .select('file_path')
+        .eq('work_report_id', reportId)
+        .eq('file_name', fileName)
+        .single();
+        
+      if (fileError || !fileData) {
+        toast.error('File information not found');
+        return;
+      }
+      
+      // Download file
+      const { data, error } = await supabase.storage
+        .from('attachments')
+        .download(fileData.file_path);
+        
+      if (error) {
+        toast.error('Error downloading file');
+        console.error('Download error:', error);
+        return;
+      }
+      
+      // Create and trigger download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('File download error:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   return (
@@ -124,7 +150,7 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
                                 variant="ghost" 
                                 size="sm" 
                                 className="p-1 h-auto"
-                                onClick={() => handleFileDownload(file)}
+                                onClick={() => handleFileDownload(report.id, file)}
                               >
                                 <Download className="h-3 w-3" />
                               </Button>

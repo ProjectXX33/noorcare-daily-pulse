@@ -1,124 +1,331 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { CheckIn, User, WorkReport } from '../types';
-import { mockCheckIns, mockWorkReports } from '../data/mockData';
+import { CheckIn, WorkReport, Department, Position } from '../types';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface CheckInContextType {
   checkIns: CheckIn[];
   workReports: WorkReport[];
-  addCheckIn: (userId: string, userName: string, department: string, position: string) => void;
-  addCheckOut: (userId: string) => void;
-  addWorkReport: (report: Omit<WorkReport, 'id'>) => void;
+  addCheckIn: (userId: string, userName: string, department: Department, position: Position) => Promise<void>;
+  addCheckOut: (userId: string) => Promise<void>;
+  addWorkReport: (report: Omit<WorkReport, 'id'>, file?: File) => Promise<void>;
   getUserCheckIns: (userId: string) => CheckIn[];
   getUserWorkReports: (userId: string) => WorkReport[];
   hasCheckedInToday: (userId: string) => boolean;
   hasCheckedOutToday: (userId: string) => boolean;
   hasSubmittedReportToday: (userId: string) => boolean;
-  resetDailyCheckIns: () => void;
+  isLoading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
 
 export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [checkIns, setCheckIns] = useState<CheckIn[]>(mockCheckIns);
-  const [workReports, setWorkReports] = useState<WorkReport[]>(mockWorkReports);
+  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [workReports, setWorkReports] = useState<WorkReport[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
 
-  // Check if it's past 3 AM Egypt time and reset daily check-ins if needed
+  // Fetch all data on initial load and when user changes
   useEffect(() => {
-    const checkResetTime = () => {
-      // Convert current time to Egypt time (UTC+2)
-      const now = new Date();
-      const egyptTime = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // UTC+2
-      const hours = egyptTime.getUTCHours();
+    if (user) {
+      refreshData();
+    }
+  }, [user]);
+
+  // Function to reload all data from Supabase
+  const refreshData = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    
+    try {
+      await Promise.all([
+        fetchCheckIns(),
+        fetchWorkReports(),
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch check-ins from Supabase
+  const fetchCheckIns = async () => {
+    try {
+      // Query based on user role
+      const query = user?.role === 'admin' 
+        ? supabase.from('check_ins').select(`
+            *,
+            users:user_id (username, name, department, position)
+          `)
+        : supabase.from('check_ins').select(`
+            *,
+            users:user_id (username, name, department, position)
+          `).eq('user_id', user?.id);
+
+      const { data, error } = await query;
       
-      // If it's just past 3 AM Egypt time, reset the check-ins for today
-      if (hours === 3 && egyptTime.getUTCMinutes() === 0) {
-        resetDailyCheckIns();
+      if (error) {
+        throw error;
       }
-    };
-
-    // Check once on load
-    checkResetTime();
-    
-    // Then check every minute
-    const interval = setInterval(checkResetTime, 60000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const resetDailyCheckIns = () => {
-    console.log("Resetting daily check-ins at 3 AM Egypt time");
-    
-    // Keep all check-ins, but mark today's check-ins as checked out
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    setCheckIns(prev => 
-      prev.map(checkIn => {
-        const checkInDate = new Date(checkIn.timestamp);
-        checkInDate.setHours(0, 0, 0, 0);
+      
+      if (data) {
+        // Transform database records to app format
+        const formattedCheckIns: CheckIn[] = data.map(record => ({
+          id: record.id,
+          userId: record.user_id,
+          timestamp: new Date(record.timestamp),
+          userName: record.users.name,
+          department: record.users.department,
+          position: record.users.position,
+          checkOutTime: record.checkout_time ? new Date(record.checkout_time) : null
+        }));
         
-        // If check-in is from today and has no checkout time, add checkout time
-        if (checkInDate.getTime() === today.getTime() && !checkIn.checkOutTime) {
-          return {
-            ...checkIn,
-            checkOutTime: new Date()
-          };
-        }
-        return checkIn;
-      })
-    );
-    
-    toast.info('Daily check-ins have been reset for the new day');
+        setCheckIns(formattedCheckIns);
+      }
+    } catch (error) {
+      console.error('Error fetching check-ins:', error);
+      throw error;
+    }
   };
 
-  const addCheckIn = (userId: string, userName: string, department: string, position: string) => {
-    const newCheckIn: CheckIn = {
-      id: Date.now().toString(),
-      userId,
-      timestamp: new Date(),
-      userName,
-      department: department as any,
-      position: position as any,
-      checkOutTime: null
-    };
+  // Fetch work reports from Supabase
+  const fetchWorkReports = async () => {
+    try {
+      // Query based on user role
+      const query = user?.role === 'admin' 
+        ? supabase.from('work_reports').select(`
+            *,
+            users:user_id (username, name, department, position),
+            file_attachments (id, file_path, file_name)
+          `)
+        : supabase.from('work_reports').select(`
+            *,
+            users:user_id (username, name, department, position),
+            file_attachments (id, file_path, file_name)
+          `).eq('user_id', user?.id);
 
-    setCheckIns(prev => [newCheckIn, ...prev]);
-    toast.success('Check-in recorded successfully!');
-  };
-
-  const addCheckOut = (userId: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    setCheckIns(prev => 
-      prev.map(checkIn => {
-        const checkInDate = new Date(checkIn.timestamp);
-        checkInDate.setHours(0, 0, 0, 0);
+      const { data, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        // Transform database records to app format
+        const formattedReports: WorkReport[] = data.map(record => ({
+          id: record.id,
+          userId: record.user_id,
+          userName: record.users.name,
+          date: new Date(record.date),
+          tasksDone: record.tasks_done,
+          issuesFaced: record.issues_faced || '',
+          plansForTomorrow: record.plans_for_tomorrow,
+          department: record.users.department,
+          position: record.users.position,
+          fileAttachments: record.file_attachments?.map(file => file.file_name) || []
+        }));
         
-        if (checkIn.userId === userId && checkInDate.getTime() === today.getTime() && !checkIn.checkOutTime) {
-          return {
-            ...checkIn,
-            checkOutTime: new Date()
-          };
-        }
-        return checkIn;
-      })
-    );
-    
-    toast.success('Check-out recorded successfully!');
+        setWorkReports(formattedReports);
+      }
+    } catch (error) {
+      console.error('Error fetching work reports:', error);
+      throw error;
+    }
   };
 
-  const addWorkReport = (report: Omit<WorkReport, 'id'>) => {
-    const newReport: WorkReport = {
-      ...report,
-      id: Date.now().toString(),
-    };
+  const addCheckIn = async (userId: string, userName: string, department: Department, position: Position) => {
+    try {
+      setIsLoading(true);
+      
+      // Insert check-in record
+      const { data, error } = await supabase
+        .from('check_ins')
+        .insert({
+          user_id: userId,
+          timestamp: new Date().toISOString(),
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Update user's last check-in
+      await supabase
+        .from('users')
+        .update({ last_checkin: new Date().toISOString() })
+        .eq('id', userId);
+      
+      // Add to local state
+      const newCheckIn: CheckIn = {
+        id: data.id,
+        userId,
+        timestamp: new Date(data.timestamp),
+        userName,
+        department,
+        position,
+        checkOutTime: null
+      };
+      
+      setCheckIns(prev => [newCheckIn, ...prev]);
+      toast.success('Check-in recorded successfully!');
+      
+      // Refresh data to ensure everything is up-to-date
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding check-in:', error);
+      toast.error('Failed to record check-in');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    setWorkReports(prev => [newReport, ...prev]);
-    toast.success('Work report submitted successfully!');
+  const addCheckOut = async (userId: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Find the latest check-in for this user that doesn't have a check-out time
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayISOString = today.toISOString();
+      
+      // First, get the most recent check-in without checkout
+      const { data: checkInData, error: fetchError } = await supabase
+        .from('check_ins')
+        .select()
+        .eq('user_id', userId)
+        .gte('timestamp', todayISOString)
+        .is('checkout_time', null)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      // Update the check-out time
+      const { error: updateError } = await supabase
+        .from('check_ins')
+        .update({ checkout_time: new Date().toISOString() })
+        .eq('id', checkInData.id);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Update local state
+      setCheckIns(prev => 
+        prev.map(checkIn => {
+          if (checkIn.id === checkInData.id) {
+            return {
+              ...checkIn,
+              checkOutTime: new Date()
+            };
+          }
+          return checkIn;
+        })
+      );
+      
+      toast.success('Check-out recorded successfully!');
+      
+      // Refresh data to ensure everything is up-to-date
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding check-out:', error);
+      toast.error('Failed to record check-out');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addWorkReport = async (report: Omit<WorkReport, 'id'>, file?: File) => {
+    try {
+      setIsLoading(true);
+      
+      // Insert work report
+      const { data, error } = await supabase
+        .from('work_reports')
+        .insert({
+          user_id: report.userId,
+          date: report.date.toISOString(),
+          tasks_done: report.tasksDone,
+          issues_faced: report.issuesFaced || null,
+          plans_for_tomorrow: report.plansForTomorrow,
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Upload file if provided
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `work-reports/${data.id}/${fileName}`;
+        
+        // Upload to storage bucket
+        const { error: uploadError } = await supabase
+          .storage
+          .from('attachments')
+          .upload(filePath, file);
+          
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        // Get public URL
+        const { data: urlData } = supabase
+          .storage
+          .from('attachments')
+          .getPublicUrl(filePath);
+        
+        // Add file reference to database
+        await supabase
+          .from('file_attachments')
+          .insert({
+            work_report_id: data.id,
+            file_path: filePath,
+            file_name: file.name,
+            file_type: file.type,
+          });
+      }
+      
+      // Create report object for local state with generated ID
+      const newReport: WorkReport = {
+        id: data.id,
+        userId: report.userId,
+        userName: report.userName,
+        date: report.date,
+        tasksDone: report.tasksDone,
+        issuesFaced: report.issuesFaced,
+        plansForTomorrow: report.plansForTomorrow,
+        fileAttachments: file ? [file.name] : undefined,
+        department: report.department,
+        position: report.position,
+      };
+      
+      setWorkReports(prev => [newReport, ...prev]);
+      toast.success('Work report submitted successfully!');
+      
+      // Refresh data to ensure everything is up-to-date
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding work report:', error);
+      toast.error('Failed to submit work report');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getUserCheckIns = (userId: string): CheckIn[] => {
@@ -180,7 +387,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         hasCheckedInToday,
         hasCheckedOutToday,
         hasSubmittedReportToday,
-        resetDailyCheckIns
+        isLoading,
+        refreshData
       }}
     >
       {children}

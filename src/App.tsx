@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 import CheckInPage from "./pages/CheckInPage";
 import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
@@ -26,11 +27,26 @@ const queryClient = new QueryClient({
 });
 
 // Private route component to protect routes that require authentication
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <p className="mt-4 text-gray-600">Loading...</p>
+      </div>
+    </div>;
+  }
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  
+  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    return user.role === 'admin' 
+      ? <Navigate to="/dashboard" replace /> 
+      : <Navigate to="/employee-dashboard" replace />;
   }
   
   return <>{children}</>;
@@ -38,17 +54,20 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Admin route component to protect routes that require admin role
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAuthenticated } = useAuth();
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (user?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return <>{children}</>;
+  return (
+    <PrivateRoute allowedRoles={['admin']}>
+      {children}
+    </PrivateRoute>
+  );
+};
+
+// Employee route component to protect routes that require employee role
+const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <PrivateRoute allowedRoles={['employee']}>
+      {children}
+    </PrivateRoute>
+  );
 };
 
 // This component is outside the BrowserRouter but inside the other providers
@@ -63,9 +82,17 @@ const AppWithAuth = () => {
             <Route 
               path="/dashboard" 
               element={
-                <PrivateRoute>
+                <AdminRoute>
                   <Dashboard />
-                </PrivateRoute>
+                </AdminRoute>
+              } 
+            />
+            <Route 
+              path="/employee-dashboard" 
+              element={
+                <EmployeeRoute>
+                  <EmployeeDashboard />
+                </EmployeeRoute>
               } 
             />
             <Route 

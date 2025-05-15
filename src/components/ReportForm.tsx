@@ -3,21 +3,21 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ReportForm = () => {
   const { user } = useAuth();
-  const { addWorkReport, hasSubmittedReportToday } = useCheckIn();
+  const { addWorkReport, hasSubmittedReportToday, isLoading: contextLoading } = useCheckIn();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     tasksDone: '',
     issuesFaced: '',
     plansForTomorrow: '',
-    fileAttachment: null as File | null,
   });
+  const [fileAttachment, setFileAttachment] = useState<File | null>(null);
 
   if (!user) return null;
 
@@ -30,7 +30,7 @@ const ReportForm = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({ ...prev, fileAttachment: e.target.files![0] }));
+      setFileAttachment(e.target.files[0]);
     }
   };
 
@@ -41,32 +41,24 @@ const ReportForm = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const fileAttachments = formData.fileAttachment 
-        ? [formData.fileAttachment.name] 
-        : undefined;
-        
-      addWorkReport({
+      await addWorkReport({
         userId: user.id,
         userName: user.name,
         date: new Date(),
         tasksDone: formData.tasksDone,
         issuesFaced: formData.issuesFaced,
         plansForTomorrow: formData.plansForTomorrow,
-        fileAttachments,
         department: user.department,
         position: user.position,
-      });
+      }, fileAttachment || undefined);
       
       // Reset form
       setFormData({
         tasksDone: '',
         issuesFaced: '',
         plansForTomorrow: '',
-        fileAttachment: null,
       });
+      setFileAttachment(null);
     } finally {
       setIsLoading(false);
     }
@@ -151,9 +143,9 @@ const ReportForm = () => {
             <Button 
               type="submit" 
               className="w-full bg-primary hover:bg-primary/90"
-              disabled={isLoading}
+              disabled={isLoading || contextLoading}
             >
-              {isLoading ? 'Submitting...' : 'Submit Report'}
+              {isLoading || contextLoading ? 'Submitting...' : 'Submit Report'}
             </Button>
           </div>
         </form>
