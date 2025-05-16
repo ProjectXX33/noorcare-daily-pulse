@@ -12,7 +12,10 @@ export async function fetchAllTasks(): Promise<Task[]> {
       `)
       .order('created_at', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      throw error;
+    }
     
     return data.map((record: any) => ({
       id: record.id,
@@ -102,6 +105,7 @@ export async function createTask(task: {
   try {
     console.log('Creating task with data:', task);
     
+    // Insert task data
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
@@ -112,10 +116,7 @@ export async function createTask(task: {
         progress_percentage: task.progressPercentage,
         created_by: task.createdBy
       }])
-      .select(`
-        *,
-        assignee:assigned_to (name)
-      `)
+      .select()
       .single();
       
     if (error) {
@@ -123,22 +124,38 @@ export async function createTask(task: {
       throw error;
     }
     
+    console.log('Task created successfully:', data);
+    
     // Create a notification for the assigned user
-    await sendNotification({
-      userId: task.assignedTo,
-      title: 'New Task Assigned',
-      message: `You have been assigned a new task: ${task.title}`,
-      adminId: task.createdBy,
-      relatedTo: 'task',
-      relatedId: data.id
-    });
+    try {
+      await sendNotification({
+        userId: task.assignedTo,
+        title: 'New Task Assigned',
+        message: `You have been assigned a new task: ${task.title}`,
+        adminId: task.createdBy,
+        relatedTo: 'task',
+        relatedId: data.id
+      });
+    } catch (notificationError) {
+      console.error('Error sending notification:', notificationError);
+      // Don't fail the task creation if notification fails
+    }
+    
+    // Get the assignee name
+    const { data: assigneeData, error: assigneeError } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', task.assignedTo)
+      .single();
+      
+    const assigneeName = assigneeError ? 'Unknown' : assigneeData.name;
     
     return {
       id: data.id,
       title: data.title,
       description: data.description,
       assignedTo: data.assigned_to,
-      assignedToName: data.assignee ? data.assignee.name : 'Unknown',
+      assignedToName: assigneeName,
       status: data.status,
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
@@ -280,13 +297,15 @@ export async function sendNotification({
       
       console.log('Sending notifications to all users:', notifications);
       
-      const { error } = await supabase
-        .from('notifications')
-        .insert(notifications);
-        
-      if (error) {
-        console.error('Error inserting notifications for all users:', error);
-        throw error;
+      if (notifications.length > 0) {
+        const { error } = await supabase
+          .from('notifications')
+          .insert(notifications);
+          
+        if (error) {
+          console.error('Error inserting notifications for all users:', error);
+          throw error;
+        }
       }
     } else if (userId) {
       // Create a notification for a specific user

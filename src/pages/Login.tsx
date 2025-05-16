@@ -8,10 +8,11 @@ import { toast } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 
 const Login = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, refreshSession } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [language, setLanguage] = useState('en');
+  const [isProcessingReset, setIsProcessingReset] = useState(false);
   
   // Load language preference on component mount
   useEffect(() => {
@@ -45,12 +46,15 @@ const Login = () => {
       const accessToken = searchParams.get('access_token');
       const type = searchParams.get('type');
       
-      if (type === 'recovery' && accessToken) {
-        // User clicked a password reset link
+      if (type === 'recovery' && accessToken && !isProcessingReset) {
+        setIsProcessingReset(true);
         try {
           const newPassword = prompt(t.enterNewPassword) || '';
           
-          if (!newPassword) return;
+          if (!newPassword) {
+            setIsProcessingReset(false);
+            return;
+          }
           
           const { data, error } = await supabase.auth.updateUser({
             password: newPassword,
@@ -60,16 +64,20 @@ const Login = () => {
           
           if (data) {
             toast.success(t.passwordUpdated);
+            // Refresh session after password update
+            await refreshSession();
           }
         } catch (error) {
           console.error('Error resetting password:', error);
           toast.error(t.resetError);
+        } finally {
+          setIsProcessingReset(false);
         }
       }
     };
     
     handlePasswordReset();
-  }, [searchParams, t]);
+  }, [searchParams, t, isProcessingReset, refreshSession]);
 
   useEffect(() => {
     if (isAuthenticated) {
