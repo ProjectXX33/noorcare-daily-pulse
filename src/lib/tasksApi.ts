@@ -8,8 +8,16 @@ export async function fetchAllTasks(): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select(`
-        *,
-        users:assigned_to(name)
+        id,
+        title,
+        description,
+        assigned_to,
+        status,
+        progress_percentage,
+        created_at,
+        updated_at,
+        created_by,
+        users(name)
       `)
       .order('created_at', { ascending: false });
     
@@ -39,8 +47,16 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select(`
-        *,
-        users:assigned_to(name)
+        id,
+        title,
+        description,
+        assigned_to,
+        status,
+        progress_percentage,
+        created_at,
+        updated_at,
+        created_by,
+        users(name)
       `)
       .eq('assigned_to', employeeId)
       .order('created_at', { ascending: false });
@@ -86,8 +102,16 @@ export async function createTask(task: {
         created_by: task.createdBy
       })
       .select(`
-        *,
-        users:assigned_to(name)
+        id,
+        title,
+        description,
+        assigned_to,
+        status,
+        progress_percentage,
+        created_at,
+        updated_at,
+        created_by,
+        users(name)
       `)
       .single();
     
@@ -137,8 +161,16 @@ export async function updateTaskProgress(
     const { data: taskData, error: taskError } = await supabase
       .from('tasks')
       .select(`
-        *,
-        users:assigned_to(name)
+        id,
+        title,
+        description,
+        assigned_to,
+        status,
+        progress_percentage,
+        created_at,
+        updated_at,
+        created_by,
+        users(name)
       `)
       .eq('id', taskId)
       .single();
@@ -170,8 +202,16 @@ export async function updateTaskProgress(
       })
       .eq('id', taskId)
       .select(`
-        *,
-        users:assigned_to(name)
+        id,
+        title,
+        description,
+        assigned_to,
+        status,
+        progress_percentage,
+        created_at,
+        updated_at,
+        created_by,
+        users(name)
       `)
       .single();
       
