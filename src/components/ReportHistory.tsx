@@ -41,7 +41,7 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
         checkInTime: format(new Date(checkInRecord.timestamp), 'h:mm a'),
         checkOutTime: checkInRecord.checkOutTime 
           ? format(new Date(checkInRecord.checkOutTime), 'h:mm a') 
-          : 'Not checked out',
+          : 'Not recorded',
         totalHours: checkInRecord.checkOutTime 
           ? ((new Date(checkInRecord.checkOutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
           : 'Not recorded'

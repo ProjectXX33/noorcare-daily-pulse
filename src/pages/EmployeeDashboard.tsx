@@ -33,7 +33,8 @@ const EmployeeDashboard = () => {
       loading: "Loading your dashboard...",
       recentCheckins: "Your Recent Check-ins",
       recentReports: "Your Recent Reports",
-      tasks: "Tasks"
+      tasks: "Tasks",
+      viewTasks: "View Tasks"
     },
     ar: {
       welcome: "مرحبا",
@@ -44,7 +45,8 @@ const EmployeeDashboard = () => {
       loading: "جاري تحميل لوحة التحكم الخاصة بك...",
       recentCheckins: "تسجيلات الدخول الأخيرة",
       recentReports: "التقارير الأخيرة",
-      tasks: "المهام"
+      tasks: "المهام",
+      viewTasks: "عرض المهام"
     }
   };
 
@@ -111,9 +113,6 @@ const EmployeeDashboard = () => {
             <TabsTrigger value="history">
               History
             </TabsTrigger>
-            <TabsTrigger value="tasks">
-              {t.tasks}
-            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="history">
@@ -126,16 +125,11 @@ const EmployeeDashboard = () => {
                 reports={userReports.slice(0, 3)} 
                 title={t.recentReports} 
               />
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="tasks">
-            <div className="grid gap-6">
               <Button 
-                className="w-fit bg-primary hover:bg-primary/90" 
+                className="w-fit bg-primary hover:bg-primary/90 mt-4" 
                 onClick={() => navigate('/tasks')}
               >
-                {t.tasks}
+                {t.viewTasks}
               </Button>
             </div>
           </TabsContent>

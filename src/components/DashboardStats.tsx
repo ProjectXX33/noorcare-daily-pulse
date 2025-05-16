@@ -36,7 +36,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
 
   const todayReportsText = todayReports.length > 0 
     ? todayReports.length.toString() 
-    : isAdmin ? 'None submitted today' : 'Not submitted today';
+    : isAdmin ? '0' : 'Not submitted today';
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
@@ -45,7 +45,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           <CardTitle className="text-sm font-medium">Today's Check-ins</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{todayCheckIns.length || 'Not recorded'}</div>
+          <div className="text-2xl font-bold">{todayCheckIns.length || '0'}</div>
           <p className="text-xs text-muted-foreground">
             {isAdmin ? 'Total employee check-ins today' : 'You have checked in today'}
           </p>
@@ -67,7 +67,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{workReports.length || 'None'}</div>
+          <div className="text-2xl font-bold">{workReports.length || '0'}</div>
           <p className="text-xs text-muted-foreground">
             {isAdmin ? 'All reports in the system' : 'Your total submitted reports'}
           </p>
