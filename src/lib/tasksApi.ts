@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Task } from "@/types";
 
@@ -20,7 +21,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
       description: item.description,
       assignedTo: item.assigned_to,
       assignedToName: item.users ? item.users.name : 'Unknown',
-      status: item.status,
+      status: item.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: item.progress_percentage,
       createdAt: new Date(item.created_at),
       updatedAt: new Date(item.updated_at),
@@ -52,7 +53,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
       description: item.description,
       assignedTo: item.assigned_to,
       assignedToName: item.users ? item.users.name : 'Unknown',
-      status: item.status,
+      status: item.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: item.progress_percentage,
       createdAt: new Date(item.created_at),
       updatedAt: new Date(item.updated_at),
@@ -113,7 +114,7 @@ export async function createTask(task: {
       description: data.description,
       assignedTo: data.assigned_to,
       assignedToName: data.users ? data.users.name : 'Unknown',
-      status: data.status,
+      status: data.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
@@ -125,7 +126,7 @@ export async function createTask(task: {
   }
 }
 
-// This function exists in the file you provided, so I'm keeping it as is
+// Update task progress
 export async function updateTaskProgress(
   taskId: string,
   userId: string,
@@ -150,7 +151,7 @@ export async function updateTaskProgress(
     }
     
     // Determine the status based on the progress percentage
-    let status: 'On Hold' | 'In Progress' | 'Complete' = taskData.status;
+    let status: 'On Hold' | 'In Progress' | 'Complete' = taskData.status as 'On Hold' | 'In Progress' | 'Complete';
     if (progressPercentage === 0) {
       status = 'On Hold';
     } else if (progressPercentage === 100) {
@@ -182,7 +183,7 @@ export async function updateTaskProgress(
         await sendNotification({
           userId: taskData.created_by,
           title: 'Task Status Updated',
-          message: `Task "${taskData.title}" status has been updated to ${status} by ${data.users?.name || 'Assigned user'}`,
+          message: `Task "${taskData.title}" status has been updated to ${status} by ${data.users ? data.users.name : 'Assigned user'}`,
           adminId: userId, // Using assignee's ID as admin ID here
           relatedTo: 'task',
           relatedId: taskId
@@ -199,7 +200,7 @@ export async function updateTaskProgress(
       description: data.description,
       assignedTo: data.assigned_to,
       assignedToName: data.users ? data.users.name : 'Unknown',
-      status: data.status,
+      status: data.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at),
