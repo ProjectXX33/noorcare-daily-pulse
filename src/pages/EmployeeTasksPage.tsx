@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from "sonner";
-import { fetchEmployeeTasks, updateTaskProgress } from '@/lib/tasksApi';
+import { fetchEmployeeTasks, updateTaskProgress, subscribeToEmployeeTasks } from '@/lib/tasksApi';
 import { Task } from '@/types';
 import { 
   Dialog, 
@@ -97,6 +96,18 @@ const EmployeeTasksPage = () => {
   useEffect(() => {
     if (user) {
       loadTasks();
+      
+      // Subscribe to real-time updates for this employee's tasks
+      const unsubscribe = subscribeToEmployeeTasks(user.id, (updatedTasks) => {
+        console.log('Tasks updated from subscription:', updatedTasks);
+        setTasks(updatedTasks);
+        setIsLoading(false);
+      });
+      
+      // Cleanup subscription on unmount
+      return () => {
+        unsubscribe();
+      };
     }
   }, [user]);
 

@@ -13,6 +13,7 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const [language, setLanguage] = useState('en');
   const [isProcessingReset, setIsProcessingReset] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Load language preference on component mount
   useEffect(() => {
@@ -83,11 +84,44 @@ const Login = () => {
     handlePasswordReset();
   }, [searchParams, t, isProcessingReset, refreshSession]);
 
+  // Check authentication status and redirect if needed
   useEffect(() => {
+    const checkAuth = async () => {
+      // Add a timeout to ensure this doesn't run indefinitely
+      setTimeout(() => setIsLoading(false), 5000);
+      
+      try {
+        // Check if the session is still valid
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session) {
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        console.error("Authentication check error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
     if (isAuthenticated) {
       navigate('/dashboard');
+    } else {
+      checkAuth();
     }
   }, [isAuthenticated, navigate]);
+
+  // Render a loading state while checking authentication
+  if (isLoading && !isProcessingReset) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <p className="mt-4 text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>

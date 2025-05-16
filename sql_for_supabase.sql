@@ -120,5 +120,41 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Enable realtime for tables
-ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+-- First ensure that realtime is enabled for the project
+BEGIN;
+  -- Enable the realtime publication if it doesn't exist
+  -- This is only needed once per project
+  CREATE PUBLICATION IF NOT EXISTS supabase_realtime;
+  
+  -- Add tables to the realtime publication
+  ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
+  ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+  ALTER PUBLICATION supabase_realtime ADD TABLE check_ins;
+  ALTER PUBLICATION supabase_realtime ADD TABLE users;
+  ALTER PUBLICATION supabase_realtime ADD TABLE work_reports;
+COMMIT;
+
+-- Enable better error messages on any foreign key conflicts
+ALTER TABLE tasks
+  DROP CONSTRAINT IF EXISTS tasks_assigned_to_fkey,
+  ADD CONSTRAINT tasks_assigned_to_fkey 
+  FOREIGN KEY (assigned_to) 
+  REFERENCES users(id)
+  ON DELETE RESTRICT
+  ON UPDATE CASCADE;
+
+ALTER TABLE tasks
+  DROP CONSTRAINT IF EXISTS tasks_created_by_fkey,
+  ADD CONSTRAINT tasks_created_by_fkey 
+  FOREIGN KEY (created_by) 
+  REFERENCES users(id)
+  ON DELETE RESTRICT
+  ON UPDATE CASCADE;
+
+ALTER TABLE notifications
+  DROP CONSTRAINT IF EXISTS notifications_user_id_fkey,
+  ADD CONSTRAINT notifications_user_id_fkey 
+  FOREIGN KEY (user_id) 
+  REFERENCES users(id)
+  ON DELETE CASCADE
+  ON UPDATE CASCADE;
