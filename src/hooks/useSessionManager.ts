@@ -38,15 +38,19 @@ export const useSessionManager = () => {
       
       console.log('Active session found, user ID:', sessionData.session.user.id);
       
+      // Don't re-fetch profile if we already have it and user ID matches
+      if (user && user.id === sessionData.session.user.id) {
+        setIsAuthenticated(true);
+        setIsLoading(false);
+        return;
+      }
+      
       const appUser = await fetchUserProfile(sessionData.session.user.id);
       
       if (appUser) {
         console.log('User profile set from session:', appUser);
         setUser(appUser);
         setIsAuthenticated(true);
-        
-        // Don't auto-redirect here to avoid refresh loops
-        // Let the page handle redirections naturally
       } else {
         console.warn('Session exists but no user profile found');
         // If we have a valid auth session but no user profile, sign out
@@ -106,13 +110,7 @@ export const useSessionManager = () => {
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
       
-      // Redirect based on role
-      if (appUser.role === 'admin') {
-        navigate('/dashboard');
-      } else {
-        navigate('/employee-dashboard');
-      }
-      
+      // Redirect based on role - let the auth state change handle this
       return true;
     } catch (error) {
       console.error('Unexpected login error:', error);
@@ -127,6 +125,7 @@ export const useSessionManager = () => {
   const logout = async () => {
     try {
       console.log('Logging out...');
+      setIsLoading(true);
       await supabase.auth.signOut();
       setUser(null);
       setIsAuthenticated(false);
@@ -135,6 +134,8 @@ export const useSessionManager = () => {
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('An error occurred during logout');
+    } finally {
+      setIsLoading(false);
     }
   };
 

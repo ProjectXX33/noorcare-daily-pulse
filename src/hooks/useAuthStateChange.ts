@@ -31,24 +31,22 @@ export const useAuthStateChange = ({
       console.log('Auth loading timed out');
     }, 5000);
     
-    // Initial session check
-    refreshSession().then(() => clearTimeout(timeoutId));
-    
-    // Set up periodic token refresh to prevent session expiration
-    // Increase interval to reduce excessive refreshes
-    const refreshInterval = setInterval(() => {
-      // Only refresh if we're authenticated
-      if (isAuthenticated) {
-        console.log('Performing scheduled token refresh');
-        supabase.auth.refreshSession().catch(err => {
-          console.error('Scheduled token refresh failed:', err);
-        });
+    // Initial session check - avoid redundant calls
+    const initialCheck = async () => {
+      try {
+        await refreshSession();
+      } catch (error) {
+        console.error('Initial session check failed:', error);
+      } finally {
+        clearTimeout(timeoutId);
       }
-    }, 10 * 60 * 1000); // Refresh every 10 minutes instead of 5
+    };
+    
+    initialCheck();
     
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
+      console.log('Auth state changed:', event, session ? `User ID: ${session.user.id}` : 'No session');
       
       if (event === 'SIGNED_IN' && session) {
         try {
@@ -59,14 +57,11 @@ export const useAuthStateChange = ({
             setUser(appUser);
             setIsAuthenticated(true);
             
-            // Redirect to the appropriate dashboard based on role
-            // Only redirect if we're not already on the dashboard
+            // Only navigate if we're not already on the target page
             const currentPath = window.location.pathname;
             const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
             
-            if (currentPath !== targetPath && currentPath !== '/') {
-              navigate(targetPath);
-            } else if (currentPath === '/') {
+            if (currentPath === '/login' || currentPath === '/') {
               navigate(targetPath);
             }
           } else {
@@ -87,13 +82,15 @@ export const useAuthStateChange = ({
         navigate('/login');
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed successfully');
+        // Don't call refreshSession() here as it can cause an infinite loop
       }
+      
+      setIsLoading(false);
     });
     
     return () => {
       clearTimeout(timeoutId);
-      clearInterval(refreshInterval);
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, isAuthenticated, setUser, setIsAuthenticated, setIsLoading, refreshSession]);
+  }, [navigate, setUser, setIsAuthenticated, setIsLoading, refreshSession]);
 };
