@@ -8,8 +8,17 @@ const Index = () => {
   const navigate = useNavigate();
   const [isRedirecting, setIsRedirecting] = useState(true);
   const [redirectAttempted, setRedirectAttempted] = useState(false);
+  const [initialRender, setInitialRender] = useState(true);
+
+  // Mark first render complete
+  useEffect(() => {
+    setInitialRender(false);
+  }, []);
 
   useEffect(() => {
+    // Skip the first render to avoid race conditions
+    if (initialRender) return;
+    
     let timeoutId: number;
     
     const handleNavigation = () => {
@@ -40,7 +49,7 @@ const Index = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isAuthenticated, isLoading, navigate, user, redirectAttempted]);
+  }, [isAuthenticated, isLoading, navigate, user, redirectAttempted, initialRender]);
 
   // Only show loading state for a reasonable time
   if (isRedirecting) {

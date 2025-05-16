@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ const EmployeeTasksPage = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
+  const [updating, setUpdating] = useState(false);
   const [language, setLanguage] = useState('en');
 
   // Translation object for multilingual support
@@ -139,7 +141,7 @@ const EmployeeTasksPage = () => {
   const handleUpdateProgress = async () => {
     if (!user || !selectedTask) return;
     
-    setIsLoading(true);
+    setUpdating(true);
     try {
       const updatedTask = await updateTaskProgress(
         selectedTask.id,
@@ -158,7 +160,7 @@ const EmployeeTasksPage = () => {
       console.error("Error updating task progress:", error);
       toast.error("Failed to update progress");
     } finally {
-      setIsLoading(false);
+      setUpdating(false);
     }
   };
 
@@ -296,11 +298,11 @@ const EmployeeTasksPage = () => {
             </div>
           </div>
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button variant="outline" onClick={() => setIsProgressDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsProgressDialogOpen(false)} disabled={updating}>
               {t.cancel}
             </Button>
-            <Button onClick={handleUpdateProgress} disabled={isLoading}>
-              {isLoading ? (
+            <Button onClick={handleUpdateProgress} disabled={updating}>
+              {updating ? (
                 <div className="flex items-center">
                   <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                   {t.updatingProgress}
@@ -356,7 +358,7 @@ const EmployeeTasksPage = () => {
                 <Button onClick={() => {
                   setIsProgressDialogOpen(true);
                   setProgressValue(selectedTask.progressPercentage);
-                }}>
+                }} disabled={updating}>
                   {t.updateProgress}
                 </Button>
               )}

@@ -1,5 +1,5 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { Task } from "@/types";
 
 // Fetch all tasks
@@ -17,7 +17,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users!assigned_to(name)
+        users:assigned_to(name)
       `)
       .order('created_at', { ascending: false });
     
@@ -56,7 +56,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users!assigned_to(name)
+        users:assigned_to(name)
       `)
       .eq('assigned_to', employeeId)
       .order('created_at', { ascending: false });
@@ -111,7 +111,7 @@ export async function createTask(task: {
         created_at,
         updated_at,
         created_by,
-        users!assigned_to(name)
+        users:assigned_to(name)
       `)
       .single();
     
@@ -170,7 +170,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users!assigned_to(name)
+        users:assigned_to(name)
       `)
       .eq('id', taskId)
       .single();
@@ -211,7 +211,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users!assigned_to(name)
+        users:assigned_to(name)
       `)
       .single();
       
@@ -223,7 +223,7 @@ export async function updateTaskProgress(
         await sendNotification({
           userId: taskData.created_by,
           title: 'Task Status Updated',
-          message: `Task "${taskData.title}" status has been updated to ${status} by ${data.users?.name || 'Assigned user'}`,
+          message: `Task "${taskData.title}" status has been updated to ${status} by ${taskData.users?.name || 'Assigned user'}`,
           adminId: userId, // Using assignee's ID as admin ID here
           relatedTo: 'task',
           relatedId: taskId

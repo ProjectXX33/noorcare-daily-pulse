@@ -126,9 +126,8 @@ export const useSessionManager = () => {
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
       
-      // Redirect based on role - use replace to avoid redirect loops
-      const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
-      navigate(targetPath, { replace: true });
+      // Don't navigate here - this navigation will be handled by the onAuthStateChange listener
+      // We want to avoid multiple navigation attempts
       
       setIsLoading(false);
       return true;

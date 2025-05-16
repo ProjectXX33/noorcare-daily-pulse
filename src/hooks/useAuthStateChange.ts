@@ -63,6 +63,7 @@ export const useAuthStateChange = ({
                 const currentPath = window.location.pathname;
                 if (currentPath === '/login' || currentPath === '/') {
                   navigationInProgress = true;
+                  console.log('Navigating from', currentPath, 'to dashboard');
                   const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
                   navigate(targetPath, { replace: true });
                   // Reset navigation flag after a short delay
@@ -92,15 +93,6 @@ export const useAuthStateChange = ({
           
           // Don't navigate here since we already navigate in the logout function
           // This prevents double navigation that can cause errors
-          const currentPath = window.location.pathname;
-          if (currentPath !== '/login' && !navigationInProgress) {
-            navigationInProgress = true;
-            navigate('/login', { replace: true });
-            // Reset navigation flag after a short delay
-            setTimeout(() => {
-              navigationInProgress = false;
-            }, 500);
-          }
         }
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed successfully');
@@ -130,6 +122,7 @@ export const useAuthStateChange = ({
             const currentPath = window.location.pathname;
             if ((currentPath === '/login' || currentPath === '/') && !navigationInProgress) {
               navigationInProgress = true;
+              console.log('Navigating from', currentPath, 'to dashboard on initial check');
               const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
               navigate(targetPath, { replace: true });
               // Reset navigation flag after a short delay
@@ -141,6 +134,10 @@ export const useAuthStateChange = ({
             console.warn('Session exists but no user profile found');
             setUser(null);
             setIsAuthenticated(false);
+            
+            // If we have a valid auth session but no profile, sign out
+            await supabase.auth.signOut();
+            toast.error('User profile not found');
           }
         } else {
           // No session, ensure user is logged out
@@ -152,6 +149,7 @@ export const useAuthStateChange = ({
           const currentPath = window.location.pathname;
           if (currentPath !== '/login' && currentPath !== '/' && !navigationInProgress) {
             navigationInProgress = true;
+            console.log('No session, redirecting to login page');
             navigate('/login', { replace: true });
             // Reset navigation flag after a short delay
             setTimeout(() => {

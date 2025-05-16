@@ -16,6 +16,12 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [redirectAttempted, setRedirectAttempted] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [initialRender, setInitialRender] = useState(true);
+  
+  // Mark first render to prevent multiple auth checks
+  useEffect(() => {
+    setInitialRender(false);
+  }, []);
   
   // Load language preference on component mount
   useEffect(() => {
@@ -88,6 +94,9 @@ const Login = () => {
 
   // Handle authentication status and redirect
   useEffect(() => {
+    // Skip the first render to prevent double session check
+    if (initialRender) return;
+    
     console.log('Login page - checking auth status. isAuthenticated:', isAuthenticated, 'redirectAttempted:', redirectAttempted, 'sessionChecked:', sessionChecked);
     
     // Clear the loading state after a short delay to prevent UI freeze
@@ -130,7 +139,7 @@ const Login = () => {
     }
     
     return () => clearTimeout(loadingTimeout);
-  }, [isAuthenticated, user, navigate, refreshSession, redirectAttempted, sessionChecked]);
+  }, [isAuthenticated, user, navigate, refreshSession, redirectAttempted, sessionChecked, initialRender]);
 
   // Render a loading state while checking authentication
   if ((isLoading || !sessionChecked) && !isProcessingReset) {
