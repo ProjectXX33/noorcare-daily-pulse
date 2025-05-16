@@ -13,6 +13,7 @@ import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
+import EmployeeTasksPage from "./pages/EmployeeTasksPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -134,6 +135,14 @@ const AppWithAuth = () => {
                 <AdminRoute>
                   <AdminTasksPage />
                 </AdminRoute>
+              } 
+            />
+            <Route 
+              path="/employee-tasks" 
+              element={
+                <EmployeeRoute>
+                  <EmployeeTasksPage />
+                </EmployeeRoute>
               } 
             />
             <Route path="*" element={<NotFound />} />

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { Task, Notification } from '@/types';
 
@@ -335,7 +336,7 @@ export async function fetchUserNotifications(userId: string): Promise<Notificati
   }
 }
 
-// Fixed function for downloading file attachments
+// Function for downloading file attachments
 export async function downloadFileAttachment(filePath: string): Promise<{
   url: string;
   fileName: string;
@@ -377,4 +378,73 @@ export async function downloadFileAttachment(filePath: string): Promise<{
     console.error('Error downloading attachment:', error);
     throw error;
   }
+}
+
+// Add a subscription for real-time updates to the tasks table
+export function subscribeToTaskChanges(callback: (tasks: Task[]) => void): () => void {
+  // Initialize with current data
+  fetchAllTasks().then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel('public:tasks')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'tasks' }, 
+      () => {
+        // When there's any change, fetch the updated list
+        fetchAllTasks().then(callback).catch(console.error);
+      }
+    )
+    .subscribe();
+  
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
+}
+
+// Add a subscription for real-time updates to employee-specific tasks
+export function subscribeToEmployeeTasks(userId: string, callback: (tasks: Task[]) => void): () => void {
+  // Initialize with current data
+  fetchEmployeeTasks(userId).then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel(`public:tasks:user_${userId}`)
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` }, 
+      () => {
+        // When there's any change to this user's tasks, fetch the updated list
+        fetchEmployeeTasks(userId).then(callback).catch(console.error);
+      }
+    )
+    .subscribe();
+  
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
+}
+
+// Add a subscription for real-time updates to notifications
+export function subscribeToNotifications(userId: string, callback: (notifications: Notification[]) => void): () => void {
+  // Initialize with current data
+  fetchUserNotifications(userId).then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel(`public:notifications:user_${userId}`)
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, 
+      () => {
+        // When there's any change to this user's notifications, fetch the updated list
+        fetchUserNotifications(userId).then(callback).catch(console.error);
+      }
+    )
+    .subscribe();
+  
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
 }

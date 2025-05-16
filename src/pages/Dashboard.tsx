@@ -4,6 +4,7 @@ import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
 import CheckInHistory from '@/components/CheckInHistory';
 import ReportHistory from '@/components/ReportHistory';
+import TasksAdminPanel from '@/components/TasksAdminPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
@@ -111,11 +112,11 @@ const Dashboard = () => {
         <Tabs defaultValue="history" className="mt-6">
           <TabsList className="mb-4">
             <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="tasks">{t.tasks}</TabsTrigger>
             <TabsTrigger value="calendar">
               <Calendar className="h-4 w-4 mr-2" />
               {t.calendar}
             </TabsTrigger>
-            <TabsTrigger value="tasks">{t.tasks}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="history">
@@ -131,6 +132,36 @@ const Dashboard = () => {
             </div>
           </TabsContent>
           
+          <TabsContent value="tasks">
+            {user.role === 'admin' ? (
+              <TasksAdminPanel language={language} />
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-green-600">{t.upcomingTasks}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No upcoming tasks
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-red-600">{t.overdueTasks}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No overdue tasks
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+          
           <TabsContent value="calendar">
             <Card>
               <CardHeader>
@@ -142,32 +173,6 @@ const Dashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="tasks">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-green-600">{t.upcomingTasks}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No upcoming tasks
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-red-600">{t.overdueTasks}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No overdue tasks
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>

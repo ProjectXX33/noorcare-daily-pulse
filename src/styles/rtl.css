@@ -13,6 +13,11 @@
   margin-left: 0;
 }
 
+[dir="rtl"] .space-x-2 > * + * {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
 [dir="rtl"] .mr-2 {
   margin-right: 0;
   margin-left: 0.5rem;
@@ -103,4 +108,38 @@
 
 [dir="rtl"] .justify-start {
   justify-content: flex-end;
+}
+
+/* Fix checkbox alignment in RTL */
+[dir="rtl"] .items-center.space-x-2 {
+  margin-left: 0.5rem;
+}
+
+/* Fix spacing between elements in RTL mode */
+[dir="rtl"] .gap-2 > *, 
+[dir="rtl"] .gap-4 > * {
+  margin-left: 0;
+}
+
+/* Fix spacing in dialog content for RTL mode */
+[dir="rtl"] .DialogContent {
+  direction: rtl;
+}
+
+/* Fix checkbox and label alignment in RTL */
+[dir="rtl"] .flex.items-center.space-x-2 {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+[dir="rtl"] .flex.items-center.space-x-2 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
+  margin-left: 0;
+}
+
+/* Fix textarea direction in RTL */
+[dir="rtl"] textarea {
+  direction: rtl;
 }
