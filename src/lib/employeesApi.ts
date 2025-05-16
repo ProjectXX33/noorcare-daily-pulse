@@ -8,7 +8,10 @@ export async function fetchEmployees(): Promise<User[]> {
       .from('users')
       .select('*');
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching employees:', error);
+      throw error;
+    }
     
     return data.map((user: any) => ({
       id: user.id,
@@ -36,14 +39,15 @@ export async function createEmployee(employee: {
   role: 'admin' | 'employee';
 }): Promise<User> {
   try {
+    console.log('Creating employee with data:', employee);
+    
     // First create the auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: employee.email,
       password: employee.password,
-      options: {
-        data: {
-          role: employee.role, // Store role in auth metadata
-        }
+      email_confirm: true,
+      user_metadata: {
+        role: employee.role,
       }
     });
 
@@ -52,8 +56,12 @@ export async function createEmployee(employee: {
       throw authError;
     }
     
-    if (!authData.user) throw new Error('Failed to create auth user');
+    if (!authData.user) {
+      throw new Error('Failed to create auth user');
+    }
 
+    console.log('Auth user created successfully:', authData.user.id);
+    
     // Then insert the user profile data
     const { data, error } = await supabase
       .from('users')
@@ -79,6 +87,8 @@ export async function createEmployee(employee: {
       }
       throw error;
     }
+    
+    console.log('User profile created successfully:', data);
     
     return {
       id: data.id,

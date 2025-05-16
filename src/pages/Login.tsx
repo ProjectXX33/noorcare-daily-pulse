@@ -5,6 +5,7 @@ import LoginForm from '@/components/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 const Login = () => {
   const { isAuthenticated } = useAuth();
@@ -79,7 +80,9 @@ const Login = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="w-full max-w-md">
-        <LoginForm />
+        <LanguageProvider>
+          <LoginForm />
+        </LanguageProvider>
       </div>
     </div>
   );
