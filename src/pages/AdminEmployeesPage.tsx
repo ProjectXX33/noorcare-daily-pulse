@@ -1,9 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { mockUsers } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Dialog, 
@@ -30,94 +29,216 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
+import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 
 const AdminEmployeesPage = () => {
   const { user } = useAuth();
-  const [employees, setEmployees] = useState(mockUsers.filter(u => u.role !== 'admin'));
+  const [employees, setEmployees] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
+  const [language, setLanguage] = useState('en');
   const [newEmployee, setNewEmployee] = useState({
     username: '',
     name: '',
     email: '',
     department: 'Engineering' as Department,
     position: 'Designer' as Position,
-    password: ''
+    password: '',
+    role: 'employee' as 'admin' | 'employee'
   });
   const [newPassword, setNewPassword] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showEditPassword, setShowEditPassword] = useState(false);
 
+  // Translation object for multilingual support
+  const translations = {
+    en: {
+      employees: "Employees",
+      addEmployee: "Add Employee",
+      employeeDirectory: "Employee Directory",
+      manageEmployeeAccounts: "Manage employee accounts and access",
+      name: "Name",
+      username: "Username",
+      department: "Department",
+      position: "Position",
+      lastCheckIn: "Last Check-in",
+      actions: "Actions",
+      edit: "Edit",
+      resetPassword: "Reset Password",
+      never: "Never checked in",
+      addNewEmployee: "Add New Employee",
+      createAccount: "Create a new employee account",
+      editEmployee: "Edit Employee",
+      updateInfo: "Update employee information",
+      password: "Password",
+      cancel: "Cancel",
+      save: "Save Changes",
+      setNewPassword: "Set New Password",
+      employeeAdded: "Employee added successfully!",
+      employeeUpdated: "Employee updated successfully!",
+      passwordReset: "Password has been reset",
+      fillAllFields: "Please fill all required fields",
+      email: "Email",
+      role: "Role",
+      admin: "Admin",
+      employee: "Employee"
+    },
+    ar: {
+      employees: "الموظفين",
+      addEmployee: "إضافة موظف",
+      employeeDirectory: "دليل الموظفين",
+      manageEmployeeAccounts: "إدارة حسابات الموظفين والوصول",
+      name: "الاسم",
+      username: "اسم المستخدم",
+      department: "القسم",
+      position: "المنصب",
+      lastCheckIn: "آخر تسجيل دخول",
+      actions: "الإجراءات",
+      edit: "تعديل",
+      resetPassword: "إعادة تعيين كلمة المرور",
+      never: "لم يسجل الدخول أبدًا",
+      addNewEmployee: "إضافة موظف جديد",
+      createAccount: "إنشاء حساب موظف جديد",
+      editEmployee: "تعديل الموظف",
+      updateInfo: "تحديث معلومات الموظف",
+      password: "كلمة المرور",
+      cancel: "إلغاء",
+      save: "حفظ التغييرات",
+      setNewPassword: "تعيين كلمة مرور جديدة",
+      employeeAdded: "تمت إضافة الموظف بنجاح!",
+      employeeUpdated: "تم تحديث الموظف بنجاح!",
+      passwordReset: "تم إعادة تعيين كلمة المرور",
+      fillAllFields: "يرجى ملء جميع الحقول المطلوبة",
+      email: "البريد الإلكتروني",
+      role: "الدور",
+      admin: "مدير",
+      employee: "موظف"
+    }
+  };
+
+  useEffect(() => {
+    const storedLang = localStorage.getItem('preferredLanguage');
+    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
+      setLanguage(storedLang);
+    }
+  }, []);
+
+  const t = translations[language as keyof typeof translations];
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  const loadEmployees = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchEmployees();
+      setEmployees(data.filter(u => u.id !== user?.id)); // Exclude current user
+    } catch (error) {
+      console.error("Error loading employees:", error);
+      toast.error("Failed to load employees");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!user || user.role !== 'admin') {
     return null;
   }
 
-  const handleAddEmployee = () => {
+  const handleAddEmployee = async () => {
     if (!newEmployee.username || !newEmployee.name || !newEmployee.email || !newEmployee.password) {
-      toast.error("Please fill all required fields");
+      toast.error(t.fillAllFields);
       return;
     }
 
-    const newEmployeeData: User = {
-      id: Date.now().toString(),
-      username: newEmployee.username,
-      name: newEmployee.name,
-      email: newEmployee.email,
-      department: newEmployee.department,
-      position: newEmployee.position,
-      role: 'employee'
-    };
-
-    setEmployees(prev => [...prev, newEmployeeData]);
-    setIsAddEmployeeOpen(false);
-    toast.success("Employee added successfully!");
-    
-    // Reset form
-    setNewEmployee({
-      username: '',
-      name: '',
-      email: '',
-      department: 'Engineering',
-      position: 'Designer',
-      password: ''
-    });
+    setIsLoading(true);
+    try {
+      await createEmployee({
+        username: newEmployee.username,
+        name: newEmployee.name,
+        email: newEmployee.email,
+        password: newEmployee.password,
+        department: newEmployee.department,
+        position: newEmployee.position,
+        role: newEmployee.role
+      });
+      
+      // Refresh employee list
+      await loadEmployees();
+      
+      setIsAddEmployeeOpen(false);
+      toast.success(t.employeeAdded);
+      
+      // Reset form
+      setNewEmployee({
+        username: '',
+        name: '',
+        email: '',
+        department: 'Engineering',
+        position: 'Designer',
+        password: '',
+        role: 'employee'
+      });
+    } catch (error) {
+      console.error("Error creating employee:", error);
+      toast.error("Failed to create employee");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditEmployee = () => {
+  const handleEditEmployee = async () => {
     if (!selectedEmployee || !selectedEmployee.name || !selectedEmployee.email) {
-      toast.error("Please fill all required fields");
+      toast.error(t.fillAllFields);
       return;
     }
 
-    const updatedEmployee = {...selectedEmployee};
-    
-    if (showEditPassword && editPassword) {
-      // In a real app, this would involve a secure password update
-      toast.success(`Password updated for ${selectedEmployee.name}`);
+    setIsLoading(true);
+    try {
+      await updateEmployee(selectedEmployee.id, selectedEmployee);
+      
+      if (showEditPassword && editPassword) {
+        await resetEmployeePassword(selectedEmployee.email);
+        toast.success(`${t.passwordReset}: ${selectedEmployee.name}`);
+      }
+      
+      await loadEmployees();
+      
+      setIsEditEmployeeOpen(false);
+      setShowEditPassword(false);
+      setEditPassword('');
+      toast.success(t.employeeUpdated);
+    } catch (error) {
+      console.error("Error updating employee:", error);
+      toast.error("Failed to update employee");
+    } finally {
+      setIsLoading(false);
     }
-
-    setEmployees(prev => prev.map(emp => 
-      emp.id === updatedEmployee.id ? updatedEmployee : emp
-    ));
-    
-    setIsEditEmployeeOpen(false);
-    setShowEditPassword(false);
-    setEditPassword('');
-    toast.success("Employee updated successfully!");
   };
 
-  const handleResetPassword = () => {
+  const handleResetPassword = async () => {
     if (!selectedEmployee || !newPassword) {
-      toast.error("Please enter a new password");
+      toast.error(t.fillAllFields);
       return;
     }
 
-    // In a real app, this would call an API to update the password
-    setIsResetPasswordOpen(false);
-    toast.success(`Password for ${selectedEmployee.name} has been reset`);
-    setNewPassword('');
+    setIsLoading(true);
+    try {
+      await resetEmployeePassword(selectedEmployee.email);
+      setIsResetPasswordOpen(false);
+      toast.success(`${t.passwordReset}: ${selectedEmployee.name}`);
+      setNewPassword('');
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const openEditDialog = (employee: User) => {
@@ -144,68 +265,82 @@ const AdminEmployeesPage = () => {
 
   return (
     <MainLayout>
-      <div className="flex flex-col">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Employees</h1>
+      <div className="flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
+          <h1 className="text-2xl font-bold">{t.employees}</h1>
           <Button 
             className="bg-primary hover:bg-primary/90"
             onClick={() => setIsAddEmployeeOpen(true)}
           >
-            Add Employee
+            {t.addEmployee}
           </Button>
         </div>
         
         <Card>
           <CardHeader>
-            <CardTitle>Employee Directory</CardTitle>
-            <CardDescription>Manage employee accounts and access</CardDescription>
+            <CardTitle>{t.employeeDirectory}</CardTitle>
+            <CardDescription>{t.manageEmployeeAccounts}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">Name</th>
-                    <th className="text-left py-3 px-4">Username</th>
-                    <th className="text-left py-3 px-4">Department</th>
-                    <th className="text-left py-3 px-4">Position</th>
-                    <th className="text-left py-3 px-4">Last Check-in</th>
-                    <th className="text-right py-3 px-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.map(employee => (
-                    <tr key={employee.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{employee.name}</td>
-                      <td className="py-3 px-4">{employee.username}</td>
-                      <td className="py-3 px-4">{employee.department}</td>
-                      <td className="py-3 px-4">{employee.position}</td>
-                      <td className="py-3 px-4">
-                        {employee.lastCheckin 
-                          ? new Date(employee.lastCheckin).toLocaleString() 
-                          : 'Never checked in'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              Actions
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => openEditDialog(employee)}>
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
-                              Reset Password
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t.name}</TableHead>
+                    <TableHead>{t.username}</TableHead>
+                    <TableHead>{t.department}</TableHead>
+                    <TableHead>{t.position}</TableHead>
+                    <TableHead>{t.lastCheckIn}</TableHead>
+                    <TableHead className="text-right">{t.actions}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        <div className="flex justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : employees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
+                    </TableRow>
+                  ) : (
+                    employees.map(employee => (
+                      <TableRow key={employee.id}>
+                        <TableCell>{employee.name}</TableCell>
+                        <TableCell>{employee.username}</TableCell>
+                        <TableCell>{employee.department}</TableCell>
+                        <TableCell>{employee.position}</TableCell>
+                        <TableCell>
+                          {employee.lastCheckin 
+                            ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
+                            : t.never}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                {t.actions}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => openEditDialog(employee)}>
+                                {t.edit}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
+                                {t.resetPassword}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
@@ -213,17 +348,17 @@ const AdminEmployeesPage = () => {
 
       {/* Add Employee Dialog */}
       <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
-            <DialogTitle>Add New Employee</DialogTitle>
+            <DialogTitle>{t.addNewEmployee}</DialogTitle>
             <DialogDescription>
-              Create a new employee account
+              {t.createAccount}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
-                Name
+                {t.name}
               </Label>
               <Input
                 id="name"
@@ -235,7 +370,7 @@ const AdminEmployeesPage = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="username" className="text-right">
-                Username
+                {t.username}
               </Label>
               <Input
                 id="username"
@@ -247,7 +382,7 @@ const AdminEmployeesPage = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
-                Email
+                {t.email}
               </Label>
               <Input
                 id="email"
@@ -260,7 +395,7 @@ const AdminEmployeesPage = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="password" className="text-right">
-                Password
+                {t.password}
               </Label>
               <Input
                 id="password"
@@ -273,14 +408,14 @@ const AdminEmployeesPage = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="department" className="text-right">
-                Department
+                {t.department}
               </Label>
               <Select
                 value={newEmployee.department}
                 onValueChange={(value) => setNewEmployee(prev => ({...prev, department: value as Department}))}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder={t.department} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Engineering">Engineering</SelectItem>
@@ -292,14 +427,14 @@ const AdminEmployeesPage = () => {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="position" className="text-right">
-                Position
+                {t.position}
               </Label>
               <Select
                 value={newEmployee.position}
                 onValueChange={(value) => setNewEmployee(prev => ({...prev, position: value as Position}))}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select position" />
+                  <SelectValue placeholder={t.position} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Customer Service">Customer Service</SelectItem>
@@ -310,28 +445,52 @@ const AdminEmployeesPage = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="role" className="text-right">
+                {t.role}
+              </Label>
+              <Select
+                value={newEmployee.role}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee'}))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t.role} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">{t.admin}</SelectItem>
+                  <SelectItem value="employee">{t.employee}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddEmployee}>Add Employee</Button>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleAddEmployee} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.addEmployee}
+                </div>
+              ) : t.addEmployee}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Employee Dialog */}
       <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
-            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogTitle>{t.editEmployee}</DialogTitle>
             <DialogDescription>
-              Update employee information
+              {t.updateInfo}
             </DialogDescription>
           </DialogHeader>
           {selectedEmployee && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-name" className="text-right">
-                  Name
+                  {t.name}
                 </Label>
                 <Input
                   id="edit-name"
@@ -343,7 +502,7 @@ const AdminEmployeesPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-email" className="text-right">
-                  Email
+                  {t.email}
                 </Label>
                 <Input
                   id="edit-email"
@@ -356,14 +515,14 @@ const AdminEmployeesPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-department" className="text-right">
-                  Department
+                  {t.department}
                 </Label>
                 <Select
                   value={selectedEmployee.department}
                   onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, department: value as Department} : null)}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder={t.department} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Engineering">Engineering</SelectItem>
@@ -375,14 +534,14 @@ const AdminEmployeesPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-position" className="text-right">
-                  Position
+                  {t.position}
                 </Label>
                 <Select
                   value={selectedEmployee.position}
                   onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, position: value as Position} : null)}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select position" />
+                    <SelectValue placeholder={t.position} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Customer Service">Customer Service</SelectItem>
@@ -395,18 +554,18 @@ const AdminEmployeesPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-role" className="text-right">
-                  Role
+                  {t.role}
                 </Label>
                 <Select
                   value={selectedEmployee.role}
                   onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee'} : null)}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select role" />
+                    <SelectValue placeholder={t.role} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="admin">{t.admin}</SelectItem>
+                    <SelectItem value="employee">{t.employee}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -419,13 +578,13 @@ const AdminEmployeesPage = () => {
                   onChange={() => setShowEditPassword(!showEditPassword)}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
                 />
-                <Label htmlFor="change-password">Set New Password</Label>
+                <Label htmlFor="change-password">{t.setNewPassword}</Label>
               </div>
               
               {showEditPassword && (
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-password" className="text-right">
-                    New Password
+                    {t.password}
                   </Label>
                   <Input
                     id="edit-password"
@@ -438,26 +597,33 @@ const AdminEmployeesPage = () => {
               )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditEmployee}>Save Changes</Button>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleEditEmployee} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.save}
+                </div>
+              ) : t.save}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Reset Password Dialog */}
       <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
+            <DialogTitle>{t.resetPassword}</DialogTitle>
             <DialogDescription>
-              {selectedEmployee ? `Reset password for ${selectedEmployee.name}` : 'Reset employee password'}
+              {selectedEmployee ? `${t.resetPassword}: ${selectedEmployee.name}` : t.resetPassword}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="new-password" className="text-right">
-                New Password
+                {t.password}
               </Label>
               <Input
                 id="new-password"
@@ -468,9 +634,16 @@ const AdminEmployeesPage = () => {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>Cancel</Button>
-            <Button onClick={handleResetPassword}>Reset Password</Button>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleResetPassword} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.resetPassword}
+                </div>
+              ) : t.resetPassword}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

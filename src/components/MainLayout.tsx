@@ -1,155 +1,188 @@
 
-import React from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, User } from 'lucide-react';
+import { Menu, User, Home, CalendarDays, CheckSquare, ClipboardList, Users, LogOut } from 'lucide-react';
+import NotificationsMenu from '@/components/NotificationsMenu';
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
+const MainLayout = ({ children }: MainLayoutProps) => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { user, logout } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [language, setLanguage] = useState('en');
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
+  // Translation object for multilingual support
+  const translations = {
+    en: {
+      dashboard: "Dashboard",
+      employeeDashboard: "My Dashboard",
+      checkIn: "Check In",
+      dailyReport: "Daily Report",
+      employees: "Employees",
+      reports: "Reports",
+      profile: "Profile",
+      signOut: "Sign Out",
+      welcome: "Welcome"
+    },
+    ar: {
+      dashboard: "لوحة التحكم",
+      employeeDashboard: "لوحة التحكم الخاصة بي",
+      checkIn: "تسجيل الدخول",
+      dailyReport: "التقرير اليومي",
+      employees: "الموظفين",
+      reports: "التقارير",
+      profile: "الملف الشخصي",
+      signOut: "تسجيل الخروج",
+      welcome: "مرحبا"
+    }
   };
 
-  if (!user) return null;
+  useEffect(() => {
+    const storedLang = localStorage.getItem('preferredLanguage');
+    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
+      setLanguage(storedLang);
+      document.documentElement.dir = storedLang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.lang = storedLang;
+    }
+  }, []);
+
+  const t = translations[language as keyof typeof translations];
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const navItems = [
+    ...(user?.role === 'admin' ? [
+      { name: t.dashboard, icon: Home, path: '/dashboard' },
+      { name: t.employees, icon: Users, path: '/employees' },
+      { name: t.reports, icon: ClipboardList, path: '/reports' },
+    ] : [
+      { name: t.employeeDashboard, icon: Home, path: '/employee-dashboard' },
+      { name: t.checkIn, icon: CheckSquare, path: '/check-in' },
+      { name: t.dailyReport, icon: CalendarDays, path: '/report' },
+    ])
+  ];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className="hidden md:flex flex-col w-64 bg-white border-r">
-        <div className="p-4 flex items-center gap-2">
-          <img 
-            src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png" 
-            alt="NoorCare Logo" 
-            className="h-8 w-8"
-          />
-          <h1 className="font-bold text-primary text-xl">NoorCare</h1>
-        </div>
-        <Separator />
-        <div className="flex-1 py-4 px-2 space-y-1">
-          <Button
-            variant={isActive('/dashboard') ? "default" : "ghost"}
-            className={`w-full justify-start ${isActive('/dashboard') ? 'bg-primary' : ''}`}
-            onClick={() => navigate('/dashboard')}
-            type="button"
-          >
-            Dashboard
-          </Button>
-          <Button
-            variant={isActive('/check-in') ? "default" : "ghost"}
-            className={`w-full justify-start ${isActive('/check-in') ? 'bg-primary' : ''}`}
-            onClick={() => navigate('/check-in')}
-            type="button"
-          >
-            Check-In
-          </Button>
-          <Button
-            variant={isActive('/report') ? "default" : "ghost"}
-            className={`w-full justify-start ${isActive('/report') ? 'bg-primary' : ''}`}
-            onClick={() => navigate('/report')}
-            type="button"
-          >
-            Daily Report
-          </Button>
-          {user.role === 'admin' && (
-            <>
-              <Button
-                variant={isActive('/employees') ? "default" : "ghost"}
-                className={`w-full justify-start ${isActive('/employees') ? 'bg-primary' : ''}`}
-                onClick={() => navigate('/employees')}
-                type="button"
-              >
-                Employees
-              </Button>
-              <Button
-                variant={isActive('/reports') ? "default" : "ghost"}
-                className={`w-full justify-start ${isActive('/reports') ? 'bg-primary' : ''}`}
-                onClick={() => navigate('/reports')}
-                type="button"
-              >
-                All Reports
-              </Button>
-            </>
-          )}
-        </div>
-        <div className="p-4 border-t">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <User size={16} className="text-primary" />
+    <div className="min-h-screen flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Header */}
+      <header className="bg-white border-b shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            {/* Logo */}
+            <div className="flex items-center">
+              <div className="flex-shrink-0 flex items-center">
+                <img
+                  src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png"
+                  alt="NoorCare Logo"
+                  className="h-8 w-8 mr-2"
+                />
+                <span className="text-lg font-bold text-primary">NoorCare</span>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-sm">{user.name}</p>
-              <p className="text-xs text-gray-500">{user.department} - {user.position}</p>
-            </div>
-          </div>
-          <Button 
-            variant="outline" 
-            className="w-full justify-start text-red-500" 
-            onClick={logout}
-            type="button"
-          >
-            <LogOut size={16} className="mr-2" /> Logout
-          </Button>
-        </div>
-      </div>
 
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b z-10">
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img 
-              src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png" 
-              alt="NoorCare Logo" 
-              className="h-8 w-8"
-            />
-            <h1 className="font-bold text-primary">NoorCare</h1>
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-4">
+              {navItems.map((item) => (
+                <Button
+                  key={item.name}
+                  variant="ghost"
+                  className="flex items-center space-x-1"
+                  onClick={() => navigate(item.path)}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.name}</span>
+                </Button>
+              ))}
+            </nav>
+
+            {/* User menu and mobile menu button */}
+            <div className="flex items-center">
+              {/* Notifications */}
+              <NotificationsMenu />
+
+              {/* User menu */}
+              <div className="ml-3 relative flex items-center">
+                <Button variant="ghost" className="flex items-center space-x-1" onClick={() => {}}>
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:block">{user?.name}</span>
+                </Button>
+
+                <Button variant="ghost" onClick={handleLogout} className="ml-2">
+                  <LogOut className="h-4 w-4" />
+                  <span className="sr-only">{t.signOut}</span>
+                </Button>
+              </div>
+
+              {/* Mobile menu button */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" className="md:hidden ml-2">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side={language === 'ar' ? 'right' : 'left'}>
+                  <div className="flex flex-col h-full">
+                    <div className="px-4 py-6">
+                      <div className="flex items-center">
+                        <img
+                          src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png"
+                          alt="NoorCare Logo"
+                          className="h-8 w-8 mr-2"
+                        />
+                        <span className="text-lg font-bold text-primary">NoorCare</span>
+                      </div>
+                      <div className="mt-6">
+                        <p className="text-sm text-muted-foreground">
+                          {t.welcome}, {user?.name}
+                        </p>
+                      </div>
+                    </div>
+                    <nav className="flex-1 px-2 py-4 space-y-1">
+                      {navItems.map((item) => (
+                        <Button
+                          key={item.name}
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            navigate(item.path);
+                            setIsMobileMenuOpen(false);
+                          }}
+                        >
+                          <item.icon className="h-5 w-5 mr-3" />
+                          {item.name}
+                        </Button>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="h-5 w-5 mr-3" />
+                        {t.signOut}
+                      </Button>
+                    </nav>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
-          <Button variant="outline" size="sm" onClick={logout} type="button">
-            <LogOut size={16} />
-          </Button>
         </div>
-        <div className="flex border-t overflow-x-auto">
-          <Button
-            variant="ghost"
-            className={`flex-1 rounded-none ${isActive('/dashboard') ? 'border-b-2 border-primary' : ''}`}
-            onClick={() => navigate('/dashboard')}
-            type="button"
-          >
-            Dashboard
-          </Button>
-          <Button
-            variant="ghost"
-            className={`flex-1 rounded-none ${isActive('/check-in') ? 'border-b-2 border-primary' : ''}`}
-            onClick={() => navigate('/check-in')}
-            type="button"
-          >
-            Check-In
-          </Button>
-          <Button
-            variant="ghost"
-            className={`flex-1 rounded-none ${isActive('/report') ? 'border-b-2 border-primary' : ''}`}
-            onClick={() => navigate('/report')}
-            type="button"
-          >
-            Report
-          </Button>
-        </div>
-      </div>
+      </header>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        <main className="flex-1 p-4 md:p-8 md:pt-6 md:pb-8 md:mt-0 mt-24">
-          {children}
-        </main>
-      </div>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {children}
+      </main>
     </div>
   );
 };

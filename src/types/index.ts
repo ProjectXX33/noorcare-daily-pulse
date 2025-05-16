@@ -37,12 +37,24 @@ export type WorkReport = {
   position: Position;
 };
 
+export type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: Date;
+  relatedTo?: string;
+  relatedId?: string;
+}
+
 // Supabase specific types
 export type Tables = {
   users: UserRecord;
   check_ins: CheckInRecord;
   work_reports: WorkReportRecord;
   file_attachments: FileAttachmentRecord;
+  notifications: NotificationRecord;
 };
 
 export type UserRecord = {
@@ -83,4 +95,15 @@ export type FileAttachmentRecord = {
   file_name: string;
   file_type: string;
   created_at: string;
+};
+
+export type NotificationRecord = {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  related_to?: string;
+  related_id?: string;
 };

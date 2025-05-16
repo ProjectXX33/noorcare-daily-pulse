@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoginForm from '@/components/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,33 @@ const Login = () => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [language, setLanguage] = useState('en');
+  
+  // Load language preference on component mount
+  useEffect(() => {
+    const storedLang = localStorage.getItem('preferredLanguage');
+    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
+      setLanguage(storedLang);
+      document.documentElement.dir = storedLang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.lang = storedLang;
+    }
+  }, []);
+
+  // Translation object for multilingual support
+  const translations = {
+    en: {
+      enterNewPassword: "Please enter your new password",
+      passwordUpdated: "Password updated successfully!",
+      resetError: "Failed to update password"
+    },
+    ar: {
+      enterNewPassword: "الرجاء إدخال كلمة المرور الجديدة",
+      passwordUpdated: "تم تحديث كلمة المرور بنجاح!",
+      resetError: "فشل في تحديث كلمة المرور"
+    }
+  };
+
+  const t = translations[language as keyof typeof translations];
   
   // Handle password reset flow
   useEffect(() => {
@@ -20,24 +47,28 @@ const Login = () => {
       if (type === 'recovery' && accessToken) {
         // User clicked a password reset link
         try {
+          const newPassword = prompt(t.enterNewPassword) || '';
+          
+          if (!newPassword) return;
+          
           const { data, error } = await supabase.auth.updateUser({
-            password: prompt('Please enter your new password') || '',
+            password: newPassword,
           });
           
           if (error) throw error;
           
           if (data) {
-            toast.success('Password updated successfully!');
+            toast.success(t.passwordUpdated);
           }
         } catch (error) {
           console.error('Error resetting password:', error);
-          toast.error('Failed to update password');
+          toast.error(t.resetError);
         }
       }
     };
     
     handlePasswordReset();
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -46,7 +77,7 @@ const Login = () => {
   }, [isAuthenticated, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <div className="w-full max-w-md">
         <LoginForm />
       </div>
