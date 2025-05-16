@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { fetchUserProfile } from './useUserProfile';
 
 export const useSessionManager = () => {
@@ -36,18 +36,6 @@ export const useSessionManager = () => {
         return;
       }
       
-      // Explicitly refresh the session token to extend its validity
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.error('Failed to refresh token:', refreshError);
-        // Force logout on token refresh failure
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsLoading(false);
-        return;
-      }
-      
       console.log('Active session found, user ID:', sessionData.session.user.id);
       
       const appUser = await fetchUserProfile(sessionData.session.user.id);
@@ -57,12 +45,8 @@ export const useSessionManager = () => {
         setUser(appUser);
         setIsAuthenticated(true);
         
-        // Redirect to the appropriate dashboard based on role
-        if (appUser.role === 'admin') {
-          navigate('/dashboard');
-        } else {
-          navigate('/employee-dashboard');
-        }
+        // Don't auto-redirect here to avoid refresh loops
+        // Let the page handle redirections naturally
       } else {
         console.warn('Session exists but no user profile found');
         // If we have a valid auth session but no user profile, sign out

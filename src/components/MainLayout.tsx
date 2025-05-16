@@ -26,6 +26,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
       dailyReport: "Daily Report",
       employees: "Employees",
       reports: "Reports",
+      tasks: "Tasks",
       profile: "Profile",
       signOut: "Sign Out",
       welcome: "Welcome"
@@ -37,6 +38,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
       dailyReport: "التقرير اليومي",
       employees: "الموظفين",
       reports: "التقارير",
+      tasks: "المهام",
       profile: "الملف الشخصي",
       signOut: "تسجيل الخروج",
       welcome: "مرحبا"
@@ -64,10 +66,12 @@ const MainLayout = ({ children }: MainLayoutProps) => {
       { name: t.dashboard, icon: Home, path: '/dashboard' },
       { name: t.employees, icon: Users, path: '/employees' },
       { name: t.reports, icon: ClipboardList, path: '/reports' },
+      { name: t.tasks, icon: CheckSquare, path: '/tasks' },
     ] : [
       { name: t.employeeDashboard, icon: Home, path: '/employee-dashboard' },
       { name: t.checkIn, icon: CheckSquare, path: '/check-in' },
       { name: t.dailyReport, icon: CalendarDays, path: '/report' },
+      { name: t.tasks, icon: CheckSquare, path: '/employee-tasks' },
     ])
   ];
 

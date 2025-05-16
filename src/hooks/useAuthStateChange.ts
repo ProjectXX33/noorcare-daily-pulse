@@ -2,7 +2,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUserProfile } from './useUserProfile';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from "sonner";
 
 export interface AuthStateChangeProps {
   setUser: (user: any) => void;
@@ -34,7 +35,7 @@ export const useAuthStateChange = ({
     refreshSession().then(() => clearTimeout(timeoutId));
     
     // Set up periodic token refresh to prevent session expiration
-    // This is critical to prevent the cookie problem
+    // Increase interval to reduce excessive refreshes
     const refreshInterval = setInterval(() => {
       // Only refresh if we're authenticated
       if (isAuthenticated) {
@@ -43,7 +44,7 @@ export const useAuthStateChange = ({
           console.error('Scheduled token refresh failed:', err);
         });
       }
-    }, 5 * 60 * 1000); // Refresh every 5 minutes
+    }, 10 * 60 * 1000); // Refresh every 10 minutes instead of 5
     
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -59,13 +60,18 @@ export const useAuthStateChange = ({
             setIsAuthenticated(true);
             
             // Redirect to the appropriate dashboard based on role
-            if (appUser.role === 'admin') {
-              navigate('/dashboard');
-            } else {
-              navigate('/employee-dashboard');
+            // Only redirect if we're not already on the dashboard
+            const currentPath = window.location.pathname;
+            const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+            
+            if (currentPath !== targetPath && currentPath !== '/') {
+              navigate(targetPath);
+            } else if (currentPath === '/') {
+              navigate(targetPath);
             }
           } else {
             console.warn('User signed in but no profile found');
+            toast.error("User profile not found");
             // Clean up if profile missing
             await supabase.auth.signOut();
           }
