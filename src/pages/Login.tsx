@@ -46,6 +46,8 @@ const Login = () => {
       const accessToken = searchParams.get('access_token');
       const type = searchParams.get('type');
       
+      console.log('Password reset parameters:', { accessToken: !!accessToken, type });
+      
       if (type === 'recovery' && accessToken && !isProcessingReset) {
         setIsProcessingReset(true);
         try {
@@ -56,6 +58,7 @@ const Login = () => {
             return;
           }
           
+          console.log('Updating password...');
           const { data, error } = await supabase.auth.updateUser({
             password: newPassword,
           });
@@ -66,6 +69,7 @@ const Login = () => {
             toast.success(t.passwordUpdated);
             // Refresh session after password update
             await refreshSession();
+            console.log('Password updated successfully');
           }
         } catch (error) {
           console.error('Error resetting password:', error);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { createTask, sendNotification, subscribeToTaskChanges } from '@/lib/tasksApi';
+import { createTask, fetchAllTasks, sendNotification, subscribeToTaskChanges } from '@/lib/tasksApi';
 import { fetchEmployees } from '@/lib/employeesApi';
 import { Task, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -103,17 +102,34 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
   useEffect(() => {
     const loadEmployees = async () => {
       try {
+        console.log('Loading employees...');
         const data = await fetchEmployees();
+        console.log('Employees loaded:', data);
         setEmployees(data);
       } catch (error) {
         console.error("Error loading employees:", error);
       }
     };
 
+    const loadTasks = async () => {
+      try {
+        console.log('Loading tasks...');
+        const data = await fetchAllTasks();
+        console.log('Tasks loaded:', data);
+        setTasks(data);
+      } catch (error) {
+        console.error("Error loading tasks:", error);
+      }
+    };
+
     loadEmployees();
+    loadTasks();
 
     // Subscribe to real-time task updates
-    const unsubscribe = subscribeToTaskChanges(setTasks);
+    const unsubscribe = subscribeToTaskChanges((updatedTasks) => {
+      console.log('Tasks updated from subscription:', updatedTasks);
+      setTasks(updatedTasks);
+    });
     
     return () => {
       unsubscribe();
@@ -130,7 +146,8 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
 
     setIsLoading(true);
     try {
-      await createTask({
+      console.log('Creating task:', newTask);
+      const createdTask = await createTask({
         title: newTask.title,
         description: newTask.description,
         assignedTo: newTask.assignedTo,
@@ -138,6 +155,11 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
         progressPercentage: newTask.progressPercentage,
         createdBy: user.id
       });
+
+      console.log('Task created successfully:', createdTask);
+      
+      // Update the tasks list with the new task
+      setTasks(prevTasks => [createdTask, ...prevTasks]);
 
       setIsTaskDialogOpen(false);
       setNewTask({
@@ -168,6 +190,7 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
 
     setIsLoading(true);
     try {
+      console.log('Sending notification:', newNotification);
       if (newNotification.sendToAll) {
         await sendNotification({
           title: newNotification.title,

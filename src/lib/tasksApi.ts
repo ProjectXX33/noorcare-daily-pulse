@@ -1,14 +1,14 @@
-
 import { supabase } from '@/lib/supabase';
 import { Task, Notification } from '@/types';
 
 export async function fetchAllTasks(): Promise<Task[]> {
   try {
+    console.log('Fetching all tasks...');
     const { data, error } = await supabase
       .from('tasks')
       .select(`
         *,
-        assignee:assigned_to (name)
+        users:assigned_to (name)
       `)
       .order('created_at', { ascending: false });
       
@@ -17,12 +17,14 @@ export async function fetchAllTasks(): Promise<Task[]> {
       throw error;
     }
     
+    console.log('Tasks fetched:', data);
+    
     return data.map((record: any) => ({
       id: record.id,
       title: record.title,
       description: record.description,
       assignedTo: record.assigned_to,
-      assignedToName: record.assignee ? record.assignee.name : 'Unknown',
+      assignedToName: record.users ? record.users.name : 'Unknown',
       status: record.status,
       progressPercentage: record.progress_percentage,
       createdAt: new Date(record.created_at),
@@ -37,20 +39,29 @@ export async function fetchAllTasks(): Promise<Task[]> {
 
 export async function fetchUserTasks(userId: string): Promise<Task[]> {
   try {
+    console.log(`Fetching tasks for user ${userId}...`);
     const { data, error } = await supabase
       .from('tasks')
-      .select('*')
+      .select(`
+        *,
+        users:assigned_to (name)
+      `)
       .eq('assigned_to', userId)
       .order('created_at', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching user tasks:', error);
+      throw error;
+    }
+    
+    console.log('User tasks fetched:', data);
     
     return data.map((record: any) => ({
       id: record.id,
       title: record.title,
       description: record.description,
       assignedTo: record.assigned_to,
-      assignedToName: '', // Will be filled by the component
+      assignedToName: record.users ? record.users.name : 'Unknown',
       status: record.status,
       progressPercentage: record.progress_percentage,
       createdAt: new Date(record.created_at),
@@ -65,23 +76,29 @@ export async function fetchUserTasks(userId: string): Promise<Task[]> {
 
 export async function fetchEmployeeTasks(userId: string): Promise<Task[]> {
   try {
+    console.log(`Fetching tasks for employee ${userId}...`);
     const { data, error } = await supabase
       .from('tasks')
       .select(`
         *,
-        assignee:assigned_to (name)
+        users:assigned_to (name)
       `)
       .eq('assigned_to', userId)
       .order('created_at', { ascending: false });
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching employee tasks:', error);
+      throw error;
+    }
+    
+    console.log('Employee tasks fetched:', data);
     
     return data.map((record: any) => ({
       id: record.id,
       title: record.title,
       description: record.description,
       assignedTo: record.assigned_to,
-      assignedToName: record.assignee ? record.assignee.name : 'Unknown',
+      assignedToName: record.users ? record.users.name : 'Unknown',
       status: record.status,
       progressPercentage: record.progress_percentage,
       createdAt: new Date(record.created_at),
@@ -105,7 +122,7 @@ export async function createTask(task: {
   try {
     console.log('Creating task with data:', task);
     
-    // Insert task data
+    // Insert task data - important to use the correct column names matching your database
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
@@ -116,15 +133,30 @@ export async function createTask(task: {
         progress_percentage: task.progressPercentage,
         created_by: task.createdBy
       }])
-      .select()
-      .single();
+      .select();
       
     if (error) {
       console.error('Error creating task:', error);
       throw error;
     }
     
-    console.log('Task created successfully:', data);
+    if (!data || data.length === 0) {
+      console.error('No data returned after creating task');
+      throw new Error('No data returned after creating task');
+    }
+    
+    const createdTask = data[0];
+    console.log('Task created successfully:', createdTask);
+    
+    // Get the assignee name
+    const { data: assigneeData, error: assigneeError } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', task.assignedTo)
+      .single();
+      
+    const assigneeName = assigneeError ? 'Unknown' : assigneeData?.name || 'Unknown';
+    console.log('Assignee name:', assigneeName);
     
     // Create a notification for the assigned user
     try {
@@ -134,33 +166,25 @@ export async function createTask(task: {
         message: `You have been assigned a new task: ${task.title}`,
         adminId: task.createdBy,
         relatedTo: 'task',
-        relatedId: data.id
+        relatedId: createdTask.id
       });
+      console.log('Notification sent successfully');
     } catch (notificationError) {
       console.error('Error sending notification:', notificationError);
       // Don't fail the task creation if notification fails
     }
     
-    // Get the assignee name
-    const { data: assigneeData, error: assigneeError } = await supabase
-      .from('users')
-      .select('name')
-      .eq('id', task.assignedTo)
-      .single();
-      
-    const assigneeName = assigneeError ? 'Unknown' : assigneeData.name;
-    
     return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      assignedTo: data.assigned_to,
+      id: createdTask.id,
+      title: createdTask.title,
+      description: createdTask.description,
+      assignedTo: createdTask.assigned_to,
       assignedToName: assigneeName,
-      status: data.status,
-      progressPercentage: data.progress_percentage,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      createdBy: data.created_by
+      status: createdTask.status,
+      progressPercentage: createdTask.progress_percentage,
+      createdAt: new Date(createdTask.created_at),
+      updatedAt: new Date(createdTask.updated_at),
+      createdBy: createdTask.created_by
     };
   } catch (error) {
     console.error('Error creating task:', error);
@@ -201,7 +225,7 @@ export async function updateTaskProgress(
       .from('tasks')
       .select(`
         *,
-        assignee:assigned_to (name)
+        users:assigned_to (name)
       `)
       .eq('id', taskId)
       .single();
@@ -229,7 +253,7 @@ export async function updateTaskProgress(
       .eq('id', taskId)
       .select(`
         *,
-        assignee:assigned_to (name)
+        users:assigned_to (name)
       `)
       .single();
       
@@ -240,7 +264,7 @@ export async function updateTaskProgress(
       title: data.title,
       description: data.description,
       assignedTo: data.assigned_to,
-      assignedToName: data.assignee ? data.assignee.name : 'Unknown',
+      assignedToName: data.users ? data.users.name : 'Unknown',
       status: data.status,
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
@@ -271,7 +295,7 @@ export async function sendNotification({
   relatedId?: string;
 }): Promise<void> {
   try {
-    console.log('Sending notification:', { userId, title, message, adminId, sendToAll });
+    console.log('Sending notification:', { userId, title, message, adminId, sendToAll, relatedTo, relatedId });
     
     if (sendToAll) {
       // Get all users except the admin
@@ -291,8 +315,8 @@ export async function sendNotification({
         title,
         message,
         is_read: false,
-        related_to: relatedTo,
-        related_id: relatedId
+        related_to: relatedTo || null,
+        related_id: relatedId || null
       }));
       
       console.log('Sending notifications to all users:', notifications);
@@ -306,10 +330,19 @@ export async function sendNotification({
           console.error('Error inserting notifications for all users:', error);
           throw error;
         }
+        
+        console.log('Notifications for all users inserted successfully');
       }
     } else if (userId) {
       // Create a notification for a specific user
-      console.log('Sending notification to specific user:', userId);
+      console.log('Sending notification to specific user:', userId, {
+        user_id: userId,
+        title,
+        message,
+        is_read: false,
+        related_to: relatedTo || null,
+        related_id: relatedId || null
+      });
       
       const { error } = await supabase
         .from('notifications')
@@ -318,14 +351,16 @@ export async function sendNotification({
           title,
           message,
           is_read: false,
-          related_to: relatedTo,
-          related_id: relatedId
+          related_to: relatedTo || null,
+          related_id: relatedId || null
         }]);
         
       if (error) {
         console.error('Error inserting notification for specific user:', error);
         throw error;
       }
+      
+      console.log('Notification for specific user inserted successfully');
     } else {
       throw new Error('Either userId or sendToAll must be provided');
     }
@@ -422,22 +457,37 @@ export async function downloadFileAttachment(filePath: string): Promise<{
 // Add a subscription for real-time updates to the tasks table
 export function subscribeToTaskChanges(callback: (tasks: Task[]) => void): () => void {
   // Initialize with current data
-  fetchAllTasks().then(callback).catch(console.error);
+  console.log('Setting up subscription to task changes');
+  fetchAllTasks().then(tasks => {
+    console.log('Initial tasks data loaded for subscription:', tasks);
+    callback(tasks);
+  }).catch(error => {
+    console.error('Error loading initial tasks data for subscription:', error);
+  });
   
   // Set up the subscription
   const subscription = supabase
     .channel('public:tasks')
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'tasks' }, 
-      () => {
+      (payload) => {
+        console.log('Task change detected:', payload);
         // When there's any change, fetch the updated list
-        fetchAllTasks().then(callback).catch(console.error);
+        fetchAllTasks().then(tasks => {
+          console.log('Updated tasks after change:', tasks);
+          callback(tasks);
+        }).catch(error => {
+          console.error('Error fetching updated tasks after change:', error);
+        });
       }
     )
-    .subscribe();
+    .subscribe(status => {
+      console.log('Task subscription status:', status);
+    });
   
   // Return unsubscribe function
   return () => {
+    console.log('Unsubscribing from tasks channel');
     subscription.unsubscribe();
   };
 }
@@ -445,22 +495,37 @@ export function subscribeToTaskChanges(callback: (tasks: Task[]) => void): () =>
 // Add a subscription for real-time updates to employee-specific tasks
 export function subscribeToEmployeeTasks(userId: string, callback: (tasks: Task[]) => void): () => void {
   // Initialize with current data
-  fetchEmployeeTasks(userId).then(callback).catch(console.error);
+  console.log(`Setting up subscription to employee tasks for user ${userId}`);
+  fetchEmployeeTasks(userId).then(tasks => {
+    console.log('Initial employee tasks data loaded for subscription:', tasks);
+    callback(tasks);
+  }).catch(error => {
+    console.error('Error loading initial employee tasks data for subscription:', error);
+  });
   
   // Set up the subscription
   const subscription = supabase
     .channel(`public:tasks:user_${userId}`)
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` }, 
-      () => {
+      (payload) => {
+        console.log('Employee task change detected:', payload);
         // When there's any change to this user's tasks, fetch the updated list
-        fetchEmployeeTasks(userId).then(callback).catch(console.error);
+        fetchEmployeeTasks(userId).then(tasks => {
+          console.log('Updated employee tasks after change:', tasks);
+          callback(tasks);
+        }).catch(error => {
+          console.error('Error fetching updated employee tasks after change:', error);
+        });
       }
     )
-    .subscribe();
+    .subscribe(status => {
+      console.log('Employee task subscription status:', status);
+    });
   
   // Return unsubscribe function
   return () => {
+    console.log('Unsubscribing from employee tasks channel');
     subscription.unsubscribe();
   };
 }
@@ -468,22 +533,37 @@ export function subscribeToEmployeeTasks(userId: string, callback: (tasks: Task[
 // Add a subscription for real-time updates to notifications
 export function subscribeToNotifications(userId: string, callback: (notifications: Notification[]) => void): () => void {
   // Initialize with current data
-  fetchUserNotifications(userId).then(callback).catch(console.error);
+  console.log(`Setting up subscription to notifications for user ${userId}`);
+  fetchUserNotifications(userId).then(notifications => {
+    console.log('Initial notifications data loaded for subscription:', notifications);
+    callback(notifications);
+  }).catch(error => {
+    console.error('Error loading initial notifications data for subscription:', error);
+  });
   
   // Set up the subscription
   const subscription = supabase
     .channel(`public:notifications:user_${userId}`)
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, 
-      () => {
+      (payload) => {
+        console.log('Notification change detected:', payload);
         // When there's any change to this user's notifications, fetch the updated list
-        fetchUserNotifications(userId).then(callback).catch(console.error);
+        fetchUserNotifications(userId).then(notifications => {
+          console.log('Updated notifications after change:', notifications);
+          callback(notifications);
+        }).catch(error => {
+          console.error('Error fetching updated notifications after change:', error);
+        });
       }
     )
-    .subscribe();
+    .subscribe(status => {
+      console.log('Notification subscription status:', status);
+    });
   
   // Return unsubscribe function
   return () => {
+    console.log('Unsubscribing from notifications channel');
     subscription.unsubscribe();
   };
 }
