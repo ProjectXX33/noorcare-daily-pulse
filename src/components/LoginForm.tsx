@@ -1,54 +1,42 @@
 
 import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Globe } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import LanguageSelector from './LanguageSelector';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [resetPasswordMode, setResetPasswordMode] = useState(false);
-  const [language, setLanguage] = useState('en'); // Default language is English
-  const {
-    login
-  } = useAuth();
-  const navigate = useNavigate();
+  const { login } = useAuth();
+  const { language } = useLanguage();
 
-  // Translation object for multilingual support
   const translations = {
     en: {
-      title: "NoorCare",
-      resetPasswordDesc: "Enter your email to reset your password",
-      loginDesc: "Enter your credentials to access your account",
+      title: "Login",
+      description: "Enter your credentials to access the system",
       email: "Email",
+      emailPlaceholder: "Enter your email",
       password: "Password",
-      sendResetLink: "Send Reset Link",
-      backToLogin: "Back to Login",
-      signingIn: "Signing in...",
-      signIn: "Sign In",
-      forgotPassword: "Forgot your password?",
-      languageSelector: "Language"
+      passwordPlaceholder: "Enter your password",
+      loginButton: "Login",
+      loggingIn: "Logging in...",
+      footer: "Employee Attendance and Management System"
     },
     ar: {
-      title: "نوركير",
-      resetPasswordDesc: "أدخل بريدك الإلكتروني لإعادة تعيين كلمة المرور",
-      loginDesc: "أدخل بيانات الاعتماد الخاصة بك للوصول إلى حسابك",
+      title: "تسجيل الدخول",
+      description: "أدخل بيانات الاعتماد للوصول إلى النظام",
       email: "البريد الإلكتروني",
+      emailPlaceholder: "أدخل بريدك الإلكتروني",
       password: "كلمة المرور",
-      sendResetLink: "إرسال رابط إعادة التعيين",
-      backToLogin: "العودة إلى تسجيل الدخول",
-      signingIn: "جاري تسجيل الدخول...",
-      signIn: "تسجيل الدخول",
-      forgotPassword: "نسيت كلمة المرور؟",
-      languageSelector: "اللغة"
+      passwordPlaceholder: "أدخل كلمة المرور",
+      loginButton: "تسجيل الدخول",
+      loggingIn: "جاري تسجيل الدخول...",
+      footer: "نظام حضور وإدارة الموظفين"
     }
   };
 
@@ -56,114 +44,74 @@ const LoginForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      const success = await login(email, password);
-      if (success) {
-        // Navigation is handled within login function
-      }
+      console.log('Attempting login with:', { email });
+      await login(email, password);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const {
-        error
-      } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`
-      });
-      if (error) {
-        toast.error('Error sending password reset email: ' + error.message);
-      } else {
-        toast.success('Password reset email sent! Check your inbox.');
-        setResetPasswordMode(false);
-      }
-    } catch (error) {
-      console.error('Password reset error:', error);
-      toast.error('An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const toggleLanguage = (value: string) => {
-    setLanguage(value);
-    // Store language preference
-    localStorage.setItem('preferredLanguage', value);
-    // Apply RTL for Arabic
-    document.documentElement.dir = value === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = value;
-  };
-
-  // Set language from storage or browser preference on component mount
-  React.useEffect(() => {
-    const storedLang = localStorage.getItem('preferredLanguage');
-    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
-      toggleLanguage(storedLang);
-    }
-  }, []);
-
-  return <Card className="w-full max-w-md" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <CardHeader>
-        <div className="flex justify-center mb-4">
-          <img src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png" alt="NoorCare Logo" className="h-16 w-16 object-contain" />
-        </div>
-        <CardTitle className="text-2xl text-center text-primary">{t.title}</CardTitle>
-        <CardDescription className="text-center">
-          {resetPasswordMode ? t.resetPasswordDesc : t.loginDesc}
-        </CardDescription>
-        <div className="mt-2 flex justify-end">
-          <Select value={language} onValueChange={toggleLanguage}>
-            <SelectTrigger className="w-[110px]">
-              <Globe className="w-4 h-4 mr-2" />
-              <SelectValue placeholder={t.languageSelector} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="ar">العربية</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {resetPasswordMode ? <form onSubmit={handleResetPassword}>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="reset-email">{t.email}</Label>
-                <Input id="reset-email" type="email" placeholder={t.email} value={email} onChange={e => setEmail(e.target.value)} required />
-              </div>
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <LanguageSelector />
+      
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">{t.title}</CardTitle>
+          <CardDescription>
+            {t.description}
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">{t.email}</Label>
+              <Input 
+                id="email"
+                type="email"
+                placeholder={t.emailPlaceholder}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
-            <Button type="submit" className="w-full mt-4 bg-primary hover:bg-primary/90" disabled={isLoading}>
-              {isLoading ? `${t.sendResetLink}...` : t.sendResetLink}
-            </Button>
-            <Button type="button" variant="ghost" className="w-full mt-2" onClick={() => setResetPasswordMode(false)} disabled={isLoading}>
-              {t.backToLogin}
-            </Button>
-          </form> : <form onSubmit={handleSubmit}>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="email">{t.email}</Label>
-                <Input id="email" type="email" placeholder={t.email} value={email} onChange={e => setEmail(e.target.value)} required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">{t.password}</Label>
-                <Input id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">{t.password}</Label>
+              <Input 
+                id="password"
+                type="password"
+                placeholder={t.passwordPlaceholder}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
-            <Button type="submit" className="w-full mt-4 bg-primary hover:bg-primary/90" disabled={isLoading}>
-              {isLoading ? t.signingIn : t.signIn}
+          </CardContent>
+          <CardFooter>
+            <Button 
+              type="submit" 
+              className="w-full bg-primary hover:bg-primary/90"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.loggingIn}
+                </div>
+              ) : t.loginButton}
             </Button>
-            <div className="text-center mt-4">
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => setResetPasswordMode(true)}>
-                {t.forgotPassword}
-              </button>
-            </div>
-          </form>}
-      </CardContent>
-    </Card>;
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
 };
+
 export default LoginForm;

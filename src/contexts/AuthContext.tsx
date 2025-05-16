@@ -25,6 +25,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to fetch user profile data
   const fetchUserProfile = async (userId: string): Promise<User | null> => {
     try {
+      console.log('Fetching user profile for ID:', userId);
+      
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
@@ -37,9 +39,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       if (!userData) {
-        console.error('No user data found');
+        console.error('No user data found for ID:', userId);
         return null;
       }
+      
+      console.log('User profile data retrieved:', userData);
       
       // Transform from database format to app format
       const appUser: User = {
@@ -77,18 +81,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       if (!sessionData?.session) {
+        console.log('No active session found');
         setUser(null);
         setIsAuthenticated(false);
         setIsLoading(false);
         return;
       }
       
+      console.log('Active session found, user ID:', sessionData.session.user.id);
+      
       const appUser = await fetchUserProfile(sessionData.session.user.id);
       
       if (appUser) {
+        console.log('User profile set from session:', appUser);
         setUser(appUser);
         setIsAuthenticated(true);
       } else {
+        console.warn('Session exists but no user profile found');
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -103,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check for existing session on load
   useEffect(() => {
+    console.log('AuthProvider mounted, refreshing session');
     refreshSession();
     
     // Set up session refresh interval
@@ -112,18 +122,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
       if (event === 'SIGNED_IN' && session) {
         try {
           const appUser = await fetchUserProfile(session.user.id);
           
           if (appUser) {
+            console.log('User signed in:', appUser);
             setUser(appUser);
             setIsAuthenticated(true);
+          } else {
+            console.warn('User signed in but no profile found');
           }
         } catch (error) {
           console.error('Error processing auth state change:', error);
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -139,25 +155,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
+      console.log('Attempting login for:', email);
+      
       // Sign in with Supabase auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error || !data.user) {
+      if (error) {
+        console.error('Login error:', error);
         toast.error('Invalid email or password');
         return false;
       }
+      
+      if (!data.user) {
+        console.error('No user returned from auth');
+        toast.error('Invalid email or password');
+        return false;
+      }
+      
+      console.log('Auth successful, fetching user profile');
       
       // Get user profile
       const appUser = await fetchUserProfile(data.user.id);
       
       if (!appUser) {
+        console.error('User profile not found after successful auth');
         toast.error('User profile not found');
+        // Sign out since profile is missing
+        await supabase.auth.signOut();
         return false;
       }
       
+      console.log('Login successful, user:', appUser);
       setUser(appUser);
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
@@ -171,7 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return true;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Unexpected login error:', error);
       toast.error('An error occurred during login');
       return false;
     } finally {
@@ -181,6 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      console.log('Logging out...');
       await supabase.auth.signOut();
       setUser(null);
       setIsAuthenticated(false);

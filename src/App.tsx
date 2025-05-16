@@ -18,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { useAuth } from "./contexts/AuthContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
+import "./styles/rtl.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,77 +80,79 @@ const AppWithAuth = () => {
     <BrowserRouter>
       <AuthProvider>
         <CheckInProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route 
-              path="/dashboard" 
-              element={
-                <AdminRoute>
-                  <Dashboard />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/employee-dashboard" 
-              element={
-                <EmployeeRoute>
-                  <EmployeeDashboard />
-                </EmployeeRoute>
-              } 
-            />
-            <Route 
-              path="/check-in" 
-              element={
-                <PrivateRoute>
-                  <CheckInPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/report" 
-              element={
-                <PrivateRoute>
-                  <ReportPage />
-                </PrivateRoute>
-              } 
-            />
-            <Route 
-              path="/employees" 
-              element={
-                <AdminRoute>
-                  <AdminEmployeesPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/reports" 
-              element={
-                <AdminRoute>
-                  <AdminReportsPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/tasks" 
-              element={
-                <AdminRoute>
-                  <AdminTasksPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/employee-tasks" 
-              element={
-                <EmployeeRoute>
-                  <EmployeeTasksPage />
-                </EmployeeRoute>
-              } 
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-          <Sonner />
+          <LanguageProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <AdminRoute>
+                    <Dashboard />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/employee-dashboard" 
+                element={
+                  <EmployeeRoute>
+                    <EmployeeDashboard />
+                  </EmployeeRoute>
+                } 
+              />
+              <Route 
+                path="/check-in" 
+                element={
+                  <PrivateRoute>
+                    <CheckInPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/report" 
+                element={
+                  <PrivateRoute>
+                    <ReportPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/employees" 
+                element={
+                  <AdminRoute>
+                    <AdminEmployeesPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/reports" 
+                element={
+                  <AdminRoute>
+                    <AdminReportsPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/tasks" 
+                element={
+                  <AdminRoute>
+                    <AdminTasksPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/employee-tasks" 
+                element={
+                  <EmployeeRoute>
+                    <EmployeeTasksPage />
+                  </EmployeeRoute>
+                } 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+            <Sonner />
+          </LanguageProvider>
         </CheckInProvider>
       </AuthProvider>
     </BrowserRouter>

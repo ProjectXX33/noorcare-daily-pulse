@@ -100,23 +100,28 @@ export async function createTask(task: {
   createdBy: string;
 }): Promise<Task> {
   try {
+    console.log('Creating task with data:', task);
+    
     const { data, error } = await supabase
       .from('tasks')
-      .insert({
+      .insert([{
         title: task.title,
         description: task.description,
         assigned_to: task.assignedTo,
         status: task.status,
         progress_percentage: task.progressPercentage,
         created_by: task.createdBy
-      })
+      }])
       .select(`
         *,
         assignee:assigned_to (name)
       `)
       .single();
       
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating task:', error);
+      throw error;
+    }
     
     // Create a notification for the assigned user
     await sendNotification({
@@ -249,6 +254,8 @@ export async function sendNotification({
   relatedId?: string;
 }): Promise<void> {
   try {
+    console.log('Sending notification:', { userId, title, message, adminId, sendToAll });
+    
     if (sendToAll) {
       // Get all users except the admin
       const { data: users, error: usersError } = await supabase
@@ -256,7 +263,10 @@ export async function sendNotification({
         .select('id')
         .neq('id', adminId);
         
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('Error fetching users for notification:', usersError);
+        throw usersError;
+      }
       
       // Create notifications for all users
       const notifications = users.map(user => ({
@@ -268,25 +278,35 @@ export async function sendNotification({
         related_id: relatedId
       }));
       
+      console.log('Sending notifications to all users:', notifications);
+      
       const { error } = await supabase
         .from('notifications')
         .insert(notifications);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting notifications for all users:', error);
+        throw error;
+      }
     } else if (userId) {
       // Create a notification for a specific user
+      console.log('Sending notification to specific user:', userId);
+      
       const { error } = await supabase
         .from('notifications')
-        .insert({
+        .insert([{
           user_id: userId,
           title,
           message,
           is_read: false,
           related_to: relatedTo,
           related_id: relatedId
-        });
+        }]);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting notification for specific user:', error);
+        throw error;
+      }
     } else {
       throw new Error('Either userId or sendToAll must be provided');
     }

@@ -57,7 +57,7 @@ export async function createEmployee(employee: {
     // Then insert the user profile data
     const { data, error } = await supabase
       .from('users')
-      .insert({
+      .insert([{
         id: authData.user.id,
         username: employee.username,
         name: employee.name,
@@ -65,7 +65,7 @@ export async function createEmployee(employee: {
         role: employee.role,
         department: employee.department,
         position: employee.position,
-      })
+      }])
       .select()
       .single();
 
