@@ -3,18 +3,29 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { fetchUserProfile } from './useUserProfile';
 
 export const useSessionManager = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [lastRefresh, setLastRefresh] = useState<number>(0);
   const navigate = useNavigate();
 
   // Function to refresh the session
   const refreshSession = async (): Promise<void> => {
+    // Prevent rapid consecutive refreshes
+    const now = Date.now();
+    if (now - lastRefresh < 1000) {
+      console.log('Refresh throttled - skipping');
+      return;
+    }
+    
+    setLastRefresh(now);
+    
     try {
+      console.log('Refreshing session...');
       setIsLoading(true);
       
       // Get current session
@@ -40,6 +51,7 @@ export const useSessionManager = () => {
       
       // Don't re-fetch profile if we already have it and user ID matches
       if (user && user.id === sessionData.session.user.id) {
+        console.log('User profile already loaded, skipping fetch');
         setIsAuthenticated(true);
         setIsLoading(false);
         return;
@@ -57,6 +69,7 @@ export const useSessionManager = () => {
         await supabase.auth.signOut();
         setUser(null);
         setIsAuthenticated(false);
+        toast.error('User profile not found');
       }
     } catch (error) {
       console.error('Refresh session error:', error);
@@ -110,7 +123,7 @@ export const useSessionManager = () => {
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
       
-      // Redirect based on role - let the auth state change handle this
+      // Let the auth state change handle the redirect
       return true;
     } catch (error) {
       console.error('Unexpected login error:', error);

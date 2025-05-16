@@ -14,8 +14,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     storageKey: 'noorcare-auth-token',
-    storage: localStorage,
-    detectSessionInUrl: true,
-    flowType: 'implicit'
+    detectSessionInUrl: false
   }
 });

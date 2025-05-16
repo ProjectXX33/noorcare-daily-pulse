@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 
 const Login = () => {
-  const { isAuthenticated, refreshSession } = useAuth();
+  const { isAuthenticated, user, refreshSession } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [language, setLanguage] = useState('en');
@@ -86,56 +86,45 @@ const Login = () => {
 
   // Check authentication status and redirect if needed
   useEffect(() => {
+    console.log('Login page - checking auth status. isAuthenticated:', isAuthenticated);
+    
     // Clear the loading state after a short delay to prevent UI freeze
-    const loadingTimeout = setTimeout(() => setIsLoading(false), 2000);
+    const loadingTimeout = setTimeout(() => setIsLoading(false), 1000);
     
-    const checkAuth = async () => {
-      try {
-        // First check if we already have a user in memory
-        if (isAuthenticated) {
-          navigate('/dashboard');
-          return;
-        }
-        
-        // Check if the session is valid
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error("Session check error:", error);
-          setIsLoading(false);
-          return;
-        }
-        
-        if (data.session) {
-          console.log("Valid session found, refreshing...");
-          // Attempt to refresh the token explicitly to avoid cookie issues
-          const { error: refreshError } = await supabase.auth.refreshSession();
+    // If user is already authenticated, redirect to appropriate dashboard
+    if (isAuthenticated && user) {
+      console.log('User is authenticated, redirecting to dashboard');
+      const targetPath = user.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+      navigate(targetPath, { replace: true });
+      return;
+    }
+    
+    // Only proceed with session check if not authenticated
+    if (!isAuthenticated) {
+      const checkSession = async () => {
+        try {
+          const { data } = await supabase.auth.getSession();
           
-          if (refreshError) {
-            console.error("Failed to refresh session:", refreshError);
-            // Clear potentially corrupted session
-            await supabase.auth.signOut();
+          if (data.session) {
+            console.log('Session found on login page, refreshing session...');
+            await refreshSession();
+          } else {
+            console.log('No active session found on login page');
             setIsLoading(false);
-            return;
           }
-          
-          // If we have a valid session, load the user profile
-          await refreshSession();
-        } else {
-          console.log("No active session found");
+        } catch (error) {
+          console.error('Login page session check error:', error);
           setIsLoading(false);
         }
-      } catch (error) {
-        console.error("Authentication check error:", error);
-        setIsLoading(false);
-      }
-    };
-    
-    // Start auth check
-    checkAuth();
+      };
+      
+      checkSession();
+    } else {
+      setIsLoading(false);
+    }
     
     return () => clearTimeout(loadingTimeout);
-  }, [isAuthenticated, navigate, refreshSession]);
+  }, [isAuthenticated, user, navigate, refreshSession]);
 
   // Render a loading state while checking authentication
   if (isLoading && !isProcessingReset) {
@@ -147,6 +136,11 @@ const Login = () => {
         </div>
       </div>
     );
+  }
+
+  // Only show login form if not authenticated
+  if (isAuthenticated && user) {
+    return null; // This will be unmounted as the redirect happens
   }
 
   return (
