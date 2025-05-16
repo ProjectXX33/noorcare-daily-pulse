@@ -48,6 +48,19 @@ export type Notification = {
   relatedId?: string;
 }
 
+export type Task = {
+  id: string;
+  title: string;
+  description: string;
+  assignedTo: string; // userId
+  assignedToName: string; // username for display
+  status: 'On Hold' | 'In Progress' | 'Complete';
+  progressPercentage: number;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string; // admin userId
+}
+
 // Supabase specific types
 export type Tables = {
   users: UserRecord;
@@ -55,6 +68,7 @@ export type Tables = {
   work_reports: WorkReportRecord;
   file_attachments: FileAttachmentRecord;
   notifications: NotificationRecord;
+  tasks: TaskRecord;
 };
 
 export type UserRecord = {
@@ -107,3 +121,15 @@ export type NotificationRecord = {
   related_to?: string;
   related_id?: string;
 };
+
+export type TaskRecord = {
+  id: string;
+  title: string;
+  description: string;
+  assigned_to: string;
+  status: 'On Hold' | 'In Progress' | 'Complete';
+  progress_percentage: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
