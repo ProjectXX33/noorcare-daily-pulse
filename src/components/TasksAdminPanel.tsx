@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -192,6 +191,7 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
     setIsLoading(true);
     try {
       console.log('Sending notification:', newNotification);
+      
       if (newNotification.sendToAll) {
         await sendNotification({
           title: newNotification.title,
@@ -199,9 +199,11 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
           adminId: user.id,
           sendToAll: true
         });
+        console.log('Notification sent to all users');
       } else {
         // Send to selected users
         for (const userId of newNotification.selectedUsers) {
+          console.log(`Sending notification to user ${userId}`);
           await sendNotification({
             userId,
             title: newNotification.title,

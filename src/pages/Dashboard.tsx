@@ -4,14 +4,11 @@ import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
 import CheckInHistory from '@/components/CheckInHistory';
 import ReportHistory from '@/components/ReportHistory';
-import TasksAdminPanel from '@/components/TasksAdminPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,11 +26,8 @@ const Dashboard = () => {
       checkInNow: "Check In Now",
       checkInsHistory: "Recent Check-ins",
       reportsHistory: "Recent Reports",
-      calendar: "Calendar View",
       tasks: "Tasks Management",
-      employees: "View All Employees",
-      upcomingTasks: "Upcoming Tasks",
-      overdueTasks: "Overdue Tasks"
+      employees: "View All Employees"
     },
     ar: {
       welcome: "مرحبا",
@@ -43,11 +37,8 @@ const Dashboard = () => {
       checkInNow: "سجل الدخول الآن",
       checkInsHistory: "تسجيلات الدخول الأخيرة",
       reportsHistory: "التقارير الأخيرة",
-      calendar: "عرض التقويم",
       tasks: "إدارة المهام",
-      employees: "عرض جميع الموظفين",
-      upcomingTasks: "المهام القادمة",
-      overdueTasks: "المهام المتأخرة"
+      employees: "عرض جميع الموظفين"
     }
   };
 
@@ -112,11 +103,6 @@ const Dashboard = () => {
         <Tabs defaultValue="history" className="mt-6">
           <TabsList className="mb-4">
             <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="tasks">{t.tasks}</TabsTrigger>
-            <TabsTrigger value="calendar">
-              <Calendar className="h-4 w-4 mr-2" />
-              {t.calendar}
-            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="history">
@@ -125,54 +111,14 @@ const Dashboard = () => {
               <ReportHistory reports={userReports} title={t.reportsHistory} />
               
               {user.role === 'admin' && (
-                <div className="flex justify-end mt-4">
+                <div className="flex justify-between mt-4">
                   <Button variant="outline" onClick={() => navigate('/employees')}>{t.employees}</Button>
+                  <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate('/tasks')}>
+                    {t.tasks}
+                  </Button>
                 </div>
               )}
             </div>
-          </TabsContent>
-          
-          <TabsContent value="tasks">
-            {user.role === 'admin' ? (
-              <TasksAdminPanel language={language} />
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-green-600">{t.upcomingTasks}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      No upcoming tasks
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-red-600">{t.overdueTasks}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      No overdue tasks
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="calendar">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.calendar}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-                  Calendar view coming soon
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>
