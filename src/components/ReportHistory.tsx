@@ -41,23 +41,25 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
         checkInTime: format(new Date(checkInRecord.timestamp), 'h:mm a'),
         checkOutTime: checkInRecord.checkOutTime 
           ? format(new Date(checkInRecord.checkOutTime), 'h:mm a') 
-          : 'Not recorded',
+          : 'No record',
         totalHours: checkInRecord.checkOutTime 
           ? ((new Date(checkInRecord.checkOutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
-          : 'Not recorded'
+          : 'N/A'
       };
     }
     
     return {
-      checkInTime: 'Not recorded',
-      checkOutTime: 'Not recorded',
-      totalHours: 'Not recorded'
+      checkInTime: 'No record',
+      checkOutTime: 'No record',
+      totalHours: 'N/A'
     };
   };
 
   // Function to download file from Supabase storage
   const handleFileDownload = async (reportId: string, fileName: string) => {
     try {
+      toast.loading('Preparing file for download...');
+      
       // Get file path from database
       const { data: fileData, error: fileError } = await supabase
         .from('file_attachments')
@@ -67,9 +69,13 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
         .single();
         
       if (fileError || !fileData) {
+        toast.dismiss();
         toast.error('File information not found');
+        console.error('File info error:', fileError);
         return;
       }
+      
+      console.log('Found file path:', fileData.file_path);
       
       // Download file
       const { data, error } = await supabase.storage
@@ -77,7 +83,8 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
         .download(fileData.file_path);
         
       if (error) {
-        toast.error('Error downloading file');
+        toast.dismiss();
+        toast.error(`Error downloading file: ${error.message}`);
         console.error('Download error:', error);
         return;
       }
@@ -92,8 +99,10 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
+      toast.dismiss();
       toast.success('File downloaded successfully');
     } catch (error) {
+      toast.dismiss();
       console.error('File download error:', error);
       toast.error('Failed to download file');
     }

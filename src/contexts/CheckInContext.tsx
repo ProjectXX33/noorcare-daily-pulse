@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CheckIn, WorkReport, Department, Position } from '../types';
 import { toast } from 'sonner';
@@ -46,6 +45,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fetchCheckIns(),
         fetchWorkReports(),
       ]);
+      console.log('Data refreshed successfully');
     } catch (error) {
       console.error('Error refreshing data:', error);
       toast.error('Failed to load data');
@@ -54,25 +54,30 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Fetch check-ins from Supabase
+  // Fetch check-ins from Supabase with a more explicit query
   const fetchCheckIns = async () => {
     try {
+      console.log('Fetching check-ins for user:', user?.id, 'role:', user?.role);
+      
       // Query based on user role
-      const query = user?.role === 'admin' 
-        ? supabase.from('check_ins').select(`
-            *,
-            users:user_id (username, name, department, position)
-          `)
-        : supabase.from('check_ins').select(`
-            *,
-            users:user_id (username, name, department, position)
-          `).eq('user_id', user?.id);
-
+      const query = supabase.from('check_ins')
+        .select(`
+          *,
+          users:user_id (username, name, department, position)
+        `);
+        
+      if (user?.role !== 'admin') {
+        query.eq('user_id', user?.id);
+      }
+      
       const { data, error } = await query;
       
       if (error) {
+        console.error('Supabase check-ins error:', error);
         throw error;
       }
+      
+      console.log('Check-ins fetched:', data?.length || 0, data);
       
       if (data) {
         // Transform database records to app format
@@ -80,9 +85,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           id: record.id,
           userId: record.user_id,
           timestamp: new Date(record.timestamp),
-          userName: record.users.name,
-          department: record.users.department,
-          position: record.users.position,
+          userName: record.users?.name || 'Unknown User',
+          department: record.users?.department || 'Unknown' as Department,
+          position: record.users?.position || 'Unknown' as Position,
           checkOutTime: record.checkout_time ? new Date(record.checkout_time) : null
         }));
         
@@ -336,16 +341,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return workReports.filter(report => report.userId === userId);
   };
 
+  // Update hasCheckedInToday function to be more explicit about logging
   const hasCheckedInToday = (userId: string): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    return checkIns.some(checkIn => {
+    const todayCheckIns = checkIns.filter(checkIn => {
       const checkInDate = new Date(checkIn.timestamp);
       checkInDate.setHours(0, 0, 0, 0);
       
       return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
     });
+    
+    console.log('Today check-ins for user', userId, ':', todayCheckIns.length, todayCheckIns);
+    return todayCheckIns.length > 0;
   };
 
   const hasCheckedOutToday = (userId: string): boolean => {
