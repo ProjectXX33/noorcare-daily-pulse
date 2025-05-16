@@ -1,6 +1,131 @@
+import { supabase } from "@/integrations/supabase/client";
+import { Task } from "@/types";
 
-// This file is very long, so I'm only updating the relevant parts for assigned users to change task status
+// Fetch all tasks
+export async function fetchAllTasks(): Promise<Task[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        users:assigned_to (name)
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data.map(item => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      assignedTo: item.assigned_to,
+      assignedToName: item.users ? item.users.name : 'Unknown',
+      status: item.status,
+      progressPercentage: item.progress_percentage,
+      createdAt: new Date(item.created_at),
+      updatedAt: new Date(item.updated_at),
+      createdBy: item.created_by
+    }));
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    throw error;
+  }
+}
 
+// Fetch tasks assigned to a specific employee
+export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        users:assigned_to (name)
+      `)
+      .eq('assigned_to', employeeId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data.map(item => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      assignedTo: item.assigned_to,
+      assignedToName: item.users ? item.users.name : 'Unknown',
+      status: item.status,
+      progressPercentage: item.progress_percentage,
+      createdAt: new Date(item.created_at),
+      updatedAt: new Date(item.updated_at),
+      createdBy: item.created_by
+    }));
+  } catch (error) {
+    console.error('Error fetching employee tasks:', error);
+    throw error;
+  }
+}
+
+// Create a new task
+export async function createTask(task: {
+  title: string;
+  description: string;
+  assignedTo: string;
+  status: 'On Hold' | 'In Progress' | 'Complete';
+  progressPercentage: number;
+  createdBy: string;
+}): Promise<Task> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        title: task.title,
+        description: task.description,
+        assigned_to: task.assignedTo,
+        status: task.status,
+        progress_percentage: task.progressPercentage,
+        created_by: task.createdBy
+      })
+      .select(`
+        *,
+        users:assigned_to (name)
+      `)
+      .single();
+    
+    if (error) throw error;
+    
+    // Send notification to the assigned user
+    try {
+      await sendNotification({
+        userId: task.assignedTo,
+        title: 'New Task Assigned',
+        message: `You have been assigned a new task: "${task.title}"`,
+        adminId: task.createdBy,
+        relatedTo: 'task',
+        relatedId: data.id
+      });
+    } catch (notifError) {
+      console.error('Error sending task assignment notification:', notifError);
+      // Don't throw error as the main task was created successfully
+    }
+    
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      assignedTo: data.assigned_to,
+      assignedToName: data.users ? data.users.name : 'Unknown',
+      status: data.status,
+      progressPercentage: data.progress_percentage,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      createdBy: data.created_by
+    };
+  } catch (error) {
+    console.error('Error creating task:', error);
+    throw error;
+  }
+}
+
+// This function exists in the file you provided, so I'm keeping it as is
 export async function updateTaskProgress(
   taskId: string,
   userId: string,
@@ -84,4 +209,130 @@ export async function updateTaskProgress(
     console.error('Error updating task progress:', error);
     throw error;
   }
+}
+
+// Send a notification to a user
+export async function sendNotification({
+  userId,
+  title,
+  message,
+  adminId,
+  sendToAll = false,
+  relatedTo,
+  relatedId
+}: {
+  userId?: string;
+  title: string;
+  message: string;
+  adminId: string;
+  sendToAll?: boolean;
+  relatedTo?: string;
+  relatedId?: string;
+}): Promise<void> {
+  try {
+    if (sendToAll) {
+      // Get all users except the admin
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id')
+        .neq('id', adminId)
+        .eq('role', 'employee');
+      
+      if (usersError) throw usersError;
+      
+      // Create notification for each user
+      const notificationsToInsert = users.map(user => ({
+        user_id: user.id,
+        title,
+        message,
+        related_to: relatedTo,
+        related_id: relatedId
+      }));
+      
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notificationsToInsert);
+      
+      if (error) throw error;
+    } else if (userId) {
+      // Create notification for a specific user
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title,
+          message,
+          related_to: relatedTo,
+          related_id: relatedId
+        });
+      
+      if (error) throw error;
+    } else {
+      throw new Error('Either userId must be provided or sendToAll must be true');
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    throw error;
+  }
+}
+
+// Subscribe to real-time task changes
+export function subscribeToTaskChanges(callback: (tasks: Task[]) => void): () => void {
+  // Set up subscription
+  const channel = supabase
+    .channel('tasks-channel')
+    .on('postgres_changes', 
+      {
+        event: '*', 
+        schema: 'public',
+        table: 'tasks'
+      }, 
+      async (payload) => {
+        console.log('Task change detected:', payload);
+        try {
+          // Fetch all tasks again when there's a change
+          const tasks = await fetchAllTasks();
+          callback(tasks);
+        } catch (error) {
+          console.error('Error fetching updated tasks:', error);
+        }
+      }
+    )
+    .subscribe();
+
+  // Return unsubscribe function
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// Subscribe to real-time task changes for a specific employee
+export function subscribeToEmployeeTasks(employeeId: string, callback: (tasks: Task[]) => void): () => void {
+  // Set up subscription
+  const channel = supabase
+    .channel(`tasks-employee-${employeeId}`)
+    .on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+        filter: `assigned_to=eq.${employeeId}`
+      },
+      async (payload) => {
+        console.log('Employee task change detected:', payload);
+        try {
+          // Fetch employee tasks again when there's a change
+          const tasks = await fetchEmployeeTasks(employeeId);
+          callback(tasks);
+        } catch (error) {
+          console.error('Error fetching updated employee tasks:', error);
+        }
+      }
+    )
+    .subscribe();
+
+  // Return unsubscribe function
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
