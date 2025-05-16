@@ -11,6 +11,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,97 +22,104 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
 
-  // Check for existing session on load
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        setIsLoading(true);
+  // Function to fetch user profile data
+  const fetchUserProfile = async (userId: string): Promise<User | null> => {
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
         
-        // Get current session
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (!sessionData?.session) {
-          setIsLoading(false);
-          return;
-        }
-        
-        // Get user profile
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', sessionData.session.user.id)
-          .single();
-          
-        if (error) {
-          console.error('Error fetching user data:', error);
-          // Don't show error toast on initial load to prevent unwanted notifications
-          setIsLoading(false);
-          return;
-        }
-        
-        if (!userData) {
-          console.error('No user data found');
-          setIsLoading(false);
-          return;
-        }
-        
-        // Transform from database format to app format
-        const appUser: User = {
-          id: userData.id,
-          username: userData.username,
-          name: userData.name,
-          email: userData.email,
-          role: userData.role,
-          department: userData.department,
-          position: userData.position,
-          lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
-        };
-        
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+      
+      if (!userData) {
+        console.error('No user data found');
+        return null;
+      }
+      
+      // Transform from database format to app format
+      const appUser: User = {
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        department: userData.department,
+        position: userData.position,
+        lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
+      };
+      
+      return appUser;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
+  // Function to refresh the session
+  const refreshSession = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Get current session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session refresh error:', sessionError);
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!sessionData?.session) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+      
+      const appUser = await fetchUserProfile(sessionData.session.user.id);
+      
+      if (appUser) {
         setUser(appUser);
         setIsAuthenticated(true);
-      } catch (error) {
-        console.error('Session check error:', error);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
       }
-    };
+    } catch (error) {
+      console.error('Refresh session error:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Check for existing session on load
+  useEffect(() => {
+    refreshSession();
     
-    checkSession();
+    // Set up session refresh interval
+    const intervalId = setInterval(() => {
+      refreshSession();
+    }, 60000); // Refresh every minute to prevent freezing after inactivity
     
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
         try {
-          // Get user profile after sign in
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (error) {
-            console.error('Error fetching user profile:', error);
-            return;
+          const appUser = await fetchUserProfile(session.user.id);
+          
+          if (appUser) {
+            setUser(appUser);
+            setIsAuthenticated(true);
           }
-          
-          if (!userData) {
-            console.error('No user data found after sign in');
-            return;
-          }
-          
-          const appUser: User = {
-            id: userData.id,
-            username: userData.username,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            department: userData.department,
-            position: userData.position,
-            lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
-          };
-          
-          setUser(appUser);
-          setIsAuthenticated(true);
         } catch (error) {
           console.error('Error processing auth state change:', error);
         }
@@ -122,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     return () => {
+      clearInterval(intervalId);
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -142,41 +151,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       // Get user profile
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-        
-      if (userError) {
-        console.error('Error fetching user profile:', userError);
-        toast.error('Error fetching user profile');
-        return false;
-      }
+      const appUser = await fetchUserProfile(data.user.id);
       
-      if (!userData) {
+      if (!appUser) {
         toast.error('User profile not found');
         return false;
       }
       
-      // Transform to app user format
-      const appUser: User = {
-        id: userData.id,
-        username: userData.username,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        department: userData.department,
-        position: userData.position,
-        lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
-      };
-      
       setUser(appUser);
       setIsAuthenticated(true);
-      toast.success(`Welcome back, ${userData.name}!`);
+      toast.success(`Welcome back, ${appUser.name}!`);
       
       // Redirect based on role
-      if (userData.role === 'admin') {
+      if (appUser.role === 'admin') {
         navigate('/dashboard');
       } else {
         navigate('/employee-dashboard');
@@ -206,7 +193,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isAuthenticated, 
+      isLoading, 
+      refreshSession 
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,31 +1,30 @@
 
 import { supabase } from '@/lib/supabase';
-import { Task } from '@/types';
+import { Task, Notification } from '@/types';
 
-// Fetch tasks for admin (all tasks)
 export async function fetchAllTasks(): Promise<Task[]> {
   try {
     const { data, error } = await supabase
       .from('tasks')
       .select(`
         *,
-        users:assigned_to (name)
+        assignee:assigned_to (name)
       `)
       .order('created_at', { ascending: false });
       
     if (error) throw error;
     
-    return data.map((task: any) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      assignedTo: task.assigned_to,
-      assignedToName: task.users?.name || 'Unknown',
-      status: task.status,
-      progressPercentage: task.progress_percentage,
-      createdAt: new Date(task.created_at),
-      updatedAt: new Date(task.updated_at),
-      createdBy: task.created_by
+    return data.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      assignedTo: record.assigned_to,
+      assignedToName: record.assignee ? record.assignee.name : 'Unknown',
+      status: record.status,
+      progressPercentage: record.progress_percentage,
+      createdAt: new Date(record.created_at),
+      updatedAt: new Date(record.updated_at),
+      createdBy: record.created_by
     }));
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -33,39 +32,34 @@ export async function fetchAllTasks(): Promise<Task[]> {
   }
 }
 
-// Fetch tasks for a specific employee
-export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
+export async function fetchUserTasks(userId: string): Promise<Task[]> {
   try {
     const { data, error } = await supabase
       .from('tasks')
-      .select(`
-        *,
-        users:assigned_to (name)
-      `)
-      .eq('assigned_to', employeeId)
+      .select('*')
+      .eq('assigned_to', userId)
       .order('created_at', { ascending: false });
       
     if (error) throw error;
     
-    return data.map((task: any) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      assignedTo: task.assigned_to,
-      assignedToName: task.users?.name || 'Unknown',
-      status: task.status,
-      progressPercentage: task.progress_percentage,
-      createdAt: new Date(task.created_at),
-      updatedAt: new Date(task.updated_at),
-      createdBy: task.created_by
+    return data.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      assignedTo: record.assigned_to,
+      assignedToName: '', // Will be filled by the component
+      status: record.status,
+      progressPercentage: record.progress_percentage,
+      createdAt: new Date(record.created_at),
+      updatedAt: new Date(record.updated_at),
+      createdBy: record.created_by
     }));
   } catch (error) {
-    console.error('Error fetching employee tasks:', error);
+    console.error('Error fetching user tasks:', error);
     throw error;
   }
 }
 
-// Create a new task (admin only)
 export async function createTask(task: {
   title: string;
   description: string;
@@ -87,20 +81,20 @@ export async function createTask(task: {
       })
       .select(`
         *,
-        users:assigned_to (name)
+        assignee:assigned_to (name)
       `)
       .single();
       
     if (error) throw error;
     
-    // Create a notification for the employee
-    await supabase.from('notifications').insert({
-      user_id: task.assignedTo,
+    // Create a notification for the assigned user
+    await sendNotification({
+      userId: task.assignedTo,
       title: 'New Task Assigned',
       message: `You have been assigned a new task: ${task.title}`,
-      is_read: false,
-      related_to: 'task',
-      related_id: data.id
+      adminId: task.createdBy,
+      relatedTo: 'task',
+      relatedId: data.id
     });
     
     return {
@@ -108,7 +102,7 @@ export async function createTask(task: {
       title: data.title,
       description: data.description,
       assignedTo: data.assigned_to,
-      assignedToName: data.users?.name || 'Unknown',
+      assignedToName: data.assignee ? data.assignee.name : 'Unknown',
       status: data.status,
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
@@ -121,104 +115,63 @@ export async function createTask(task: {
   }
 }
 
-// Update task progress and status (employee can only update their own tasks)
-export async function updateTaskProgress(
+export async function updateTaskStatus(
   taskId: string, 
-  employeeId: string, 
+  status: 'On Hold' | 'In Progress' | 'Complete',
   progressPercentage: number
-): Promise<Task> {
+): Promise<void> {
   try {
-    // First, check if the employee is authorized to update this task
-    const { data: taskData, error: taskError } = await supabase
+    const { error } = await supabase
       .from('tasks')
-      .select('*')
-      .eq('id', taskId)
-      .eq('assigned_to', employeeId)
-      .single();
-      
-    if (taskError) throw new Error('Unauthorized or task not found');
-    
-    // Automatically set status to Complete if progress is 100%
-    const status = progressPercentage === 100 ? 'Complete' : taskData.status;
-    
-    // Update the task
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ 
+      .update({
+        status,
         progress_percentage: progressPercentage,
-        status: status,
         updated_at: new Date().toISOString()
       })
-      .eq('id', taskId)
-      .select(`
-        *,
-        users:assigned_to (name)
-      `)
-      .single();
+      .eq('id', taskId);
       
     if (error) throw error;
-    
-    // If task is completed, notify the admin who created it
-    if (progressPercentage === 100) {
-      await supabase.from('notifications').insert({
-        user_id: data.created_by,
-        title: 'Task Completed',
-        message: `Task "${data.title}" has been completed by ${data.users?.name || 'an employee'}`,
-        is_read: false,
-        related_to: 'task',
-        related_id: data.id
-      });
-    }
-    
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      assignedTo: data.assigned_to,
-      assignedToName: data.users?.name || 'Unknown',
-      status: data.status,
-      progressPercentage: data.progress_percentage,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      createdBy: data.created_by
-    };
   } catch (error) {
-    console.error('Error updating task progress:', error);
+    console.error('Error updating task status:', error);
     throw error;
   }
 }
 
-// Send notification to one or all employees
-export async function sendNotification({ 
-  userId, 
-  title, 
+export async function sendNotification({
+  userId,
+  title,
   message,
-  sendToAll,
-  adminId
-}: { 
+  adminId,
+  sendToAll = false,
+  relatedTo,
+  relatedId
+}: {
   userId?: string;
   title: string;
   message: string;
-  sendToAll: boolean;
   adminId: string;
+  sendToAll?: boolean;
+  relatedTo?: string;
+  relatedId?: string;
 }): Promise<void> {
   try {
     if (sendToAll) {
-      // Get all employees
-      const { data: employees, error: employeesError } = await supabase
+      // Get all users except the admin
+      const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id')
-        .neq('id', adminId); // exclude the admin sending the notification
+        .neq('id', adminId);
         
-      if (employeesError) throw employeesError;
+      if (usersError) throw usersError;
       
-      // Insert notifications for all employees
-      const notifications = employees.map(emp => ({
-        user_id: emp.id,
+      // Create notifications for all users
+      const notifications = users.map(user => ({
+        user_id: user.id,
         title,
         message,
         is_read: false,
-        related_to: 'admin_message'
+        related_to: relatedTo,
+        related_id: relatedId
       }));
       
       const { error } = await supabase
@@ -227,7 +180,7 @@ export async function sendNotification({
         
       if (error) throw error;
     } else if (userId) {
-      // Insert notification for one employee
+      // Create a notification for a specific user
       const { error } = await supabase
         .from('notifications')
         .insert({
@@ -235,7 +188,8 @@ export async function sendNotification({
           title,
           message,
           is_read: false,
-          related_to: 'admin_message'
+          related_to: relatedTo,
+          related_id: relatedId
         });
         
       if (error) throw error;
@@ -244,6 +198,90 @@ export async function sendNotification({
     }
   } catch (error) {
     console.error('Error sending notification:', error);
+    throw error;
+  }
+}
+
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+export async function fetchUserNotifications(userId: string): Promise<Notification[]> {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data.map((record: any) => ({
+      id: record.id,
+      userId: record.user_id,
+      title: record.title,
+      message: record.message,
+      isRead: record.is_read,
+      createdAt: new Date(record.created_at),
+      relatedTo: record.related_to || undefined,
+      relatedId: record.related_id || undefined
+    }));
+  } catch (error) {
+    console.error('Error fetching user notifications:', error);
+    throw error;
+  }
+}
+
+// Fixed function for downloading file attachments
+export async function downloadFileAttachment(filePath: string): Promise<{
+  url: string;
+  fileName: string;
+  fileType: string;
+}> {
+  try {
+    // First get the file details from the database
+    const { data: fileData, error: fileError } = await supabase
+      .from('file_attachments')
+      .select('file_name, file_type')
+      .eq('file_path', filePath)
+      .single();
+      
+    if (fileError) {
+      console.error('Error fetching file details:', fileError);
+      throw fileError;
+    }
+    
+    // Then get the actual file from storage
+    const { data, error } = await supabase.storage
+      .from('attachments') // Make sure this matches your bucket name
+      .download(filePath);
+      
+    if (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
+    
+    // Create a blob URL for the file
+    const blob = new Blob([data], { type: fileData.file_type });
+    const url = URL.createObjectURL(blob);
+    
+    return {
+      url,
+      fileName: fileData.file_name,
+      fileType: fileData.file_type
+    };
+  } catch (error) {
+    console.error('Error downloading attachment:', error);
     throw error;
   }
 }

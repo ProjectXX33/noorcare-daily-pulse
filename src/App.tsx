@@ -12,6 +12,7 @@ import CheckInPage from "./pages/CheckInPage";
 import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
+import AdminTasksPage from "./pages/AdminTasksPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -124,6 +125,14 @@ const AppWithAuth = () => {
               element={
                 <AdminRoute>
                   <AdminReportsPage />
+                </AdminRoute>
+              } 
+            />
+            <Route 
+              path="/tasks" 
+              element={
+                <AdminRoute>
+                  <AdminTasksPage />
                 </AdminRoute>
               } 
             />

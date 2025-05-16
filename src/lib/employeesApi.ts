@@ -40,10 +40,19 @@ export async function createEmployee(employee: {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: employee.email,
       password: employee.password,
+      options: {
+        data: {
+          role: employee.role, // Store role in auth metadata
+        }
+      }
     });
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('Failed to create user');
+    if (authError) {
+      console.error('Auth error:', authError);
+      throw authError;
+    }
+    
+    if (!authData.user) throw new Error('Failed to create auth user');
 
     // Then insert the user profile data
     const { data, error } = await supabase
@@ -60,7 +69,16 @@ export async function createEmployee(employee: {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Database error:', error);
+      // If the profile insertion fails, attempt to clean up the auth user
+      try {
+        await supabase.auth.admin.deleteUser(authData.user.id);
+      } catch (cleanupError) {
+        console.error('Failed to clean up auth user after profile creation error:', cleanupError);
+      }
+      throw error;
+    }
     
     return {
       id: data.id,
@@ -123,4 +141,27 @@ export async function resetEmployeePassword(email: string): Promise<void> {
     console.error('Error resetting password:', error);
     throw error;
   }
+}
+
+// Add a subscription for real-time updates to the users table
+export function subscribeToEmployeeChanges(callback: (employees: User[]) => void): () => void {
+  // Initialize with current data
+  fetchEmployees().then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel('public:users')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'users' }, 
+      () => {
+        // When there's any change, fetch the updated list
+        fetchEmployees().then(callback).catch(console.error);
+      }
+    )
+    .subscribe();
+  
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
 }
