@@ -185,8 +185,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } finally {
           setIsLoading(false);
         }
-      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        console.log('User signed out or deleted');
+      } else if (event === 'SIGNED_OUT') {
+        // Fixed: Removed the comparison with "USER_DELETED" which was causing the error
+        console.log('User signed out');
         setUser(null);
         setIsAuthenticated(false);
         navigate('/login');
