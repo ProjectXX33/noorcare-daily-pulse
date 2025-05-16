@@ -103,23 +103,44 @@ const Dashboard = () => {
         <Tabs defaultValue="history" className="mt-6">
           <TabsList className="mb-4">
             <TabsTrigger value="history">History</TabsTrigger>
+            {user.role === 'admin' && (
+              <TabsTrigger value="management">Management</TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="history">
             <div className="grid gap-6">
               <CheckInHistory checkIns={userCheckIns} title={t.checkInsHistory} />
               <ReportHistory reports={userReports} title={t.reportsHistory} />
-              
-              {user.role === 'admin' && (
-                <div className="flex justify-between mt-4">
-                  <Button variant="outline" onClick={() => navigate('/employees')}>{t.employees}</Button>
-                  <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate('/tasks')}>
-                    {t.tasks}
-                  </Button>
-                </div>
-              )}
             </div>
           </TabsContent>
+          
+          {user.role === 'admin' && (
+            <TabsContent value="management">
+              <div className="grid gap-6">
+                <div className="flex flex-wrap gap-4">
+                  <Button 
+                    onClick={() => navigate('/employees')} 
+                    variant="outline"
+                  >
+                    {t.employees}
+                  </Button>
+                  <Button 
+                    className="bg-primary hover:bg-primary/90" 
+                    onClick={() => navigate('/tasks')}
+                  >
+                    {t.tasks}
+                  </Button>
+                  <Button 
+                    onClick={() => navigate('/reports')} 
+                    variant="outline"
+                  >
+                    View All Reports
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </MainLayout>

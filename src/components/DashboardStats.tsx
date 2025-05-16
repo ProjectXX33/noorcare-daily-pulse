@@ -34,6 +34,10 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
     return reportDate.getTime() === today.getTime();
   });
 
+  const todayReportsText = todayReports.length > 0 
+    ? todayReports.length.toString() 
+    : isAdmin ? 'None submitted today' : 'Not submitted today';
+
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <Card>
@@ -41,7 +45,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           <CardTitle className="text-sm font-medium">Today's Check-ins</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{todayCheckIns.length}</div>
+          <div className="text-2xl font-bold">{todayCheckIns.length || 'Not recorded'}</div>
           <p className="text-xs text-muted-foreground">
             {isAdmin ? 'Total employee check-ins today' : 'You have checked in today'}
           </p>
@@ -52,7 +56,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           <CardTitle className="text-sm font-medium">Today's Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{todayReports.length}</div>
+          <div className="text-2xl font-bold">{todayReportsText}</div>
           <p className="text-xs text-muted-foreground">
             {isAdmin ? 'Total employee reports submitted today' : 'Your report status for today'}
           </p>
@@ -63,7 +67,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{workReports.length}</div>
+          <div className="text-2xl font-bold">{workReports.length || 'None'}</div>
           <p className="text-xs text-muted-foreground">
             {isAdmin ? 'All reports in the system' : 'Your total submitted reports'}
           </p>

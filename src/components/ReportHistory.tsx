@@ -44,14 +44,14 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
           : 'Not checked out',
         totalHours: checkInRecord.checkOutTime 
           ? ((new Date(checkInRecord.checkOutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
-          : 'N/A'
+          : 'Not recorded'
       };
     }
     
     return {
-      checkInTime: 'No check-in record',
-      checkOutTime: 'No check-out record',
-      totalHours: 'N/A'
+      checkInTime: 'Not recorded',
+      checkOutTime: 'Not recorded',
+      totalHours: 'Not recorded'
     };
   };
 
@@ -91,6 +91,8 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      
+      toast.success('File downloaded successfully');
     } catch (error) {
       console.error('File download error:', error);
       toast.error('Failed to download file');

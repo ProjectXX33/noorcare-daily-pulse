@@ -8,8 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const EmployeeDashboard = () => {
@@ -34,10 +33,7 @@ const EmployeeDashboard = () => {
       loading: "Loading your dashboard...",
       recentCheckins: "Your Recent Check-ins",
       recentReports: "Your Recent Reports",
-      calendar: "Calendar",
-      tasks: "Tasks",
-      upcoming: "Upcoming Tasks",
-      overdue: "Overdue Tasks"
+      tasks: "Tasks"
     },
     ar: {
       welcome: "مرحبا",
@@ -48,10 +44,7 @@ const EmployeeDashboard = () => {
       loading: "جاري تحميل لوحة التحكم الخاصة بك...",
       recentCheckins: "تسجيلات الدخول الأخيرة",
       recentReports: "التقارير الأخيرة",
-      calendar: "التقويم",
-      tasks: "المهام",
-      upcoming: "المهام القادمة",
-      overdue: "المهام المتأخرة"
+      tasks: "المهام"
     }
   };
 
@@ -118,10 +111,6 @@ const EmployeeDashboard = () => {
             <TabsTrigger value="history">
               History
             </TabsTrigger>
-            <TabsTrigger value="calendar">
-              <Calendar className="h-4 w-4 mr-2" />
-              {t.calendar}
-            </TabsTrigger>
             <TabsTrigger value="tasks">
               {t.tasks}
             </TabsTrigger>
@@ -140,42 +129,14 @@ const EmployeeDashboard = () => {
             </div>
           </TabsContent>
           
-          <TabsContent value="calendar">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.calendar}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-                  Calendar view coming soon
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
           <TabsContent value="tasks">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-green-600">{t.upcoming}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No upcoming tasks
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-red-600">{t.overdue}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No overdue tasks
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid gap-6">
+              <Button 
+                className="w-fit bg-primary hover:bg-primary/90" 
+                onClick={() => navigate('/tasks')}
+              >
+                {t.tasks}
+              </Button>
             </div>
           </TabsContent>
         </Tabs>

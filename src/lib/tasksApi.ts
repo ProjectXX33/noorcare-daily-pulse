@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 import { Task } from "@/types";
 
@@ -17,7 +16,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .order('created_at', { ascending: false });
     
@@ -56,7 +55,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .eq('assigned_to', employeeId)
       .order('created_at', { ascending: false });
@@ -111,7 +110,7 @@ export async function createTask(task: {
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .single();
     
@@ -170,7 +169,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .eq('id', taskId)
       .single();
@@ -211,7 +210,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .single();
       
