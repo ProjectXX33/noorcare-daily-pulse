@@ -27,6 +27,7 @@ export const useAuthStateChange = ({
     
     let isMounted = true;
     let initialCheckComplete = false;
+    let navigationInProgress = false;
     
     // Set max timeout to prevent endless loading
     const timeoutId = setTimeout(() => {
@@ -57,11 +58,17 @@ export const useAuthStateChange = ({
               setIsLoading(false);
               
               // Only navigate if we're on the login page and initial check is complete
-              if (initialCheckComplete) {
+              // and no navigation is currently in progress
+              if (initialCheckComplete && !navigationInProgress) {
                 const currentPath = window.location.pathname;
                 if (currentPath === '/login' || currentPath === '/') {
+                  navigationInProgress = true;
                   const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
                   navigate(targetPath, { replace: true });
+                  // Reset navigation flag after a short delay
+                  setTimeout(() => {
+                    navigationInProgress = false;
+                  }, 500);
                 }
               }
             } else if (isMounted) {
@@ -86,8 +93,13 @@ export const useAuthStateChange = ({
           // Don't navigate here since we already navigate in the logout function
           // This prevents double navigation that can cause errors
           const currentPath = window.location.pathname;
-          if (currentPath !== '/login') {
+          if (currentPath !== '/login' && !navigationInProgress) {
+            navigationInProgress = true;
             navigate('/login', { replace: true });
+            // Reset navigation flag after a short delay
+            setTimeout(() => {
+              navigationInProgress = false;
+            }, 500);
           }
         }
       } else if (event === 'TOKEN_REFRESHED') {
@@ -114,11 +126,16 @@ export const useAuthStateChange = ({
             setUser(appUser);
             setIsAuthenticated(true);
             
-            // Only navigate if we're on the login page
+            // Only navigate if we're on the login page and no navigation is in progress
             const currentPath = window.location.pathname;
-            if (currentPath === '/login' || currentPath === '/') {
+            if ((currentPath === '/login' || currentPath === '/') && !navigationInProgress) {
+              navigationInProgress = true;
               const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
               navigate(targetPath, { replace: true });
+              // Reset navigation flag after a short delay
+              setTimeout(() => {
+                navigationInProgress = false;
+              }, 500);
             }
           } else if (isMounted) {
             console.warn('Session exists but no user profile found');
@@ -131,9 +148,15 @@ export const useAuthStateChange = ({
           setIsAuthenticated(false);
           
           // Only redirect to login if not already there and not on the root page
+          // and no navigation is in progress
           const currentPath = window.location.pathname;
-          if (currentPath !== '/login' && currentPath !== '/') {
+          if (currentPath !== '/login' && currentPath !== '/' && !navigationInProgress) {
+            navigationInProgress = true;
             navigate('/login', { replace: true });
+            // Reset navigation flag after a short delay
+            setTimeout(() => {
+              navigationInProgress = false;
+            }, 500);
           }
         }
       } catch (error) {

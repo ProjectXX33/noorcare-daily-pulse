@@ -4,24 +4,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   const [isRedirecting, setIsRedirecting] = useState(true);
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
 
   useEffect(() => {
     let timeoutId: number;
     
     const handleNavigation = () => {
-      if (!isLoading) {
-        if (isAuthenticated) {
-          navigate('/dashboard');
+      // Only proceed if we haven't already attempted to redirect and we have a definitive authentication state
+      if (!redirectAttempted && !isLoading) {
+        console.log('Index page - handling navigation. isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+        setRedirectAttempted(true);
+        
+        if (isAuthenticated && user) {
+          const targetPath = user.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+          console.log('User is authenticated, redirecting to', targetPath);
+          navigate(targetPath, { replace: true });
         } else {
-          navigate('/login');
+          console.log('User is not authenticated, redirecting to login');
+          navigate('/login', { replace: true });
         }
-      } else {
-        // If still loading, wait a bit and try again
+      } else if (isLoading) {
+        // If still loading, wait a bit and then show content if taking too long
         timeoutId = window.setTimeout(() => {
-          setIsRedirecting(false); // Show content if taking too long
+          setIsRedirecting(false);
+          console.log('Navigation timeout - showing fallback content');
         }, 3000);
       }
     };
@@ -31,7 +40,7 @@ const Index = () => {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, user, redirectAttempted]);
 
   // Only show loading state for a reasonable time
   if (isRedirecting) {
