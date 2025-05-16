@@ -87,11 +87,17 @@ const Login = () => {
   // Check authentication status and redirect if needed
   useEffect(() => {
     // Clear the loading state after a short delay to prevent UI freeze
-    const loadingTimeout = setTimeout(() => setIsLoading(false), 2500);
+    const loadingTimeout = setTimeout(() => setIsLoading(false), 2000);
     
     const checkAuth = async () => {
       try {
-        // Check if the session is still valid
+        // First check if we already have a user in memory
+        if (isAuthenticated) {
+          navigate('/dashboard');
+          return;
+        }
+        
+        // Check if the session is valid
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -101,22 +107,32 @@ const Login = () => {
         }
         
         if (data.session) {
-          // If we have a valid session, navigate to appropriate dashboard
+          console.log("Valid session found, refreshing...");
+          // Attempt to refresh the token explicitly to avoid cookie issues
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Failed to refresh session:", refreshError);
+            // Clear potentially corrupted session
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return;
+          }
+          
+          // If we have a valid session, load the user profile
           await refreshSession();
+        } else {
+          console.log("No active session found");
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("Authentication check error:", error);
-      } finally {
         setIsLoading(false);
-        clearTimeout(loadingTimeout);
       }
     };
     
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    } else {
-      checkAuth();
-    }
+    // Start auth check
+    checkAuth();
     
     return () => clearTimeout(loadingTimeout);
   }, [isAuthenticated, navigate, refreshSession]);

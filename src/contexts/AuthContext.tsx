@@ -88,6 +88,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
+      // Explicitly refresh the session token to extend its validity
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error('Failed to refresh token:', refreshError);
+        // Force logout on token refresh failure
+        await supabase.auth.signOut();
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
+      
       console.log('Active session found, user ID:', sessionData.session.user.id);
       
       const appUser = await fetchUserProfile(sessionData.session.user.id);
@@ -105,6 +117,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         console.warn('Session exists but no user profile found');
+        // If we have a valid auth session but no user profile, sign out
+        await supabase.auth.signOut();
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -117,9 +131,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check for existing session on load
+  // Check for existing session on load and set up auto-refresh
   useEffect(() => {
-    console.log('AuthProvider mounted, refreshing session');
+    console.log('AuthProvider mounted, initializing auth state');
     
     // Set max timeout to prevent endless loading
     const timeoutId = setTimeout(() => {
@@ -127,7 +141,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Auth loading timed out');
     }, 5000);
     
+    // Initial session check
     refreshSession().then(() => clearTimeout(timeoutId));
+    
+    // Set up periodic token refresh to prevent session expiration
+    // This is critical to prevent the cookie problem
+    const refreshInterval = setInterval(() => {
+      // Only refresh if we're authenticated
+      if (isAuthenticated) {
+        console.log('Performing scheduled token refresh');
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Scheduled token refresh failed:', err);
+        });
+      }
+    }, 5 * 60 * 1000); // Refresh every 5 minutes
     
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -150,25 +177,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           } else {
             console.warn('User signed in but no profile found');
+            // Clean up if profile missing
+            await supabase.auth.signOut();
           }
         } catch (error) {
           console.error('Error processing auth state change:', error);
         } finally {
           setIsLoading(false);
         }
-      } else if (event === 'SIGNED_OUT') {
-        console.log('User signed out');
+      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        console.log('User signed out or deleted');
         setUser(null);
         setIsAuthenticated(false);
         navigate('/login');
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed successfully');
       }
     });
     
     return () => {
       clearTimeout(timeoutId);
+      clearInterval(refreshInterval);
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, isAuthenticated]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
