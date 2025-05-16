@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoginForm from '@/components/LoginForm';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 
@@ -14,6 +14,7 @@ const Login = () => {
   const [language, setLanguage] = useState('en');
   const [isProcessingReset, setIsProcessingReset] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
   
   // Load language preference on component mount
   useEffect(() => {
@@ -84,23 +85,25 @@ const Login = () => {
     handlePasswordReset();
   }, [searchParams, t, isProcessingReset, refreshSession]);
 
-  // Check authentication status and redirect if needed
+  // Handle authentication status and redirect
   useEffect(() => {
-    console.log('Login page - checking auth status. isAuthenticated:', isAuthenticated);
+    console.log('Login page - checking auth status. isAuthenticated:', isAuthenticated, 'redirectAttempted:', redirectAttempted);
     
     // Clear the loading state after a short delay to prevent UI freeze
     const loadingTimeout = setTimeout(() => setIsLoading(false), 1000);
     
-    // If user is already authenticated, redirect to appropriate dashboard
-    if (isAuthenticated && user) {
-      console.log('User is authenticated, redirecting to dashboard');
+    // If user is already authenticated, redirect once to appropriate dashboard
+    if (isAuthenticated && user && !redirectAttempted) {
+      console.log('User is authenticated, redirecting to dashboard once');
+      setRedirectAttempted(true);
+      
       const targetPath = user.role === 'admin' ? '/dashboard' : '/employee-dashboard';
       navigate(targetPath, { replace: true });
       return;
     }
     
-    // Only proceed with session check if not authenticated
-    if (!isAuthenticated) {
+    // Only proceed with session check if not authenticated and no redirect attempted yet
+    if (!isAuthenticated && !redirectAttempted) {
       const checkSession = async () => {
         try {
           const { data } = await supabase.auth.getSession();
@@ -124,7 +127,7 @@ const Login = () => {
     }
     
     return () => clearTimeout(loadingTimeout);
-  }, [isAuthenticated, user, navigate, refreshSession]);
+  }, [isAuthenticated, user, navigate, refreshSession, redirectAttempted]);
 
   // Render a loading state while checking authentication
   if (isLoading && !isProcessingReset) {
@@ -136,11 +139,6 @@ const Login = () => {
         </div>
       </div>
     );
-  }
-
-  // Only show login form if not authenticated
-  if (isAuthenticated && user) {
-    return null; // This will be unmounted as the redirect happens
   }
 
   return (

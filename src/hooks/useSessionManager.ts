@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { fetchUserProfile } from './useUserProfile';
 
 export const useSessionManager = () => {
@@ -96,12 +96,14 @@ export const useSessionManager = () => {
       if (error) {
         console.error('Login error:', error);
         toast.error('Invalid email or password');
+        setIsLoading(false);
         return false;
       }
       
       if (!data.user) {
         console.error('No user returned from auth');
         toast.error('Invalid email or password');
+        setIsLoading(false);
         return false;
       }
       
@@ -115,6 +117,7 @@ export const useSessionManager = () => {
         toast.error('User profile not found');
         // Sign out since profile is missing
         await supabase.auth.signOut();
+        setIsLoading(false);
         return false;
       }
       
@@ -123,14 +126,17 @@ export const useSessionManager = () => {
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
       
-      // Let the auth state change handle the redirect
+      // Redirect based on role - do this here to avoid race conditions
+      const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+      navigate(targetPath, { replace: true });
+      
+      setIsLoading(false);
       return true;
     } catch (error) {
       console.error('Unexpected login error:', error);
       toast.error('An error occurred during login');
-      return false;
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
 
@@ -142,7 +148,7 @@ export const useSessionManager = () => {
       await supabase.auth.signOut();
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/login');
+      navigate('/login', { replace: true });
       toast.success('You have been logged out');
     } catch (error) {
       console.error('Logout error:', error);
