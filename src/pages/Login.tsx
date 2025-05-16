@@ -86,21 +86,29 @@ const Login = () => {
 
   // Check authentication status and redirect if needed
   useEffect(() => {
+    // Clear the loading state after a short delay to prevent UI freeze
+    const loadingTimeout = setTimeout(() => setIsLoading(false), 2500);
+    
     const checkAuth = async () => {
-      // Add a timeout to ensure this doesn't run indefinitely
-      setTimeout(() => setIsLoading(false), 5000);
-      
       try {
         // Check if the session is still valid
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Session check error:", error);
+          setIsLoading(false);
+          return;
+        }
         
         if (data.session) {
-          navigate('/dashboard');
+          // If we have a valid session, navigate to appropriate dashboard
+          await refreshSession();
         }
       } catch (error) {
         console.error("Authentication check error:", error);
       } finally {
         setIsLoading(false);
+        clearTimeout(loadingTimeout);
       }
     };
     
@@ -109,7 +117,9 @@ const Login = () => {
     } else {
       checkAuth();
     }
-  }, [isAuthenticated, navigate]);
+    
+    return () => clearTimeout(loadingTimeout);
+  }, [isAuthenticated, navigate, refreshSession]);
 
   // Render a loading state while checking authentication
   if (isLoading && !isProcessingReset) {

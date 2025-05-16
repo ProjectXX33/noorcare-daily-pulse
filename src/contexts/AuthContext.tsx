@@ -96,6 +96,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('User profile set from session:', appUser);
         setUser(appUser);
         setIsAuthenticated(true);
+        
+        // Redirect to the appropriate dashboard based on role
+        if (appUser.role === 'admin') {
+          navigate('/dashboard');
+        } else {
+          navigate('/employee-dashboard');
+        }
       } else {
         console.warn('Session exists but no user profile found');
         setUser(null);
@@ -113,14 +120,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check for existing session on load
   useEffect(() => {
     console.log('AuthProvider mounted, refreshing session');
-    refreshSession();
     
-    // Set up session refresh interval
-    const intervalId = setInterval(() => {
-      refreshSession();
-    }, 60000); // Refresh every minute to prevent freezing after inactivity
+    // Set max timeout to prevent endless loading
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      console.log('Auth loading timed out');
+    }, 5000);
     
-    // Subscribe to auth changes
+    refreshSession().then(() => clearTimeout(timeoutId));
+    
+    // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
       
@@ -132,24 +141,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('User signed in:', appUser);
             setUser(appUser);
             setIsAuthenticated(true);
+            
+            // Redirect to the appropriate dashboard based on role
+            if (appUser.role === 'admin') {
+              navigate('/dashboard');
+            } else {
+              navigate('/employee-dashboard');
+            }
           } else {
             console.warn('User signed in but no profile found');
           }
         } catch (error) {
           console.error('Error processing auth state change:', error);
+        } finally {
+          setIsLoading(false);
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('User signed out');
         setUser(null);
         setIsAuthenticated(false);
+        navigate('/login');
       }
     });
     
     return () => {
-      clearInterval(intervalId);
+      clearTimeout(timeoutId);
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
