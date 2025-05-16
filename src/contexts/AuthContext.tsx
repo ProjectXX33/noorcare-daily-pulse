@@ -42,8 +42,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('id', sessionData.session.user.id)
           .single();
           
-        if (error || !userData) {
+        if (error) {
           console.error('Error fetching user data:', error);
+          // Don't show error toast on initial load to prevent unwanted notifications
+          setIsLoading(false);
+          return;
+        }
+        
+        if (!userData) {
+          console.error('No user data found');
           setIsLoading(false);
           return;
         }
@@ -74,14 +81,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Subscribe to auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Get user profile after sign in
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        try {
+          // Get user profile after sign in
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (error) {
+            console.error('Error fetching user profile:', error);
+            return;
+          }
           
-        if (!error && userData) {
+          if (!userData) {
+            console.error('No user data found after sign in');
+            return;
+          }
+          
           const appUser: User = {
             id: userData.id,
             username: userData.username,
@@ -95,6 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           setUser(appUser);
           setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Error processing auth state change:', error);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -129,8 +148,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', data.user.id)
         .single();
         
-      if (userError || !userData) {
+      if (userError) {
+        console.error('Error fetching user profile:', userError);
         toast.error('Error fetching user profile');
+        return false;
+      }
+      
+      if (!userData) {
+        toast.error('User profile not found');
         return false;
       }
       
