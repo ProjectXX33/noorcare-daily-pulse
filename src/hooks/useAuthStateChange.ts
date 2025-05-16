@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchUserProfile } from './useUserProfile';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 
 export interface AuthStateChangeProps {
@@ -82,7 +82,13 @@ export const useAuthStateChange = ({
           setUser(null);
           setIsAuthenticated(false);
           setIsLoading(false);
-          navigate('/login', { replace: true });
+          
+          // Don't navigate here since we already navigate in the logout function
+          // This prevents double navigation that can cause errors
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login') {
+            navigate('/login', { replace: true });
+          }
         }
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('Token refreshed successfully');

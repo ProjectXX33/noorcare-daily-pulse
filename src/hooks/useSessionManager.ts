@@ -145,15 +145,29 @@ export const useSessionManager = () => {
     try {
       console.log('Logging out...');
       setIsLoading(true);
-      await supabase.auth.signOut();
+      
+      // First update local state to prevent redirection attempts
       setUser(null);
       setIsAuthenticated(false);
+      
+      // Then navigate to login page
       navigate('/login', { replace: true });
-      toast.success('You have been logged out');
+      
+      // Finally sign out from Supabase
+      // This prevents errors when the auth state changes while redirecting
+      setTimeout(async () => {
+        try {
+          await supabase.auth.signOut();
+          toast.success('You have been logged out');
+        } catch (error) {
+          console.error('Delayed signout error:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 100);
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('An error occurred during logout');
-    } finally {
       setIsLoading(false);
     }
   };
