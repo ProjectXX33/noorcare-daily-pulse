@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { Task, Notification } from '@/types';
 
@@ -56,6 +55,37 @@ export async function fetchUserTasks(userId: string): Promise<Task[]> {
     }));
   } catch (error) {
     console.error('Error fetching user tasks:', error);
+    throw error;
+  }
+}
+
+export async function fetchEmployeeTasks(userId: string): Promise<Task[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        assignee:assigned_to (name)
+      `)
+      .eq('assigned_to', userId)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data.map((record: any) => ({
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      assignedTo: record.assigned_to,
+      assignedToName: record.assignee ? record.assignee.name : 'Unknown',
+      status: record.status,
+      progressPercentage: record.progress_percentage,
+      createdAt: new Date(record.created_at),
+      updatedAt: new Date(record.updated_at),
+      createdBy: record.created_by
+    }));
+  } catch (error) {
+    console.error('Error fetching employee tasks:', error);
     throw error;
   }
 }
@@ -133,6 +163,69 @@ export async function updateTaskStatus(
     if (error) throw error;
   } catch (error) {
     console.error('Error updating task status:', error);
+    throw error;
+  }
+}
+
+export async function updateTaskProgress(
+  taskId: string,
+  userId: string,
+  progressPercentage: number
+): Promise<Task> {
+  try {
+    // Get the current task to determine the status
+    const { data: taskData, error: taskError } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        assignee:assigned_to (name)
+      `)
+      .eq('id', taskId)
+      .single();
+    
+    if (taskError) throw taskError;
+    
+    // Determine the status based on the progress percentage
+    let status: 'On Hold' | 'In Progress' | 'Complete' = taskData.status;
+    if (progressPercentage === 0) {
+      status = 'On Hold';
+    } else if (progressPercentage === 100) {
+      status = 'Complete';
+    } else {
+      status = 'In Progress';
+    }
+    
+    // Update the task progress and status
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({
+        progress_percentage: progressPercentage,
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskId)
+      .select(`
+        *,
+        assignee:assigned_to (name)
+      `)
+      .single();
+      
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      assignedTo: data.assigned_to,
+      assignedToName: data.assignee ? data.assignee.name : 'Unknown',
+      status: data.status,
+      progressPercentage: data.progress_percentage,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+      createdBy: data.created_by
+    };
+  } catch (error) {
+    console.error('Error updating task progress:', error);
     throw error;
   }
 }
