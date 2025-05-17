@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { Task, User } from '@/types';
 import { toast } from 'sonner';
@@ -32,7 +31,8 @@ export const fetchTasks = async (): Promise<Task[]> => {
       assignedToName: task.assigned_to.name,
       createdBy: task.created_by.id,
       createdAt: new Date(task.created_at),
-      updatedAt: new Date(task.updated_at)
+      updatedAt: new Date(task.updated_at),
+      comments: task.comments || [] // Ensure comments are included
     }));
     
     console.log('Tasks fetched:', tasks);
@@ -46,7 +46,7 @@ export const fetchTasks = async (): Promise<Task[]> => {
 // Alias for fetchTasks to maintain compatibility with existing code
 export const fetchAllTasks = fetchTasks;
 
-// Fetch tasks for a specific user
+// Fetch tasks for a specific user - update to include comments
 export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
   try {
     console.log(`Fetching tasks for user ${userId}...`);
@@ -75,7 +75,8 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       assignedToName: task.assigned_to.name,
       createdBy: task.created_by.id,
       createdAt: new Date(task.created_at),
-      updatedAt: new Date(task.updated_at)
+      updatedAt: new Date(task.updated_at),
+      comments: task.comments || [] // Ensure comments are included
     }));
     
     console.log('User tasks fetched:', tasks);

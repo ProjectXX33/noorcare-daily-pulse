@@ -388,7 +388,7 @@ const EmployeeTasksPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Task Details Dialog */}
+      {/* Task Details Dialog - Add file upload here too */}
       {selectedTask && (
         <Dialog 
           open={!!selectedTask && !isProgressDialogOpen} 
@@ -427,6 +427,17 @@ const EmployeeTasksPage = () => {
                       <span className="text-xs text-gray-500">{selectedTask.progressPercentage}%</span>
                     </div>
                   </div>
+                </div>
+                
+                {/* Allow file uploads in details view too */}
+                <div className="pt-4 border-t">
+                  <h4 className="text-sm font-medium mb-3">Upload File</h4>
+                  <TaskFileUpload 
+                    taskId={selectedTask.id} 
+                    userId={user?.id || ''} 
+                    onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                    language={language}
+                  />
                 </div>
                 
                 {/* Show attachments */}

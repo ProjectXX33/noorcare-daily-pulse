@@ -39,7 +39,8 @@ import { toast } from "sonner";
 import { 
   fetchTasks, 
   createTask, 
-  sendNotification 
+  sendNotification, 
+  updateTask 
 } from '@/lib/tasksApi';
 import { fetchEmployees } from '@/lib/employeesApi';
 import { User, Task } from '@/types';
@@ -249,17 +250,20 @@ const AdminTasksPage = () => {
 
     setUpdatingTaskProgress(true);
     try {
-      // Fix: Ensure we include all required properties of the Task type
-      const updatedTask: Task = {
-        ...editingTask,
-        assignedToName: employees.find(emp => emp.id === editingTask.assignedTo)?.name || '',
-        createdBy: tasks.find(task => task.id === editingTask.id)?.createdBy || user.id,
-        createdAt: tasks.find(task => task.id === editingTask.id)?.createdAt || new Date(),
-        updatedAt: new Date(),
-        status: editingTask.progressPercentage === 100 ? 'Complete' : editingTask.status
-      };
+      // Call the updateTask API instead of just updating local state
+      const updatedTask = await updateTask(
+        editingTask.id,
+        {
+          title: editingTask.title,
+          description: editingTask.description,
+          assignedTo: editingTask.assignedTo,
+          status: editingTask.status,
+          progressPercentage: editingTask.progressPercentage
+        },
+        user.id
+      );
       
-      // Update tasks list
+      // Update local state with the response from the API
       setTasks(tasks.map(task => 
         task.id === updatedTask.id ? updatedTask : task
       ));
