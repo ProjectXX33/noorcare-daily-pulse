@@ -1,378 +1,385 @@
-import { supabase } from "@/lib/supabase";
-import { Task } from "@/types";
+
+import { supabase } from '@/lib/supabase';
+import { Task, User } from '@/types';
+import { toast } from 'sonner';
 
 // Fetch all tasks
-export async function fetchAllTasks(): Promise<Task[]> {
+export const fetchTasks = async (): Promise<Task[]> => {
   try {
+    console.log('Fetching all tasks...');
     const { data, error } = await supabase
       .from('tasks')
       .select(`
-        id,
-        title,
-        description,
-        assigned_to,
-        status,
-        progress_percentage,
-        created_at,
-        updated_at,
-        created_by,
-        users!assigned_to(name)
+        *,
+        assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
+        created_by:users!tasks_created_by_fkey (id, name, username, department, position)
       `)
       .order('created_at', { ascending: false });
+      
+    if (error) {
+      throw error;
+    }
     
-    if (error) throw error;
-    
-    return data.map(item => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      assignedTo: item.assigned_to,
-      assignedToName: item.users?.name || 'Unknown',
-      status: item.status as 'On Hold' | 'In Progress' | 'Complete',
-      progressPercentage: item.progress_percentage,
-      createdAt: new Date(item.created_at),
-      updatedAt: new Date(item.updated_at),
-      createdBy: item.created_by
+    // Map the data to match our Task interface
+    const tasks: Task[] = data.map(task => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      progressPercentage: task.progress_percentage,
+      assignedTo: {
+        id: task.assigned_to.id,
+        name: task.assigned_to.name,
+        username: task.assigned_to.username,
+        department: task.assigned_to.department,
+        position: task.assigned_to.position
+      },
+      createdBy: {
+        id: task.created_by.id,
+        name: task.created_by.name,
+        username: task.created_by.username,
+        department: task.created_by.department,
+        position: task.created_by.position
+      },
+      createdAt: new Date(task.created_at),
+      updatedAt: new Date(task.updated_at)
     }));
+    
+    console.log('Tasks fetched:', tasks);
+    return tasks;
   } catch (error) {
     console.error('Error fetching tasks:', error);
     throw error;
   }
-}
+};
 
-// Fetch tasks assigned to a specific employee
-export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
+// Fetch tasks for a specific user
+export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
   try {
+    console.log(`Fetching tasks for user ${userId}...`);
     const { data, error } = await supabase
       .from('tasks')
       .select(`
-        id,
-        title,
-        description,
-        assigned_to,
-        status,
-        progress_percentage,
-        created_at,
-        updated_at,
-        created_by,
-        users!assigned_to(name)
+        *,
+        assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
+        created_by:users!tasks_created_by_fkey (id, name, username, department, position)
       `)
-      .eq('assigned_to', employeeId)
+      .eq('assigned_to', userId)
       .order('created_at', { ascending: false });
+      
+    if (error) {
+      throw error;
+    }
     
-    if (error) throw error;
-    
-    return data.map(item => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      assignedTo: item.assigned_to,
-      assignedToName: item.users?.name || 'Unknown',
-      status: item.status as 'On Hold' | 'In Progress' | 'Complete',
-      progressPercentage: item.progress_percentage,
-      createdAt: new Date(item.created_at),
-      updatedAt: new Date(item.updated_at),
-      createdBy: item.created_by
+    // Map the data to match our Task interface
+    const tasks: Task[] = data.map(task => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      progressPercentage: task.progress_percentage,
+      assignedTo: {
+        id: task.assigned_to.id,
+        name: task.assigned_to.name,
+        username: task.assigned_to.username,
+        department: task.assigned_to.department,
+        position: task.assigned_to.position
+      },
+      createdBy: {
+        id: task.created_by.id,
+        name: task.created_by.name,
+        username: task.created_by.username,
+        department: task.created_by.department,
+        position: task.created_by.position
+      },
+      createdAt: new Date(task.created_at),
+      updatedAt: new Date(task.updated_at)
     }));
+    
+    console.log('User tasks fetched:', tasks);
+    return tasks;
   } catch (error) {
-    console.error('Error fetching employee tasks:', error);
+    console.error(`Error fetching tasks for user ${userId}:`, error);
     throw error;
   }
-}
+};
 
 // Create a new task
-export async function createTask(task: {
-  title: string;
-  description: string;
-  assignedTo: string;
-  status: 'On Hold' | 'In Progress' | 'Complete';
-  progressPercentage: number;
-  createdBy: string;
-}): Promise<Task> {
+export const createTask = async (
+  task: {
+    title: string;
+    description?: string;
+    assignedTo: string;
+    status: string;
+  }, 
+  createdBy: string
+): Promise<Task> => {
   try {
+    console.log('Creating task:', task);
+    
     const { data, error } = await supabase
       .from('tasks')
-      .insert({
+      .insert([{
         title: task.title,
         description: task.description,
         assigned_to: task.assignedTo,
         status: task.status,
-        progress_percentage: task.progressPercentage,
-        created_by: task.createdBy
-      })
+        created_by: createdBy,
+        progress_percentage: 0,
+      }])
       .select(`
-        id,
-        title,
-        description,
-        assigned_to,
-        status,
-        progress_percentage,
-        created_at,
-        updated_at,
-        created_by,
-        users!assigned_to(name)
+        *,
+        assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
+        created_by:users!tasks_created_by_fkey (id, name, username, department, position)
       `)
       .single();
     
-    if (error) throw error;
-    
-    // Send notification to the assigned user
-    try {
-      await sendNotification({
-        userId: task.assignedTo,
-        title: 'New Task Assigned',
-        message: `You have been assigned a new task: "${task.title}"`,
-        adminId: task.createdBy,
-        relatedTo: 'task',
-        relatedId: data.id
-      });
-    } catch (notifError) {
-      console.error('Error sending task assignment notification:', notifError);
-      // Don't throw error as the main task was created successfully
+    if (error) {
+      throw error;
     }
     
-    return {
+    // Create task notification for assigned user
+    if (data.assigned_to.id !== createdBy) {
+      await createTaskNotification(
+        data.assigned_to.id, 
+        data.id, 
+        data.title, 
+        'assigned'
+      );
+    }
+    
+    // Map the data to match our Task interface
+    const newTask: Task = {
       id: data.id,
       title: data.title,
       description: data.description,
-      assignedTo: data.assigned_to,
-      assignedToName: data.users?.name || 'Unknown',
-      status: data.status as 'On Hold' | 'In Progress' | 'Complete',
+      status: data.status,
       progressPercentage: data.progress_percentage,
+      assignedTo: {
+        id: data.assigned_to.id,
+        name: data.assigned_to.name,
+        username: data.assigned_to.username,
+        department: data.assigned_to.department,
+        position: data.assigned_to.position
+      },
+      createdBy: {
+        id: data.created_by.id,
+        name: data.created_by.name,
+        username: data.created_by.username,
+        department: data.created_by.department,
+        position: data.created_by.position
+      },
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      createdBy: data.created_by
+      updatedAt: new Date(data.updated_at)
     };
+    
+    console.log('Task created:', newTask);
+    return newTask;
   } catch (error) {
     console.error('Error creating task:', error);
     throw error;
   }
-}
+};
 
-// Update task progress
-export async function updateTaskProgress(
+// Update an existing task
+export const updateTask = async (
   taskId: string,
-  userId: string,
-  progressPercentage: number
-): Promise<Task> {
+  updates: {
+    title?: string;
+    description?: string;
+    status?: string;
+    assignedTo?: string;
+    progressPercentage?: number;
+  },
+  currentUserId: string
+): Promise<Task> => {
   try {
-    // Get the current task to determine the status and check if user can update
-    const { data: taskData, error: taskError } = await supabase
+    console.log(`Updating task ${taskId}:`, updates);
+    
+    // Convert the updates to match database column names
+    const dbUpdates: any = {};
+    if (updates.title) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.status) dbUpdates.status = updates.status;
+    if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
+    if (updates.progressPercentage !== undefined) dbUpdates.progress_percentage = updates.progressPercentage;
+    
+    // Get current task details for notification purposes
+    const { data: currentTask } = await supabase
       .from('tasks')
-      .select(`
-        id,
-        title,
-        description,
-        assigned_to,
-        status,
-        progress_percentage,
-        created_at,
-        updated_at,
-        created_by,
-        users!assigned_to(name)
-      `)
+      .select('*')
       .eq('id', taskId)
       .single();
     
-    if (taskError) throw taskError;
-    
-    // Check if the user is either the creator or the assigned user
-    if (taskData.assigned_to !== userId && taskData.created_by !== userId) {
-      throw new Error('You do not have permission to update this task');
-    }
-    
-    // Determine the status based on the progress percentage
-    let status: 'On Hold' | 'In Progress' | 'Complete' = taskData.status as 'On Hold' | 'In Progress' | 'Complete';
-    if (progressPercentage === 0) {
-      status = 'On Hold';
-    } else if (progressPercentage === 100) {
-      status = 'Complete';
-    } else {
-      status = 'In Progress';
-    }
-    
-    // Update the task progress and status
+    // Update the task
     const { data, error } = await supabase
       .from('tasks')
-      .update({
-        progress_percentage: progressPercentage,
-        status: status,
-        updated_at: new Date().toISOString()
-      })
+      .update(dbUpdates)
       .eq('id', taskId)
       .select(`
-        id,
-        title,
-        description,
-        assigned_to,
-        status,
-        progress_percentage,
-        created_at,
-        updated_at,
-        created_by,
-        users!assigned_to(name)
+        *,
+        assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
+        created_by:users!tasks_created_by_fkey (id, name, username, department, position)
       `)
       .single();
-      
-    if (error) throw error;
     
-    // If the status changed and the user is the assignee (not admin), notify the creator
-    if (userId === taskData.assigned_to && status !== taskData.status) {
-      try {
-        await sendNotification({
-          userId: taskData.created_by,
-          title: 'Task Status Updated',
-          message: `Task "${taskData.title}" status has been updated to ${status} by ${taskData.users?.name || 'Assigned user'}`,
-          adminId: userId, // Using assignee's ID as admin ID here
-          relatedTo: 'task',
-          relatedId: taskId
-        });
-      } catch (notifError) {
-        console.error('Error sending status update notification:', notifError);
-        // Don't throw error as the main update was successful
+    if (error) {
+      throw error;
+    }
+    
+    // Create task notification if assignment changed
+    if (updates.assignedTo && currentTask && currentTask.assigned_to !== updates.assignedTo) {
+      await createTaskNotification(
+        updates.assignedTo, 
+        taskId, 
+        data.title, 
+        'assigned'
+      );
+    }
+    
+    // Create status update notification
+    if (updates.status && currentTask && currentTask.status !== updates.status) {
+      // Notify task creator if status updated by assignee
+      if (currentUserId === data.assigned_to.id && data.created_by.id !== currentUserId) {
+        await createTaskNotification(
+          data.created_by.id, 
+          taskId, 
+          data.title, 
+          'status_update', 
+          updates.status
+        );
+      }
+      
+      // Notify assignee if status updated by someone else
+      if (currentUserId !== data.assigned_to.id) {
+        await createTaskNotification(
+          data.assigned_to.id, 
+          taskId, 
+          data.title, 
+          'status_update', 
+          updates.status
+        );
       }
     }
     
-    return {
+    // Map the data to match our Task interface
+    const updatedTask: Task = {
       id: data.id,
       title: data.title,
       description: data.description,
-      assignedTo: data.assigned_to,
-      assignedToName: data.users?.name || 'Unknown',
-      status: data.status as 'On Hold' | 'In Progress' | 'Complete',
+      status: data.status,
       progressPercentage: data.progress_percentage,
+      assignedTo: {
+        id: data.assigned_to.id,
+        name: data.assigned_to.name,
+        username: data.assigned_to.username,
+        department: data.assigned_to.department,
+        position: data.assigned_to.position
+      },
+      createdBy: {
+        id: data.created_by.id,
+        name: data.created_by.name,
+        username: data.created_by.username,
+        department: data.created_by.department,
+        position: data.created_by.position
+      },
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
-      createdBy: data.created_by
+      updatedAt: new Date(data.updated_at)
     };
+    
+    console.log('Task updated:', updatedTask);
+    return updatedTask;
   } catch (error) {
-    console.error('Error updating task progress:', error);
+    console.error(`Error updating task ${taskId}:`, error);
     throw error;
   }
-}
+};
 
-// Send a notification to a user
-export async function sendNotification({
-  userId,
-  title,
-  message,
-  adminId,
-  sendToAll = false,
-  relatedTo,
-  relatedId
-}: {
-  userId?: string;
-  title: string;
-  message: string;
-  adminId: string;
-  sendToAll?: boolean;
-  relatedTo?: string;
-  relatedId?: string;
-}): Promise<void> {
+// Delete a task
+export const deleteTask = async (taskId: string): Promise<void> => {
   try {
-    if (sendToAll) {
-      // Get all users except the admin
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('id')
-        .neq('id', adminId)
-        .eq('role', 'employee');
-      
-      if (usersError) throw usersError;
-      
-      // Create notification for each user
-      const notificationsToInsert = users.map(user => ({
-        user_id: user.id,
+    console.log(`Deleting task ${taskId}...`);
+    
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId);
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log(`Task ${taskId} deleted successfully`);
+  } catch (error) {
+    console.error(`Error deleting task ${taskId}:`, error);
+    throw error;
+  }
+};
+
+// Create a notification for task-related events
+const createTaskNotification = async (
+  userId: string, 
+  taskId: string, 
+  taskTitle: string, 
+  type: 'assigned' | 'status_update' | 'completed', 
+  status?: string
+): Promise<void> => {
+  try {
+    let title = '';
+    let message = '';
+    
+    switch (type) {
+      case 'assigned':
+        title = 'New Task Assigned';
+        message = `You've been assigned a new task: ${taskTitle}`;
+        break;
+      case 'status_update':
+        title = 'Task Status Updated';
+        message = `Task "${taskTitle}" status has been updated to ${status}`;
+        break;
+      case 'completed':
+        title = 'Task Completed';
+        message = `Task "${taskTitle}" has been marked as complete`;
+        break;
+    }
+    
+    const { error } = await supabase
+      .from('notifications')
+      .insert([{
+        user_id: userId,
         title,
         message,
-        related_to: relatedTo,
-        related_id: relatedId
-      }));
-      
-      const { error } = await supabase
-        .from('notifications')
-        .insert(notificationsToInsert);
-      
-      if (error) throw error;
-    } else if (userId) {
-      // Create notification for a specific user
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          title,
-          message,
-          related_to: relatedTo,
-          related_id: relatedId
-        });
-      
-      if (error) throw error;
-    } else {
-      throw new Error('Either userId must be provided or sendToAll must be true');
+        related_to: 'task',
+        related_id: taskId
+      }]);
+    
+    if (error) {
+      console.error('Error creating task notification:', error);
     }
   } catch (error) {
-    console.error('Error sending notification:', error);
-    throw error;
+    console.error('Error creating task notification:', error);
   }
-}
+};
 
-// Subscribe to real-time task changes
-export function subscribeToTaskChanges(callback: (tasks: Task[]) => void): () => void {
-  // Set up subscription
-  const channel = supabase
-    .channel('tasks-channel')
+// Subscribe to task changes
+export const subscribeToTaskChanges = (callback: (tasks: Task[]) => void): () => void => {
+  // Initialize with current data
+  fetchTasks().then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel('public:tasks')
     .on('postgres_changes', 
-      {
-        event: '*', 
-        schema: 'public',
-        table: 'tasks'
-      }, 
-      async (payload) => {
-        console.log('Task change detected:', payload);
-        try {
-          // Fetch all tasks again when there's a change
-          const tasks = await fetchAllTasks();
-          callback(tasks);
-        } catch (error) {
-          console.error('Error fetching updated tasks:', error);
-        }
+      { event: '*', schema: 'public', table: 'tasks' }, 
+      () => {
+        // When there's any change, fetch the updated list
+        fetchTasks().then(callback).catch(console.error);
       }
     )
     .subscribe();
-
+  
   // Return unsubscribe function
   return () => {
-    supabase.removeChannel(channel);
+    subscription.unsubscribe();
   };
-}
-
-// Subscribe to real-time task changes for a specific employee
-export function subscribeToEmployeeTasks(employeeId: string, callback: (tasks: Task[]) => void): () => void {
-  // Set up subscription
-  const channel = supabase
-    .channel(`tasks-employee-${employeeId}`)
-    .on('postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'tasks',
-        filter: `assigned_to=eq.${employeeId}`
-      },
-      async (payload) => {
-        console.log('Employee task change detected:', payload);
-        try {
-          // Fetch employee tasks again when there's a change
-          const tasks = await fetchEmployeeTasks(employeeId);
-          callback(tasks);
-        } catch (error) {
-          console.error('Error fetching updated employee tasks:', error);
-        }
-      }
-    )
-    .subscribe();
-
-  // Return unsubscribe function
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}
+};

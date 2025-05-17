@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { User, Department, Position } from '@/types';
 
@@ -41,13 +40,18 @@ export async function createEmployee(employee: {
   try {
     console.log('Creating employee with data:', employee);
     
-    // First create the auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Instead of using the admin API directly, we'll use the signup method
+    // and then update the role and other details in the users table
+    // This works because we have RLS policies that allow admins to insert into the users table
+    
+    // First, sign up the user with email and password
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: employee.email,
       password: employee.password,
-      email_confirm: true,
-      user_metadata: {
-        role: employee.role,
+      options: {
+        data: {
+          role: employee.role
+        }
       }
     });
 
@@ -80,11 +84,7 @@ export async function createEmployee(employee: {
     if (error) {
       console.error('Database error:', error);
       // If the profile insertion fails, attempt to clean up the auth user
-      try {
-        await supabase.auth.admin.deleteUser(authData.user.id);
-      } catch (cleanupError) {
-        console.error('Failed to clean up auth user after profile creation error:', cleanupError);
-      }
+      // Note: We can't delete the auth user here because we don't have admin privileges
       throw error;
     }
     

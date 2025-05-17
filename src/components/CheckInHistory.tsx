@@ -1,66 +1,64 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckIn } from '@/types';
-import { format, differenceInHours, differenceInMinutes } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format } from 'date-fns';
+import { CheckIn } from '@/contexts/CheckInContext';
 
 interface CheckInHistoryProps {
   checkIns: CheckIn[];
-  title?: string;
+  title: string;
 }
 
-const CheckInHistory: React.FC<CheckInHistoryProps> = ({ 
-  checkIns,
-  title = "Recent Check-ins" 
-}) => {
-  // Sort check-ins by timestamp (most recent first)
-  const sortedCheckIns = [...checkIns].sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-
-  // Calculate duration between check-in and check-out
-  const calculateDuration = (checkIn: CheckIn) => {
-    if (!checkIn.checkOutTime) return "Not checked out";
+const CheckInHistory: React.FC<CheckInHistoryProps> = ({ checkIns, title }) => {
+  // Function to calculate hours worked
+  const calculateHoursWorked = (checkIn: CheckIn): string => {
+    if (!checkIn.checkoutTime) return "Not recorded";
     
     const checkInTime = new Date(checkIn.timestamp);
-    const checkOutTime = new Date(checkIn.checkOutTime);
+    const checkOutTime = new Date(checkIn.checkoutTime);
     
-    const hours = differenceInHours(checkOutTime, checkInTime);
-    const minutes = differenceInMinutes(checkOutTime, checkInTime) % 60;
+    const diffInMs = checkOutTime.getTime() - checkInTime.getTime();
+    const hours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const minutes = Math.round((diffInMs % (1000 * 60 * 60)) / (1000 * 60));
     
     return `${hours}h ${minutes}m`;
   };
+  
+  // Function to format time in 12-hour format
+  const formatTime = (date: Date | undefined): string => {
+    if (!date) return "Not recorded";
+    return format(new Date(date), 'h:mm a');
+  };
 
   return (
-    <Card className="col-span-3">
+    <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>Your attendance history</CardDescription>
       </CardHeader>
       <CardContent>
-        {sortedCheckIns.length === 0 ? (
-          <p className="text-sm text-gray-500">No check-in history found.</p>
+        {checkIns.length === 0 ? (
+          <p className="text-gray-500">No check-in history available.</p>
         ) : (
-          <div className="space-y-4">
-            {sortedCheckIns.map((checkIn) => (
-              <div key={checkIn.id} className="flex justify-between border-b pb-2">
-                <div>
-                  <p className="font-medium">{format(new Date(checkIn.timestamp), 'EEEE, MMMM d, yyyy')}</p>
-                  <p className="text-sm text-gray-500">{checkIn.userName}</p>
+          <div className="grid gap-4">
+            {checkIns.map((checkIn) => (
+              <div key={checkIn.id} className="bg-gray-50 p-4 rounded-lg border">
+                <div className="flex flex-col sm:flex-row justify-between mb-2">
+                  <h3 className="font-medium">
+                    {format(new Date(checkIn.timestamp), 'EEEE, MMMM d, yyyy')}
+                  </h3>
+                  <span className="text-gray-600">
+                    {calculateHoursWorked(checkIn)}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <p className="font-medium text-primary">In: {format(new Date(checkIn.timestamp), 'h:mm a')}</p>
-                      {checkIn.checkOutTime && (
-                        <p className="text-sm text-gray-700">Out: {format(new Date(checkIn.checkOutTime), 'h:mm a')}</p>
-                      )}
-                    </div>
-                    <div className="ml-4 bg-gray-100 px-2 py-1 rounded">
-                      <p className="text-xs font-medium">{calculateDuration(checkIn)}</p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between sm:justify-start gap-2">
+                    <span className="text-gray-600">Check-in:</span>
+                    <span className="font-medium">{formatTime(checkIn.timestamp)}</span>
                   </div>
-                  <p className="text-sm text-gray-500">{checkIn.department}</p>
+                  <div className="flex justify-between sm:justify-start gap-2">
+                    <span className="text-gray-600">Check-out:</span>
+                    <span className="font-medium">{formatTime(checkIn.checkoutTime)}</span>
+                  </div>
                 </div>
               </div>
             ))}
