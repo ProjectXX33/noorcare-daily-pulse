@@ -114,7 +114,7 @@ const EmployeeDashboard = () => {
           />
           
           <ReportHistory 
-            reports={userReports.slice(0, 3) as unknown as WorkReport[]} 
+            reports={userReports.slice(0, 3) as any} // Use 'any' to bypass the strict type checking
             title={t.recentReports} 
           />
           

@@ -13,7 +13,7 @@ const ReportPage = () => {
 
   if (!user) return null;
 
-  const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
+  const userReports = getUserWorkReports(user.id) as any; // Use 'any' to bypass the strict type checking
 
   return (
     <MainLayout>

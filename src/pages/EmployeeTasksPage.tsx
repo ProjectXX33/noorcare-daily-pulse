@@ -147,7 +147,8 @@ const EmployeeTasksPage = () => {
         selectedTask.id,
         {
           progressPercentage: progressValue
-        }
+        },
+        user.id // Adding the missing userId argument
       );
       
       // Update the task in the list

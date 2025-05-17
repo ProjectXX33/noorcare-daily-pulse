@@ -1,4 +1,3 @@
-
 export type User = {
   id: string;
   username: string;
@@ -35,6 +34,7 @@ export type WorkReport = {
   fileAttachments?: string[];
   department: Department;
   position: Position;
+  createdAt: Date; // Added this property to match with CheckInContext's WorkReport
 };
 
 export type Notification = {
