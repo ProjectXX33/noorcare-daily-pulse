@@ -290,6 +290,12 @@ const EmployeeTasksPage = () => {
     }
   };
 
+  const handleStatusChange = (value: string) => {
+    if (value === 'On Hold' || value === 'In Progress' || value === 'Complete') {
+      setTaskStatus(value);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -384,7 +390,7 @@ const EmployeeTasksPage = () => {
                       <Label>{t.status}</Label>
                       <Select
                         value={taskStatus}
-                        onValueChange={setTaskStatus}
+                        onValueChange={handleStatusChange}
                       >
                         <SelectTrigger className="mt-1">
                           <SelectValue placeholder={t.selectStatus} />
@@ -428,10 +434,7 @@ const EmployeeTasksPage = () => {
                     user={user}
                     comments={selectedTask.comments || []}
                     onCommentAdded={(newComments) => {
-                      // Update the selected task comments
                       setSelectedTask({...selectedTask, comments: newComments});
-                      
-                      // Update the task in the tasks array
                       setTasks(tasks.map(task => 
                         task.id === selectedTask.id ? {...task, comments: newComments} : task
                       ));
