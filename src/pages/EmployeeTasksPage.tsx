@@ -21,6 +21,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import TaskFileUpload from '@/components/TaskFileUpload';
 import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const EmployeeTasksPage = () => {
   const { user } = useAuth();
@@ -280,85 +281,101 @@ const EmployeeTasksPage = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.updateTaskProgress}</DialogTitle>
             <DialogDescription>
               {t.setProgressPercentage}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="space-y-6">
-              {selectedTask && (
-                <>
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">{t.task}: {selectedTask.title}</h4>
-                    <div className="text-sm text-gray-500 mb-4">{selectedTask.description}</div>
+          
+          {selectedTask && (
+            <Tabs defaultValue="progress" className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="progress">Progress</TabsTrigger>
+                <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsTrigger value="comments">Comments</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="progress" className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium mb-1">{t.task}: {selectedTask.title}</h4>
+                  <div className="text-sm text-gray-500 mb-4">{selectedTask.description}</div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{t.progress}</span>
+                      <span className="text-sm font-medium">{progressValue}%</span>
+                    </div>
+                    <Slider
+                      value={[progressValue]}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onValueChange={(value) => setProgressValue(value[0])}
+                      className="w-full"
+                    />
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="flex flex-col space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{t.progress}</span>
-                        <span className="text-sm font-medium">{progressValue}%</span>
+                  <div className="pt-4">
+                    <div className="p-3 bg-gray-50 rounded-md border">
+                      <div className="flex items-center mb-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                        <span className="text-sm font-medium">Current Status: {selectedTask.status}</span>
                       </div>
-                      <Slider
-                        value={[progressValue]}
-                        min={0}
-                        max={100}
-                        step={5}
-                        onValueChange={(value) => setProgressValue(value[0])}
-                        className="w-full"
-                      />
-                    </div>
-                    
-                    {/* Add file upload component */}
-                    <div className="pt-4 border-t">
-                      <h4 className="text-sm font-medium mb-3">Upload File</h4>
-                      <TaskFileUpload 
-                        taskId={selectedTask.id} 
-                        userId={user?.id || ''} 
-                        onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
-                        language={language}
-                      />
-                    </div>
-                    
-                    {/* Show existing attachments */}
-                    <div className="pt-4 border-t">
-                      <TaskAttachmentsList 
-                        taskId={selectedTask.id} 
-                        refresh={attachmentsRefreshKey}
-                        language={language}
-                      />
-                    </div>
-                    
-                    {/* Add comments section */}
-                    <div className="pt-4 border-t">
-                      {user && selectedTask && (
-                        <TaskComments
-                          taskId={selectedTask.id}
-                          user={user}
-                          comments={selectedTask.comments || []}
-                          onCommentAdded={(newComments) => {
-                            // Update the task comments in the local state
-                            setTasks(tasks.map(task => 
-                              task.id === selectedTask.id 
-                                ? {...task, comments: newComments} 
-                                : task
-                            ));
-                            
-                            // Update the selected task with new comments
-                            setSelectedTask({...selectedTask, comments: newComments});
-                          }}
-                          language={language}
-                        />
-                      )}
+                      <div className="text-xs text-gray-500">
+                        {progressValue === 100 ? 
+                          "Task will be marked as Complete when you save changes" : 
+                          "Update the slider to reflect your current progress"}
+                      </div>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="files" className="space-y-4">
+                <TaskFileUpload 
+                  taskId={selectedTask.id} 
+                  userId={user?.id || ''} 
+                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                  language={language}
+                />
+                
+                <div className="pt-4">
+                  <TaskAttachmentsList 
+                    taskId={selectedTask.id} 
+                    refresh={attachmentsRefreshKey}
+                    language={language}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="comments" className="space-y-4">
+                {user && (
+                  <TaskComments
+                    taskId={selectedTask.id}
+                    user={user}
+                    comments={selectedTask.comments || []}
+                    onCommentAdded={(newComments) => {
+                      // Update the task comments in the local state
+                      setTasks(tasks.map(task => 
+                        task.id === selectedTask.id 
+                          ? {...task, comments: newComments} 
+                          : task
+                      ));
+                      
+                      // Update the selected task with new comments
+                      setSelectedTask({...selectedTask, comments: newComments});
+                    }}
+                    language={language}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+          
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
             <Button 
               variant="outline" 
@@ -372,7 +389,7 @@ const EmployeeTasksPage = () => {
             <Button 
               onClick={handleUpdateProgress} 
               disabled={updating} 
-              className="relative overflow-hidden"
+              className="relative"
             >
               {updating ? (
                 <div className="flex items-center">
@@ -380,9 +397,6 @@ const EmployeeTasksPage = () => {
                   {t.updatingProgress}
                 </div>
               ) : t.save}
-              {!updating && (
-                <span className="absolute inset-0 w-full h-full bg-primary/10 animate-pulse-slow" style={{ opacity: 0 }}></span>
-              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -402,8 +416,15 @@ const EmployeeTasksPage = () => {
             <DialogHeader>
               <DialogTitle>{t.taskDetails}</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-6">
+            
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsTrigger value="comments">Comments</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="space-y-4">
                 <div>
                   <h3 className="text-lg font-medium">{selectedTask.title}</h3>
                   <p className="text-sm text-gray-500 mt-1">{selectedTask.description}</p>
@@ -428,51 +449,46 @@ const EmployeeTasksPage = () => {
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+              
+              <TabsContent value="files" className="space-y-4">
+                <TaskFileUpload 
+                  taskId={selectedTask.id} 
+                  userId={user?.id || ''} 
+                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                  language={language}
+                />
                 
-                {/* Allow file uploads in details view too */}
-                <div className="pt-4 border-t">
-                  <h4 className="text-sm font-medium mb-3">Upload File</h4>
-                  <TaskFileUpload 
-                    taskId={selectedTask.id} 
-                    userId={user?.id || ''} 
-                    onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                <TaskAttachmentsList 
+                  taskId={selectedTask.id} 
+                  refresh={attachmentsRefreshKey}
+                  language={language}
+                />
+              </TabsContent>
+              
+              <TabsContent value="comments" className="space-y-4">
+                {user && (
+                  <TaskComments
+                    taskId={selectedTask.id}
+                    user={user}
+                    comments={selectedTask.comments || []}
+                    onCommentAdded={(newComments) => {
+                      // Update the task comments in the local state
+                      setTasks(tasks.map(task => 
+                        task.id === selectedTask.id 
+                          ? {...task, comments: newComments} 
+                          : task
+                      ));
+                      
+                      // Update the selected task with new comments
+                      setSelectedTask({...selectedTask, comments: newComments});
+                    }}
                     language={language}
                   />
-                </div>
-                
-                {/* Show attachments */}
-                <div className="pt-4 border-t">
-                  <TaskAttachmentsList 
-                    taskId={selectedTask.id} 
-                    refresh={attachmentsRefreshKey}
-                    language={language}
-                  />
-                </div>
-                
-                {/* Show comments */}
-                <div className="pt-4 border-t">
-                  {user && (
-                    <TaskComments
-                      taskId={selectedTask.id}
-                      user={user}
-                      comments={selectedTask.comments || []}
-                      onCommentAdded={(newComments) => {
-                        // Update the task comments in the local state
-                        setTasks(tasks.map(task => 
-                          task.id === selectedTask.id 
-                            ? {...task, comments: newComments} 
-                            : task
-                        ));
-                        
-                        // Update the selected task with new comments
-                        setSelectedTask({...selectedTask, comments: newComments});
-                      }}
-                      language={language}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
+                )}
+              </TabsContent>
+            </Tabs>
+            
             <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
               <DialogClose asChild>
                 <Button variant="outline">

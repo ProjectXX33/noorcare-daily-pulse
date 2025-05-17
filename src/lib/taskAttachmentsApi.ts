@@ -9,12 +9,34 @@ export const uploadTaskAttachment = async (
   userId: string
 ): Promise<{ id: string; fileName: string; filePath: string; fileType: string } | null> => {
   try {
+    console.log('Starting file upload process for task:', taskId);
+    
     // Generate a unique path for the file
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `${userId}/${taskId}/${fileName}`;
 
+    console.log('Generated file path:', filePath);
+
+    // First check if the task-attachments bucket exists, if not create it
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(bucket => bucket.name === 'task-attachments');
+    
+    if (!bucketExists) {
+      console.log('Creating task-attachments bucket');
+      const { error: bucketError } = await supabase.storage.createBucket('task-attachments', {
+        public: false,
+        fileSizeLimit: 10485760, // 10MB
+      });
+      
+      if (bucketError) {
+        console.error('Error creating bucket:', bucketError);
+        throw bucketError;
+      }
+    }
+
     // Upload the file to storage
+    console.log('Uploading file to storage...');
     const { error: uploadError } = await supabase.storage
       .from('task-attachments')
       .upload(filePath, file);
@@ -24,6 +46,8 @@ export const uploadTaskAttachment = async (
       throw uploadError;
     }
 
+    console.log('File uploaded successfully, creating database record');
+    
     // Create an attachment record in the database
     const { data: attachment, error: dbError } = await supabase
       .from('task_attachments')
@@ -41,6 +65,8 @@ export const uploadTaskAttachment = async (
       console.error('Error creating attachment record:', dbError);
       throw dbError;
     }
+
+    console.log('Attachment record created:', attachment);
 
     return {
       id: attachment.id,
