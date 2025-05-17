@@ -56,6 +56,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
     }
     
     setIsSubmitting(true);
+    console.log('Adding comment to task:', taskId);
     
     try {
       const success = await addTaskComment(
@@ -67,10 +68,11 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
       
       if (success) {
         toast.success(t.commentAdded);
+        console.log('Comment added successfully');
         
         // Add comment to local state
         const newCommentObj = {
-          id: Date.now().toString(),
+          id: Date.now().toString(), // This will be replaced by the actual UUID on the backend
           userId: user.id,
           userName: user.name,
           text: newComment,
@@ -81,6 +83,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
         onCommentAdded(updatedComments);
         setNewComment('');
       } else {
+        console.error('Failed to add comment');
         toast.error(t.error);
       }
     } catch (error) {

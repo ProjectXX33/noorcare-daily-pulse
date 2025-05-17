@@ -85,17 +85,20 @@ const TaskFileUpload: React.FC<TaskFileUploadProps> = ({
     if (!selectedFile || !taskId || !userId) return;
     
     setIsUploading(true);
+    console.log('Starting upload with:', { taskId, userId, fileName: selectedFile.name });
     
     try {
       const result = await uploadTaskAttachment(taskId, selectedFile, userId);
       
       if (result) {
         toast.success(t.fileUploaded);
+        console.log('Upload successful:', result);
         setSelectedFile(null);
         if (onUploadComplete) {
           onUploadComplete();
         }
       } else {
+        console.error('Upload returned null result');
         toast.error(t.fileUploadFailed);
       }
     } catch (error) {

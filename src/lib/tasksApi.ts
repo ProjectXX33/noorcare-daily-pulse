@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { Task, User } from '@/types';
 import { toast } from 'sonner';
@@ -316,7 +317,7 @@ export const addTaskComment = async (
     
     // Create new comment
     const newComment = {
-      id: uuidv4(),
+      id: uuidv4(), // This will now work correctly
       userId,
       userName,
       text: comment,
