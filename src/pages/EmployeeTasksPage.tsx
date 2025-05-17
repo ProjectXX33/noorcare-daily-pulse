@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,7 +147,7 @@ const EmployeeTasksPage = () => {
         {
           progressPercentage: progressValue
         },
-        user.id // Adding the missing userId argument
+        user.id
       );
       
       // Update the task in the list
@@ -156,7 +155,9 @@ const EmployeeTasksPage = () => {
         task.id === updatedTask.id ? updatedTask : task
       ));
       
+      // Close the dialog after successful update
       setIsProgressDialogOpen(false);
+      setSelectedTask(null);
       toast.success(t.progressUpdated);
     } catch (error) {
       console.error("Error updating task progress:", error);
@@ -262,7 +263,19 @@ const EmployeeTasksPage = () => {
       </div>
 
       {/* Update Progress Dialog */}
-      <Dialog open={isProgressDialogOpen} onOpenChange={setIsProgressDialogOpen}>
+      <Dialog 
+        open={isProgressDialogOpen} 
+        onOpenChange={(open) => {
+          setIsProgressDialogOpen(open);
+          // If dialog is closing, reset the selected task
+          if (!open) {
+            // We keep the selectedTask if it's needed for the task details dialog
+            if (!selectedTask) {
+              setSelectedTask(null);
+            }
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.updateTaskProgress}</DialogTitle>
@@ -300,16 +313,29 @@ const EmployeeTasksPage = () => {
             </div>
           </div>
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button variant="outline" onClick={() => setIsProgressDialogOpen(false)} disabled={updating}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsProgressDialogOpen(false);
+              }} 
+              disabled={updating}
+            >
               {t.cancel}
             </Button>
-            <Button onClick={handleUpdateProgress} disabled={updating}>
+            <Button 
+              onClick={handleUpdateProgress} 
+              disabled={updating} 
+              className="relative overflow-hidden"
+            >
               {updating ? (
                 <div className="flex items-center">
                   <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                   {t.updatingProgress}
                 </div>
               ) : t.save}
+              {!updating && (
+                <span className="absolute inset-0 w-full h-full bg-primary/10 animate-pulse-slow" style={{ opacity: 0 }}></span>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -317,7 +343,14 @@ const EmployeeTasksPage = () => {
 
       {/* Task Details Dialog */}
       {selectedTask && (
-        <Dialog open={!!selectedTask && !isProgressDialogOpen} onOpenChange={(open) => !open && setSelectedTask(null)}>
+        <Dialog 
+          open={!!selectedTask && !isProgressDialogOpen} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTask(null);
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             <DialogHeader>
               <DialogTitle>{t.taskDetails}</DialogTitle>

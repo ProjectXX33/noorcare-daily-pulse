@@ -51,10 +51,22 @@ const AdminTasksPage = () => {
   const [employees, setEmployees] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [updatingTaskProgress, setUpdatingTaskProgress] = useState(false);
   
   const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+    status: 'On Hold' as 'On Hold' | 'In Progress' | 'Complete',
+    progressPercentage: 0
+  });
+  
+  const [editingTask, setEditingTask] = useState({
+    id: '',
     title: '',
     description: '',
     assignedTo: '',
@@ -105,7 +117,12 @@ const AdminTasksPage = () => {
       selectStatus: "Select Status",
       view: "View",
       employee: "Employee",
-      sendMessage: "Send Message"
+      sendMessage: "Send Message",
+      editTask: "Edit Task",
+      updateTask: "Update Task",
+      taskUpdated: "Task updated successfully!",
+      viewDetails: "View Details",
+      editProgress: "Edit Progress"
     },
     ar: {
       tasks: "المهام",
@@ -141,7 +158,12 @@ const AdminTasksPage = () => {
       selectStatus: "اختر الحالة",
       view: "عرض",
       employee: "موظف",
-      sendMessage: "إرسال رسالة"
+      sendMessage: "إرسال رسالة",
+      editTask: "تعديل المهمة",
+      updateTask: "تحديث المهمة",
+      taskUpdated: "تم تحديث المهمة بنجاح!",
+      viewDetails: "عرض التفاصيل",
+      editProgress: "تعديل التقدم"
     }
   };
 
@@ -213,6 +235,39 @@ const AdminTasksPage = () => {
     }
   };
 
+  const handleUpdateTask = async () => {
+    if (!user) return;
+    
+    if (!editingTask.title || !editingTask.description || !editingTask.assignedTo) {
+      toast.error(t.fillAllFields);
+      return;
+    }
+
+    setUpdatingTaskProgress(true);
+    try {
+      // This is a simplified version - in a real app you'd call an API endpoint
+      // to update the task in the database
+      const updatedTask = {
+        ...editingTask,
+        status: editingTask.progressPercentage === 100 ? 'Complete' : editingTask.status
+      };
+      
+      // Update tasks list
+      setTasks(tasks.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      ));
+      
+      setIsEditTaskDialogOpen(false);
+      toast.success(t.taskUpdated);
+      
+    } catch (error) {
+      console.error("Error updating task:", error);
+      toast.error("Failed to update task");
+    } finally {
+      setUpdatingTaskProgress(false);
+    }
+  };
+
   const handleSendNotification = async () => {
     if (!user) return;
     
@@ -248,6 +303,18 @@ const AdminTasksPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const openEditTaskDialog = (task: Task) => {
+    setEditingTask({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      assignedTo: task.assignedTo,
+      status: task.status as 'On Hold' | 'In Progress' | 'Complete',
+      progressPercentage: task.progressPercentage
+    });
+    setIsEditTaskDialogOpen(true);
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -344,18 +411,15 @@ const AdminTasksPage = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    {t.actions}
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  <DropdownMenuItem>
-                                    {t.view}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditTaskDialog(task)}
+                                >
+                                  {t.editTask}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -514,6 +578,116 @@ const AdminTasksPage = () => {
                   {t.createTask}
                 </div>
               ) : t.createTask}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle>{t.editTask}</DialogTitle>
+            <DialogDescription>
+              Edit task details and progress
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-task-title" className="text-right">
+                {t.title}
+              </Label>
+              <Input
+                id="edit-task-title"
+                value={editingTask.title}
+                onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-task-description" className="text-right">
+                {t.description}
+              </Label>
+              <Textarea
+                id="edit-task-description"
+                value={editingTask.description}
+                onChange={(e) => setEditingTask({...editingTask, description: e.target.value})}
+                className="col-span-3"
+                rows={4}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-task-assigned" className="text-right">
+                {t.assignedTo}
+              </Label>
+              <Select 
+                value={editingTask.assignedTo} 
+                onValueChange={(value) => setEditingTask({...editingTask, assignedTo: value})}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t.selectEmployee} />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map(employee => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.name} ({employee.department})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-task-status" className="text-right">
+                {t.status}
+              </Label>
+              <Select 
+                value={editingTask.status} 
+                onValueChange={(value: 'On Hold' | 'In Progress' | 'Complete') => 
+                  setEditingTask({...editingTask, status: value})
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t.selectStatus} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="On Hold">{t.onHold}</SelectItem>
+                  <SelectItem value="In Progress">{t.inProgress}</SelectItem>
+                  <SelectItem value="Complete">{t.complete}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-task-progress" className="text-right">
+                {t.progress}
+              </Label>
+              <div className="col-span-3 flex items-center gap-2">
+                <Progress value={editingTask.progressPercentage} className="flex-1 h-2" />
+                <Input
+                  id="edit-task-progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editingTask.progressPercentage}
+                  onChange={(e) => setEditingTask({
+                    ...editingTask, 
+                    progressPercentage: parseInt(e.target.value) || 0,
+                    status: parseInt(e.target.value) === 100 ? 'Complete' : editingTask.status
+                  })}
+                  className="w-16"
+                />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsEditTaskDialogOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleUpdateTask} disabled={updatingTaskProgress}>
+              {updatingTaskProgress ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.updateTask}
+                </div>
+              ) : t.updateTask}
             </Button>
           </DialogFooter>
         </DialogContent>
