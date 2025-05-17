@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -50,7 +49,7 @@ const EmployeeTasksPage = () => {
   const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskProgress, setTaskProgress] = useState(0);
-  const [taskStatus, setTaskStatus] = useState<string>('');
+  const [taskStatus, setTaskStatus] = useState<'On Hold' | 'In Progress' | 'Complete'>('On Hold');
   const [updatingTask, setUpdatingTask] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
@@ -192,7 +191,7 @@ const EmployeeTasksPage = () => {
           return { 
             ...task, 
             progressPercentage: taskProgress,
-            status: updatedStatus
+            status: updatedStatus as 'On Hold' | 'In Progress' | 'Complete'
           };
         }
         return task;

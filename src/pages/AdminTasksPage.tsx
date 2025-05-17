@@ -347,6 +347,44 @@ const AdminTasksPage = () => {
     }
   };
 
+  // Add the missing handler for new task progress changes
+  const handleNewTaskProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const progress = parseInt(e.target.value);
+    
+    // If progress is 100%, automatically update status to Complete
+    if (progress === 100) {
+      setNewTask({
+        ...newTask,
+        progressPercentage: progress,
+        status: 'Complete'
+      });
+    } else {
+      setNewTask({
+        ...newTask,
+        progressPercentage: progress
+      });
+    }
+  };
+  
+  // Add the missing handler for edit task progress changes
+  const handleEditTaskProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const progress = parseInt(e.target.value);
+    
+    // If progress is 100%, automatically update status to Complete
+    if (progress === 100) {
+      setEditingTask({
+        ...editingTask,
+        progressPercentage: progress,
+        status: 'Complete'
+      });
+    } else {
+      setEditingTask({
+        ...editingTask,
+        progressPercentage: progress
+      });
+    }
+  };
+
   if (!user || user.role !== 'admin') {
     return null;
   }
