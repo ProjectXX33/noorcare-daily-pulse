@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,8 +38,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import TaskFileUpload from '@/components/TaskFileUpload';
-import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
 
 const EmployeeTasksPage = () => {
@@ -49,10 +48,9 @@ const EmployeeTasksPage = () => {
   const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskProgress, setTaskProgress] = useState(0);
-  const [taskStatus, setTaskStatus] = useState<'On Hold' | 'In Progress' | 'Complete'>('On Hold');
+  const [taskStatus, setTaskStatus] = useState<'Not Started' | 'On Hold' | 'In Progress' | 'Complete'>('Not Started');
   const [updatingTask, setUpdatingTask] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
   const [currentTab, setCurrentTab] = useState("details");
 
   // Translation object for multilingual support
@@ -64,6 +62,7 @@ const EmployeeTasksPage = () => {
       progress: "Progress",
       actions: "Actions",
       viewDetails: "View Details",
+      notStarted: "Not Started",
       onHold: "On Hold",
       inProgress: "In Progress",
       complete: "Complete",
@@ -86,7 +85,6 @@ const EmployeeTasksPage = () => {
       update: "Update",
       updateStatus: "Update Status",
       selectStatus: "Select Status",
-      attachments: "Attachments",
       details: "Details"
     },
     ar: {
@@ -96,6 +94,7 @@ const EmployeeTasksPage = () => {
       progress: "التقدم",
       actions: "الإجراءات",
       viewDetails: "عرض التفاصيل",
+      notStarted: "لم تبدأ",
       onHold: "في الانتظار",
       inProgress: "قيد التنفيذ",
       complete: "مكتمل",
@@ -118,7 +117,6 @@ const EmployeeTasksPage = () => {
       update: "تحديث",
       updateStatus: "تحديث الحالة",
       selectStatus: "اختر الحالة",
-      attachments: "المرفقات",
       details: "التفاصيل"
     }
   };
@@ -164,7 +162,7 @@ const EmployeeTasksPage = () => {
   const handleOpenTaskDetails = (task: Task) => {
     setSelectedTask(task);
     setTaskProgress(task.progressPercentage || 0);
-    setTaskStatus(task.status);
+    setTaskStatus(task.status as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete');
     setTaskDetailsOpen(true);
   };
 
@@ -174,7 +172,13 @@ const EmployeeTasksPage = () => {
     setUpdatingTask(true);
     try {
       // If progress is 100%, automatically set status to Complete
-      const updatedStatus = taskProgress === 100 ? 'Complete' : taskStatus;
+      // If progress is 0%, automatically set status to Not Started
+      let updatedStatus = taskStatus;
+      if (taskProgress === 100) {
+        updatedStatus = 'Complete';
+      } else if (taskProgress === 0) {
+        updatedStatus = 'Not Started';
+      }
 
       await updateTask(
         selectedTask.id,
@@ -191,7 +195,7 @@ const EmployeeTasksPage = () => {
           return { 
             ...task, 
             progressPercentage: taskProgress,
-            status: updatedStatus as 'On Hold' | 'In Progress' | 'Complete'
+            status: updatedStatus as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete'
           };
         }
         return task;
@@ -212,8 +216,11 @@ const EmployeeTasksPage = () => {
     setTaskProgress(progress);
     
     // If progress is 100%, automatically update status to Complete
+    // If progress is 0%, automatically update status to Not Started
     if (progress === 100) {
       setTaskStatus('Complete');
+    } else if (progress === 0) {
+      setTaskStatus('Not Started');
     }
   };
 
@@ -266,6 +273,8 @@ const EmployeeTasksPage = () => {
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
+      case 'Not Started':
+        return 'bg-gray-100 text-gray-800';
       case 'On Hold':
         return 'bg-yellow-100 text-yellow-800';
       case 'In Progress':
@@ -279,6 +288,8 @@ const EmployeeTasksPage = () => {
 
   const getTranslatedStatus = (status: string) => {
     switch (status) {
+      case 'Not Started':
+        return t.notStarted;
       case 'On Hold':
         return t.onHold;
       case 'In Progress':
@@ -291,8 +302,8 @@ const EmployeeTasksPage = () => {
   };
 
   const handleStatusChange = (value: string) => {
-    if (value === 'On Hold' || value === 'In Progress' || value === 'Complete') {
-      setTaskStatus(value);
+    if (value === 'Not Started' || value === 'On Hold' || value === 'In Progress' || value === 'Complete') {
+      setTaskStatus(value as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete');
     }
   };
 
@@ -371,10 +382,9 @@ const EmployeeTasksPage = () => {
             
             {selectedTask && (
               <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="details">{t.details}</TabsTrigger>
                   <TabsTrigger value="comments">{t.comments}</TabsTrigger>
-                  <TabsTrigger value="attachments">{t.attachments}</TabsTrigger>
                 </TabsList>
               
                 <TabsContent value="details" className="space-y-4 mt-4">
@@ -396,6 +406,7 @@ const EmployeeTasksPage = () => {
                           <SelectValue placeholder={t.selectStatus} />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="Not Started">{t.notStarted}</SelectItem>
                           <SelectItem value="On Hold">{t.onHold}</SelectItem>
                           <SelectItem value="In Progress">{t.inProgress}</SelectItem>
                           <SelectItem value="Complete">{t.complete}</SelectItem>
@@ -441,25 +452,6 @@ const EmployeeTasksPage = () => {
                     }}
                     language={language}
                   />
-                </TabsContent>
-                
-                <TabsContent value="attachments" className="space-y-4 mt-4">
-                  {user && (
-                    <TaskFileUpload
-                      taskId={selectedTask.id}
-                      userId={user.id}
-                      onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
-                      language={language}
-                    />
-                  )}
-                  
-                  <div className="mt-4">
-                    <TaskAttachmentsList
-                      taskId={selectedTask.id}
-                      refresh={attachmentsRefreshKey}
-                      language={language}
-                    />
-                  </div>
                 </TabsContent>
               </Tabs>
             )}

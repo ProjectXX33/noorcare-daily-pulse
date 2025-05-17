@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,8 +46,6 @@ import {
 import { fetchEmployees } from '@/lib/employeesApi';
 import { User, Task } from '@/types';
 import { Checkbox } from "@/components/ui/checkbox";
-import TaskFileUpload from '@/components/TaskFileUpload';
-import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
 
 const AdminTasksPage = () => {
@@ -60,13 +59,13 @@ const AdminTasksPage = () => {
   const [language, setLanguage] = useState('en');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [updatingTaskProgress, setUpdatingTaskProgress] = useState(false);
-  const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
+  const [currentTaskTab, setCurrentTaskTab] = useState("details");
   
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
     assignedTo: '',
-    status: 'On Hold' as 'On Hold' | 'In Progress' | 'Complete',
+    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
     progressPercentage: 0
   });
   
@@ -75,7 +74,7 @@ const AdminTasksPage = () => {
     title: '',
     description: '',
     assignedTo: '',
-    status: 'On Hold' as 'On Hold' | 'In Progress' | 'Complete',
+    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
     progressPercentage: 0
   });
   
@@ -100,6 +99,7 @@ const AdminTasksPage = () => {
       status: "Status",
       progress: "Progress",
       actions: "Actions",
+      notStarted: "Not Started",
       onHold: "On Hold",
       inProgress: "In Progress",
       complete: "Complete",
@@ -127,7 +127,9 @@ const AdminTasksPage = () => {
       updateTask: "Update Task",
       taskUpdated: "Task updated successfully!",
       viewDetails: "View Details",
-      editProgress: "Edit Progress"
+      editProgress: "Edit Progress",
+      comments: "Comments",
+      details: "Details"
     },
     ar: {
       tasks: "المهام",
@@ -141,6 +143,7 @@ const AdminTasksPage = () => {
       status: "الحالة",
       progress: "التقدم",
       actions: "الإجراءات",
+      notStarted: "لم تبدأ",
       onHold: "في الانتظار",
       inProgress: "قيد التنفيذ",
       complete: "مكتمل",
@@ -168,7 +171,9 @@ const AdminTasksPage = () => {
       updateTask: "تحديث المهمة",
       taskUpdated: "تم تحديث المهمة بنجاح!",
       viewDetails: "عرض التفاصيل",
-      editProgress: "تعديل التقدم"
+      editProgress: "تعديل التقدم",
+      comments: "التعليقات",
+      details: "التفاصيل"
     }
   };
 
@@ -213,15 +218,19 @@ const AdminTasksPage = () => {
       return;
     }
 
-    // Automatically set status to Complete if progress is 100%
-    if (newTask.progressPercentage === 100 && newTask.status !== 'Complete') {
-      setNewTask({ ...newTask, status: 'Complete' });
+    // Automatically set status based on progress
+    let status = newTask.status;
+    if (newTask.progressPercentage === 0) {
+      status = 'Not Started';
+    } else if (newTask.progressPercentage === 100) {
+      status = 'Complete';
     }
 
     setIsLoading(true);
     try {
       const createdTask = await createTask({
         ...newTask,
+        status,
         createdBy: user.id
       });
       
@@ -234,7 +243,7 @@ const AdminTasksPage = () => {
         title: '',
         description: '',
         assignedTo: '',
-        status: 'On Hold',
+        status: 'Not Started',
         progressPercentage: 0
       });
     } catch (error) {
@@ -253,8 +262,13 @@ const AdminTasksPage = () => {
       return;
     }
 
-    // Automatically set status to Complete if progress is 100%
-    const finalStatus = editingTask.progressPercentage === 100 ? 'Complete' : editingTask.status;
+    // Automatically set status based on progress
+    let finalStatus = editingTask.status;
+    if (editingTask.progressPercentage === 0) {
+      finalStatus = 'Not Started';
+    } else if (editingTask.progressPercentage === 100) {
+      finalStatus = 'Complete';
+    }
 
     setUpdatingTaskProgress(true);
     try {
@@ -328,14 +342,18 @@ const AdminTasksPage = () => {
       title: task.title,
       description: task.description,
       assignedTo: task.assignedTo,
-      status: task.status as 'On Hold' | 'In Progress' | 'Complete',
+      status: task.status as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: task.progressPercentage
     });
+    setSelectedTask(task);
+    setCurrentTaskTab("details");
     setIsEditTaskDialogOpen(true);
   };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
+      case 'Not Started':
+        return 'bg-gray-100 text-gray-800 border border-gray-200';
       case 'On Hold':
         return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
       case 'In Progress':
@@ -347,16 +365,22 @@ const AdminTasksPage = () => {
     }
   };
 
-  // Add the missing handler for new task progress changes
   const handleNewTaskProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const progress = parseInt(e.target.value);
     
     // If progress is 100%, automatically update status to Complete
+    // If progress is 0%, automatically update status to Not Started
     if (progress === 100) {
       setNewTask({
         ...newTask,
         progressPercentage: progress,
         status: 'Complete'
+      });
+    } else if (progress === 0) {
+      setNewTask({
+        ...newTask,
+        progressPercentage: progress,
+        status: 'Not Started'
       });
     } else {
       setNewTask({
@@ -366,16 +390,22 @@ const AdminTasksPage = () => {
     }
   };
   
-  // Add the missing handler for edit task progress changes
   const handleEditTaskProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const progress = parseInt(e.target.value);
     
     // If progress is 100%, automatically update status to Complete
+    // If progress is 0%, automatically update status to Not Started
     if (progress === 100) {
       setEditingTask({
         ...editingTask,
         progressPercentage: progress,
         status: 'Complete'
+      });
+    } else if (progress === 0) {
+      setEditingTask({
+        ...editingTask,
+        progressPercentage: progress,
+        status: 'Not Started'
       });
     } else {
       setEditingTask({
@@ -455,7 +485,8 @@ const AdminTasksPage = () => {
                             <TableCell>{task.assignedToName}</TableCell>
                             <TableCell>
                               <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
-                                {task.status === 'On Hold' ? t.onHold : 
+                                {task.status === 'Not Started' ? t.notStarted :
+                                 task.status === 'On Hold' ? t.onHold : 
                                  task.status === 'In Progress' ? t.inProgress : t.complete}
                               </span>
                             </TableCell>
@@ -587,7 +618,7 @@ const AdminTasksPage = () => {
               </Label>
               <Select 
                 value={newTask.status} 
-                onValueChange={(value: 'On Hold' | 'In Progress' | 'Complete') => 
+                onValueChange={(value: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete') => 
                   setNewTask({...newTask, status: value})
                 }
               >
@@ -595,6 +626,7 @@ const AdminTasksPage = () => {
                   <SelectValue placeholder={t.selectStatus} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Not Started">{t.notStarted}</SelectItem>
                   <SelectItem value="On Hold">{t.onHold}</SelectItem>
                   <SelectItem value="In Progress">{t.inProgress}</SelectItem>
                   <SelectItem value="Complete">{t.complete}</SelectItem>
@@ -634,139 +666,125 @@ const AdminTasksPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Task Dialog */}
+      {/* Edit Task Dialog - Improved UI */}
       <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.editTask}</DialogTitle>
             <DialogDescription>
-              Edit task details and progress
+              {editingTask.title}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-task-title" className="text-right">
-                {t.title}
-              </Label>
-              <Input
-                id="edit-task-title"
-                value={editingTask.title}
-                onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-task-description" className="text-right">
-                {t.description}
-              </Label>
-              <Textarea
-                id="edit-task-description"
-                value={editingTask.description}
-                onChange={(e) => setEditingTask({...editingTask, description: e.target.value})}
-                className="col-span-3"
-                rows={4}
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-task-assigned" className="text-right">
-                {t.assignedTo}
-              </Label>
-              <Select 
-                value={editingTask.assignedTo} 
-                onValueChange={(value) => setEditingTask({...editingTask, assignedTo: value})}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t.selectEmployee} />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map(employee => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.name} ({employee.department})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-task-status" className="text-right">
-                {t.status}
-              </Label>
-              <Select 
-                value={editingTask.status} 
-                onValueChange={(value: 'On Hold' | 'In Progress' | 'Complete') => 
-                  setEditingTask({...editingTask, status: value})
-                }
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t.selectStatus} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="On Hold">{t.onHold}</SelectItem>
-                  <SelectItem value="In Progress">{t.inProgress}</SelectItem>
-                  <SelectItem value="Complete">{t.complete}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-task-progress" className="text-right">
-                {t.progress}
-              </Label>
-              <div className="col-span-3 flex items-center gap-2">
-                <Progress value={editingTask.progressPercentage} className="flex-1 h-2" />
-                <Input
-                  id="edit-task-progress"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={editingTask.progressPercentage}
-                  onChange={handleEditTaskProgressChange}
-                  className="w-16"
-                />
-                <span>%</span>
-              </div>
-            </div>
+          
+          <Tabs value={currentTaskTab} onValueChange={setCurrentTaskTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details">{t.details}</TabsTrigger>
+              <TabsTrigger value="comments">{t.comments}</TabsTrigger>
+            </TabsList>
             
-            {/* Add file upload section */}
-            {user && editingTask.id && (
-              <div className="col-span-4 border-t pt-4 mt-2">
-                <h4 className="text-base font-medium mb-3">Task Attachments</h4>
-                <TaskFileUpload 
-                  taskId={editingTask.id} 
-                  userId={user.id} 
-                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
-                  language={language}
-                />
-                
-                <div className="mt-4">
-                  <TaskAttachmentsList 
-                    taskId={editingTask.id} 
-                    refresh={attachmentsRefreshKey}
-                    language={language}
+            <TabsContent value="details" className="space-y-4 mt-4">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-task-title">{t.title}</Label>
+                  <Input
+                    id="edit-task-title"
+                    value={editingTask.title}
+                    onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
                   />
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-task-description">{t.description}</Label>
+                  <Textarea
+                    id="edit-task-description"
+                    value={editingTask.description}
+                    onChange={(e) => setEditingTask({...editingTask, description: e.target.value})}
+                    rows={4}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-task-assigned">{t.assignedTo}</Label>
+                  <Select 
+                    value={editingTask.assignedTo} 
+                    onValueChange={(value) => setEditingTask({...editingTask, assignedTo: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t.selectEmployee} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map(employee => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.name} ({employee.department})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-task-status">{t.status}</Label>
+                    <Select 
+                      value={editingTask.status} 
+                      onValueChange={(value: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete') => 
+                        setEditingTask({...editingTask, status: value})
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t.selectStatus} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Not Started">{t.notStarted}</SelectItem>
+                        <SelectItem value="On Hold">{t.onHold}</SelectItem>
+                        <SelectItem value="In Progress">{t.inProgress}</SelectItem>
+                        <SelectItem value="Complete">{t.complete}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-task-progress">{t.progress}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="edit-task-progress"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editingTask.progressPercentage}
+                        onChange={handleEditTaskProgressChange}
+                        className="w-16"
+                      />
+                      <span>%</span>
+                      <Progress value={editingTask.progressPercentage} className="flex-1 h-2" />
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
+            </TabsContent>
             
-            {/* Add comments section */}
-            {user && editingTask.id && (
-              <div className="col-span-4 border-t pt-4 mt-2">
+            <TabsContent value="comments" className="space-y-4 mt-4">
+              {user && selectedTask && (
                 <TaskComments
-                  taskId={editingTask.id}
+                  taskId={selectedTask.id}
                   user={user}
-                  comments={tasks.find(t => t.id === editingTask.id)?.comments || []}
+                  comments={selectedTask.comments || []}
                   onCommentAdded={(newComments) => {
                     // Update the task comments in the local state
                     setTasks(tasks.map(task => 
-                      task.id === editingTask.id 
+                      task.id === selectedTask.id 
                         ? {...task, comments: newComments} 
                         : task
                     ));
+                    // Also update the selected task
+                    setSelectedTask({...selectedTask, comments: newComments});
                   }}
                   language={language}
                 />
-              </div>
-            )}
-          </div>
+              )}
+            </TabsContent>
+          </Tabs>
+          
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
             <Button variant="outline" onClick={() => setIsEditTaskDialogOpen(false)}>{t.cancel}</Button>
             <Button onClick={handleUpdateTask} disabled={updatingTaskProgress}>

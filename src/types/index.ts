@@ -48,19 +48,19 @@ export type Notification = {
   relatedId?: string;
 }
 
-export type Task = {
+export interface Task {
   id: string;
   title: string;
   description: string;
-  assignedTo: string; // userId
-  assignedToName: string; // username for display
-  status: 'On Hold' | 'In Progress' | 'Complete';
-  progressPercentage: number;
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  assignedTo: string;
+  assignedToName?: string;
+  createdBy: string;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string; // admin userId
+  progressPercentage: number;
   comments?: TaskComment[];
-};
+}
 
 export type TaskComment = {
   id: string;

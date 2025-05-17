@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { Task, User } from '@/types';
 import { toast } from 'sonner';
@@ -104,13 +105,16 @@ export const createTask = async (
   try {
     console.log('Creating task:', task);
     
+    // Set status to "Not Started" if progress is 0
+    const status = task.progressPercentage === 0 ? 'Not Started' : task.status;
+    
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
         title: task.title,
         description: task.description,
         assigned_to: task.assignedTo,
-        status: task.status,
+        status: status,
         created_by: task.createdBy,
         progress_percentage: task.progressPercentage || 0,
       }])
@@ -176,9 +180,22 @@ export const updateTask = async (
     const dbUpdates: any = {};
     if (updates.title) dbUpdates.title = updates.title;
     if (updates.description !== undefined) dbUpdates.description = updates.description;
-    if (updates.status) dbUpdates.status = updates.status;
+    
+    // Set status based on progress percentage
+    if (updates.progressPercentage !== undefined) {
+      dbUpdates.progress_percentage = updates.progressPercentage;
+      if (updates.progressPercentage === 0) {
+        dbUpdates.status = 'Not Started';
+      } else if (updates.progressPercentage === 100) {
+        dbUpdates.status = 'Complete';
+      } else if (updates.status) {
+        dbUpdates.status = updates.status;
+      }
+    } else if (updates.status) {
+      dbUpdates.status = updates.status;
+    }
+    
     if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
-    if (updates.progressPercentage !== undefined) dbUpdates.progress_percentage = updates.progressPercentage;
     
     // Get current task details for notification purposes
     const { data: currentTask } = await supabase
