@@ -109,21 +109,21 @@ const EmployeeDashboard = () => {
         )}
 
         <div className="grid gap-6">
-          <div className="mt-4">
+          <div className="mt-6">
             <CheckInHistory 
               checkIns={userCheckIns.slice(0, 5)} 
               title={t.recentCheckins} 
             />
           </div>
           
-          <div className="mt-4">
+          <div className="mt-6">
             <ReportHistory 
               reports={userReports.slice(0, 3) as any}
               title={t.recentReports} 
             />
           </div>
           
-          <div className="flex space-x-4 mt-4">
+          <div className="flex space-x-4 mt-6">
             <Button 
               className="bg-primary hover:bg-primary/90" 
               onClick={() => navigate('/employee-tasks')}

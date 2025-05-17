@@ -120,7 +120,7 @@ const Dashboard = () => {
               <div className="mt-4">
                 <CheckInHistory checkIns={userCheckIns} title={t.checkInsHistory} />
               </div>
-              <div className="mt-4">
+              <div className="mt-6">
                 <ReportHistory 
                   reports={userReports as any} 
                   title={t.reportsHistory} 

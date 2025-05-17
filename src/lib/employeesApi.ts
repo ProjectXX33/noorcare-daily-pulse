@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { User, Department, Position } from '@/types';
 
@@ -38,7 +39,7 @@ export async function createEmployee(employee: {
   role: 'admin' | 'employee';
 }): Promise<User> {
   try {
-    console.log('Creating employee with data:', employee);
+    console.log('Creating employee with data:', { ...employee, password: '[REDACTED]' });
     
     // First, sign up the user with email and password
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -77,26 +78,36 @@ export async function createEmployee(employee: {
         role: employee.role,
         department: employee.department,
         position: employee.position,
-      }])
-      .select()
-      .single();
+      }]);
 
     if (error) {
       console.error('Database error:', error);
       throw error;
     }
     
-    console.log('User profile created successfully:', data);
+    // Fetch the created user to return the complete object
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+    
+    if (userError) {
+      console.error('Error fetching created user:', userError);
+      throw userError;
+    }
+    
+    console.log('User profile created successfully:', userData);
     
     return {
-      id: data.id,
-      username: data.username,
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      department: data.department,
-      position: data.position,
-      lastCheckin: data.last_checkin ? new Date(data.last_checkin) : undefined
+      id: userData.id,
+      username: userData.username,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      department: userData.department,
+      position: userData.position,
+      lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
     };
   } catch (error) {
     console.error('Error creating employee:', error);

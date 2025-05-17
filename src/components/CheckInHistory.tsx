@@ -43,14 +43,19 @@ const CheckInHistory: React.FC<CheckInHistoryProps> = ({ checkIns, title }) => {
             {checkIns.map((checkIn) => (
               <div key={checkIn.id} className="bg-gray-50 p-4 rounded-lg border">
                 <div className="flex flex-col sm:flex-row justify-between mb-2">
-                  <h3 className="font-medium">
-                    {format(new Date(checkIn.timestamp), 'EEEE, MMMM d, yyyy')}
-                  </h3>
-                  <span className="text-gray-600">
+                  <div>
+                    <h3 className="font-medium">
+                      {format(new Date(checkIn.timestamp), 'EEEE, MMMM d, yyyy')}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      <span className="font-medium">{checkIn.userName}</span> - {checkIn.department}
+                    </p>
+                  </div>
+                  <span className="text-gray-600 mt-2 sm:mt-0">
                     {calculateHoursWorked(checkIn)}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-2">
                   <div className="flex justify-between sm:justify-start gap-2">
                     <span className="text-gray-600">Check-in:</span>
                     <span className="font-medium">{formatTime(checkIn.timestamp)}</span>
