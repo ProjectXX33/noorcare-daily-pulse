@@ -18,6 +18,9 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import TaskFileUpload from '@/components/TaskFileUpload';
+import TaskAttachmentsList from '@/components/TaskAttachmentsList';
+import TaskComments from '@/components/TaskComments';
 
 const EmployeeTasksPage = () => {
   const { user } = useAuth();
@@ -28,6 +31,7 @@ const EmployeeTasksPage = () => {
   const [progressValue, setProgressValue] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
 
   // Translation object for multilingual support
   const translations = {
@@ -276,14 +280,14 @@ const EmployeeTasksPage = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.updateTaskProgress}</DialogTitle>
             <DialogDescription>
               {t.setProgressPercentage}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-6">
+          <div className="py-4">
             <div className="space-y-6">
               {selectedTask && (
                 <>
@@ -306,6 +310,49 @@ const EmployeeTasksPage = () => {
                         onValueChange={(value) => setProgressValue(value[0])}
                         className="w-full"
                       />
+                    </div>
+                    
+                    {/* Add file upload component */}
+                    <div className="pt-4 border-t">
+                      <h4 className="text-sm font-medium mb-3">Upload File</h4>
+                      <TaskFileUpload 
+                        taskId={selectedTask.id} 
+                        userId={user?.id || ''} 
+                        onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                        language={language}
+                      />
+                    </div>
+                    
+                    {/* Show existing attachments */}
+                    <div className="pt-4 border-t">
+                      <TaskAttachmentsList 
+                        taskId={selectedTask.id} 
+                        refresh={attachmentsRefreshKey}
+                        language={language}
+                      />
+                    </div>
+                    
+                    {/* Add comments section */}
+                    <div className="pt-4 border-t">
+                      {user && selectedTask && (
+                        <TaskComments
+                          taskId={selectedTask.id}
+                          user={user}
+                          comments={selectedTask.comments || []}
+                          onCommentAdded={(newComments) => {
+                            // Update the task comments in the local state
+                            setTasks(tasks.map(task => 
+                              task.id === selectedTask.id 
+                                ? {...task, comments: newComments} 
+                                : task
+                            ));
+                            
+                            // Update the selected task with new comments
+                            setSelectedTask({...selectedTask, comments: newComments});
+                          }}
+                          language={language}
+                        />
+                      )}
                     </div>
                   </div>
                 </>
@@ -351,12 +398,12 @@ const EmployeeTasksPage = () => {
             }
           }}
         >
-          <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             <DialogHeader>
               <DialogTitle>{t.taskDetails}</DialogTitle>
             </DialogHeader>
             <div className="py-4">
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium">{selectedTask.title}</h3>
                   <p className="text-sm text-gray-500 mt-1">{selectedTask.description}</p>
@@ -380,6 +427,38 @@ const EmployeeTasksPage = () => {
                       <span className="text-xs text-gray-500">{selectedTask.progressPercentage}%</span>
                     </div>
                   </div>
+                </div>
+                
+                {/* Show attachments */}
+                <div className="pt-4 border-t">
+                  <TaskAttachmentsList 
+                    taskId={selectedTask.id} 
+                    refresh={attachmentsRefreshKey}
+                    language={language}
+                  />
+                </div>
+                
+                {/* Show comments */}
+                <div className="pt-4 border-t">
+                  {user && (
+                    <TaskComments
+                      taskId={selectedTask.id}
+                      user={user}
+                      comments={selectedTask.comments || []}
+                      onCommentAdded={(newComments) => {
+                        // Update the task comments in the local state
+                        setTasks(tasks.map(task => 
+                          task.id === selectedTask.id 
+                            ? {...task, comments: newComments} 
+                            : task
+                        ));
+                        
+                        // Update the selected task with new comments
+                        setSelectedTask({...selectedTask, comments: newComments});
+                      }}
+                      language={language}
+                    />
+                  )}
                 </div>
               </div>
             </div>

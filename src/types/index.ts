@@ -59,7 +59,16 @@ export type Task = {
   createdAt: Date;
   updatedAt: Date;
   createdBy: string; // admin userId
-}
+  comments?: TaskComment[];
+};
+
+export type TaskComment = {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: string;
+};
 
 // Supabase specific types
 export type Tables = {
@@ -132,4 +141,5 @@ export type TaskRecord = {
   created_at: string;
   updated_at: string;
   created_by: string;
+  comments: TaskComment[];
 }

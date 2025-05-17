@@ -117,9 +117,55 @@ export type Database = {
           },
         ]
       }
+      task_attachments: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          file_name: string
+          file_path: string
+          file_type: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          file_name: string
+          file_path: string
+          file_type: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          file_name?: string
+          file_path?: string
+          file_type?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string
+          comments: Json | null
           created_at: string | null
           created_by: string
           description: string | null
@@ -131,6 +177,7 @@ export type Database = {
         }
         Insert: {
           assigned_to: string
+          comments?: Json | null
           created_at?: string | null
           created_by: string
           description?: string | null
@@ -142,6 +189,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string
+          comments?: Json | null
           created_at?: string | null
           created_by?: string
           description?: string | null

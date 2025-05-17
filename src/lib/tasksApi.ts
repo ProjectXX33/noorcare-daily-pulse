@@ -1,7 +1,7 @@
-
 import { supabase } from '@/lib/supabase';
 import { Task, User } from '@/types';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 
 // Fetch all tasks
 export const fetchTasks = async (): Promise<Task[]> => {
@@ -289,6 +289,60 @@ export const deleteTask = async (taskId: string): Promise<void> => {
   } catch (error) {
     console.error(`Error deleting task ${taskId}:`, error);
     throw error;
+  }
+};
+
+// Add a comment to a task
+export const addTaskComment = async (
+  taskId: string,
+  comment: string,
+  userId: string,
+  userName: string
+): Promise<boolean> => {
+  try {
+    console.log(`Adding comment to task ${taskId}`);
+    
+    // Get current comments
+    const { data: taskData, error: fetchError } = await supabase
+      .from('tasks')
+      .select('comments')
+      .eq('id', taskId)
+      .single();
+    
+    if (fetchError) {
+      console.error('Error fetching task comments:', fetchError);
+      throw fetchError;
+    }
+    
+    // Create new comment
+    const newComment = {
+      id: uuidv4(),
+      userId,
+      userName,
+      text: comment,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add comment to existing comments
+    const updatedComments = [...(taskData.comments || []), newComment];
+    
+    // Update task with new comments
+    const { error: updateError } = await supabase
+      .from('tasks')
+      .update({
+        comments: updatedComments
+      })
+      .eq('id', taskId);
+    
+    if (updateError) {
+      console.error('Error updating task comments:', updateError);
+      throw updateError;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error adding comment to task:', error);
+    return false;
   }
 };
 

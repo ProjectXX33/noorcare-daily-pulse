@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +44,9 @@ import {
 import { fetchEmployees } from '@/lib/employeesApi';
 import { User, Task } from '@/types';
 import { Checkbox } from "@/components/ui/checkbox";
+import TaskFileUpload from '@/components/TaskFileUpload';
+import TaskAttachmentsList from '@/components/TaskAttachmentsList';
+import TaskComments from '@/components/TaskComments';
 
 const AdminTasksPage = () => {
   const { user } = useAuth();
@@ -57,6 +59,7 @@ const AdminTasksPage = () => {
   const [language, setLanguage] = useState('en');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [updatingTaskProgress, setUpdatingTaskProgress] = useState(false);
+  const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
   
   const [newTask, setNewTask] = useState({
     title: '',
@@ -589,7 +592,7 @@ const AdminTasksPage = () => {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.editTask}</DialogTitle>
             <DialogDescription>
@@ -682,6 +685,47 @@ const AdminTasksPage = () => {
                 <span>%</span>
               </div>
             </div>
+            
+            {/* Add file upload section */}
+            {user && editingTask.id && (
+              <div className="col-span-4 border-t pt-4 mt-2">
+                <h4 className="text-base font-medium mb-3">Task Attachments</h4>
+                <TaskFileUpload 
+                  taskId={editingTask.id} 
+                  userId={user.id} 
+                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                  language={language}
+                />
+                
+                <div className="mt-4">
+                  <TaskAttachmentsList 
+                    taskId={editingTask.id} 
+                    refresh={attachmentsRefreshKey}
+                    language={language}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Add comments section */}
+            {user && editingTask.id && (
+              <div className="col-span-4 border-t pt-4 mt-2">
+                <TaskComments
+                  taskId={editingTask.id}
+                  user={user}
+                  comments={tasks.find(t => t.id === editingTask.id)?.comments || []}
+                  onCommentAdded={(newComments) => {
+                    // Update the task comments in the local state
+                    setTasks(tasks.map(task => 
+                      task.id === editingTask.id 
+                        ? {...task, comments: newComments} 
+                        : task
+                    ));
+                  }}
+                  language={language}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
             <Button variant="outline" onClick={() => setIsEditTaskDialogOpen(false)}>{t.cancel}</Button>
