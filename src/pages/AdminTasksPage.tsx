@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -245,10 +246,13 @@ const AdminTasksPage = () => {
 
     setUpdatingTaskProgress(true);
     try {
-      // This is a simplified version - in a real app you'd call an API endpoint
-      // to update the task in the database
-      const updatedTask = {
+      // Fix: Ensure we include all required properties of the Task type
+      const updatedTask: Task = {
         ...editingTask,
+        assignedToName: employees.find(emp => emp.id === editingTask.assignedTo)?.name || '',
+        createdBy: tasks.find(task => task.id === editingTask.id)?.createdBy || user.id,
+        createdAt: tasks.find(task => task.id === editingTask.id)?.createdAt || new Date(),
+        updatedAt: new Date(),
         status: editingTask.progressPercentage === 100 ? 'Complete' : editingTask.status
       };
       
