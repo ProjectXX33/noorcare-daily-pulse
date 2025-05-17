@@ -1,3 +1,4 @@
+
 export type User = {
   id: string;
   username: string;
@@ -136,7 +137,7 @@ export type TaskRecord = {
   title: string;
   description: string;
   assigned_to: string;
-  status: 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
   progress_percentage: number;
   created_at: string;
   updated_at: string;
