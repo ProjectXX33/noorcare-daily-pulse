@@ -18,7 +18,7 @@ export const uploadTaskAttachment = async (
 
     console.log('Generated file path:', filePath);
 
-    // First check if the task-attachments bucket exists, if not create it
+    // Check if the task-attachments bucket exists, if not create it
     const { data: buckets } = await supabase.storage.listBuckets();
     const bucketExists = buckets?.some(bucket => bucket.name === 'task-attachments');
     
@@ -39,7 +39,10 @@ export const uploadTaskAttachment = async (
     console.log('Uploading file to storage...');
     const { error: uploadError } = await supabase.storage
       .from('task-attachments')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
     if (uploadError) {
       console.error('Error uploading file:', uploadError);

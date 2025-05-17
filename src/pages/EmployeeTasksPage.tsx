@@ -1,90 +1,126 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from "sonner";
-import { fetchUserTasks, updateTask, subscribeToEmployeeTasks } from '@/lib/tasksApi';
+import { 
+  fetchUserTasks, 
+  updateTask, 
+  subscribeToEmployeeTasks,
+  addTaskComment 
+} from '@/lib/tasksApi';
 import { Task } from '@/types';
+import { 
+  Tabs, 
+  TabsList, 
+  TabsTrigger, 
+  TabsContent 
+} from "@/components/ui/tabs";
 import { 
   Dialog, 
   DialogContent, 
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle, 
-  DialogClose
+  DialogTitle,
+  DialogTrigger
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
-import { Progress } from "@/components/ui/progress";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import TaskFileUpload from '@/components/TaskFileUpload';
 import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const EmployeeTasksPage = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isProgressDialogOpen, setIsProgressDialogOpen] = useState(false);
-  const [progressValue, setProgressValue] = useState(0);
-  const [updating, setUpdating] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskProgress, setTaskProgress] = useState(0);
+  const [taskStatus, setTaskStatus] = useState<string>('');
+  const [updatingTask, setUpdatingTask] = useState(false);
+  const [newComment, setNewComment] = useState('');
   const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
+  const [currentTab, setCurrentTab] = useState("details");
 
   // Translation object for multilingual support
   const translations = {
     en: {
       myTasks: "My Tasks",
-      assignedTasks: "Assigned Tasks",
-      viewAndManageYourTasks: "View and manage your assigned tasks",
       title: "Title",
-      description: "Description",
       status: "Status",
       progress: "Progress",
       actions: "Actions",
+      viewDetails: "View Details",
       onHold: "On Hold",
       inProgress: "In Progress",
       complete: "Complete",
-      updateProgress: "Update Progress",
-      cancel: "Cancel",
-      save: "Save Changes",
-      progressUpdated: "Progress updated successfully!",
-      loadingTasks: "Loading your tasks...",
-      noTasks: "No tasks assigned to you",
-      updateTaskProgress: "Update Task Progress",
-      setProgressPercentage: "Set the progress percentage for this task",
-      viewDetails: "View Details",
+      noTasks: "You don't have any tasks assigned to you",
+      loadingTasks: "Loading tasks...",
       taskDetails: "Task Details",
-      updatingProgress: "Updating progress...",
-      task: "Task"
+      updateProgress: "Update Progress",
+      description: "Description",
+      assignedBy: "Assigned By",
+      save: "Save",
+      cancel: "Cancel",
+      taskUpdated: "Task updated successfully",
+      updateError: "Error updating task",
+      comments: "Comments",
+      addComment: "Add Comment",
+      postComment: "Post Comment",
+      commentPlaceholder: "Write a comment...",
+      commentPosted: "Comment posted successfully",
+      commentError: "Error posting comment",
+      update: "Update",
+      updateStatus: "Update Status",
+      selectStatus: "Select Status",
+      attachments: "Attachments",
+      details: "Details"
     },
     ar: {
       myTasks: "مهامي",
-      assignedTasks: "المهام المسندة",
-      viewAndManageYourTasks: "عرض وإدارة المهام المسندة إليك",
       title: "العنوان",
-      description: "الوصف",
       status: "الحالة",
       progress: "التقدم",
       actions: "الإجراءات",
+      viewDetails: "عرض التفاصيل",
       onHold: "في الانتظار",
       inProgress: "قيد التنفيذ",
       complete: "مكتمل",
-      updateProgress: "تحديث التقدم",
-      cancel: "إلغاء",
-      save: "حفظ التغييرات",
-      progressUpdated: "تم تحديث التقدم بنجاح!",
-      loadingTasks: "جاري تحميل المهام الخاصة بك...",
-      noTasks: "لا توجد مهام مسندة إليك",
-      updateTaskProgress: "تحديث تقدم المهمة",
-      setProgressPercentage: "حدد النسبة المئوية للتقدم في هذه المهمة",
-      viewDetails: "عرض التفاصيل",
+      noTasks: "ليس لديك أي مهام مسندة إليك",
+      loadingTasks: "جاري تحميل المهام...",
       taskDetails: "تفاصيل المهمة",
-      updatingProgress: "جاري تحديث التقدم...",
-      task: "مهمة"
+      updateProgress: "تحديث التقدم",
+      description: "الوصف",
+      assignedBy: "تم تعيينه بواسطة",
+      save: "حفظ",
+      cancel: "إلغاء",
+      taskUpdated: "تم تحديث المهمة بنجاح",
+      updateError: "خطأ في تحديث المهمة",
+      comments: "التعليقات",
+      addComment: "إضافة تعليق",
+      postComment: "نشر تعليق",
+      commentPlaceholder: "اكتب تعليقًا...",
+      commentPosted: "تم نشر التعليق بنجاح",
+      commentError: "خطأ في نشر التعليق",
+      update: "تحديث",
+      updateStatus: "تحديث الحالة",
+      selectStatus: "اختر الحالة",
+      attachments: "المرفقات",
+      details: "التفاصيل"
     }
   };
 
@@ -101,412 +137,345 @@ const EmployeeTasksPage = () => {
 
   useEffect(() => {
     if (user) {
+      const loadTasks = async () => {
+        try {
+          setIsLoading(true);
+          const data = await fetchUserTasks(user.id);
+          setTasks(data);
+        } catch (error) {
+          console.error("Error loading tasks:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
       loadTasks();
-      
-      // Subscribe to real-time updates for this employee's tasks
+
+      // Subscribe to task changes
       const unsubscribe = subscribeToEmployeeTasks(user.id, (updatedTasks) => {
-        console.log('Tasks updated from subscription:', updatedTasks);
         setTasks(updatedTasks);
-        setIsLoading(false);
       });
       
-      // Cleanup subscription on unmount
       return () => {
         unsubscribe();
       };
     }
   }, [user]);
 
-  const loadTasks = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      const data = await fetchUserTasks(user.id);
-      setTasks(data);
-    } catch (error) {
-      console.error("Error loading tasks:", error);
-      toast.error("Failed to load tasks");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const openProgressDialog = (task: Task) => {
+  const handleOpenTaskDetails = (task: Task) => {
     setSelectedTask(task);
-    setProgressValue(task.progressPercentage);
-    setIsProgressDialogOpen(true);
+    setTaskProgress(task.progressPercentage || 0);
+    setTaskStatus(task.status);
+    setTaskDetailsOpen(true);
   };
 
-  const openDetailsDialog = (task: Task) => {
-    setSelectedTask(task);
-  };
-
-  const handleUpdateProgress = async () => {
+  const handleUpdateTask = async () => {
     if (!user || !selectedTask) return;
-    
-    setUpdating(true);
+
+    setUpdatingTask(true);
     try {
-      const updatedTask = await updateTask(
+      // If progress is 100%, automatically set status to Complete
+      const updatedStatus = taskProgress === 100 ? 'Complete' : taskStatus;
+
+      await updateTask(
         selectedTask.id,
         {
-          progressPercentage: progressValue
+          progressPercentage: taskProgress,
+          status: updatedStatus
         },
         user.id
       );
-      
-      // Update the task in the list
-      setTasks(tasks.map(task => 
-        task.id === updatedTask.id ? updatedTask : task
-      ));
-      
-      // Close the dialog after successful update
-      setIsProgressDialogOpen(false);
-      setSelectedTask(null);
-      toast.success(t.progressUpdated);
+
+      // Update local state to reflect changes
+      setTasks(tasks.map(task => {
+        if (task.id === selectedTask.id) {
+          return { 
+            ...task, 
+            progressPercentage: taskProgress,
+            status: updatedStatus
+          };
+        }
+        return task;
+      }));
+
+      toast.success(t.taskUpdated);
+      setTaskDetailsOpen(false);
     } catch (error) {
-      console.error("Error updating task progress:", error);
-      toast.error("Failed to update progress");
+      console.error("Error updating task:", error);
+      toast.error(t.updateError);
     } finally {
-      setUpdating(false);
+      setUpdatingTask(false);
+    }
+  };
+
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const progress = parseInt(e.target.value);
+    setTaskProgress(progress);
+    
+    // If progress is 100%, automatically update status to Complete
+    if (progress === 100) {
+      setTaskStatus('Complete');
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!user || !selectedTask || !newComment.trim()) return;
+
+    try {
+      const result = await addTaskComment(
+        selectedTask.id,
+        newComment,
+        user.id,
+        user.name
+      );
+
+      if (result) {
+        // Update local task comments
+        const updatedComments = [
+          ...(selectedTask.comments || []),
+          {
+            id: Date.now().toString(), // Temporary ID until we refresh
+            userId: user.id,
+            userName: user.name,
+            text: newComment,
+            createdAt: new Date().toISOString()
+          }
+        ];
+
+        // Update the tasks array with the new comment
+        setTasks(tasks.map(task => {
+          if (task.id === selectedTask.id) {
+            return { ...task, comments: updatedComments };
+          }
+          return task;
+        }));
+
+        // Also update the selected task
+        setSelectedTask({
+          ...selectedTask,
+          comments: updatedComments
+        });
+
+        setNewComment('');
+        toast.success(t.commentPosted);
+      }
+    } catch (error) {
+      console.error("Error posting comment:", error);
+      toast.error(t.commentError);
     }
   };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'On Hold':
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
       case 'In Progress':
-        return 'bg-blue-100 text-blue-800 border border-blue-200';
+        return 'bg-blue-100 text-blue-800';
       case 'Complete':
-        return 'bg-green-100 text-green-800 border border-green-200';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
+  const getTranslatedStatus = (status: string) => {
+    switch (status) {
+      case 'On Hold':
+        return t.onHold;
+      case 'In Progress':
+        return t.inProgress;
+      case 'Complete':
+        return t.complete;
+      default:
+        return status;
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <MainLayout>
-      <div className="flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
+      <div className="container mx-auto px-4 py-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">{t.myTasks}</h1>
         </div>
-        
+
         <Card>
           <CardHeader>
-            <CardTitle>{t.assignedTasks}</CardTitle>
-            <CardDescription>{t.viewAndManageYourTasks}</CardDescription>
+            <CardTitle>{t.myTasks}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t.title}</TableHead>
-                    <TableHead>{t.status}</TableHead>
-                    <TableHead>{t.progress}</TableHead>
-                    <TableHead className="text-right">{t.actions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4">
-                        <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                        </div>
-                        <p className="mt-2 text-sm text-gray-500">{t.loadingTasks}</p>
-                      </TableCell>
-                    </TableRow>
-                  ) : tasks.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4">{t.noTasks}</TableCell>
-                    </TableRow>
-                  ) : (
-                    tasks.map(task => (
-                      <TableRow key={task.id}>
-                        <TableCell className="font-medium">{task.title}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
-                            {task.status === 'On Hold' ? t.onHold : 
-                             task.status === 'In Progress' ? t.inProgress : t.complete}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={task.progressPercentage} className="h-2" />
-                            <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openDetailsDialog(task)}
-                            >
-                              {t.viewDetails}
-                            </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => openProgressDialog(task)}
-                              disabled={task.status === 'Complete'}
-                            >
-                              {t.updateProgress}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Update Progress Dialog */}
-      <Dialog 
-        open={isProgressDialogOpen} 
-        onOpenChange={(open) => {
-          setIsProgressDialogOpen(open);
-          // If dialog is closing, reset the selected task
-          if (!open) {
-            // We keep the selectedTask if it's needed for the task details dialog
-            if (!selectedTask) {
-              setSelectedTask(null);
-            }
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-          <DialogHeader>
-            <DialogTitle>{t.updateTaskProgress}</DialogTitle>
-            <DialogDescription>
-              {t.setProgressPercentage}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedTask && (
-            <Tabs defaultValue="progress" className="w-full">
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="progress">Progress</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-                <TabsTrigger value="comments">Comments</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="progress" className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium mb-1">{t.task}: {selectedTask.title}</h4>
-                  <div className="text-sm text-gray-500 mb-4">{selectedTask.description}</div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="flex flex-col space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{t.progress}</span>
-                      <span className="text-sm font-medium">{progressValue}%</span>
-                    </div>
-                    <Slider
-                      value={[progressValue]}
-                      min={0}
-                      max={100}
-                      step={5}
-                      onValueChange={(value) => setProgressValue(value[0])}
-                      className="w-full"
-                    />
-                  </div>
-                  
-                  <div className="pt-4">
-                    <div className="p-3 bg-gray-50 rounded-md border">
-                      <div className="flex items-center mb-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                        <span className="text-sm font-medium">Current Status: {selectedTask.status}</span>
+            {isLoading ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-500">{t.loadingTasks}</p>
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-gray-500">{t.noTasks}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {tasks.map(task => (
+                  <div key={task.id} className="border rounded-md p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{task.title}</h3>
+                        <p className="text-sm text-gray-500 mt-1">{task.description}</p>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {progressValue === 100 ? 
-                          "Task will be marked as Complete when you save changes" : 
-                          "Update the slider to reflect your current progress"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="files" className="space-y-4">
-                <TaskFileUpload 
-                  taskId={selectedTask.id} 
-                  userId={user?.id || ''} 
-                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
-                  language={language}
-                />
-                
-                <div className="pt-4">
-                  <TaskAttachmentsList 
-                    taskId={selectedTask.id} 
-                    refresh={attachmentsRefreshKey}
-                    language={language}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="comments" className="space-y-4">
-                {user && (
-                  <TaskComments
-                    taskId={selectedTask.id}
-                    user={user}
-                    comments={selectedTask.comments || []}
-                    onCommentAdded={(newComments) => {
-                      // Update the task comments in the local state
-                      setTasks(tasks.map(task => 
-                        task.id === selectedTask.id 
-                          ? {...task, comments: newComments} 
-                          : task
-                      ));
-                      
-                      // Update the selected task with new comments
-                      setSelectedTask({...selectedTask, comments: newComments});
-                    }}
-                    language={language}
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-          
-          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsProgressDialogOpen(false);
-              }} 
-              disabled={updating}
-            >
-              {t.cancel}
-            </Button>
-            <Button 
-              onClick={handleUpdateProgress} 
-              disabled={updating} 
-              className="relative"
-            >
-              {updating ? (
-                <div className="flex items-center">
-                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  {t.updatingProgress}
-                </div>
-              ) : t.save}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task Details Dialog - Add file upload here too */}
-      {selectedTask && (
-        <Dialog 
-          open={!!selectedTask && !isProgressDialogOpen} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setSelectedTask(null);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-            <DialogHeader>
-              <DialogTitle>{t.taskDetails}</DialogTitle>
-            </DialogHeader>
-            
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-                <TabsTrigger value="comments">Comments</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="details" className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium">{selectedTask.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{selectedTask.description}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div>
-                    <p className="text-sm font-medium">{t.status}</p>
-                    <div className="mt-1">
-                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(selectedTask.status)}`}>
-                        {selectedTask.status === 'On Hold' ? t.onHold : 
-                         selectedTask.status === 'In Progress' ? t.inProgress : t.complete}
+                      <span className={`px-2 py-1 text-xs rounded-full ${getStatusBadgeClass(task.status)}`}>
+                        {getTranslatedStatus(task.status)}
                       </span>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium">{t.progress}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Progress value={selectedTask.progressPercentage} className="h-2" />
-                      <span className="text-xs text-gray-500">{selectedTask.progressPercentage}%</span>
+                    
+                    <div className="mt-4">
+                      <div className="flex items-center text-xs text-gray-500 mb-1">
+                        <span>{t.progress}: {task.progressPercentage}%</span>
+                      </div>
+                      <Progress value={task.progressPercentage} className="h-2" />
+                    </div>
+                    
+                    <div className="mt-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleOpenTaskDetails(task)}
+                      >
+                        {t.viewDetails}
+                      </Button>
                     </div>
                   </div>
-                </div>
-              </TabsContent>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={taskDetailsOpen} onOpenChange={setTaskDetailsOpen}>
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+            <DialogHeader>
+              <DialogTitle>
+                {selectedTask?.title}
+              </DialogTitle>
+              <DialogDescription>
+                {t.taskDetails}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedTask && (
+              <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="details">{t.details}</TabsTrigger>
+                  <TabsTrigger value="comments">{t.comments}</TabsTrigger>
+                  <TabsTrigger value="attachments">{t.attachments}</TabsTrigger>
+                </TabsList>
               
-              <TabsContent value="files" className="space-y-4">
-                <TaskFileUpload 
-                  taskId={selectedTask.id} 
-                  userId={user?.id || ''} 
-                  onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
-                  language={language}
-                />
+                <TabsContent value="details" className="space-y-4 mt-4">
+                  <div className="space-y-4">
+                    <div>
+                      <Label>{t.description}</Label>
+                      <div className="mt-1 p-2 border rounded-md bg-gray-50">
+                        {selectedTask.description || '-'}
+                      </div>
+                    </div>
+                  
+                    <div>
+                      <Label>{t.status}</Label>
+                      <Select
+                        value={taskStatus}
+                        onValueChange={setTaskStatus}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder={t.selectStatus} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="On Hold">{t.onHold}</SelectItem>
+                          <SelectItem value="In Progress">{t.inProgress}</SelectItem>
+                          <SelectItem value="Complete">{t.complete}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  
+                    <div>
+                      <Label>{t.progress}</Label>
+                      <div className="flex items-center gap-4 mt-1">
+                        <Input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={taskProgress}
+                          onChange={handleProgressChange}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={taskProgress}
+                          onChange={handleProgressChange}
+                          className="w-20"
+                        />
+                        <span>%</span>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
                 
-                <TaskAttachmentsList 
-                  taskId={selectedTask.id} 
-                  refresh={attachmentsRefreshKey}
-                  language={language}
-                />
-              </TabsContent>
-              
-              <TabsContent value="comments" className="space-y-4">
-                {user && (
+                <TabsContent value="comments" className="space-y-4 mt-4">
                   <TaskComments
                     taskId={selectedTask.id}
                     user={user}
                     comments={selectedTask.comments || []}
                     onCommentAdded={(newComments) => {
-                      // Update the task comments in the local state
-                      setTasks(tasks.map(task => 
-                        task.id === selectedTask.id 
-                          ? {...task, comments: newComments} 
-                          : task
-                      ));
-                      
-                      // Update the selected task with new comments
+                      // Update the selected task comments
                       setSelectedTask({...selectedTask, comments: newComments});
+                      
+                      // Update the task in the tasks array
+                      setTasks(tasks.map(task => 
+                        task.id === selectedTask.id ? {...task, comments: newComments} : task
+                      ));
                     }}
                     language={language}
                   />
-                )}
-              </TabsContent>
-            </Tabs>
+                </TabsContent>
+                
+                <TabsContent value="attachments" className="space-y-4 mt-4">
+                  {user && (
+                    <TaskFileUpload
+                      taskId={selectedTask.id}
+                      userId={user.id}
+                      onUploadComplete={() => setAttachmentsRefreshKey(prev => prev + 1)}
+                      language={language}
+                    />
+                  )}
+                  
+                  <div className="mt-4">
+                    <TaskAttachmentsList
+                      taskId={selectedTask.id}
+                      refresh={attachmentsRefreshKey}
+                      language={language}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
             
             <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-              <DialogClose asChild>
-                <Button variant="outline">
-                  {t.cancel}
-                </Button>
-              </DialogClose>
-              {selectedTask.status !== 'Complete' && (
-                <Button onClick={() => {
-                  setIsProgressDialogOpen(true);
-                  setProgressValue(selectedTask.progressPercentage);
-                }} disabled={updating}>
-                  {t.updateProgress}
-                </Button>
-              )}
+              <Button variant="outline" onClick={() => setTaskDetailsOpen(false)}>{t.cancel}</Button>
+              <Button onClick={handleUpdateTask} disabled={updatingTask}>
+                {updatingTask ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    {t.update}
+                  </div>
+                ) : t.update}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
+      </div>
     </MainLayout>
   );
 };

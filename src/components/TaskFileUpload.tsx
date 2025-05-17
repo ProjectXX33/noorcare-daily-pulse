@@ -45,7 +45,7 @@ const TaskFileUpload: React.FC<TaskFileUploadProps> = ({
     }
   };
 
-  const t = translations[language as keyof typeof translations];
+  const t = translations[language as keyof typeof translations] || translations.en;
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

@@ -213,6 +213,11 @@ const AdminTasksPage = () => {
       return;
     }
 
+    // Automatically set status to Complete if progress is 100%
+    if (newTask.progressPercentage === 100 && newTask.status !== 'Complete') {
+      setNewTask({ ...newTask, status: 'Complete' });
+    }
+
     setIsLoading(true);
     try {
       const createdTask = await createTask({
@@ -248,22 +253,23 @@ const AdminTasksPage = () => {
       return;
     }
 
+    // Automatically set status to Complete if progress is 100%
+    const finalStatus = editingTask.progressPercentage === 100 ? 'Complete' : editingTask.status;
+
     setUpdatingTaskProgress(true);
     try {
-      // Call the updateTask API instead of just updating local state
       const updatedTask = await updateTask(
         editingTask.id,
         {
           title: editingTask.title,
           description: editingTask.description,
           assignedTo: editingTask.assignedTo,
-          status: editingTask.status,
+          status: finalStatus,
           progressPercentage: editingTask.progressPercentage
         },
         user.id
       );
       
-      // Update local state with the response from the API
       setTasks(tasks.map(task => 
         task.id === updatedTask.id ? updatedTask : task
       ));
@@ -569,11 +575,7 @@ const AdminTasksPage = () => {
                   min="0"
                   max="100"
                   value={newTask.progressPercentage}
-                  onChange={(e) => setNewTask({
-                    ...newTask, 
-                    progressPercentage: parseInt(e.target.value) || 0,
-                    status: parseInt(e.target.value) === 100 ? 'Complete' : newTask.status
-                  })}
+                  onChange={handleNewTaskProgressChange}
                   className="w-16"
                 />
                 <span>%</span>
@@ -679,11 +681,7 @@ const AdminTasksPage = () => {
                   min="0"
                   max="100"
                   value={editingTask.progressPercentage}
-                  onChange={(e) => setEditingTask({
-                    ...editingTask, 
-                    progressPercentage: parseInt(e.target.value) || 0,
-                    status: parseInt(e.target.value) === 100 ? 'Complete' : editingTask.status
-                  })}
+                  onChange={handleEditTaskProgressChange}
                   className="w-16"
                 />
                 <span>%</span>
