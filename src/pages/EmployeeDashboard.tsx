@@ -9,7 +9,6 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
@@ -108,32 +107,26 @@ const EmployeeDashboard = () => {
           </div>
         )}
 
-        <Tabs defaultValue="history" className="mt-6">
-          <TabsList className="mb-4">
-            <TabsTrigger value="history">
-              History
-            </TabsTrigger>
-          </TabsList>
+        <div className="grid gap-6">
+          <CheckInHistory 
+            checkIns={userCheckIns.slice(0, 5)} 
+            title={t.recentCheckins} 
+          />
           
-          <TabsContent value="history">
-            <div className="grid gap-6">
-              <CheckInHistory 
-                checkIns={userCheckIns.slice(0, 5)} 
-                title={t.recentCheckins} 
-              />
-              <ReportHistory 
-                reports={userReports.slice(0, 3)} 
-                title={t.recentReports} 
-              />
-              <Button 
-                className="w-fit bg-primary hover:bg-primary/90 mt-4" 
-                onClick={() => navigate('/tasks')}
-              >
-                {t.viewTasks}
-              </Button>
-            </div>
-          </TabsContent>
-        </Tabs>
+          <ReportHistory 
+            reports={userReports.slice(0, 3)} 
+            title={t.recentReports} 
+          />
+          
+          <div className="flex space-x-4 mt-4">
+            <Button 
+              className="bg-primary hover:bg-primary/90" 
+              onClick={() => navigate('/employee-tasks')}
+            >
+              {t.viewTasks}
+            </Button>
+          </div>
+        </div>
       </div>
     </MainLayout>
   );

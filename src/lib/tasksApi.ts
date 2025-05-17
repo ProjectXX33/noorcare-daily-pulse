@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 import { Task } from "@/types";
 
@@ -17,7 +16,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .order('created_at', { ascending: false });
     
@@ -28,7 +27,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
       title: item.title,
       description: item.description,
       assignedTo: item.assigned_to,
-      assignedToName: item.users ? item.users.name : 'Unknown',
+      assignedToName: item.users?.name || 'Unknown',
       status: item.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: item.progress_percentage,
       createdAt: new Date(item.created_at),
@@ -56,7 +55,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .eq('assigned_to', employeeId)
       .order('created_at', { ascending: false });
@@ -68,7 +67,7 @@ export async function fetchEmployeeTasks(employeeId: string): Promise<Task[]> {
       title: item.title,
       description: item.description,
       assignedTo: item.assigned_to,
-      assignedToName: item.users ? item.users.name : 'Unknown',
+      assignedToName: item.users?.name || 'Unknown',
       status: item.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: item.progress_percentage,
       createdAt: new Date(item.created_at),
@@ -170,7 +169,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .eq('id', taskId)
       .single();
@@ -211,7 +210,7 @@ export async function updateTaskProgress(
         created_at,
         updated_at,
         created_by,
-        users:assigned_to(name)
+        users!assigned_to(name)
       `)
       .single();
       
@@ -223,7 +222,7 @@ export async function updateTaskProgress(
         await sendNotification({
           userId: taskData.created_by,
           title: 'Task Status Updated',
-          message: `Task "${taskData.title}" status has been updated to ${status} by ${taskData.users ? taskData.users.name : 'Assigned user'}`,
+          message: `Task "${taskData.title}" status has been updated to ${status} by ${taskData.users?.name || 'Assigned user'}`,
           adminId: userId, // Using assignee's ID as admin ID here
           relatedTo: 'task',
           relatedId: taskId
@@ -239,7 +238,7 @@ export async function updateTaskProgress(
       title: data.title,
       description: data.description,
       assignedTo: data.assigned_to,
-      assignedToName: data.users ? data.users.name : 'Unknown',
+      assignedToName: data.users?.name || 'Unknown',
       status: data.status as 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: data.progress_percentage,
       createdAt: new Date(data.created_at),
