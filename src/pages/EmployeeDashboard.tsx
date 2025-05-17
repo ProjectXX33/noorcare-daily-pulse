@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
@@ -108,15 +109,19 @@ const EmployeeDashboard = () => {
         )}
 
         <div className="grid gap-6">
-          <CheckInHistory 
-            checkIns={userCheckIns.slice(0, 5)} 
-            title={t.recentCheckins} 
-          />
+          <div className="mt-4">
+            <CheckInHistory 
+              checkIns={userCheckIns.slice(0, 5)} 
+              title={t.recentCheckins} 
+            />
+          </div>
           
-          <ReportHistory 
-            reports={userReports.slice(0, 3) as any} // Use 'any' to bypass the strict type checking
-            title={t.recentReports} 
-          />
+          <div className="mt-4">
+            <ReportHistory 
+              reports={userReports.slice(0, 3) as any}
+              title={t.recentReports} 
+            />
+          </div>
           
           <div className="flex space-x-4 mt-4">
             <Button 

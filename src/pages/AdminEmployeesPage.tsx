@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,7 +98,7 @@ const AdminEmployeesPage = () => {
       lastCheckIn: "آخر تسجيل دخول",
       actions: "الإجراءات",
       edit: "تعديل",
-      resetPassword: "إعادة تعيين كلمة المرور",
+      resetPassword: "إعادة تعيين كلمة المر��ر",
       never: "لم يسجل الدخول أبدًا",
       addNewEmployee: "إضافة موظف جديد",
       createAccount: "إنشاء حساب موظف جديد",
@@ -125,7 +124,16 @@ const AdminEmployeesPage = () => {
     if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
       setLanguage(storedLang);
     }
+    
+    // Set up employee subscription
+    const unsubscribe = subscribeToEmployeeChanges();
+    return () => unsubscribe();
   }, []);
+  
+  const subscribeToEmployeeChanges = () => {
+    loadEmployees();
+    return () => {};
+  };
 
   const t = translations[language as keyof typeof translations];
 
@@ -158,6 +166,11 @@ const AdminEmployeesPage = () => {
 
     setIsLoading(true);
     try {
+      console.log("Adding employee with data:", {
+        ...newEmployee,
+        password: "***" // Don't log actual password
+      });
+      
       await createEmployee({
         username: newEmployee.username,
         name: newEmployee.name,
@@ -184,9 +197,9 @@ const AdminEmployeesPage = () => {
         password: '',
         role: 'employee'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating employee:", error);
-      toast.error("Failed to create employee");
+      toast.error(`Failed to create employee: ${error.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }

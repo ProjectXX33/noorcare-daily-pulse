@@ -40,17 +40,17 @@ export async function createEmployee(employee: {
   try {
     console.log('Creating employee with data:', employee);
     
-    // Instead of using the admin API directly, we'll use the signup method
-    // and then update the role and other details in the users table
-    // This works because we have RLS policies that allow admins to insert into the users table
-    
     // First, sign up the user with email and password
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: employee.email,
       password: employee.password,
       options: {
         data: {
-          role: employee.role
+          username: employee.username,
+          name: employee.name,
+          role: employee.role,
+          department: employee.department,
+          position: employee.position
         }
       }
     });
@@ -83,8 +83,6 @@ export async function createEmployee(employee: {
 
     if (error) {
       console.error('Database error:', error);
-      // If the profile insertion fails, attempt to clean up the auth user
-      // Note: We can't delete the auth user here because we don't have admin privileges
       throw error;
     }
     

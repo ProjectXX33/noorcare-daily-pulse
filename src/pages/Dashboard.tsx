@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
@@ -116,11 +117,15 @@ const Dashboard = () => {
           
           <TabsContent value="history">
             <div className="grid gap-6">
-              <CheckInHistory checkIns={userCheckIns} title={t.checkInsHistory} />
-              <ReportHistory 
-                reports={userReports as any} // Use 'any' to bypass the strict type checking
-                title={t.reportsHistory} 
-              />
+              <div className="mt-4">
+                <CheckInHistory checkIns={userCheckIns} title={t.checkInsHistory} />
+              </div>
+              <div className="mt-4">
+                <ReportHistory 
+                  reports={userReports as any} 
+                  title={t.reportsHistory} 
+                />
+              </div>
             </div>
           </TabsContent>
           
