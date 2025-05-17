@@ -1,11 +1,10 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User } from '@/types';
+import { User, CheckIn as CheckInType, WorkReport as WorkReportType } from '@/types';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-// Update the CheckIn interface to match the one in types/index.ts
+// Update interfaces to match the ones in types/index.ts
 export interface CheckIn {
   id: string;
   userId: string;
@@ -14,16 +13,16 @@ export interface CheckIn {
   userName: string;
   department: string;
   position: string;
+  checkOutTime?: Date; // Added to match types/index.ts
 }
 
-// Update the WorkReport interface to match the one in types/index.ts
 export interface WorkReport {
   id: string;
   userId: string;
   userName: string;
   date: Date;
   tasksDone: string;
-  issuesFaced?: string;
+  issuesFaced: string | null;
   plansForTomorrow: string;
   createdAt: Date;
   department: string;
@@ -41,9 +40,9 @@ interface CheckInContextType {
   checkOutUser: (userId: string) => Promise<void>;
   submitWorkReport: (userId: string, reportData: {
     tasksDone: string;
-    issuesFaced?: string;
+    issuesFaced?: string | null;
     plansForTomorrow: string;
-  }) => Promise<void>;
+  }, fileAttachment?: File) => Promise<void>;
   hasCheckedInToday: (userId: string) => boolean;
   hasCheckedOutToday: (userId: string) => boolean;
   getUserLatestCheckIn: (userId: string) => CheckIn | null;
@@ -130,6 +129,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userId: item.user_id,
           timestamp: new Date(item.timestamp),
           checkoutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
+          checkOutTime: item.checkout_time ? new Date(item.checkout_time) : undefined, // Also include checkOutTime to match types/index.ts
           userName: user.name || 'Unknown User',
           department: user.department || 'Unknown',
           position: user.position || 'Unknown',
@@ -260,6 +260,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userId: data[0].user_id,
           timestamp: new Date(data[0].timestamp),
           checkoutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined,
+          checkOutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined, // Also include checkOutTime to match types/index.ts
           userName: userData.name,
           department: userData.department,
           position: userData.position
@@ -325,7 +326,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const submitWorkReport = async (userId: string, reportData: {
     tasksDone: string;
-    issuesFaced?: string;
+    issuesFaced?: string | null;
     plansForTomorrow: string;
   }, fileAttachment?: File) => {
     try {

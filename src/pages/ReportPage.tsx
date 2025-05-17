@@ -5,6 +5,7 @@ import ReportForm from '@/components/ReportForm';
 import ReportHistory from '@/components/ReportHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { WorkReport } from '@/types';
 
 const ReportPage = () => {
   const { user } = useAuth();
@@ -12,7 +13,7 @@ const ReportPage = () => {
 
   if (!user) return null;
 
-  const userReports = getUserWorkReports(user.id);
+  const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
 
   return (
     <MainLayout>

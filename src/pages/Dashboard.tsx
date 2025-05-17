@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
@@ -9,6 +8,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CheckIn, WorkReport } from '@/types';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -53,8 +53,14 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  const userCheckIns = user.role === 'admin' ? checkIns : getUserCheckIns(user.id);
-  const userReports = user.role === 'admin' ? workReports : getUserWorkReports(user.id);
+  const userCheckIns = user.role === 'admin' 
+    ? checkIns as unknown as CheckIn[] 
+    : getUserCheckIns(user.id) as unknown as CheckIn[];
+    
+  const userReports = user.role === 'admin' 
+    ? workReports as unknown as WorkReport[] 
+    : getUserWorkReports(user.id) as unknown as WorkReport[];
+    
   const checkedInToday = hasCheckedInToday(user.id);
 
   if (isLoading) {
@@ -111,7 +117,7 @@ const Dashboard = () => {
           <TabsContent value="history">
             <div className="grid gap-6">
               <CheckInHistory checkIns={userCheckIns} title={t.checkInsHistory} />
-              <ReportHistory reports={userReports} title={t.reportsHistory} />
+              <ReportHistory reports={userReports as unknown as WorkReport[]} title={t.reportsHistory} />
             </div>
           </TabsContent>
           

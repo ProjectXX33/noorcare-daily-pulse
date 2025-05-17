@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import DashboardStats from '@/components/DashboardStats';
@@ -9,6 +8,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { CheckIn, WorkReport } from '@/types';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
@@ -60,8 +60,8 @@ const EmployeeDashboard = () => {
 
   if (!user) return null;
 
-  const userCheckIns = getUserCheckIns(user.id);
-  const userReports = getUserWorkReports(user.id);
+  const userCheckIns = getUserCheckIns(user.id) as unknown as CheckIn[];
+  const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
   const checkedInToday = hasCheckedInToday(user.id);
 
   if (isLoading) {
@@ -114,7 +114,7 @@ const EmployeeDashboard = () => {
           />
           
           <ReportHistory 
-            reports={userReports.slice(0, 3)} 
+            reports={userReports.slice(0, 3) as unknown as WorkReport[]} 
             title={t.recentReports} 
           />
           

@@ -45,10 +45,10 @@ const ReportForm = () => {
         user.id,
         {
           tasksDone: formData.tasksDone,
-          issuesFaced: formData.issuesFaced,
+          issuesFaced: formData.issuesFaced || null,
           plansForTomorrow: formData.plansForTomorrow,
-          fileAttachment: fileAttachment || undefined
-        }
+        },
+        fileAttachment || undefined
       );
       
       // Reset form

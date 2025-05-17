@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,8 +145,9 @@ const EmployeeTasksPage = () => {
     try {
       const updatedTask = await updateTask(
         selectedTask.id,
-        user.id,
-        progressValue
+        {
+          progressPercentage: progressValue
+        }
       );
       
       // Update the task in the list
