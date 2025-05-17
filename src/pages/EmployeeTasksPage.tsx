@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from "sonner";
-import { fetchEmployeeTasks, updateTaskProgress, subscribeToEmployeeTasks } from '@/lib/tasksApi';
+import { fetchUserTasks, updateTask, subscribeToEmployeeTasks } from '@/lib/tasksApi';
 import { Task } from '@/types';
 import { 
   Dialog, 
@@ -118,7 +117,7 @@ const EmployeeTasksPage = () => {
     
     setIsLoading(true);
     try {
-      const data = await fetchEmployeeTasks(user.id);
+      const data = await fetchUserTasks(user.id);
       setTasks(data);
     } catch (error) {
       console.error("Error loading tasks:", error);
@@ -143,7 +142,7 @@ const EmployeeTasksPage = () => {
     
     setUpdating(true);
     try {
-      const updatedTask = await updateTaskProgress(
+      const updatedTask = await updateTask(
         selectedTask.id,
         user.id,
         progressValue

@@ -27,20 +27,9 @@ export const fetchTasks = async (): Promise<Task[]> => {
       description: task.description,
       status: task.status,
       progressPercentage: task.progress_percentage,
-      assignedTo: {
-        id: task.assigned_to.id,
-        name: task.assigned_to.name,
-        username: task.assigned_to.username,
-        department: task.assigned_to.department,
-        position: task.assigned_to.position
-      },
-      createdBy: {
-        id: task.created_by.id,
-        name: task.created_by.name,
-        username: task.created_by.username,
-        department: task.created_by.department,
-        position: task.created_by.position
-      },
+      assignedTo: task.assigned_to.id,
+      assignedToName: task.assigned_to.name,
+      createdBy: task.created_by.id,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at)
     }));
@@ -52,6 +41,9 @@ export const fetchTasks = async (): Promise<Task[]> => {
     throw error;
   }
 };
+
+// Alias for fetchTasks to maintain compatibility with existing code
+export const fetchAllTasks = fetchTasks;
 
 // Fetch tasks for a specific user
 export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
@@ -78,20 +70,9 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       description: task.description,
       status: task.status,
       progressPercentage: task.progress_percentage,
-      assignedTo: {
-        id: task.assigned_to.id,
-        name: task.assigned_to.name,
-        username: task.assigned_to.username,
-        department: task.assigned_to.department,
-        position: task.assigned_to.position
-      },
-      createdBy: {
-        id: task.created_by.id,
-        name: task.created_by.name,
-        username: task.created_by.username,
-        department: task.created_by.department,
-        position: task.created_by.position
-      },
+      assignedTo: task.assigned_to.id,
+      assignedToName: task.assigned_to.name,
+      createdBy: task.created_by.id,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at)
     }));
@@ -104,6 +85,9 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
   }
 };
 
+// Alias for fetchUserTasks to maintain compatibility with existing code
+export const fetchEmployeeTasks = fetchUserTasks;
+
 // Create a new task
 export const createTask = async (
   task: {
@@ -111,8 +95,9 @@ export const createTask = async (
     description?: string;
     assignedTo: string;
     status: string;
-  }, 
-  createdBy: string
+    progressPercentage?: number;
+    createdBy: string;
+  }
 ): Promise<Task> => {
   try {
     console.log('Creating task:', task);
@@ -124,8 +109,8 @@ export const createTask = async (
         description: task.description,
         assigned_to: task.assignedTo,
         status: task.status,
-        created_by: createdBy,
-        progress_percentage: 0,
+        created_by: task.createdBy,
+        progress_percentage: task.progressPercentage || 0,
       }])
       .select(`
         *,
@@ -139,7 +124,7 @@ export const createTask = async (
     }
     
     // Create task notification for assigned user
-    if (data.assigned_to.id !== createdBy) {
+    if (data.assigned_to.id !== task.createdBy) {
       await createTaskNotification(
         data.assigned_to.id, 
         data.id, 
@@ -155,20 +140,9 @@ export const createTask = async (
       description: data.description,
       status: data.status,
       progressPercentage: data.progress_percentage,
-      assignedTo: {
-        id: data.assigned_to.id,
-        name: data.assigned_to.name,
-        username: data.assigned_to.username,
-        department: data.assigned_to.department,
-        position: data.assigned_to.position
-      },
-      createdBy: {
-        id: data.created_by.id,
-        name: data.created_by.name,
-        username: data.created_by.username,
-        department: data.created_by.department,
-        position: data.created_by.position
-      },
+      assignedTo: data.assigned_to.id,
+      assignedToName: data.assigned_to.name,
+      createdBy: data.created_by.id,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at)
     };
@@ -269,20 +243,9 @@ export const updateTask = async (
       description: data.description,
       status: data.status,
       progressPercentage: data.progress_percentage,
-      assignedTo: {
-        id: data.assigned_to.id,
-        name: data.assigned_to.name,
-        username: data.assigned_to.username,
-        department: data.assigned_to.department,
-        position: data.assigned_to.position
-      },
-      createdBy: {
-        id: data.created_by.id,
-        name: data.created_by.name,
-        username: data.created_by.username,
-        department: data.created_by.department,
-        position: data.created_by.position
-      },
+      assignedTo: data.assigned_to.id,
+      assignedToName: data.assigned_to.name,
+      createdBy: data.created_by.id,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at)
     };
@@ -293,6 +256,19 @@ export const updateTask = async (
     console.error(`Error updating task ${taskId}:`, error);
     throw error;
   }
+};
+
+// Alias for updateTask to maintain compatibility with existing code
+export const updateTaskProgress = async (
+  taskId: string,
+  progressPercentage: number,
+  currentUserId: string
+): Promise<Task> => {
+  return updateTask(
+    taskId,
+    { progressPercentage },
+    currentUserId
+  );
 };
 
 // Delete a task
@@ -361,6 +337,68 @@ const createTaskNotification = async (
   }
 };
 
+// Send notification to users
+export const sendNotification = async (params: {
+  userId?: string;
+  title: string;
+  message: string;
+  sendToAll?: boolean;
+  adminId: string;
+}): Promise<void> => {
+  try {
+    const { userId, title, message, sendToAll, adminId } = params;
+    
+    if (sendToAll) {
+      // Get all users except the admin
+      const { data: users, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .neq('id', adminId);
+      
+      if (userError) {
+        throw userError;
+      }
+      
+      // Create notifications for all users
+      if (users && users.length > 0) {
+        const notifications = users.map(user => ({
+          user_id: user.id,
+          title,
+          message,
+          related_to: 'admin',
+          related_id: adminId
+        }));
+        
+        const { error } = await supabase
+          .from('notifications')
+          .insert(notifications);
+        
+        if (error) {
+          throw error;
+        }
+      }
+    } else if (userId) {
+      // Create notification for a specific user
+      const { error } = await supabase
+        .from('notifications')
+        .insert([{
+          user_id: userId,
+          title,
+          message,
+          related_to: 'admin',
+          related_id: adminId
+        }]);
+      
+      if (error) {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    throw error;
+  }
+};
+
 // Subscribe to task changes
 export const subscribeToTaskChanges = (callback: (tasks: Task[]) => void): () => void => {
   // Initialize with current data
@@ -374,6 +412,29 @@ export const subscribeToTaskChanges = (callback: (tasks: Task[]) => void): () =>
       () => {
         // When there's any change, fetch the updated list
         fetchTasks().then(callback).catch(console.error);
+      }
+    )
+    .subscribe();
+  
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
+};
+
+// Subscribe to employee task changes
+export const subscribeToEmployeeTasks = (userId: string, callback: (tasks: Task[]) => void): () => void => {
+  // Initialize with current data
+  fetchUserTasks(userId).then(callback).catch(console.error);
+  
+  // Set up the subscription
+  const subscription = supabase
+    .channel(`public:tasks:assigned_to=eq.${userId}`)
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${userId}` }, 
+      () => {
+        // When there's any change, fetch the updated list
+        fetchUserTasks(userId).then(callback).catch(console.error);
       }
     )
     .subscribe();

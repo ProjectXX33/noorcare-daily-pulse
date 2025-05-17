@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { createTask, fetchAllTasks, sendNotification, subscribeToTaskChanges } from '@/lib/tasksApi';
+import { createTask, fetchTasks, sendNotification, subscribeToTaskChanges } from '@/lib/tasksApi';
 import { fetchEmployees } from '@/lib/employeesApi';
 import { Task, User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -114,7 +115,7 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
     const loadTasks = async () => {
       try {
         console.log('Loading tasks...');
-        const data = await fetchAllTasks();
+        const data = await fetchTasks();
         console.log('Tasks loaded:', data);
         setTasks(data);
       } catch (error) {

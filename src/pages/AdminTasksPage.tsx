@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +37,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { 
-  fetchAllTasks, 
+  fetchTasks, 
   createTask, 
   sendNotification 
 } from '@/lib/tasksApi';
@@ -165,7 +164,7 @@ const AdminTasksPage = () => {
     setIsLoading(true);
     try {
       const [tasksData, employeesData] = await Promise.all([
-        fetchAllTasks(),
+        fetchTasks(),
         fetchEmployees()
       ]);
       

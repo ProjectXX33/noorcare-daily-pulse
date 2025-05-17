@@ -47,8 +47,8 @@ const ReportForm = () => {
           tasksDone: formData.tasksDone,
           issuesFaced: formData.issuesFaced,
           plansForTomorrow: formData.plansForTomorrow,
-        },
-        fileAttachment || undefined
+          fileAttachment: fileAttachment || undefined
+        }
       );
       
       // Reset form
