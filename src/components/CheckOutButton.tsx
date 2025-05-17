@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 
 const CheckOutButton = () => {
   const { user } = useAuth();
-  const { addCheckOut, hasCheckedInToday, hasCheckedOutToday } = useCheckIn();
+  const { checkOutUser, hasCheckedInToday, hasCheckedOutToday } = useCheckIn();
   const [isLoading, setIsLoading] = useState(false);
 
   if (!user) return null;
@@ -25,10 +25,7 @@ const CheckOutButton = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      addCheckOut(user.id);
+      await checkOutUser(user.id);
     } finally {
       setIsLoading(false);
     }

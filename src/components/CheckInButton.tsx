@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 
 const CheckInButton = () => {
   const { user } = useAuth();
-  const { addCheckIn, hasCheckedInToday } = useCheckIn();
+  const { checkInUser, hasCheckedInToday } = useCheckIn();
   const [isLoading, setIsLoading] = useState(false);
 
   if (!user) return null;
@@ -22,15 +22,7 @@ const CheckInButton = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      addCheckIn(
-        user.id,
-        user.name,
-        user.department,
-        user.position
-      );
+      await checkInUser(user.id);
     } finally {
       setIsLoading(false);
     }

@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const ReportForm = () => {
   const { user } = useAuth();
-  const { addWorkReport, hasSubmittedReportToday, isLoading: contextLoading } = useCheckIn();
+  const { submitWorkReport, hasSubmittedReportToday, isLoading: contextLoading } = useCheckIn();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     tasksDone: '',
@@ -41,16 +41,15 @@ const ReportForm = () => {
     setIsLoading(true);
     
     try {
-      await addWorkReport({
-        userId: user.id,
-        userName: user.name,
-        date: new Date(),
-        tasksDone: formData.tasksDone,
-        issuesFaced: formData.issuesFaced,
-        plansForTomorrow: formData.plansForTomorrow,
-        department: user.department,
-        position: user.position,
-      }, fileAttachment || undefined);
+      await submitWorkReport(
+        user.id,
+        {
+          tasksDone: formData.tasksDone,
+          issuesFaced: formData.issuesFaced,
+          plansForTomorrow: formData.plansForTomorrow,
+        },
+        fileAttachment || undefined
+      );
       
       // Reset form
       setFormData({

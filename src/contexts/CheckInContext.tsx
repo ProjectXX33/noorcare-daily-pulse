@@ -3,23 +3,32 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
+// Update the CheckIn interface to match the one in types/index.ts
 export interface CheckIn {
   id: string;
   userId: string;
   timestamp: Date;
   checkoutTime?: Date;
+  userName: string;
+  department: string;
+  position: string;
 }
 
+// Update the WorkReport interface to match the one in types/index.ts
 export interface WorkReport {
   id: string;
   userId: string;
+  userName: string;
   date: Date;
   tasksDone: string;
   issuesFaced?: string;
   plansForTomorrow: string;
   createdAt: Date;
+  department: string;
+  position: string;
+  fileAttachments?: string[];
 }
 
 interface CheckInContextType {
@@ -95,19 +104,37 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const fetchCheckIns = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: checkInsData, error: checkInsError } = await supabase
         .from('check_ins')
-        .select('*')
+        .select('*, users:user_id(name, department, position)')
         .order('timestamp', { ascending: false });
         
-      if (error) throw error;
+      if (checkInsError) throw checkInsError;
+
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, department, position');
+
+      if (usersError) throw usersError;
       
-      const formattedCheckIns: CheckIn[] = data.map(item => ({
-        id: item.id,
-        userId: item.user_id,
-        timestamp: new Date(item.timestamp),
-        checkoutTime: item.checkout_time ? new Date(item.checkout_time) : undefined
-      }));
+      // Create a map of user details for quick lookup
+      const usersMap = usersData.reduce((acc: Record<string, any>, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {});
+      
+      const formattedCheckIns: CheckIn[] = checkInsData.map(item => {
+        const user = usersMap[item.user_id] || {};
+        return {
+          id: item.id,
+          userId: item.user_id,
+          timestamp: new Date(item.timestamp),
+          checkoutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
+          userName: user.name || 'Unknown User',
+          department: user.department || 'Unknown',
+          position: user.position || 'Unknown',
+        };
+      });
       
       setCheckIns(formattedCheckIns);
     } catch (error) {
@@ -117,22 +144,56 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const fetchWorkReports = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: reportsData, error: reportsError } = await supabase
         .from('work_reports')
-        .select('*')
+        .select('*, users:user_id(name, department, position)')
         .order('date', { ascending: false });
         
-      if (error) throw error;
+      if (reportsError) throw reportsError;
       
-      const formattedReports: WorkReport[] = data.map(item => ({
-        id: item.id,
-        userId: item.user_id,
-        date: new Date(item.date),
-        tasksDone: item.tasks_done,
-        issuesFaced: item.issues_faced,
-        plansForTomorrow: item.plans_for_tomorrow,
-        createdAt: new Date(item.created_at)
-      }));
+      const { data: attachmentsData, error: attachmentsError } = await supabase
+        .from('file_attachments')
+        .select('*');
+      
+      if (attachmentsError) throw attachmentsError;
+      
+      // Create a map of attachments for each report
+      const attachmentsByReport = attachmentsData.reduce((acc: Record<string, string[]>, file) => {
+        if (!acc[file.work_report_id]) {
+          acc[file.work_report_id] = [];
+        }
+        acc[file.work_report_id].push(file.file_name);
+        return acc;
+      }, {});
+
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, department, position');
+
+      if (usersError) throw usersError;
+      
+      // Create a map of user details for quick lookup
+      const usersMap = usersData.reduce((acc: Record<string, any>, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {});
+      
+      const formattedReports: WorkReport[] = reportsData.map(item => {
+        const user = usersMap[item.user_id] || {};
+        return {
+          id: item.id,
+          userId: item.user_id,
+          userName: user.name || 'Unknown User',
+          date: new Date(item.date),
+          tasksDone: item.tasks_done,
+          issuesFaced: item.issues_faced,
+          plansForTomorrow: item.plans_for_tomorrow,
+          createdAt: new Date(item.created_at),
+          department: user.department || 'Unknown',
+          position: user.position || 'Unknown',
+          fileAttachments: attachmentsByReport[item.id] || []
+        };
+      });
       
       setWorkReports(formattedReports);
     } catch (error) {
@@ -150,6 +211,15 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const checkInUser = async (userId: string) => {
     try {
+      // Get the user data
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, department, position')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) throw userError;
+      
       // Get today's date at the start of the day
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -189,7 +259,10 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           id: data[0].id,
           userId: data[0].user_id,
           timestamp: new Date(data[0].timestamp),
-          checkoutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined
+          checkoutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined,
+          userName: userData.name,
+          department: userData.department,
+          position: userData.position
         };
         
         setCheckIns(prev => [newCheckIn, ...prev]);
@@ -254,8 +327,17 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     tasksDone: string;
     issuesFaced?: string;
     plansForTomorrow: string;
-  }) => {
+  }, fileAttachment?: File) => {
     try {
+      // Get user data
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, department, position')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) throw userError;
+      
       // Use current date - this ensures the date is in the user's timezone
       const today = new Date();
       const formattedDate = format(today, 'yyyy-MM-dd');
@@ -287,16 +369,53 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
       if (error) throw error;
       
+      let fileAttachments: string[] = [];
+      
       // Add the new report to the local state
       if (data && data[0]) {
+        // Handle file attachment if provided
+        if (fileAttachment) {
+          const fileName = fileAttachment.name;
+          const filePath = `${userId}/${data[0].id}/${fileName}`;
+          
+          // Upload file to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, fileAttachment);
+            
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError);
+          } else {
+            // Record file attachment in the database
+            const { error: attachmentError } = await supabase
+              .from('file_attachments')
+              .insert([{
+                work_report_id: data[0].id,
+                file_name: fileName,
+                file_path: filePath,
+                file_type: fileAttachment.type
+              }]);
+              
+            if (attachmentError) {
+              console.error('Error recording file attachment:', attachmentError);
+            } else {
+              fileAttachments.push(fileName);
+            }
+          }
+        }
+        
         const newReport: WorkReport = {
           id: data[0].id,
           userId: data[0].user_id,
+          userName: userData.name,
           date: new Date(data[0].date),
           tasksDone: data[0].tasks_done,
           issuesFaced: data[0].issues_faced,
           plansForTomorrow: data[0].plans_for_tomorrow,
-          createdAt: new Date(data[0].created_at)
+          createdAt: new Date(data[0].created_at),
+          department: userData.department,
+          position: userData.position,
+          fileAttachments
         };
         
         setWorkReports(prev => [newReport, ...prev]);

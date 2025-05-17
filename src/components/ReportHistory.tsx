@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { WorkReport } from '@/types';
+import { WorkReport } from '@/contexts/CheckInContext';
 import { format } from 'date-fns';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/lib/supabase';
@@ -39,11 +39,11 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
     if (checkInRecord) {
       return {
         checkInTime: format(new Date(checkInRecord.timestamp), 'h:mm a'),
-        checkOutTime: checkInRecord.checkOutTime 
-          ? format(new Date(checkInRecord.checkOutTime), 'h:mm a') 
+        checkOutTime: checkInRecord.checkoutTime 
+          ? format(new Date(checkInRecord.checkoutTime), 'h:mm a') 
           : 'Not recorded',
-        totalHours: checkInRecord.checkOutTime 
-          ? ((new Date(checkInRecord.checkOutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
+        totalHours: checkInRecord.checkoutTime 
+          ? ((new Date(checkInRecord.checkoutTime).getTime() - new Date(checkInRecord.timestamp).getTime()) / (1000 * 60 * 60)).toFixed(2) 
           : 'Not recorded'
       };
     }
