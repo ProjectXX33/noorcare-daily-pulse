@@ -201,7 +201,8 @@ async function fetchAllWorkReports(): Promise<WorkReport[]> {
       plansForTomorrow: record.plans_for_tomorrow,
       fileAttachments: record.file_attachments?.map((file: any) => file.file_path) || [],
       department: record.users.department,
-      position: record.users.position
+      position: record.users.position,
+      createdAt: new Date(record.created_at) // Add createdAt property
     }));
   } catch (error) {
     console.error('Error fetching work reports:', error);

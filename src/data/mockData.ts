@@ -91,7 +91,8 @@ export const mockWorkReports: WorkReport[] = [
     issuesFaced: 'Some compatibility issues with older browsers that needed adjustments.',
     plansForTomorrow: 'Start working on the mobile responsive design and implement the changes requested by the marketing team.',
     department: 'Engineering',
-    position: 'Designer'
+    position: 'Designer',
+    createdAt: new Date(2025, 4, 13, 17, 0) // Added createdAt property
   },
   {
     id: '2',
@@ -103,7 +104,8 @@ export const mockWorkReports: WorkReport[] = [
     plansForTomorrow: 'Follow up on escalated issues and finalize the customer service improvement plan.',
     fileAttachments: ['customer_feedback.pdf'],
     department: 'Manager',
-    position: 'Customer Service'
+    position: 'Customer Service',
+    createdAt: new Date(2025, 4, 13, 16, 30) // Added createdAt property
   },
   {
     id: '3',
@@ -114,6 +116,7 @@ export const mockWorkReports: WorkReport[] = [
     issuesFaced: 'Unclear requirements for one of the features.',
     plansForTomorrow: 'Meet with product team to clarify requirements and continue working on wireframes.',
     department: 'Engineering',
-    position: 'Designer'
+    position: 'Designer',
+    createdAt: new Date(2025, 4, 12, 17, 15) // Added createdAt property
   }
 ];
