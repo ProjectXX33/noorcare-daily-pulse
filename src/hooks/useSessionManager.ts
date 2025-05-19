@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
@@ -171,6 +170,48 @@ export const useSessionManager = () => {
     }
   };
 
+  // Function to update user profile
+  const updateUserProfile = async (userData: Partial<User>): Promise<void> => {
+    try {
+      if (!user) {
+        throw new Error('No user logged in');
+      }
+      
+      setIsLoading(true);
+      
+      // Update the user profile in the database
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: userData.name,
+          username: userData.username,
+          department: userData.department,
+          position: userData.position
+        })
+        .eq('id', userData.id || user.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update the local user state
+      if (userData.id === user.id) {
+        setUser({
+          ...user,
+          ...userData
+        });
+      }
+      
+      console.log('User profile updated successfully');
+      
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     user,
     setUser,
@@ -180,6 +221,7 @@ export const useSessionManager = () => {
     setIsLoading,
     refreshSession,
     login,
-    logout
+    logout,
+    updateUserProfile
   };
 };
