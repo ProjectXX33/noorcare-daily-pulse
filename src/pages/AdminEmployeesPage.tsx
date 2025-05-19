@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -279,10 +278,10 @@ const AdminEmployeesPage = () => {
   return (
     <>
       <div className="flex flex-col w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6 sticky top-0 z-50 bg-background pt-2 pb-4">
           <h1 className="text-2xl font-bold">{t.employees}</h1>
           <Button 
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
             onClick={() => setIsAddEmployeeOpen(true)}
           >
             {t.addEmployee}
@@ -295,65 +294,67 @@ const AdminEmployeesPage = () => {
             <CardDescription>{t.manageEmployeeAccounts}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t.name}</TableHead>
-                    <TableHead>{t.username}</TableHead>
-                    <TableHead>{t.department}</TableHead>
-                    <TableHead>{t.position}</TableHead>
-                    <TableHead>{t.lastCheckIn}</TableHead>
-                    <TableHead className="text-right">{t.actions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                        </div>
-                      </TableCell>
+                      <TableHead className="w-[120px] sm:w-auto">{t.name}</TableHead>
+                      <TableHead className="hidden sm:table-cell">{t.username}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t.department}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t.position}</TableHead>
+                      <TableHead className="hidden sm:table-cell">{t.lastCheckIn}</TableHead>
+                      <TableHead className="text-right">{t.actions}</TableHead>
                     </TableRow>
-                  ) : employees.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
-                    </TableRow>
-                  ) : (
-                    employees.map(employee => (
-                      <TableRow key={employee.id}>
-                        <TableCell>{employee.name}</TableCell>
-                        <TableCell>{employee.username}</TableCell>
-                        <TableCell>{employee.department}</TableCell>
-                        <TableCell>{employee.position}</TableCell>
-                        <TableCell>
-                          {employee.lastCheckin 
-                            ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
-                            : t.never}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                {t.actions}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => openEditDialog(employee)}>
-                                {t.edit}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
-                                {t.resetPassword}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : employees.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
+                      </TableRow>
+                    ) : (
+                      employees.map(employee => (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium">{employee.name}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{employee.username}</TableCell>
+                          <TableCell className="hidden md:table-cell">{employee.department}</TableCell>
+                          <TableCell className="hidden md:table-cell">{employee.position}</TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {employee.lastCheckin 
+                              ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
+                              : t.never}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  {t.actions}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => openEditDialog(employee)}>
+                                  {t.edit}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
+                                  {t.resetPassword}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -361,7 +362,7 @@ const AdminEmployeesPage = () => {
 
       {/* Add Employee Dialog */}
       <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.addNewEmployee}</DialogTitle>
             <DialogDescription>
@@ -476,9 +477,15 @@ const AdminEmployeesPage = () => {
               </Select>
             </div>
           </div>
-          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>{t.cancel}</Button>
-            <Button onClick={handleAddEmployee} disabled={isLoading}>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : 'flex-col space-y-2 sm:space-y-0 sm:flex-row'}>
+            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)} className="w-full sm:w-auto">
+              {t.cancel}
+            </Button>
+            <Button 
+              onClick={handleAddEmployee} 
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
@@ -492,7 +499,7 @@ const AdminEmployeesPage = () => {
 
       {/* Edit Employee Dialog */}
       <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
-        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.editEmployee}</DialogTitle>
             <DialogDescription>
@@ -610,9 +617,15 @@ const AdminEmployeesPage = () => {
               )}
             </div>
           )}
-          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>{t.cancel}</Button>
-            <Button onClick={handleEditEmployee} disabled={isLoading}>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : 'flex-col space-y-2 sm:space-y-0 sm:flex-row'}>
+            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)} className="w-full sm:w-auto">
+              {t.cancel}
+            </Button>
+            <Button 
+              onClick={handleEditEmployee} 
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
@@ -626,7 +639,7 @@ const AdminEmployeesPage = () => {
 
       {/* Reset Password Dialog */}
       <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
-        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="sm:max-w-[425px] max-w-[95vw]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.resetPassword}</DialogTitle>
             <DialogDescription>
@@ -647,9 +660,15 @@ const AdminEmployeesPage = () => {
               />
             </div>
           </div>
-          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>{t.cancel}</Button>
-            <Button onClick={handleResetPassword} disabled={isLoading}>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : 'flex-col space-y-2 sm:space-y-0 sm:flex-row'}>
+            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)} className="w-full sm:w-auto">
+              {t.cancel}
+            </Button>
+            <Button 
+              onClick={handleResetPassword} 
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
               {isLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
