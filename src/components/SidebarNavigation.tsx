@@ -23,6 +23,7 @@ import {
   SidebarTrigger
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import NotificationsMenu from '@/components/NotificationsMenu';
 
 interface SidebarNavigationProps {
   children: React.ReactNode;
@@ -83,8 +84,13 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter>
-            <div className="flex flex-col gap-2">
+          <SidebarFooter className="mt-auto">
+            <div className="flex flex-col gap-2 p-2">
+              <div className="flex items-center justify-between mb-2">
+                <User className="h-4 w-4 mr-2" />
+                <span className="text-sm font-medium">{user?.name}</span>
+                <NotificationsMenu />
+              </div>
               <Button 
                 variant="ghost" 
                 className="justify-start" 
@@ -109,7 +115,6 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           <header className="h-14 border-b flex items-center justify-between px-4 bg-background">
             <div className="flex items-center">
               <SidebarTrigger />
-              <h1 className="text-lg font-medium ml-2">{user?.name}</h1>
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4">{children}</main>

@@ -19,6 +19,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 
 const queryClient = new QueryClient({
@@ -53,7 +54,7 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
       : <Navigate to="/employee-dashboard" replace />;
   }
   
-  return <>{children}</>;
+  return <SidebarNavigation>{children}</SidebarNavigation>;
 };
 
 // Admin route component to protect routes that require admin role
