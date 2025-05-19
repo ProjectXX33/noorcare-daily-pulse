@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSelector from './LanguageSelector';
+import { Mail, Lock } from 'lucide-react';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -59,45 +60,66 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <LanguageSelector />
+    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-primary-50 to-white dark:from-gray-900 dark:to-gray-800" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="absolute top-4 right-4 md:top-8 md:right-8">
+        <LanguageSelector />
+      </div>
       
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">{t.title}</CardTitle>
-          <CardDescription>
+      <Card className="w-full max-w-md mx-auto shadow-card animate-fade-in glass-effect">
+        <CardHeader className="space-y-1 text-center pb-2">
+          <div className="flex justify-center items-center mb-2">
+            <img
+              src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png"
+              alt="NoorCare Logo"
+              className="h-12 w-12"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold text-primary-600">{t.title}</CardTitle>
+          <CardDescription className="text-muted-foreground">
             {t.description}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="email">{t.email}</Label>
-              <Input 
-                id="email"
-                type="email"
-                placeholder={t.emailPlaceholder}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Label htmlFor="email" className="text-sm font-medium">{t.email}</Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <Input 
+                  id="email"
+                  type="email"
+                  placeholder={t.emailPlaceholder}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">{t.password}</Label>
-              <Input 
-                id="password"
-                type="password"
-                placeholder={t.passwordPlaceholder}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <Label htmlFor="password" className="text-sm font-medium">{t.password}</Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <Input 
+                  id="password"
+                  type="password"
+                  placeholder={t.passwordPlaceholder}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             <Button 
               type="submit" 
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full bg-primary hover:bg-primary-600 transition-all"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -107,6 +129,7 @@ const LoginForm = () => {
                 </div>
               ) : t.loginButton}
             </Button>
+            <p className="text-xs text-center text-muted-foreground mt-4">{t.footer}</p>
           </CardFooter>
         </form>
       </Card>

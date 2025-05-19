@@ -27,11 +27,31 @@ export default {
 				foreground: 'hsl(var(--foreground))',
 				primary: {
 					DEFAULT: '#28a745',
-					foreground: '#ffffff'
+					foreground: '#ffffff',
+					50: '#ecf8f0',
+					100: '#d9f1e1',
+					200: '#b4e3c2',
+					300: '#8fd5a3',
+					400: '#6ac785',
+					500: '#28a745',
+					600: '#24963e',
+					700: '#1f8534',
+					800: '#19742b',
+					900: '#145321',
 				},
 				secondary: {
 					DEFAULT: '#dc3545',
-					foreground: '#ffffff'
+					foreground: '#ffffff',
+					50: '#fbeaec',
+					100: '#f8d5d9',
+					200: '#f1acb2',
+					300: '#ea838c',
+					400: '#e35a66',
+					500: '#dc3545',
+					600: '#c62f3e',
+					700: '#af2936',
+					800: '#97232e',
+					900: '#801d26',
 				},
 				destructive: {
 					DEFAULT: 'hsl(var(--destructive))',
@@ -68,6 +88,11 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			boxShadow: {
+				'soft': '0 4px 12px rgba(0, 0, 0, 0.05)',
+				'card': '0 2px 8px rgba(0, 0, 0, 0.08)',
+				'dropdown': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
 			},
 			keyframes: {
 				'accordion-down': {

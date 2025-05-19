@@ -143,3 +143,14 @@
 [dir="rtl"] textarea {
   direction: rtl;
 }
+
+/* Input groups in RTL */
+[dir="rtl"] .pl-10 {
+  padding-left: 0;
+  padding-right: 2.5rem;
+}
+
+[dir="rtl"] .left-3 {
+  left: auto;
+  right: 0.75rem;
+}

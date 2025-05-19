@@ -38,12 +38,14 @@ const Login = () => {
     en: {
       enterNewPassword: "Please enter your new password",
       passwordUpdated: "Password updated successfully!",
-      resetError: "Failed to update password"
+      resetError: "Failed to update password",
+      loading: "Loading..."
     },
     ar: {
       enterNewPassword: "الرجاء إدخال كلمة المرور الجديدة",
       passwordUpdated: "تم تحديث كلمة المرور بنجاح!",
-      resetError: "فشل في تحديث كلمة المرور"
+      resetError: "فشل في تحديث كلمة المرور",
+      loading: "جار التحميل..."
     }
   };
 
@@ -144,23 +146,19 @@ const Login = () => {
   // Render a loading state while checking authentication
   if ((isLoading || !sessionChecked) && !isProcessingReset) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-white dark:from-gray-900 dark:to-gray-800">
+        <div className="flex flex-col items-center glass-effect p-8 rounded-xl">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          <p className="mt-4 text-gray-500">Loading...</p>
+          <p className="mt-4 text-gray-500">{t.loading}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="w-full max-w-md">
-        <LanguageProvider>
-          <LoginForm />
-        </LanguageProvider>
-      </div>
-    </div>
+    <LanguageProvider>
+      <LoginForm />
+    </LanguageProvider>
   );
 };
 
