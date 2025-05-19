@@ -49,12 +49,30 @@ const mockTasks = [
   }
 ];
 
+// Mock comments data
+const mockComments = [
+  {
+    id: '1',
+    userId: '1',
+    userName: 'Admin User',
+    text: 'Please complete this task by Friday.',
+    createdAt: '2023-05-15T09:30:00Z'
+  }
+];
+
 const EmployeeTasksPage = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
+  const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
+  const [refreshAttachments, setRefreshAttachments] = useState(0);
+  const [taskComments, setTaskComments] = useState<Record<string, any[]>>({
+    '1': mockComments,
+    '2': [],
+    '3': []
+  });
   
   // Status badge color variants
   const getStatusColor = (status: string) => {
@@ -93,6 +111,17 @@ const EmployeeTasksPage = () => {
   const handleUpdateProgress = (taskId: string, newProgress: number) => {
     // Implement this function to update task progress
     setUpdateStatus("Progress updated successfully");
+  };
+
+  const handleCommentAdded = (taskId: string, newComments: any[]) => {
+    setTaskComments(prev => ({
+      ...prev,
+      [taskId]: newComments
+    }));
+  };
+
+  const handleFileUploaded = () => {
+    setRefreshAttachments(prev => prev + 1);
   };
   
   return (
@@ -207,15 +236,30 @@ const EmployeeTasksPage = () => {
                 
                 <div>
                   <h3 className="font-medium mb-2">Attachments</h3>
-                  <TaskAttachmentsList taskId={selectedTask.id} />
+                  <TaskAttachmentsList 
+                    taskId={selectedTask.id} 
+                    refresh={refreshAttachments} 
+                    language={language} 
+                  />
                   <div className="mt-2">
-                    <TaskFileUpload taskId={selectedTask.id} />
+                    <TaskFileUpload 
+                      taskId={selectedTask.id} 
+                      userId={user.id} 
+                      onUploadComplete={handleFileUploaded} 
+                      language={language}
+                    />
                   </div>
                 </div>
                 
                 <div>
                   <h3 className="font-medium mb-2">Comments</h3>
-                  <TaskComments taskId={selectedTask.id} />
+                  <TaskComments 
+                    taskId={selectedTask.id}
+                    user={user}
+                    comments={taskComments[selectedTask.id] || []} 
+                    onCommentAdded={(newComments) => handleCommentAdded(selectedTask.id, newComments)}
+                    language={language}
+                  />
                 </div>
               </div>
             </DialogContent>

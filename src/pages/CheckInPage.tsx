@@ -14,18 +14,17 @@ const CheckInPage = () => {
   const { 
     isLoading, 
     getUserCheckIns, 
-    getCurrentCheckInStatus, 
     hasCheckedInToday 
   } = useCheckIn();
   
   if (!user) return null;
   
   const userCheckIns = getUserCheckIns(user.id); 
-  const currentStatus = getCurrentCheckInStatus(user.id);
-  const checkedInToday = hasCheckedInToday(user.id);
+  const isCheckedIn = hasCheckedInToday(user.id);
+  const currentStatus = isCheckedIn ? 'checked-in' : 'not-checked-in';
   
   // Function to format time from date
-  const formatTime = (date: string) => {
+  const formatTime = (date: string | Date) => {
     return format(new Date(date), 'h:mm a');
   };
   
@@ -92,7 +91,9 @@ const CheckInPage = () => {
                     <div className="text-sm text-muted-foreground">
                       {todayCheckIns.map((checkIn, index) => (
                         <div key={index} className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">{checkIn.type === 'check-in' ? 'Checked in:' : 'Checked out:'}</span>
+                          <span className="font-medium">
+                            {checkIn.checkOutTime ? 'Checked out:' : 'Checked in:'}
+                          </span>
                           <span>{formatTime(checkIn.timestamp)}</span>
                         </div>
                       ))}
@@ -126,14 +127,14 @@ const CheckInPage = () => {
                 <div>
                   <p className="mb-1 font-medium">Today's Check-ins:</p>
                   <p className="text-2xl font-bold">
-                    {todayCheckIns.filter(c => c.type === 'check-in').length}
+                    {todayCheckIns.filter(c => !c.checkOutTime).length}
                   </p>
                 </div>
                 
                 <div>
                   <p className="mb-1 font-medium">Today's Check-outs:</p>
                   <p className="text-2xl font-bold">
-                    {todayCheckIns.filter(c => c.type === 'check-out').length}
+                    {todayCheckIns.filter(c => c.checkOutTime).length}
                   </p>
                 </div>
                 

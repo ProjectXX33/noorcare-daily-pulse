@@ -14,7 +14,8 @@ import {
   UsersIcon, 
   ClipboardCheckIcon, 
   Clock,
-  CalendarDays
+  CalendarDays,
+  CheckSquare
 } from 'lucide-react';
 
 const Dashboard = () => {
