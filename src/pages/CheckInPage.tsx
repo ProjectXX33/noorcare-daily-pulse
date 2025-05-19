@@ -13,14 +13,25 @@ const CheckInPage = () => {
   const { 
     isLoading, 
     getUserCheckIns, 
-    hasCheckedInToday 
+    hasCheckedInToday,
+    hasCheckedOutToday
   } = useCheckIn();
   
   if (!user) return null;
   
   const userCheckIns = getUserCheckIns(user.id); 
   const isCheckedIn = hasCheckedInToday(user.id);
-  const currentStatus = isCheckedIn ? 'checked-in' : 'not-checked-in';
+  const isCheckedOut = hasCheckedOutToday(user.id);
+  
+  // Determine current status based on check-in AND check-out status
+  let currentStatus;
+  if (isCheckedIn && !isCheckedOut) {
+    currentStatus = 'checked-in';
+  } else if (isCheckedIn && isCheckedOut) {
+    currentStatus = 'workday-complete';
+  } else {
+    currentStatus = 'not-checked-in';
+  }
   
   // Function to format time from date
   const formatTime = (date: string | Date) => {
@@ -77,9 +88,15 @@ const CheckInPage = () => {
                   <span className={
                     currentStatus === 'checked-in' 
                       ? 'text-green-500 ml-2' 
-                      : 'text-amber-500 ml-2'
+                      : currentStatus === 'workday-complete'
+                        ? 'text-blue-500 ml-2'
+                        : 'text-amber-500 ml-2'
                   }>
-                    {currentStatus === 'checked-in' ? 'Currently Working' : 'Not Checked In'}
+                    {currentStatus === 'checked-in' 
+                      ? 'Currently Working' 
+                      : currentStatus === 'workday-complete'
+                        ? 'Workday Complete'
+                        : 'Not Checked In'}
                   </span>
                 </p>
                 
@@ -90,7 +107,11 @@ const CheckInPage = () => {
                         <span className="font-medium">
                           {checkIn.checkOutTime ? 'Checked out:' : 'Checked in:'}
                         </span>
-                        <span>{formatTime(checkIn.timestamp)}</span>
+                        <span>
+                          {checkIn.checkOutTime 
+                            ? formatTime(checkIn.checkOutTime) 
+                            : formatTime(checkIn.timestamp)}
+                        </span>
                       </div>
                     ))}
                   </div>
