@@ -8,8 +8,8 @@ import {
   ClipboardList, 
   CheckSquare, 
   User, 
-  Settings,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -24,6 +24,16 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import NotificationsMenu from '@/components/NotificationsMenu';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 
 interface SidebarNavigationProps {
   children: React.ReactNode;
@@ -33,6 +43,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
+  const isMobile = useIsMobile();
 
   const handleLogout = async () => {
     await logout();
@@ -56,7 +67,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navItems = user?.role === 'admin' ? adminNavItems : employeeNavItems;
   
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={!isMobile}>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar variant="inset">
           <SidebarHeader className="flex h-14 items-center border-b px-4">
@@ -76,6 +87,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                   <SidebarMenuButton
                     onClick={() => navigate(item.path)}
                     tooltip={item.name}
+                    isActive={window.location.pathname === item.path}
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.name}</span>
@@ -86,18 +98,13 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           </SidebarContent>
           <SidebarFooter className="mt-auto">
             <div className="flex flex-col gap-2 p-2">
-              <div className="flex items-center justify-between mb-2">
-                <User className="h-4 w-4 mr-2" />
-                <span className="text-sm font-medium">{user?.name}</span>
-                <NotificationsMenu />
-              </div>
               <Button 
                 variant="ghost" 
                 className="justify-start" 
                 onClick={() => navigate('/profile')}
               >
-                <User className="mr-2 h-4 w-4" />
-                Profile
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
               </Button>
               <Button 
                 variant="ghost" 
@@ -112,12 +119,42 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="h-14 border-b flex items-center justify-between px-4 bg-background">
+          <header className="h-14 border-b flex items-center justify-between px-4 bg-background sticky top-0 z-50">
             <div className="flex items-center">
               <SidebarTrigger />
             </div>
+            <div className="flex items-center gap-2">
+              <NotificationsMenu />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src="" alt={user?.name} />
+                      <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col gap-1">
+                      <p className="font-medium">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </header>
-          <main className="flex-1 overflow-auto p-4">{children}</main>
+          <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>
