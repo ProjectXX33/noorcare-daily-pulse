@@ -54,7 +54,7 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
       : <Navigate to="/employee-dashboard" replace />;
   }
   
-  return <SidebarNavigation>{children}</SidebarNavigation>;
+  return <>{children}</>;
 };
 
 // Admin route component to protect routes that require admin role
@@ -89,7 +89,9 @@ const AppWithAuth = () => {
                 path="/dashboard" 
                 element={
                   <AdminRoute>
-                    <Dashboard />
+                    <SidebarNavigation>
+                      <Dashboard />
+                    </SidebarNavigation>
                   </AdminRoute>
                 } 
               />
@@ -97,7 +99,9 @@ const AppWithAuth = () => {
                 path="/employee-dashboard" 
                 element={
                   <EmployeeRoute>
-                    <EmployeeDashboard />
+                    <SidebarNavigation>
+                      <EmployeeDashboard />
+                    </SidebarNavigation>
                   </EmployeeRoute>
                 } 
               />
@@ -105,7 +109,9 @@ const AppWithAuth = () => {
                 path="/check-in" 
                 element={
                   <PrivateRoute>
-                    <CheckInPage />
+                    <SidebarNavigation>
+                      <CheckInPage />
+                    </SidebarNavigation>
                   </PrivateRoute>
                 } 
               />
@@ -113,7 +119,9 @@ const AppWithAuth = () => {
                 path="/report" 
                 element={
                   <PrivateRoute>
-                    <ReportPage />
+                    <SidebarNavigation>
+                      <ReportPage />
+                    </SidebarNavigation>
                   </PrivateRoute>
                 } 
               />
@@ -121,7 +129,9 @@ const AppWithAuth = () => {
                 path="/employees" 
                 element={
                   <AdminRoute>
-                    <AdminEmployeesPage />
+                    <SidebarNavigation>
+                      <AdminEmployeesPage />
+                    </SidebarNavigation>
                   </AdminRoute>
                 } 
               />
@@ -129,7 +139,9 @@ const AppWithAuth = () => {
                 path="/reports" 
                 element={
                   <AdminRoute>
-                    <AdminReportsPage />
+                    <SidebarNavigation>
+                      <AdminReportsPage />
+                    </SidebarNavigation>
                   </AdminRoute>
                 } 
               />
@@ -137,7 +149,9 @@ const AppWithAuth = () => {
                 path="/tasks" 
                 element={
                   <AdminRoute>
-                    <AdminTasksPage />
+                    <SidebarNavigation>
+                      <AdminTasksPage />
+                    </SidebarNavigation>
                   </AdminRoute>
                 } 
               />
@@ -145,7 +159,9 @@ const AppWithAuth = () => {
                 path="/employee-tasks" 
                 element={
                   <EmployeeRoute>
-                    <EmployeeTasksPage />
+                    <SidebarNavigation>
+                      <EmployeeTasksPage />
+                    </SidebarNavigation>
                   </EmployeeRoute>
                 } 
               />

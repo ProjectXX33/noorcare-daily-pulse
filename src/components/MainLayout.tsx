@@ -1,14 +1,14 @@
 
 import React from 'react';
-import SidebarNavigation from './SidebarNavigation';
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-// This component is now just a wrapper for SidebarNavigation
+// Since we're now using SidebarNavigation directly in App.tsx for all routes,
+// this component is simplified to just pass through children
 const MainLayout = ({ children }: MainLayoutProps) => {
-  return <SidebarNavigation>{children}</SidebarNavigation>;
+  return <>{children}</>;
 };
 
 export default MainLayout;

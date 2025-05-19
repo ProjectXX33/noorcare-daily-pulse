@@ -69,7 +69,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   return (
     <SidebarProvider defaultOpen={!isMobile}>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <Sidebar variant="inset">
+        <Sidebar variant="inset" className="sticky top-0 h-screen">
           <SidebarHeader className="flex h-14 items-center border-b px-4">
             <div className="flex items-center gap-2">
               <img
@@ -119,7 +119,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="h-14 border-b flex items-center justify-between px-4 bg-background sticky top-0 z-50">
+          <header className="h-14 border-b flex items-center justify-between px-4 bg-background z-10">
             <div className="flex items-center">
               <SidebarTrigger />
             </div>
@@ -127,8 +127,9 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               <NotificationsMenu />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
-                    <Avatar className="h-9 w-9">
+                  <Button variant="ghost" className="h-9 w-auto flex items-center gap-2 rounded-full p-0">
+                    <span className="hidden md:inline-block text-sm">{user?.name}</span>
+                    <Avatar className="h-8 w-8">
                       <AvatarImage src="" alt={user?.name} />
                       <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
