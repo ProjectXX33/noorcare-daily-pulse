@@ -5,10 +5,9 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-// Since we're now using SidebarNavigation directly in App.tsx for all routes,
-// this component is simplified to just pass through children
+// This component is now updated to work better with the sidebar navigation
 const MainLayout = ({ children }: MainLayoutProps) => {
-  return <>{children}</>;
+  return <div className="flex flex-col w-full">{children}</div>;
 };
 
 export default MainLayout;
