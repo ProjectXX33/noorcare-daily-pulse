@@ -101,7 +101,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               <Button 
                 variant="ghost" 
                 className="justify-start" 
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/settings')}
               >
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
@@ -143,9 +143,9 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <User className="mr-2 h-4 w-4" />
-                    Profile
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout} className="text-red-500">
                     <LogOut className="mr-2 h-4 w-4" />

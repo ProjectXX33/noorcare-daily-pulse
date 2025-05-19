@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
 import EmployeeTasksPage from "./pages/EmployeeTasksPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -163,6 +163,16 @@ const AppWithAuth = () => {
                       <EmployeeTasksPage />
                     </SidebarNavigation>
                   </EmployeeRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <PrivateRoute>
+                    <SidebarNavigation>
+                      <SettingsPage />
+                    </SidebarNavigation>
+                  </PrivateRoute>
                 } 
               />
               <Route path="*" element={<NotFound />} />

@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 type Notification = {
   id: string;
@@ -26,8 +28,10 @@ type Notification = {
 const NotificationsMenu = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const { user } = useAuth();
   const [language, setLanguage] = useState('en');
+  const navigate = useNavigate();
 
   // Translation object for multilingual support
   const translations = {
@@ -71,15 +75,43 @@ const NotificationsMenu = () => {
   useEffect(() => {
     if (user) {
       fetchNotifications();
+      subscribeToNotifications();
     }
   }, [user]);
+
+  const subscribeToNotifications = () => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`public:notifications:user_id=eq.${user.id}`)
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
+        payload => {
+          console.log('New notification received:', payload);
+          // Add the new notification to the state
+          setNotifications(prev => [payload.new as Notification, ...prev]);
+          // Trigger the bell animation
+          setHasNewNotifications(true);
+          // Play notification sound if preferred
+          const audio = new Audio('/notification-sound.mp3');
+          audio.play().catch(error => {
+            // Handle error or silence it (browser might block autoplay)
+            console.log('Could not play notification sound');
+          });
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const fetchNotifications = async () => {
     if (!user) return;
 
     setIsLoading(true);
     try {
-      // This would be replaced with an actual Supabase query
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -88,10 +120,14 @@ const NotificationsMenu = () => {
         .limit(10);
 
       if (error) throw error;
+      
       setNotifications(data || []);
+      
+      // Check if there are any unread notifications
+      const hasUnread = data ? data.some(notif => !notif.is_read) : false;
+      setHasNewNotifications(hasUnread);
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      // In a real app, handle this error appropriately
     } finally {
       setIsLoading(false);
     }
@@ -127,6 +163,7 @@ const NotificationsMenu = () => {
       
       // Update the local state
       setNotifications(notifications.map(notif => ({ ...notif, is_read: true })));
+      setHasNewNotifications(false);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -149,13 +186,35 @@ const NotificationsMenu = () => {
     return `${diffInDays} ${t.days}`;
   };
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark the notification as read
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    
+    // Navigate based on notification type
+    if (notification.related_to === 'task' && notification.related_id) {
+      // Determine which task page to go to based on user role
+      const taskPath = user?.role === 'admin' ? '/tasks' : '/employee-tasks';
+      navigate(taskPath, { state: { taskId: notification.related_id } });
+      toast.info(`Navigating to task: ${notification.related_id}`);
+    } else if (notification.related_to === 'report' && notification.related_id) {
+      // Navigate to reports
+      const reportPath = user?.role === 'admin' ? '/reports' : '/report';
+      navigate(reportPath, { state: { reportId: notification.related_id } });
+    } else if (notification.related_to === 'check_in' && notification.related_id) {
+      // Navigate to check in
+      navigate('/check-in');
+    }
+  };
+
   const unreadCount = notifications.filter(notif => !notif.is_read).length;
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+          <Bell className={`h-5 w-5 ${hasNewNotifications ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
           {unreadCount > 0 && (
             <Badge variant="destructive" className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs">
               {unreadCount}
@@ -183,7 +242,7 @@ const NotificationsMenu = () => {
               {notifications.map((notification) => (
                 <div 
                   key={notification.id}
-                  onClick={() => !notification.is_read && markAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-3 cursor-pointer hover:bg-muted ${!notification.is_read ? 'bg-muted/50' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-1">

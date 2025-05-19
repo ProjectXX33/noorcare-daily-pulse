@@ -1,21 +1,27 @@
 
-/* RTL styles for Arabic language support */
-[dir="rtl"] .flex-row {
+.dir-rtl {
+  direction: rtl;
+}
+
+/* Add bell animation */
+@keyframes wiggle {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(10deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(-10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .items-center.justify-between {
   flex-direction: row-reverse;
 }
 
-[dir="rtl"] .flex-row-reverse {
-  flex-direction: row;
-}
-
-[dir="rtl"] .space-x-4 > * + * {
-  margin-right: 1rem;
-  margin-left: 0;
-}
-
-[dir="rtl"] .space-x-2 > * + * {
-  margin-right: 0.5rem;
-  margin-left: 0;
+[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
 }
 
 [dir="rtl"] .mr-2 {
@@ -23,134 +29,18 @@
   margin-left: 0.5rem;
 }
 
-[dir="rtl"] .mr-3 {
-  margin-right: 0;
-  margin-left: 0.75rem;
-}
-
-[dir="rtl"] .mr-4 {
-  margin-right: 0;
-  margin-left: 1rem;
-}
-
-[dir="rtl"] .ml-2, 
-[dir="rtl"] .ml-3 {
+[dir="rtl"] .ml-2 {
   margin-left: 0;
   margin-right: 0.5rem;
 }
 
-[dir="rtl"] .ml-4 {
-  margin-left: 0;
-  margin-right: 1rem;
+/* RTL support for sidebar */
+[dir="rtl"] .sidebar {
+  border-right: none;
+  border-left: 1px solid var(--border);
 }
 
-[dir="rtl"] .text-right {
-  text-align: left;
-}
-
-[dir="rtl"] .text-left {
+/* RTL support for dropdown menu */
+[dir="rtl"] .dropdown-menu {
   text-align: right;
-}
-
-/* Adjust form layouts for RTL */
-[dir="rtl"] .grid-cols-4 > .text-right {
-  text-align: left;
-}
-
-/* Dialog footer buttons order in RTL */
-[dir="rtl"] .flex-row-reverse {
-  flex-direction: row;
-}
-
-/* Handle icons in RTL mode */
-[dir="rtl"] svg {
-  transform: scaleX(-1);
-}
-
-/* Fix RTL for specific icons that should not be flipped */
-[dir="rtl"] .no-flip svg {
-  transform: none;
-}
-
-/* Adjust the dropdown menus for RTL */
-[dir="rtl"] .right-0 {
-  right: auto;
-  left: 0;
-}
-
-[dir="rtl"] .left-0 {
-  left: auto;
-  right: 0;
-}
-
-/* Adjust border radiuses for RTL */
-[dir="rtl"] .rounded-l-md {
-  border-radius: 0;
-  border-top-right-radius: 0.375rem;
-  border-bottom-right-radius: 0.375rem;
-}
-
-[dir="rtl"] .rounded-r-md {
-  border-radius: 0;
-  border-top-left-radius: 0.375rem;
-  border-bottom-left-radius: 0.375rem;
-}
-
-/* Fix table alignment in RTL */
-[dir="rtl"] th {
-  text-align: right;
-}
-
-/* Fix dialog positioning */
-[dir="rtl"] .justify-end {
-  justify-content: flex-start;
-}
-
-[dir="rtl"] .justify-start {
-  justify-content: flex-end;
-}
-
-/* Fix checkbox alignment in RTL */
-[dir="rtl"] .items-center.space-x-2 {
-  margin-left: 0.5rem;
-}
-
-/* Fix spacing between elements in RTL mode */
-[dir="rtl"] .gap-2 > *, 
-[dir="rtl"] .gap-4 > * {
-  margin-left: 0;
-}
-
-/* Fix spacing in dialog content for RTL mode */
-[dir="rtl"] .DialogContent {
-  direction: rtl;
-}
-
-/* Fix checkbox and label alignment in RTL */
-[dir="rtl"] .flex.items-center.space-x-2 {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-end;
-}
-
-[dir="rtl"] .flex.items-center.space-x-2 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 1;
-  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
-  margin-left: 0;
-}
-
-/* Fix textarea direction in RTL */
-[dir="rtl"] textarea {
-  direction: rtl;
-}
-
-/* Input groups in RTL */
-[dir="rtl"] .pl-10 {
-  padding-left: 0;
-  padding-right: 2.5rem;
-}
-
-[dir="rtl"] .left-3 {
-  left: auto;
-  right: 0.75rem;
 }
