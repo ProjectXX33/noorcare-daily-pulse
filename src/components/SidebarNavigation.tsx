@@ -96,7 +96,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="mt-auto">
+          <SidebarFooter className="mt-auto border-t">
             <div className="flex flex-col gap-2 p-2">
               <Button 
                 variant="ghost" 
@@ -119,7 +119,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="h-14 border-b flex items-center justify-between px-4 bg-background z-10">
+          <header className="h-14 border-b flex items-center justify-between px-4 bg-background z-10 sticky top-0">
             <div className="flex items-center">
               <SidebarTrigger />
             </div>
