@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
@@ -277,261 +277,155 @@ const AdminEmployeesPage = () => {
   };
 
   return (
-    <div className="flex flex-col w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
-        <h1 className="text-2xl font-bold">{t.employees}</h1>
-        <Button 
-          className="bg-primary hover:bg-primary/90"
-          onClick={() => setIsAddEmployeeOpen(true)}
-        >
-          {t.addEmployee}
-        </Button>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>{t.employeeDirectory}</CardTitle>
-          <CardDescription>{t.manageEmployeeAccounts}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t.name}</TableHead>
-                  <TableHead>{t.username}</TableHead>
-                  <TableHead>{t.department}</TableHead>
-                  <TableHead>{t.position}</TableHead>
-                  <TableHead>{t.lastCheckIn}</TableHead>
-                  <TableHead className="text-right">{t.actions}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+    <>
+      <div className="flex flex-col w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
+          <h1 className="text-2xl font-bold">{t.employees}</h1>
+          <Button 
+            className="bg-primary hover:bg-primary/90"
+            onClick={() => setIsAddEmployeeOpen(true)}
+          >
+            {t.addEmployee}
+          </Button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>{t.employeeDirectory}</CardTitle>
+            <CardDescription>{t.manageEmployeeAccounts}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4">
-                      <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                      </div>
-                    </TableCell>
+                    <TableHead>{t.name}</TableHead>
+                    <TableHead>{t.username}</TableHead>
+                    <TableHead>{t.department}</TableHead>
+                    <TableHead>{t.position}</TableHead>
+                    <TableHead>{t.lastCheckIn}</TableHead>
+                    <TableHead className="text-right">{t.actions}</TableHead>
                   </TableRow>
-                ) : employees.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
-                  </TableRow>
-                ) : (
-                  employees.map(employee => (
-                    <TableRow key={employee.id}>
-                      <TableCell>{employee.name}</TableCell>
-                      <TableCell>{employee.username}</TableCell>
-                      <TableCell>{employee.department}</TableCell>
-                      <TableCell>{employee.position}</TableCell>
-                      <TableCell>
-                        {employee.lastCheckin 
-                          ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
-                          : t.never}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              {t.actions}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => openEditDialog(employee)}>
-                              {t.edit}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
-                              {t.resetPassword}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        <div className="flex justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                  ) : employees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
+                    </TableRow>
+                  ) : (
+                    employees.map(employee => (
+                      <TableRow key={employee.id}>
+                        <TableCell>{employee.name}</TableCell>
+                        <TableCell>{employee.username}</TableCell>
+                        <TableCell>{employee.department}</TableCell>
+                        <TableCell>{employee.position}</TableCell>
+                        <TableCell>
+                          {employee.lastCheckin 
+                            ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
+                            : t.never}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                {t.actions}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => openEditDialog(employee)}>
+                                {t.edit}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
+                                {t.resetPassword}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-    {/* Add Employee Dialog */}
-    <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
-      <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <DialogHeader>
-          <DialogTitle>{t.addNewEmployee}</DialogTitle>
-          <DialogDescription>
-            {t.createAccount}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              {t.name}
-            </Label>
-            <Input
-              id="name"
-              name="name"
-              value={newEmployee.name}
-              onChange={handleNewEmployeeChange}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="username" className="text-right">
-              {t.username}
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              value={newEmployee.username}
-              onChange={handleNewEmployeeChange}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="email" className="text-right">
-              {t.email}
-            </Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={newEmployee.email}
-              onChange={handleNewEmployeeChange}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="password" className="text-right">
-              {t.password}
-            </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              value={newEmployee.password}
-              onChange={handleNewEmployeeChange}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="department" className="text-right">
-              {t.department}
-            </Label>
-            <Select
-              value={newEmployee.department}
-              onValueChange={(value) => setNewEmployee(prev => ({...prev, department: value as Department}))}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder={t.department} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Engineering">Engineering</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Doctor">Doctor</SelectItem>
-                <SelectItem value="Manager">Manager</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="position" className="text-right">
-              {t.position}
-            </Label>
-            <Select
-              value={newEmployee.position}
-              onValueChange={(value) => setNewEmployee(prev => ({...prev, position: value as Position}))}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder={t.position} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Customer Service">Customer Service</SelectItem>
-                <SelectItem value="Designer">Designer</SelectItem>
-                <SelectItem value="Media Buyer">Media Buyer</SelectItem>
-                <SelectItem value="Copy Writing">Copy Writing</SelectItem>
-                <SelectItem value="Web Developer">Web Developer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="role" className="text-right">
-              {t.role}
-            </Label>
-            <Select
-              value={newEmployee.role}
-              onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee'}))}
-            >
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder={t.role} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">{t.admin}</SelectItem>
-                <SelectItem value="employee">{t.employee}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-          <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>{t.cancel}</Button>
-          <Button onClick={handleAddEmployee} disabled={isLoading}>
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                {t.addEmployee}
-              </div>
-            ) : t.addEmployee}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* Edit Employee Dialog */}
-    <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
-      <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <DialogHeader>
-          <DialogTitle>{t.editEmployee}</DialogTitle>
-          <DialogDescription>
-            {t.updateInfo}
-          </DialogDescription>
-        </DialogHeader>
-        {selectedEmployee && (
+      {/* Add Employee Dialog */}
+      <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle>{t.addNewEmployee}</DialogTitle>
+            <DialogDescription>
+              {t.createAccount}
+            </DialogDescription>
+          </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">
+              <Label htmlFor="name" className="text-right">
                 {t.name}
               </Label>
               <Input
-                id="edit-name"
+                id="name"
                 name="name"
-                value={selectedEmployee.name}
-                onChange={handleEmployeeChange}
+                value={newEmployee.name}
+                onChange={handleNewEmployeeChange}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-email" className="text-right">
+              <Label htmlFor="username" className="text-right">
+                {t.username}
+              </Label>
+              <Input
+                id="username"
+                name="username"
+                value={newEmployee.username}
+                onChange={handleNewEmployeeChange}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email" className="text-right">
                 {t.email}
               </Label>
               <Input
-                id="edit-email"
+                id="email"
                 name="email"
                 type="email"
-                value={selectedEmployee.email}
-                onChange={handleEmployeeChange}
+                value={newEmployee.email}
+                onChange={handleNewEmployeeChange}
                 className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-department" className="text-right">
+              <Label htmlFor="password" className="text-right">
+                {t.password}
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={newEmployee.password}
+                onChange={handleNewEmployeeChange}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="department" className="text-right">
                 {t.department}
               </Label>
               <Select
-                value={selectedEmployee.department}
-                onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, department: value as Department} : null)}
+                value={newEmployee.department}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, department: value as Department}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.department} />
@@ -545,12 +439,12 @@ const AdminEmployeesPage = () => {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-position" className="text-right">
+              <Label htmlFor="position" className="text-right">
                 {t.position}
               </Label>
               <Select
-                value={selectedEmployee.position}
-                onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, position: value as Position} : null)}
+                value={newEmployee.position}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, position: value as Position}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.position} />
@@ -565,12 +459,12 @@ const AdminEmployeesPage = () => {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-role" className="text-right">
+              <Label htmlFor="role" className="text-right">
                 {t.role}
               </Label>
               <Select
-                value={selectedEmployee.role}
-                onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee'} : null)}
+                value={newEmployee.role}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee'}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.role} />
@@ -581,84 +475,192 @@ const AdminEmployeesPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="flex items-center gap-2 pt-2">
-              <input 
-                type="checkbox" 
-                id="change-password" 
-                checked={showEditPassword} 
-                onChange={() => setShowEditPassword(!showEditPassword)}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <Label htmlFor="change-password">{t.setNewPassword}</Label>
-            </div>
-            
-            {showEditPassword && (
+          </div>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleAddEmployee} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.addEmployee}
+                </div>
+              ) : t.addEmployee}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Employee Dialog */}
+      <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle>{t.editEmployee}</DialogTitle>
+            <DialogDescription>
+              {t.updateInfo}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEmployee && (
+            <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-password" className="text-right">
-                  {t.password}
+                <Label htmlFor="edit-name" className="text-right">
+                  {t.name}
                 </Label>
                 <Input
-                  id="edit-password"
-                  type="password"
-                  value={editPassword}
-                  onChange={(e) => setEditPassword(e.target.value)}
+                  id="edit-name"
+                  name="name"
+                  value={selectedEmployee.name}
+                  onChange={handleEmployeeChange}
                   className="col-span-3"
                 />
               </div>
-            )}
-          </div>
-        )}
-        <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-          <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>{t.cancel}</Button>
-          <Button onClick={handleEditEmployee} disabled={isLoading}>
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                {t.save}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-email" className="text-right">
+                  {t.email}
+                </Label>
+                <Input
+                  id="edit-email"
+                  name="email"
+                  type="email"
+                  value={selectedEmployee.email}
+                  onChange={handleEmployeeChange}
+                  className="col-span-3"
+                />
               </div>
-            ) : t.save}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-department" className="text-right">
+                  {t.department}
+                </Label>
+                <Select
+                  value={selectedEmployee.department}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, department: value as Department} : null)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder={t.department} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Engineering">Engineering</SelectItem>
+                    <SelectItem value="IT">IT</SelectItem>
+                    <SelectItem value="Doctor">Doctor</SelectItem>
+                    <SelectItem value="Manager">Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-position" className="text-right">
+                  {t.position}
+                </Label>
+                <Select
+                  value={selectedEmployee.position}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, position: value as Position} : null)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder={t.position} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Customer Service">Customer Service</SelectItem>
+                    <SelectItem value="Designer">Designer</SelectItem>
+                    <SelectItem value="Media Buyer">Media Buyer</SelectItem>
+                    <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                    <SelectItem value="Web Developer">Web Developer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-role" className="text-right">
+                  {t.role}
+                </Label>
+                <Select
+                  value={selectedEmployee.role}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee'} : null)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder={t.role} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">{t.admin}</SelectItem>
+                    <SelectItem value="employee">{t.employee}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="change-password" 
+                  checked={showEditPassword} 
+                  onChange={() => setShowEditPassword(!showEditPassword)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="change-password">{t.setNewPassword}</Label>
+              </div>
+              
+              {showEditPassword && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-password" className="text-right">
+                    {t.password}
+                  </Label>
+                  <Input
+                    id="edit-password"
+                    type="password"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsEditEmployeeOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleEditEmployee} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.save}
+                </div>
+              ) : t.save}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    {/* Reset Password Dialog */}
-    <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
-      <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <DialogHeader>
-          <DialogTitle>{t.resetPassword}</DialogTitle>
-          <DialogDescription>
-            {selectedEmployee ? `${t.resetPassword}: ${selectedEmployee.name}` : t.resetPassword}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="new-password" className="text-right">
-              {t.password}
-            </Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="col-span-3"
-            />
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+        <DialogContent className="sm:max-w-[425px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle>{t.resetPassword}</DialogTitle>
+            <DialogDescription>
+              {selectedEmployee ? `${t.resetPassword}: ${selectedEmployee.name}` : t.resetPassword}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-password" className="text-right">
+                {t.password}
+              </Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
           </div>
-        </div>
-        <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
-          <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>{t.cancel}</Button>
-          <Button onClick={handleResetPassword} disabled={isLoading}>
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                {t.resetPassword}
-              </div>
-            ) : t.resetPassword}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : ''}>
+            <Button variant="outline" onClick={() => setIsResetPasswordOpen(false)}>{t.cancel}</Button>
+            <Button onClick={handleResetPassword} disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.resetPassword}
+                </div>
+              ) : t.resetPassword}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
