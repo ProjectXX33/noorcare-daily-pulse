@@ -159,6 +159,50 @@ ALTER TABLE notifications
   ON DELETE CASCADE
   ON UPDATE CASCADE;
 
+-- Add storage policies for attachments bucket
+BEGIN;
+  -- Create the attachments bucket if it doesn't exist
+  INSERT INTO storage.buckets (id, name, public)
+  VALUES ('attachments', 'attachments', false)
+  ON CONFLICT (id) DO NOTHING;
+
+  -- Allow users to upload their own files
+  CREATE POLICY "Users can upload their own files"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'attachments' AND
+    (auth.uid()::text = (storage.foldername(name))[1])
+  );
+
+  -- Allow users to read files they have access to
+  CREATE POLICY "Users can read their own files"
+  ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'attachments' AND
+    (
+      auth.uid()::text = (storage.foldername(name))[1] OR
+      EXISTS (
+        SELECT 1 FROM users
+        WHERE id = auth.uid() AND role = 'admin'
+      )
+    )
+  );
+
+  -- Allow users to delete their own files
+  CREATE POLICY "Users can delete their own files"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'attachments' AND
+    (
+      auth.uid()::text = (storage.foldername(name))[1] OR
+      EXISTS (
+        SELECT 1 FROM users
+        WHERE id = auth.uid() AND role = 'admin'
+      )
+    )
+  );
+COMMIT;
+
 -- Add preferences column to users table
 ALTER TABLE users 
 ADD COLUMN IF NOT EXISTS preferences JSONB 

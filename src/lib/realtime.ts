@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 import { User, CheckIn, WorkReport, Task, Notification } from '@/types';
 
@@ -199,10 +198,10 @@ async function fetchAllWorkReports(): Promise<WorkReport[]> {
       tasksDone: record.tasks_done,
       issuesFaced: record.issues_faced || '',
       plansForTomorrow: record.plans_for_tomorrow,
-      fileAttachments: record.file_attachments?.map((file: any) => file.file_path) || [],
+      fileAttachments: record.file_attachments?.map((file: any) => file.file_name) || [],
       department: record.users.department,
       position: record.users.position,
-      createdAt: new Date(record.created_at) // Add createdAt property
+      createdAt: new Date(record.created_at)
     }));
   } catch (error) {
     console.error('Error fetching work reports:', error);

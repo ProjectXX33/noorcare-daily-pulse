@@ -38,7 +38,7 @@ interface CheckInContextType {
   getUserWorkReports: (userId: string) => WorkReport[];
   checkInUser: (userId: string) => Promise<void>;
   checkOutUser: (userId: string) => Promise<void>;
-  submitWorkReport: (userId: string, reportData: {
+  submitWorkReport: (userId: string, reportInput: {
     tasksDone: string;
     issuesFaced?: string | null;
     plansForTomorrow: string;
@@ -47,6 +47,7 @@ interface CheckInContextType {
   hasCheckedOutToday: (userId: string) => boolean;
   getUserLatestCheckIn: (userId: string) => CheckIn | null;
   hasSubmittedReportToday: (userId: string) => boolean;
+  deleteWorkReport: (reportId: string) => Promise<void>;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
@@ -324,7 +325,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
   
-  const submitWorkReport = async (userId: string, reportData: {
+  const submitWorkReport = async (userId: string, reportInput: {
     tasksDone: string;
     issuesFaced?: string | null;
     plansForTomorrow: string;
@@ -343,13 +344,17 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const today = new Date();
       const formattedDate = format(today, 'yyyy-MM-dd');
       
-      console.log('Submitting report for date:', formattedDate);
-      
       // Check if a report has already been submitted for today
-      const existingReport = workReports.find(report => {
-        const reportDate = format(new Date(report.date), 'yyyy-MM-dd');
-        return report.userId === userId && reportDate === formattedDate;
-      });
+      const { data: existingReport, error: checkError } = await supabase
+        .from('work_reports')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', formattedDate)
+        .single();
+        
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        throw checkError;
+      }
       
       if (existingReport) {
         toast.error('You have already submitted a report for today');
@@ -357,69 +362,75 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       // Create a new work report
-      const { data, error } = await supabase
+      const { data: newReport, error: reportError } = await supabase
         .from('work_reports')
         .insert([{
           user_id: userId,
           date: formattedDate,
-          tasks_done: reportData.tasksDone,
-          issues_faced: reportData.issuesFaced || null,
-          plans_for_tomorrow: reportData.plansForTomorrow
+          tasks_done: reportInput.tasksDone,
+          issues_faced: reportInput.issuesFaced || null,
+          plans_for_tomorrow: reportInput.plansForTomorrow
         }])
-        .select();
+        .select()
+        .single();
         
-      if (error) throw error;
+      if (reportError) throw reportError;
       
       let fileAttachments: string[] = [];
       
-      // Add the new report to the local state
-      if (data && data[0]) {
-        // Handle file attachment if provided
-        if (fileAttachment) {
-          const fileName = fileAttachment.name;
-          const filePath = `${userId}/${data[0].id}/${fileName}`;
+      // Handle file attachment if provided
+      if (fileAttachment && newReport) {
+        const fileName = fileAttachment.name;
+        const filePath = `${userId}/${newReport.id}/${fileName}`;
+        
+        // Upload file to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, fileAttachment, {
+            cacheControl: '3600',
+            upsert: false
+          });
           
-          // Upload file to Supabase Storage
-          const { error: uploadError } = await supabase.storage
-            .from('attachments')
-            .upload(filePath, fileAttachment);
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          toast.error('Failed to upload attachment');
+        } else {
+          // Record file attachment in the database
+          const { error: attachmentError } = await supabase
+            .from('file_attachments')
+            .insert([{
+              work_report_id: newReport.id,
+              file_name: fileName,
+              file_path: filePath,
+              file_type: fileAttachment.type
+            }]);
             
-          if (uploadError) {
-            console.error('Error uploading file:', uploadError);
+          if (attachmentError) {
+            console.error('Error recording file attachment:', attachmentError);
+            toast.error('Failed to record attachment');
           } else {
-            // Record file attachment in the database
-            const { error: attachmentError } = await supabase
-              .from('file_attachments')
-              .insert([{
-                work_report_id: data[0].id,
-                file_name: fileName,
-                file_path: filePath,
-                file_type: fileAttachment.type
-              }]);
-              
-            if (attachmentError) {
-              console.error('Error recording file attachment:', attachmentError);
-            } else {
-              fileAttachments.push(fileName);
-            }
+            fileAttachments.push(fileName);
           }
         }
-        
-        const newReport: WorkReport = {
-          id: data[0].id,
-          userId: data[0].user_id,
+      }
+      
+      // Add the new report to the local state
+      if (newReport) {
+        const workReport: WorkReport = {
+          id: newReport.id,
+          userId: newReport.user_id,
           userName: userData.name,
-          date: new Date(data[0].date),
-          tasksDone: data[0].tasks_done,
-          issuesFaced: data[0].issues_faced,
-          plansForTomorrow: data[0].plans_for_tomorrow,
-          createdAt: new Date(data[0].created_at),
+          date: new Date(newReport.date),
+          tasksDone: newReport.tasks_done,
+          issuesFaced: newReport.issues_faced,
+          plansForTomorrow: newReport.plans_for_tomorrow,
+          createdAt: new Date(newReport.created_at),
           department: userData.department,
           position: userData.position,
           fileAttachments
         };
         
-        setWorkReports(prev => [newReport, ...prev]);
+        setWorkReports(prev => [workReport, ...prev]);
         toast.success('Work report submitted successfully');
       }
     } catch (error) {
@@ -472,6 +483,33 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
   
+  const deleteWorkReport = async (reportId: string) => {
+    try {
+      // First delete any associated file attachments
+      const { error: fileError } = await supabase
+        .from('file_attachments')
+        .delete()
+        .eq('work_report_id', reportId);
+
+      if (fileError) throw fileError;
+
+      // Then delete the work report
+      const { error } = await supabase
+        .from('work_reports')
+        .delete()
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      // Update local state
+      setWorkReports(prev => prev.filter(report => report.id !== reportId));
+      toast.success('Report deleted successfully');
+    } catch (error) {
+      console.error('Error deleting work report:', error);
+      toast.error('Failed to delete report');
+    }
+  };
+  
   const contextValue: CheckInContextType = {
     checkIns,
     workReports,
@@ -484,7 +522,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasCheckedInToday,
     hasCheckedOutToday,
     getUserLatestCheckIn,
-    hasSubmittedReportToday
+    hasSubmittedReportToday,
+    deleteWorkReport,
   };
   
   return (

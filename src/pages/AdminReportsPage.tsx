@@ -1,11 +1,10 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,26 +12,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 const AdminReportsPage = () => {
   const { user } = useAuth();
-  const { workReports } = useCheckIn();
+  const { workReports, deleteWorkReport } = useCheckIn();
+  const [reports, setReports] = useState(workReports);
   const [filters, setFilters] = useState({
     employee: '',
     department: '',
     dateFrom: '',
     dateTo: '',
   });
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    setReports(workReports);
+  }, [workReports]);
 
   if (!user || user.role !== 'admin') {
     return null;
   }
 
   // Apply filters
-  const filteredReports = workReports.filter(report => {
+  const filteredReports = reports.filter(report => {
     if (filters.employee && !report.userName.toLowerCase().includes(filters.employee.toLowerCase())) {
       return false;
     }
@@ -81,20 +98,66 @@ const AdminReportsPage = () => {
   };
 
   // Function to handle file download
-  const handleFileDownload = (fileName: string) => {
-    // In a real implementation, this would make a request to your MySQL server
-    // to fetch the actual file content and trigger a download
-    
-    const dummyContent = "This is a simulated file content for " + fileName;
-    const blob = new Blob([dummyContent], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleFileDownload = async (reportId: string, fileName: string) => {
+    try {
+      toast.loading('Preparing file for download...');
+      
+      // Get file path from database
+      const { data: fileData, error: fileError } = await supabase
+        .from('file_attachments')
+        .select('file_path, file_type')
+        .eq('work_report_id', reportId)
+        .eq('file_name', fileName)
+        .single();
+        
+      if (fileError) {
+        toast.dismiss();
+        toast.error(`Error finding file: ${fileError.message}`);
+        console.error('File info error:', fileError);
+        return;
+      }
+
+      if (!fileData) {
+        toast.dismiss();
+        toast.error('File not found in database');
+        return;
+      }
+      
+      console.log('Found file data:', fileData);
+      
+      // Create a signed URL for the file
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('attachments')
+        .createSignedUrl(fileData.file_path, 60); // URL valid for 60 seconds
+        
+      if (signedUrlError) {
+        toast.dismiss();
+        toast.error(`Error creating download URL: ${signedUrlError.message}`);
+        console.error('Signed URL error:', signedUrlError);
+        return;
+      }
+
+      if (!signedUrlData?.signedUrl) {
+        toast.dismiss();
+        toast.error('Failed to generate download URL');
+        return;
+      }
+
+      // Create and trigger download link
+      const a = document.createElement("a");
+      a.href = signedUrlData.signedUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast.dismiss();
+      toast.success('File downloaded successfully');
+    } catch (error) {
+      toast.dismiss();
+      console.error('File download error:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   const exportReports = () => {
@@ -122,9 +185,20 @@ const AdminReportsPage = () => {
     document.body.removeChild(link);
   };
 
+  const handleDeleteReport = async (reportId: string) => {
+    setReportToDelete(reportId);
+  };
+
+  const confirmDelete = async () => {
+    if (reportToDelete) {
+      await deleteWorkReport(reportToDelete);
+      setReportToDelete(null);
+    }
+  };
+
   return (
     <MainLayout>
-      <div className="flex flex-col">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold mb-6">All Reports</h1>
         
         <Card className="mb-6">
@@ -224,8 +298,18 @@ const AdminReportsPage = () => {
                           {report.department} - {report.position}
                         </p>
                       </div>
-                      <div className="mt-2 sm:mt-0 text-sm text-gray-500">
-                        {format(new Date(report.date), 'EEEE, MMMM d, yyyy')}
+                      <div className="mt-2 sm:mt-0 flex items-center gap-4">
+                        <div className="text-sm text-gray-500">
+                          {format(new Date(report.date), 'EEEE, MMMM d, yyyy')}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleDeleteReport(report.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -252,7 +336,7 @@ const AdminReportsPage = () => {
                                   variant="ghost" 
                                   size="sm" 
                                   className="p-1 h-auto"
-                                  onClick={() => handleFileDownload(file)}
+                                  onClick={() => handleFileDownload(report.id, file)}
                                 >
                                   <Download className="h-3 w-3" />
                                 </Button>
@@ -268,6 +352,27 @@ const AdminReportsPage = () => {
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!reportToDelete} onOpenChange={() => setReportToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this report?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the report
+                and any associated file attachments.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
