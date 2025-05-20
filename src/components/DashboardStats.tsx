@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CalendarCheck, FileText, Users } from 'lucide-react';
+import DashboardCard from './DashboardCard';
 import { CheckIn, WorkReport } from '@/types';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
@@ -64,39 +66,27 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Today's Check-ins</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{todayCheckIns.length || '0'}</div>
-          <p className="text-xs text-muted-foreground">
-            {isAdmin ? 'Total employee check-ins today' : 'You have checked in today'}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Today's Reports</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{todayReportsText}</div>
-          <p className="text-xs text-muted-foreground">
-            {isAdmin ? 'Total employee reports submitted today' : 'Your report status for today'}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{isAdmin ? employeeCount : '1'}</div>
-          <p className="text-xs text-muted-foreground">
-            {isAdmin ? 'Active employees in the system' : 'Your account'}
-          </p>
-        </CardContent>
-      </Card>
+      <DashboardCard
+        title="Today's Check-ins"
+        value={todayCheckIns.length || '0'}
+        description={isAdmin ? 'Total employee check-ins today' : 'You have checked in today'}
+        icon={<CalendarCheck className="h-5 w-5" />}
+        variant="info"
+      />
+      <DashboardCard
+        title="Today's Reports"
+        value={todayReportsText}
+        description={isAdmin ? 'Total employee reports submitted today' : 'Your report status for today'}
+        icon={<FileText className="h-5 w-5" />}
+        variant="warning"
+      />
+      <DashboardCard
+        title="Total Employees"
+        value={isAdmin ? employeeCount : '1'}
+        description={isAdmin ? 'Active employees in the system' : 'Your account'}
+        icon={<Users className="h-5 w-5" />}
+        variant="success"
+      />
     </div>
   );
 };

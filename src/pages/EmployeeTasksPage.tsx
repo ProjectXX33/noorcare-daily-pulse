@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CheckSquare, Loader2 } from 'lucide-react';
-import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
-import TaskFileUpload from '@/components/TaskFileUpload';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { updateTaskProgress } from '@/lib/tasksApi';
+import { toast } from 'sonner';
 
 // Mock tasks data
 const mockTasks = [
@@ -69,7 +69,6 @@ const EmployeeTasksPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
-  const [refreshAttachments, setRefreshAttachments] = useState(0);
   const [taskComments, setTaskComments] = useState<Record<string, any[]>>({
     '1': mockComments,
     '2': [],
@@ -77,18 +76,19 @@ const EmployeeTasksPage = () => {
   });
   const [progressType, setProgressType] = useState<'preset' | 'custom'>('preset');
   const [customProgress, setCustomProgress] = useState<number>(0);
+  const [tasks, setTasks] = useState(mockTasks);
   
   // Status badge color variants
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'Complete':
-        return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-900/30';
       case 'In Progress':
-        return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200';
+        return 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900/30';
       case 'On Hold':
-        return 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200';
+        return 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900/30';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200';
+        return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700';
     }
   };
   
@@ -112,21 +112,35 @@ const EmployeeTasksPage = () => {
     setIsDialogOpen(true);
   };
   
-  const handleUpdateProgress = (taskId: string, newProgress: number) => {
-    // Implement this function to update task progress
-    setUpdateStatus("Progress updated successfully");
-    
-    // Update the progress in the mock tasks
-    const updatedTasks = mockTasks.map(task => {
-      if (task.id === taskId) {
-        return { ...task, progress_percentage: newProgress };
+  const handleUpdateProgress = async (taskId: string, newProgress: number) => {
+    setIsLoading(true);
+    try {
+      // Update the progress in the tasks
+      const updatedTasks = tasks.map(task => {
+        if (task.id === taskId) {
+          return { ...task, progress_percentage: newProgress };
+        }
+        return task;
+      });
+      
+      setTasks(updatedTasks);
+      
+      // Update the selected task with the new progress
+      if (selectedTask) {
+        setSelectedTask({ ...selectedTask, progress_percentage: newProgress });
       }
-      return task;
-    });
-    
-    // Update the selected task with the new progress
-    if (selectedTask) {
-      setSelectedTask({ ...selectedTask, progress_percentage: newProgress });
+      
+      // In a real application, this would call the API to update the task
+      // For now, we'll just simulate success after a delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setUpdateStatus("Progress updated successfully");
+      toast.success("Task progress updated successfully");
+    } catch (error) {
+      console.error("Error updating task progress:", error);
+      toast.error("Failed to update task progress");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -135,10 +149,6 @@ const EmployeeTasksPage = () => {
       ...prev,
       [taskId]: newComments
     }));
-  };
-
-  const handleFileUploaded = () => {
-    setRefreshAttachments(prev => prev + 1);
   };
 
   const handleCustomProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,6 +162,9 @@ const EmployeeTasksPage = () => {
     }
   };
   
+  // Progress preset values with more granular options
+  const progressPresets = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col">
@@ -162,7 +175,7 @@ const EmployeeTasksPage = () => {
       </div>
       
       <div className="grid gap-6 grid-cols-1">
-        {mockTasks.length > 0 ? mockTasks.map((task) => (
+        {tasks.length > 0 ? tasks.map((task) => (
           <Card key={task.id} className="border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between">
@@ -211,10 +224,10 @@ const EmployeeTasksPage = () => {
         )}
       </div>
       
-      {/* Task details dialog */}
+      {/* Task details dialog - Fixed size and responsive */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         {selectedTask && (
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="w-[90vw] max-w-[500px] md:max-w-[600px] h-auto max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-xl">{selectedTask.title}</DialogTitle>
               <DialogDescription className="flex items-center gap-2">
@@ -260,13 +273,14 @@ const EmployeeTasksPage = () => {
                   
                   {progressType === 'preset' ? (
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {[0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 100].map((progress) => (
+                      {progressPresets.map((progress) => (
                         <Button 
                           key={progress}
                           variant="outline" 
                           size="sm"
                           onClick={() => handleUpdateProgress(selectedTask.id, progress)}
-                          className={selectedTask.progress_percentage === progress ? 'border-primary text-primary' : ''}
+                          className={selectedTask.progress_percentage === progress ? 'border-primary text-primary dark:border-primary dark:text-primary' : ''}
+                          disabled={isLoading}
                         >
                           {progress}%
                         </Button>
@@ -281,38 +295,30 @@ const EmployeeTasksPage = () => {
                         value={customProgress}
                         onChange={handleCustomProgressChange}
                         className="w-24" 
+                        disabled={isLoading}
                       />
                       <span>%</span>
                       <Button 
                         onClick={handleApplyCustomProgress} 
                         size="sm"
+                        disabled={isLoading}
                       >
-                        Apply
+                        {isLoading ? (
+                          <span className="flex items-center">
+                            <span className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                            Updating...
+                          </span>
+                        ) : (
+                          'Apply'
+                        )}
                       </Button>
                     </div>
                   )}
                 </div>
                 
                 {updateStatus && (
-                  <p className="text-xs text-green-600 mt-2">{updateStatus}</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">{updateStatus}</p>
                 )}
-              </div>
-              
-              <div>
-                <h3 className="font-medium mb-2">Attachments</h3>
-                <TaskAttachmentsList 
-                  taskId={selectedTask.id} 
-                  refresh={refreshAttachments} 
-                  language={language} 
-                />
-                <div className="mt-2">
-                  <TaskFileUpload 
-                    taskId={selectedTask.id} 
-                    userId={user.id} 
-                    onUploadComplete={handleFileUploaded} 
-                    language={language}
-                  />
-                </div>
               </div>
               
               <div>
