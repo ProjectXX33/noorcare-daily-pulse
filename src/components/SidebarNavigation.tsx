@@ -9,7 +9,8 @@ import {
   CheckSquare, 
   User, 
   LogOut,
-  Settings
+  Settings,
+  Menu
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -119,9 +120,11 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="h-14 border-b flex items-center justify-between px-4 bg-background z-[100000] sticky top-0">
+          <header className="h-14 border-b flex items-center justify-between px-4 bg-background sticky top-0 z-40">
             <div className="flex items-center">
-              <SidebarTrigger />
+              <SidebarTrigger>
+                <Menu className="h-5 w-5" />
+              </SidebarTrigger>
             </div>
             <div className="flex items-center gap-2">
               <NotificationsMenu />
