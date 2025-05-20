@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
 import { 
@@ -214,7 +213,7 @@ const NotificationsMenu = () => {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className={`h-5 w-5 ${hasNewNotifications ? 'animate-[wiggle_1s_ease-in-out_infinite]' : ''}`} />
+          <Bell className={`h-5 w-5 transition-all ${unreadCount > 0 ? 'animate-bounce text-yellow-500' : ''}`} />
           {unreadCount > 0 && (
             <Badge variant="destructive" className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs">
               {unreadCount}
@@ -222,10 +221,10 @@ const NotificationsMenu = () => {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="p-4">
+      <PopoverContent className="max-w-[95vw] w-full sm:w-80 p-2 sm:p-4" align="end">
+        <div>
           <div className="flex items-center justify-between mb-2">
-            <h4 className="font-medium">{t.notifications}</h4>
+            <h4 className="font-medium text-base sm:text-lg">{t.notifications}</h4>
             {unreadCount > 0 && (
               <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs">
                 {t.markAllAsRead}
@@ -238,20 +237,20 @@ const NotificationsMenu = () => {
               {t.loading}
             </div>
           ) : notifications.length > 0 ? (
-            <div className="max-h-[300px] overflow-auto">
+            <div className="max-h-[60vh] overflow-auto">
               {notifications.map((notification) => (
                 <div 
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-3 cursor-pointer hover:bg-muted ${!notification.is_read ? 'bg-muted/50' : ''}`}
+                  className={`p-3 cursor-pointer hover:bg-muted rounded-lg transition-colors duration-150 ${!notification.is_read ? 'bg-muted/50' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-medium">{notification.title}</span>
+                    <span className="font-medium text-sm sm:text-base">{notification.title}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatTimeAgo(notification.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{notification.message}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{notification.message}</p>
                 </div>
               ))}
             </div>

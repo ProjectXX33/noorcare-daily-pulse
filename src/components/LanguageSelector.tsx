@@ -1,24 +1,36 @@
-
 import React from 'react';
-import { Button } from "@/components/ui/button";
 import { useLanguage } from '@/contexts/LanguageContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+type Language = 'en' | 'ar';
 
 const LanguageSelector = () => {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'en' ? 'ar' : 'en');
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value as Language);
   };
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={toggleLanguage}
-      className="fixed top-4 right-4 z-50"
-    >
-      {language === 'en' ? 'العربية' : 'English'}
-    </Button>
+    <Select value={language} onValueChange={handleLanguageChange}>
+      <SelectTrigger className={`w-[180px] ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+        <SelectValue placeholder={t('language')} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="en" className={language === 'ar' ? 'text-right' : 'text-left'}>
+          English
+        </SelectItem>
+        <SelectItem value="ar" className={language === 'ar' ? 'text-right' : 'text-left'}>
+          العربية
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 };
 

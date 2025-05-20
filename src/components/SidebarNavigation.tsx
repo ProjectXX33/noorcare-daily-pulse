@@ -1,7 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Home, 
   Users, 
@@ -10,7 +10,8 @@ import {
   User, 
   LogOut,
   Settings,
-  Menu
+  Menu,
+  Calendar
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -35,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { supabase } from '@/lib/supabase';
 
 interface SidebarNavigationProps {
   children: React.ReactNode;
@@ -43,8 +45,60 @@ interface SidebarNavigationProps {
 export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
+  const { language, t } = useLanguage();
   const isMobile = useIsMobile();
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Subscribe to notifications changes
+    const notificationsSubscription = supabase
+      .channel('notifications')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `user_id=eq.${user?.id}`
+        }, 
+        (payload) => {
+          console.log('Realtime notification:', payload);
+          // Handle the notification change
+          if (payload.eventType === 'INSERT') {
+            setNotifications(prev => [payload.new, ...prev]);
+          } else if (payload.eventType === 'DELETE') {
+            setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new : n));
+          }
+        }
+      )
+      .subscribe();
+
+    // Load initial notifications
+    const loadNotifications = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error loading notifications:', error);
+        return;
+      }
+
+      setNotifications(data || []);
+    };
+
+    loadNotifications();
+
+    return () => {
+      notificationsSubscription.unsubscribe();
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -52,17 +106,19 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   };
   
   const adminNavItems = [
-    { name: 'Dashboard', icon: Home, path: '/dashboard' },
-    { name: 'Employees', icon: Users, path: '/employees' },
-    { name: 'Reports', icon: ClipboardList, path: '/reports' },
-    { name: 'Tasks', icon: CheckSquare, path: '/tasks' }
+    { name: t('dashboard'), icon: Home, path: '/dashboard' },
+    { name: t('employees'), icon: Users, path: '/employees' },
+    { name: t('reports'), icon: ClipboardList, path: '/reports' },
+    { name: t('tasks'), icon: CheckSquare, path: '/tasks' },
+    { name: t('events'), icon: Calendar, path: '/events' },
   ];
 
   const employeeNavItems = [
-    { name: 'Dashboard', icon: Home, path: '/employee-dashboard' },
-    { name: 'Check In', icon: CheckSquare, path: '/check-in' },
-    { name: 'Daily Report', icon: ClipboardList, path: '/report' },
-    { name: 'Tasks', icon: CheckSquare, path: '/employee-tasks' }
+    { name: t('dashboard'), icon: Home, path: '/employee-dashboard' },
+    { name: t('checkIn'), icon: CheckSquare, path: '/check-in' },
+    { name: t('dailyReport'), icon: ClipboardList, path: '/report' },
+    { name: t('tasks'), icon: CheckSquare, path: '/employee-tasks' },
+    { name: t('events'), icon: Calendar, path: '/events' },
   ];
 
   const navItems = user?.role === 'admin' ? adminNavItems : employeeNavItems;
@@ -70,7 +126,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   return (
     <SidebarProvider defaultOpen={!isMobile}>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <Sidebar variant="inset" className="sticky top-0 h-screen">
+        <Sidebar variant="inset" className="sticky top-0 h-screen" side={language === 'ar' ? 'right' : 'left'}>
           <SidebarHeader className="flex h-14 items-center border-b px-4">
             <div className="flex items-center gap-2">
               <img
@@ -89,45 +145,47 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                     onClick={() => navigate(item.path)}
                     tooltip={item.name}
                     isActive={window.location.pathname === item.path}
+                    className={`w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                   >
                     <item.icon className="h-4 w-4" />
-                    <span>{item.name}</span>
+                    <span className="w-full">{item.name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="mt-auto border-t">
+          
+          <SidebarFooter>
             <div className="flex flex-col gap-2 p-2">
               <Button 
                 variant="ghost" 
-                className="justify-start" 
+                className={`justify-start w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                 onClick={() => navigate('/settings')}
               >
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
+                <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                {t('settings')}
               </Button>
               <Button 
                 variant="ghost" 
-                className="justify-start text-red-500 hover:bg-red-50 hover:text-red-600" 
+                className={`justify-start w-full text-red-500 hover:bg-red-50 hover:text-red-600 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                 onClick={handleLogout}
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
+                <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                {t('signOut')}
               </Button>
             </div>
           </SidebarFooter>
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="h-14 border-b flex items-center justify-between px-4 bg-background sticky top-0 z-40">
-            <div className="flex items-center">
+          <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background px-4 md:px-6">
+            <div className={`flex items-center ${language === 'ar' ? 'order-2' : 'order-1'}`}>
               <SidebarTrigger>
                 <Menu className="h-5 w-5" />
               </SidebarTrigger>
             </div>
-            <div className="flex items-center gap-2">
-              <NotificationsMenu />
+            <div className={`flex items-center gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
+              <NotificationsMenu notifications={notifications} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 w-auto flex items-center gap-2 rounded-full p-0">
@@ -138,7 +196,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-56 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   <DropdownMenuLabel>
                     <div className="flex flex-col gap-1">
                       <p className="font-medium">{user?.name}</p>
@@ -146,13 +204,13 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Settings
+                  <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
+                    <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                    {t('settings')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
+                  <DropdownMenuItem onClick={handleLogout} className={`text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
+                    <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                    {t('signOut')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

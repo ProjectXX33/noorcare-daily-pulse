@@ -1,7 +1,71 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+
+/* Custom FullCalendar toolbar button styles for mobile optimization */
+.fc .fc-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fc .fc-button {
+  padding: 0.4rem 1rem !important;
+  margin: 0 0.15rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 1rem !important;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  box-shadow: none !important;
+}
+.fc .fc-button-primary {
+  background: #22c55e !important; /* Tailwind green-500 */
+  border: none !important;
+  color: #fff !important;
+}
+.fc .fc-button-primary:not(:disabled):hover {
+  background: #16a34a !important; /* Tailwind green-600 */
+}
+.fc .fc-button-active, .fc .fc-button-primary.fc-button-active {
+  background: #15803d !important; /* Tailwind green-700 */
+  color: #fff !important;
+}
+.fc .fc-button:focus {
+  outline: 2px solid #22c55e !important;
+  outline-offset: 2px;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .fc .fc-toolbar {
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: stretch;
+  }
+  .fc .fc-toolbar-chunk {
+    justify-content: center;
+    width: 100%;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 1.1rem;
+    padding: 0.25rem 0;
+  }
+  .fc .fc-button {
+    font-size: 0.95rem !important;
+    padding: 0.35rem 0.7rem !important;
+    min-width: 2.2rem;
+    min-height: 2.2rem;
+  }
+}
 
 @layer base {
   :root {

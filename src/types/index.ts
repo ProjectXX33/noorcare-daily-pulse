@@ -1,4 +1,3 @@
-
 export type User = {
   id: string;
   username: string;
@@ -8,6 +7,7 @@ export type User = {
   position: Position;
   lastCheckin?: Date;
   email: string;
+  preferences?: UserPreferences;
 };
 
 export type Department = 'Engineering' | 'IT' | 'Doctor' | 'Manager';
@@ -143,4 +143,12 @@ export type TaskRecord = {
   updated_at: string;
   created_by: string;
   comments: TaskComment[];
+}
+
+export interface UserPreferences {
+  notifications: {
+    enabled: boolean;
+    email: boolean;
+  };
+  theme: 'light' | 'dark';
 }

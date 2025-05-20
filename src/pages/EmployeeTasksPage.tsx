@@ -162,7 +162,7 @@ const EmployeeTasksPage = () => {
   // Progress preset values with more granular options
   const progressPresets = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
   
-  return <div className="space-y-6">
+  return <div className="space-y-6 p-2 sm:p-4">
       <div className="flex flex-col">
         <h1 className="text-3xl font-bold mb-2">My Tasks</h1>
         <p className="text-muted-foreground">
@@ -170,7 +170,7 @@ const EmployeeTasksPage = () => {
         </p>
       </div>
       
-      <div className="grid gap-6 grid-cols-1">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         {tasks.length > 0 ? tasks.map(task => <Card key={task.id} className="border shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between">

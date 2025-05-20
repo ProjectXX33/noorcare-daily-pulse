@@ -1,175 +1,133 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Language = 'en' | 'ar';
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (language: Language) => void;
+  setLanguage: (lang: Language) => void;
   t: (key: string) => string;
-  translations: Record<string, Record<string, string>>;
 }
 
-// Initialize with common translations
-const defaultTranslations = {
+const translations = {
   en: {
-    // Common translations
-    save: "Save",
-    cancel: "Cancel",
-    submit: "Submit",
-    loading: "Loading...",
-    error: "An error occurred",
-    success: "Success",
-    edit: "Edit",
-    delete: "Delete",
-    view: "View",
-    close: "Close",
-    back: "Back",
-    next: "Next",
-    search: "Search",
-    filter: "Filter",
-    actions: "Actions",
-    // Status translations
-    complete: "Complete",
-    inProgress: "In Progress",
-    onHold: "On Hold",
-    // Role translations
-    admin: "Admin",
-    employee: "Employee",
-    // Form translations
-    requiredField: "This field is required",
-    invalidEmail: "Please enter a valid email address",
-    passwordMismatch: "Passwords do not match",
-    // Pages and sections
+    // Navigation
     dashboard: "Dashboard",
-    login: "Login",
-    logout: "Logout",
-    profile: "Profile",
-    tasks: "Tasks",
-    reports: "Reports",
     employees: "Employees",
-    notifications: "Notifications",
-    // Task related
-    taskTitle: "Title",
-    taskDescription: "Description",
-    taskStatus: "Status",
-    taskProgress: "Progress",
-    taskAssignedTo: "Assigned To",
-    // Employee related
-    employeeName: "Name",
-    employeeEmail: "Email",
-    employeeUsername: "Username",
-    employeeDepartment: "Department",
-    employeePosition: "Position",
-    employeeRole: "Role"
+    reports: "Reports",
+    tasks: "Tasks",
+    checkIn: "Check In",
+    dailyReport: "Daily Report",
+    settings: "Settings",
+    signOut: "Sign Out",
+    events: 'Events',
+    
+    // Notifications
+    notificationsTitle: "Notifications",
+    noNotifications: "No new notifications",
+    markAllAsRead: "Mark all as read",
+    loading: "Loading...",
+    viewAll: "View all",
+    mentioned: "mentioned you in",
+    task: "a task",
+    moment: "just now",
+    minutes: "minutes ago",
+    hours: "hours ago",
+    days: "days ago",
+
+    // Settings
+    general: "General",
+    generalSettingsDescription: "Manage your general settings",
+    language: "Language",
+    theme: "Theme",
+    darkMode: "Dark Mode",
+    lightMode: "Light Mode",
+    notificationsSettings: "Notifications",
+    notificationsSettingsDescription: "Manage your notification preferences",
+    notificationsDescription: "Receive notifications about important updates",
+    emailNotifications: "Email Notifications",
+    emailNotificationsDescription: "Receive notifications via email",
+    saveChanges: "Save Changes",
+    changesSaved: "Changes saved successfully",
+    errorSaving: "Error saving changes",
+    account: 'Account',
+    preferences: 'Preferences',
+    security: 'Security',
   },
   ar: {
-    // Common translations
-    save: "حفظ",
-    cancel: "إلغاء",
-    submit: "إرسال",
-    loading: "جار التحميل...",
-    error: "حدث خطأ",
-    success: "تم بنجاح",
-    edit: "تعديل",
-    delete: "حذف",
-    view: "عرض",
-    close: "إغلاق",
-    back: "رجوع",
-    next: "التالي",
-    search: "بحث",
-    filter: "تصفية",
-    actions: "إجراءات",
-    // Status translations
-    complete: "مكتمل",
-    inProgress: "قيد التنفيذ",
-    onHold: "قيد الانتظار",
-    // Role translations
-    admin: "مدير",
-    employee: "موظف",
-    // Form translations
-    requiredField: "هذا الحقل مطلوب",
-    invalidEmail: "يرجى إدخال عنوان بريد إلكتروني صالح",
-    passwordMismatch: "كلمات المرور غير متطابقة",
-    // Pages and sections
+    // Navigation
     dashboard: "لوحة التحكم",
-    login: "تسجيل الدخول",
-    logout: "تسجيل الخروج",
-    profile: "الملف الشخصي",
-    tasks: "المهام",
-    reports: "التقارير",
     employees: "الموظفين",
-    notifications: "الإشعارات",
-    // Task related
-    taskTitle: "العنوان",
-    taskDescription: "الوصف",
-    taskStatus: "الحالة",
-    taskProgress: "التقدم",
-    taskAssignedTo: "تم تعيينه إلى",
-    // Employee related
-    employeeName: "الاسم",
-    employeeEmail: "البريد الإلكتروني",
-    employeeUsername: "اسم المستخدم",
-    employeeDepartment: "القسم",
-    employeePosition: "المنصب",
-    employeeRole: "الدور"
+    reports: "التقارير",
+    tasks: "المهام",
+    checkIn: "تسجيل الحضور",
+    dailyReport: "التقرير اليومي",
+    settings: "الإعدادات",
+    signOut: "تسجيل الخروج",
+    events: 'الفعاليات',
+    
+    // Notifications
+    notificationsTitle: "الإشعارات",
+    noNotifications: "لا توجد إشعارات جديدة",
+    markAllAsRead: "تعليم الكل كمقروء",
+    loading: "جاري التحميل...",
+    viewAll: "عرض الكل",
+    mentioned: "ذكرك في",
+    task: "مهمة",
+    moment: "الآن",
+    minutes: "دقائق مضت",
+    hours: "ساعات مضت",
+    days: "أيام مضت",
+
+    // Settings
+    general: "عام",
+    generalSettingsDescription: "إدارة الإعدادات العامة",
+    language: "اللغة",
+    theme: "المظهر",
+    darkMode: "الوضع الداكن",
+    lightMode: "الوضع الفاتح",
+    notificationsSettings: "الإشعارات",
+    notificationsSettingsDescription: "إدارة تفضيلات الإشعارات",
+    notificationsDescription: "تلقي إشعارات حول التحديثات المهمة",
+    emailNotifications: "إشعارات البريد الإلكتروني",
+    emailNotificationsDescription: "تلقي الإشعارات عبر البريد الإلكتروني",
+    saveChanges: "حفظ التغييرات",
+    changesSaved: "تم حفظ التغييرات بنجاح",
+    errorSaving: "خطأ في حفظ التغييرات",
+    account: 'الحساب',
+    preferences: 'التفضيلات',
+    security: 'الأمان',
   }
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>('en');
-  const [translations, setTranslations] = useState(defaultTranslations);
+  const [language, setLanguageState] = useState<Language>(() => {
+    const stored = localStorage.getItem('preferredLanguage');
+    return (stored === 'en' || stored === 'ar') ? stored : 'en';
+  });
 
-  useEffect(() => {
-    // Load language preference from localStorage
-    const storedLang = localStorage.getItem('preferredLanguage');
-    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
-      setLanguageState(storedLang);
-    }
-  }, []);
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem('preferredLanguage', lang);
+    document.body.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.body.classList.toggle('rtl', lang === 'ar');
+    document.body.classList.toggle('ltr', lang === 'en');
+  };
 
+  const t = (key: string): string => {
+    return translations[language][key as keyof typeof translations[typeof language]] || key;
+  };
+
+  // Initialize body direction and classes
   useEffect(() => {
-    // Update document direction based on language
-    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = language;
+    document.body.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.body.classList.toggle('rtl', language === 'ar');
+    document.body.classList.toggle('ltr', language === 'en');
   }, [language]);
 
-  const setLanguage = (newLanguage: Language) => {
-    setLanguageState(newLanguage);
-    localStorage.setItem('preferredLanguage', newLanguage);
-  };
-
-  // Translation function
-  const t = (key: string): string => {
-    const langTranslations = translations[language];
-    return langTranslations[key] || key;
-  };
-
-  // Add component-specific translations
-  const addTranslations = (componentName: string, newTranslations: Record<Language, Record<string, string>>) => {
-    setTranslations(prev => {
-      const updated = { ...prev };
-      Object.keys(newTranslations).forEach(lang => {
-        if (lang in updated) {
-          updated[lang as Language] = {
-            ...updated[lang as Language],
-            ...newTranslations[lang as Language]
-          };
-        }
-      });
-      return updated;
-    });
-  };
-
   return (
-    <LanguageContext.Provider value={{ 
-      language, 
-      setLanguage, 
-      t,
-      translations
-    }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );

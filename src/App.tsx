@@ -21,6 +21,9 @@ import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import EventsPage from '@/pages/EventsPage';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,103 +85,115 @@ const AppWithAuth = () => {
       <AuthProvider>
         <CheckInProvider>
           <LanguageProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation>
-                      <Dashboard />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/employee-dashboard" 
-                element={
-                  <EmployeeRoute>
-                    <SidebarNavigation>
-                      <EmployeeDashboard />
-                    </SidebarNavigation>
-                  </EmployeeRoute>
-                } 
-              />
-              <Route 
-                path="/check-in" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation>
-                      <CheckInPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/report" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation>
-                      <ReportPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/employees" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation>
-                      <AdminEmployeesPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/reports" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation>
-                      <AdminReportsPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/tasks" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation>
-                      <AdminTasksPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/employee-tasks" 
-                element={
-                  <EmployeeRoute>
-                    <SidebarNavigation>
-                      <EmployeeTasksPage />
-                    </SidebarNavigation>
-                  </EmployeeRoute>
-                } 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation>
-                      <SettingsPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
-            <Sonner />
+            <ThemeProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation>
+                        <Dashboard />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-dashboard" 
+                  element={
+                    <EmployeeRoute>
+                      <SidebarNavigation>
+                        <EmployeeDashboard />
+                      </SidebarNavigation>
+                    </EmployeeRoute>
+                  } 
+                />
+                <Route 
+                  path="/check-in" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation>
+                        <CheckInPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/report" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation>
+                        <ReportPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/employees" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation>
+                        <AdminEmployeesPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/reports" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation>
+                        <AdminReportsPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/tasks" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation>
+                        <AdminTasksPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-tasks" 
+                  element={
+                    <EmployeeRoute>
+                      <SidebarNavigation>
+                        <EmployeeTasksPage />
+                      </SidebarNavigation>
+                    </EmployeeRoute>
+                  } 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation>
+                        <SettingsPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/events" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation>
+                        <EventsPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Toaster />
+              <Sonner />
+            </ThemeProvider>
           </LanguageProvider>
         </CheckInProvider>
       </AuthProvider>
@@ -188,11 +203,13 @@ const AppWithAuth = () => {
 
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AppWithAuth />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AppWithAuth />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

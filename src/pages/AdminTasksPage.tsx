@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -422,17 +421,18 @@ const AdminTasksPage = () => {
   return (
     <MainLayout>
       <div className="flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex justify-between items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4 gap-2 md:gap-0">
           <h1 className="text-2xl font-bold">{t.tasks}</h1>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 md:flex-row md:gap-2 w-full md:w-auto">
             <Button 
               variant="outline"
               onClick={() => setIsNotificationDialogOpen(true)}
+              className="w-full md:w-auto"
             >
               {t.sendNotification}
             </Button>
             <Button 
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 w-full md:w-auto"
               onClick={() => setIsTaskDialogOpen(true)}
             >
               {t.addTask}
@@ -453,8 +453,9 @@ const AdminTasksPage = () => {
                 <CardDescription>{t.manageTasksAndNotifications}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
+                {/* Table for md+ screens */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table className="min-w-[600px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t.title}</TableHead>
@@ -513,6 +514,41 @@ const AdminTasksPage = () => {
                     </TableBody>
                   </Table>
                 </div>
+                {/* Card layout for mobile */}
+                <div className="block md:hidden space-y-4">
+                  {isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                      <p className="mt-2 text-sm text-gray-500 ml-2">{t.loadingTasks}</p>
+                    </div>
+                  ) : tasks.length === 0 ? (
+                    <div className="text-center py-8">{t.noTasks}</div>
+                  ) : (
+                    tasks.map(task => (
+                      <Card key={task.id} className="p-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="font-bold text-base">{task.title}</div>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>{task.status === 'Not Started' ? t.notStarted : task.status === 'On Hold' ? t.onHold : task.status === 'In Progress' ? t.inProgress : t.complete}</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-2">{task.description}</div>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <span className="text-xs">{t.assignedTo}: <span className="font-medium">{task.assignedToName}</span></span>
+                          <span className="text-xs">{t.progress}: <span className="font-medium">{task.progressPercentage}%</span></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => openEditTaskDialog(task)}
+                          >
+                            {t.editTask}
+                          </Button>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -561,7 +597,7 @@ const AdminTasksPage = () => {
 
       {/* Add Task Dialog */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="w-[95vw] max-w-[525px] p-2 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.newTask}</DialogTitle>
             <DialogDescription>
@@ -668,7 +704,7 @@ const AdminTasksPage = () => {
 
       {/* Edit Task Dialog - Improved UI */}
       <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="w-[95vw] max-w-[600px] max-h-[85vh] overflow-y-auto p-2 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.editTask}</DialogTitle>
             <DialogDescription>
@@ -801,7 +837,7 @@ const AdminTasksPage = () => {
 
       {/* Send Notification Dialog */}
       <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent className="w-[95vw] max-w-[525px] p-2 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.sendNotification}</DialogTitle>
             <DialogDescription>

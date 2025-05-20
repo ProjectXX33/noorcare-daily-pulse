@@ -1,4 +1,3 @@
-
 -- First, check if tables exist and drop them if needed to start fresh
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS file_attachments;
@@ -17,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     department TEXT CHECK(department IN ('Engineering', 'IT', 'Doctor', 'Manager')) NOT NULL,
     position TEXT CHECK(position IN ('Customer Service', 'Designer', 'Media Buyer', 'Copy Writing', 'Web Developer')) NOT NULL,
     last_checkin TIMESTAMP WITH TIME ZONE,
+    preferences JSONB DEFAULT '{"notifications": {"enabled": true, "email": true}, "theme": "light"}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -158,3 +158,8 @@ ALTER TABLE notifications
   REFERENCES users(id)
   ON DELETE CASCADE
   ON UPDATE CASCADE;
+
+-- Add preferences column to users table
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS preferences JSONB 
+DEFAULT '{"notifications": {"enabled": true, "email": true}, "theme": "light"}'::jsonb;
