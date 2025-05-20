@@ -29,12 +29,13 @@ import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { UserPlus } from '@heroicons/react/24/outline';
 
 const AdminEmployeesPage = () => {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
@@ -183,7 +184,7 @@ const AdminEmployeesPage = () => {
       // Refresh employee list
       await loadEmployees();
       
-      setIsAddEmployeeOpen(false);
+      setIsAddingEmployee(false);
       toast.success(t.employeeAdded);
       
       // Reset form
@@ -278,12 +279,10 @@ const AdminEmployeesPage = () => {
   return (
     <>
       <div className="flex flex-col w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6 sticky top-0 z-50 bg-background pt-2 pb-4">
+        <div className="flex justify-between items-center mb-6 sticky top-0 z-[40] bg-background pt-2 pb-4">
           <h1 className="text-2xl font-bold">{t.employees}</h1>
-          <Button 
-            className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
-            onClick={() => setIsAddEmployeeOpen(true)}
-          >
+          <Button onClick={() => setIsAddingEmployee(true)} className="bg-primary hover:bg-primary/90">
+            <UserPlus className="mr-2 h-4 w-4" />
             {t.addEmployee}
           </Button>
         </div>
@@ -361,7 +360,7 @@ const AdminEmployeesPage = () => {
       </div>
 
       {/* Add Employee Dialog */}
-      <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
+      <Dialog open={isAddingEmployee} onOpenChange={setIsAddingEmployee}>
         <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
             <DialogTitle>{t.addNewEmployee}</DialogTitle>
@@ -478,7 +477,7 @@ const AdminEmployeesPage = () => {
             </div>
           </div>
           <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : 'flex-col space-y-2 sm:space-y-0 sm:flex-row'}>
-            <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setIsAddingEmployee(false)} className="w-full sm:w-auto">
               {t.cancel}
             </Button>
             <Button 

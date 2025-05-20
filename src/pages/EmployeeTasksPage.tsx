@@ -10,45 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { updateTaskProgress } from '@/lib/tasksApi';
+import { fetchUserTasks, updateTaskProgress } from '@/lib/tasksApi';
 import { toast } from 'sonner';
 
-// Mock tasks data with proper UUIDs instead of string numbers
-const mockTasks = [{
-  id: 'a1b2c3d4-e5f6-4a3b-8c9d-1e2f3a4b5c6d', // Using proper UUID format
-  title: 'Complete monthly report',
-  description: 'Prepare and submit the monthly activity report by the end of this week.',
-  assigned_to: '2',
-  status: 'In Progress',
-  progress_percentage: 60,
-  created_by: '1',
-  created_at: '2023-05-15T08:00:00Z',
-  updated_at: '2023-05-15T10:30:00Z'
-}, {
-  id: 'b2c3d4e5-f6a7-4b3c-9d0e-2f3g4h5i6j7', // Using proper UUID format
-  title: 'Update client records',
-  description: 'Review and update client information in the database.',
-  assigned_to: '2',
-  status: 'Not Started',
-  progress_percentage: 0,
-  created_by: '1',
-  created_at: '2023-05-14T15:00:00Z',
-  updated_at: '2023-05-14T15:00:00Z'
-}, {
-  id: 'c3d4e5f6-g7h8-4c3d-0e1f-3g4h5i6j7k8', // Using proper UUID format
-  title: 'Training session',
-  description: 'Attend the online training session on new procedures.',
-  assigned_to: '2',
-  status: 'Complete',
-  progress_percentage: 100,
-  created_by: '1',
-  created_at: '2023-05-10T09:00:00Z',
-  updated_at: '2023-05-12T11:00:00Z'
-}];
-
-// Mock comments data
+// Mock comments data for fallback
 const mockComments = [{
-  id: 'd4e5f6g7-h8i9-4d4e-1f2g-3h4i5j6k7l8', // Using proper UUID format
+  id: 'd4e5f6g7-h8i9-4d4e-1f2g-3h4i5j6k7l8',
   userId: '1',
   userName: 'Admin User',
   text: 'Please complete this task by Friday.',
@@ -56,22 +23,45 @@ const mockComments = [{
 }];
 
 const EmployeeTasksPage = () => {
-  const {
-    user
-  } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
-  const [taskComments, setTaskComments] = useState<Record<string, any[]>>({
-    'a1b2c3d4-e5f6-4a3b-8c9d-1e2f3a4b5c6d': mockComments, // Updated to use the new UUID
-    'b2c3d4e5-f6a7-4b3c-9d0e-2f3g4h5i6j7': [],
-    'c3d4e5f6-g7h8-4c3d-0e1f-3g4h5i6j7k8': []
-  });
+  const [taskComments, setTaskComments] = useState<Record<string, any[]>>({});
   const [progressType, setProgressType] = useState<'preset' | 'custom'>('preset');
   const [customProgress, setCustomProgress] = useState<number>(0);
-  const [tasks, setTasks] = useState(mockTasks);
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  // Fetch tasks when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      loadTasks();
+    }
+  }, [user]);
+
+  const loadTasks = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const userTasks = await fetchUserTasks(user.id);
+      setTasks(userTasks);
+      
+      // Initialize comments for each task
+      const initialComments: Record<string, any[]> = {};
+      userTasks.forEach(task => {
+        initialComments[task.id] = task.comments || [];
+      });
+      setTaskComments(initialComments);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      toast.error("Failed to load tasks");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Status badge color variants
   const getStatusColor = (status: string) => {
@@ -86,7 +76,9 @@ const EmployeeTasksPage = () => {
         return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700';
     }
   };
+  
   if (!user) return null;
+  
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center">
@@ -95,21 +87,28 @@ const EmployeeTasksPage = () => {
         </div>
       </div>;
   }
+  
   const handleOpenTask = (task: any) => {
     setSelectedTask(task);
     setProgressType('preset');
-    setCustomProgress(task.progress_percentage);
+    setCustomProgress(task.progressPercentage);
     setIsDialogOpen(true);
   };
+  
   const handleUpdateProgress = async (taskId: string, newProgress: number) => {
     setIsLoading(true);
     try {
-      // Update the progress in the tasks
+      await updateTaskProgress(taskId, newProgress, user.id);
+      
+      // Update the tasks in local state
       const updatedTasks = tasks.map(task => {
         if (task.id === taskId) {
           return {
             ...task,
-            progress_percentage: newProgress
+            progressPercentage: newProgress,
+            status: newProgress === 0 ? 'Not Started' : 
+                   newProgress === 100 ? 'Complete' : 
+                   'In Progress'
           };
         }
         return task;
@@ -120,15 +119,20 @@ const EmployeeTasksPage = () => {
       if (selectedTask) {
         setSelectedTask({
           ...selectedTask,
-          progress_percentage: newProgress
+          progressPercentage: newProgress,
+          status: newProgress === 0 ? 'Not Started' : 
+                 newProgress === 100 ? 'Complete' : 
+                 'In Progress'
         });
       }
 
-      // In a real application, this would call the API to update the task
-      // For now, we'll just simulate success after a delay
-      await new Promise(resolve => setTimeout(resolve, 500));
       setUpdateStatus("Progress updated successfully");
       toast.success("Task progress updated successfully");
+      
+      // Refresh tasks after a short delay
+      setTimeout(() => {
+        loadTasks();
+      }, 1000);
     } catch (error) {
       console.error("Error updating task progress:", error);
       toast.error("Failed to update task progress");
@@ -136,16 +140,19 @@ const EmployeeTasksPage = () => {
       setIsLoading(false);
     }
   };
+  
   const handleCommentAdded = (taskId: string, newComments: any[]) => {
     setTaskComments(prev => ({
       ...prev,
       [taskId]: newComments
     }));
   };
+  
   const handleCustomProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     setCustomProgress(isNaN(value) ? 0 : Math.max(0, Math.min(100, value)));
   };
+  
   const handleApplyCustomProgress = () => {
     if (selectedTask) {
       handleUpdateProgress(selectedTask.id, customProgress);
@@ -154,6 +161,7 @@ const EmployeeTasksPage = () => {
 
   // Progress preset values with more granular options
   const progressPresets = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+  
   return <div className="space-y-6">
       <div className="flex flex-col">
         <h1 className="text-3xl font-bold mb-2">My Tasks</h1>
@@ -182,14 +190,14 @@ const EmployeeTasksPage = () => {
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>Progress</span>
-                    <span>{task.progress_percentage}%</span>
+                    <span>{task.progressPercentage}%</span>
                   </div>
-                  <Progress value={task.progress_percentage} className="h-2" />
+                  <Progress value={task.progressPercentage} className="h-2" />
                 </div>
                 
                 <div className="flex justify-between items-center pt-2">
                   <div className="text-xs text-muted-foreground">
-                    Updated: {new Date(task.updated_at).toLocaleDateString()}
+                    Updated: {new Date(task.updatedAt).toLocaleDateString()}
                   </div>
                   <Button variant="outline" onClick={() => handleOpenTask(task)}>
                     View Details
@@ -218,7 +226,7 @@ const EmployeeTasksPage = () => {
                   {selectedTask.status}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  Created: {new Date(selectedTask.created_at).toLocaleDateString()}
+                  Created: {new Date(selectedTask.createdAt).toLocaleDateString()}
                 </span>
               </DialogDescription>
             </DialogHeader>
@@ -234,8 +242,8 @@ const EmployeeTasksPage = () => {
               <div>
                 <h3 className="font-medium mb-2">Progress</h3>
                 <div className="flex items-center gap-4">
-                  <Progress value={selectedTask.progress_percentage} className="h-2 flex-1" />
-                  <span className="text-sm font-medium">{selectedTask.progress_percentage}%</span>
+                  <Progress value={selectedTask.progressPercentage} className="h-2 flex-1" />
+                  <span className="text-sm font-medium">{selectedTask.progressPercentage}%</span>
                 </div>
                 
                 <div className="mt-4 space-y-4">
@@ -251,7 +259,7 @@ const EmployeeTasksPage = () => {
                   </RadioGroup>
                   
                   {progressType === 'preset' ? <div className="flex flex-wrap gap-2 mt-3">
-                      {progressPresets.map(progress => <Button key={progress} variant="outline" size="sm" onClick={() => handleUpdateProgress(selectedTask.id, progress)} className={selectedTask.progress_percentage === progress ? 'border-primary text-primary dark:border-primary dark:text-primary' : ''} disabled={isLoading}>
+                      {progressPresets.map(progress => <Button key={progress} variant="outline" size="sm" onClick={() => handleUpdateProgress(selectedTask.id, progress)} className={selectedTask.progressPercentage === progress ? 'border-primary text-primary dark:border-primary dark:text-primary' : ''} disabled={isLoading}>
                           {progress}%
                         </Button>)}
                     </div> : <div className="flex items-center gap-2">
@@ -270,12 +278,18 @@ const EmployeeTasksPage = () => {
               </div>
               
               <div>
-                
-                <TaskComments taskId={selectedTask.id} user={user} comments={taskComments[selectedTask.id] || []} onCommentAdded={newComments => handleCommentAdded(selectedTask.id, newComments)} language={language} />
+                <TaskComments 
+                  taskId={selectedTask.id} 
+                  user={user} 
+                  comments={taskComments[selectedTask.id] || []} 
+                  onCommentAdded={newComments => handleCommentAdded(selectedTask.id, newComments)} 
+                  language={language} 
+                />
               </div>
             </div>
           </DialogContent>}
       </Dialog>
     </div>;
 };
+
 export default EmployeeTasksPage;
