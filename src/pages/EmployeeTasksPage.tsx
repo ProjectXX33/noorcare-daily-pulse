@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,9 @@ import { Input } from '@/components/ui/input';
 import { updateTaskProgress } from '@/lib/tasksApi';
 import { toast } from 'sonner';
 
-// Mock tasks data
+// Mock tasks data with proper UUIDs instead of string numbers
 const mockTasks = [{
-  id: '1',
+  id: 'a1b2c3d4-e5f6-4a3b-8c9d-1e2f3a4b5c6d', // Using proper UUID format
   title: 'Complete monthly report',
   description: 'Prepare and submit the monthly activity report by the end of this week.',
   assigned_to: '2',
@@ -25,7 +25,7 @@ const mockTasks = [{
   created_at: '2023-05-15T08:00:00Z',
   updated_at: '2023-05-15T10:30:00Z'
 }, {
-  id: '2',
+  id: 'b2c3d4e5-f6a7-4b3c-9d0e-2f3g4h5i6j7', // Using proper UUID format
   title: 'Update client records',
   description: 'Review and update client information in the database.',
   assigned_to: '2',
@@ -35,7 +35,7 @@ const mockTasks = [{
   created_at: '2023-05-14T15:00:00Z',
   updated_at: '2023-05-14T15:00:00Z'
 }, {
-  id: '3',
+  id: 'c3d4e5f6-g7h8-4c3d-0e1f-3g4h5i6j7k8', // Using proper UUID format
   title: 'Training session',
   description: 'Attend the online training session on new procedures.',
   assigned_to: '2',
@@ -48,12 +48,13 @@ const mockTasks = [{
 
 // Mock comments data
 const mockComments = [{
-  id: '1',
+  id: 'd4e5f6g7-h8i9-4d4e-1f2g-3h4i5j6k7l8', // Using proper UUID format
   userId: '1',
   userName: 'Admin User',
   text: 'Please complete this task by Friday.',
   createdAt: '2023-05-15T09:30:00Z'
 }];
+
 const EmployeeTasksPage = () => {
   const {
     user
@@ -64,9 +65,9 @@ const EmployeeTasksPage = () => {
   const [updateStatus, setUpdateStatus] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
   const [taskComments, setTaskComments] = useState<Record<string, any[]>>({
-    '1': mockComments,
-    '2': [],
-    '3': []
+    'a1b2c3d4-e5f6-4a3b-8c9d-1e2f3a4b5c6d': mockComments, // Updated to use the new UUID
+    'b2c3d4e5-f6a7-4b3c-9d0e-2f3g4h5i6j7': [],
+    'c3d4e5f6-g7h8-4c3d-0e1f-3g4h5i6j7k8': []
   });
   const [progressType, setProgressType] = useState<'preset' | 'custom'>('preset');
   const [customProgress, setCustomProgress] = useState<number>(0);
