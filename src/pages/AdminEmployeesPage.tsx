@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus } from '@heroicons/react/24/outline';
+import { UserPlus } from 'lucide-react';
 
 const AdminEmployeesPage = () => {
   const { user } = useAuth();
