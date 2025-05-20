@@ -2,7 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-
+/* Add to your global CSS or Tailwind config */
+.sidebar-glass {
+  background: rgba(30, 41, 59, 0.7); /* dark glass */
+  backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 2px 0 16px 0 rgba(0,0,0,0.08);
+}
 
 /* Custom FullCalendar toolbar button styles for mobile optimization */
 .fc .fc-toolbar {
@@ -177,4 +183,118 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+/* FullCalendar event: no wrap, fill column, ellipsis if too long */
+.fc .fc-event-title,
+.fc .fc-event-time {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .fc .fc-event {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 0.95rem;
+    padding: 2px 6px;
+  }
+  .fc .fc-daygrid-day-events {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Dark mode support for FullCalendar */
+body.dark .fc {
+  background: #18181b !important;
+  color: #e5e7eb !important;
+}
+body.dark .fc .fc-event {
+  background: #27272a !important;
+  color: #f1f5f9 !important;
+  border-color: #52525b !important;
+}
+body.dark .fc .fc-daygrid-day-number {
+  color: #a1a1aa !important;
+}
+body.dark .fc .fc-toolbar-title {
+  color: #f1f5f9 !important;
+}
+
+/* FullCalendar day headers: background and white font in dark mode */
+body.dark .fc .fc-col-header-cell {
+  background: #23232b !important;
+  color: #fff !important;
+  border-bottom: 1px solid #333 !important;
+}
+
+/* Dark mode polish for FullCalendar and cards */
+body.dark .fc, 
+body.dark .card {
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.25) !important;
+}
+
+body.dark .fc .fc-day-today {
+  background: #334155 !important;
+  color: #fff !important;
+  border-radius: 0.5rem !important;
+}
+
+body.dark .fc .fc-event.fc-event-selected,
+body.dark .fc .fc-event:active {
+  background: #22d3ee !important;
+  color: #18181b !important;
+  border-color: #22d3ee !important;
+}
+
+body.dark .card table tr:hover,
+body.dark .fc .fc-daygrid-event:hover {
+  background: #334155 !important;
+  color: #fff !important;
+}
+
+body.dark ::-webkit-scrollbar {
+  background: #23232b;
+}
+body.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 8px;
+}
+
+/* Beautiful event style for FullCalendar grid view in dark mode */
+body.dark .fc .fc-daygrid-event {
+  border-left: 4px solid #22d3ee !important;
+  background: #23232b !important;
+  color: #f1f5f9 !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10) !important;
+  padding-left: 0.5rem !important;
+  margin-bottom: 2px !important;
+  transition: background 0.2s, color 0.2s;
+}
+body.dark .fc .fc-daygrid-event:hover {
+  background: #334155 !important;
+  color: #fff !important;
+}
+
+/* Beautiful event style for FullCalendar grid view in light mode */
+body .fc .fc-daygrid-event {
+  border-left: 4px solid #22c55e !important;
+  background: #f8fafc !important;
+  color: #222 !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04) !important;
+  padding-left: 0.5rem !important;
+  margin-bottom: 2px !important;
+  transition: background 0.2s, color 0.2s;
+}
+body .fc .fc-daygrid-event:hover {
+  background: #e0f2fe !important;
+  color: #222 !important;
 }

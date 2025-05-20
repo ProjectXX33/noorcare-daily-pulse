@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin, { Draggable } from '@fullcalendar/interaction';
@@ -40,6 +41,7 @@ import { format } from 'date-fns';
 const EventsPage = () => {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  const location = useLocation();
   const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
   const calendarRef = useRef(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -59,6 +61,35 @@ const EventsPage = () => {
     fetchEvents();
   }, []);
 
+  // Handle navigation from notification
+  useEffect(() => {
+    if (location.state?.eventId) {
+      const event = calendarEvents.find(e => e.id === location.state.eventId);
+      if (event && calendarRef.current) {
+        // Set view to calendar if not already
+        setView('calendar');
+        
+        // Get the calendar API
+        const calendarApi = calendarRef.current.getApi();
+        
+        // Navigate to the event's date
+        calendarApi.gotoDate(event.start);
+        
+        // Find the event element and add animation
+        setTimeout(() => {
+          const eventElement = document.querySelector(`[data-event-id="${event.id}"]`);
+          if (eventElement) {
+            eventElement.classList.add('animate-pulse', 'bg-primary/20');
+            // Remove animation after 2 seconds
+            setTimeout(() => {
+              eventElement.classList.remove('animate-pulse', 'bg-primary/20');
+            }, 2000);
+          }
+        }, 100);
+      }
+    }
+  }, [location.state?.eventId, calendarEvents]);
+
   const fetchEvents = async () => {
     try {
       const events = await eventService.getEvents();
@@ -69,20 +100,18 @@ const EventsPage = () => {
     }
   };
 
-  // Handle event click (admin only)
+  // Handle event click (all users can view info, only admin can edit/delete)
   const handleEventClick = (info: any) => {
-    if (user?.role === 'admin') {
-      const event = calendarEvents.find(e => e.id === info.event.id);
-      if (event) {
-        setSelectedEvent(event);
-        setFormData({
-          title: event.title,
-          description: event.description || '',
-          start: event.start,
-          end: event.end,
-        });
-        setIsDialogOpen(true);
-      }
+    const event = calendarEvents.find(e => e.id === info.event.id);
+    if (event) {
+      setSelectedEvent(event);
+      setFormData({
+        title: event.title,
+        description: event.description || '',
+        start: event.start,
+        end: event.end,
+      });
+      setIsDialogOpen(true);
     }
   };
 
@@ -245,6 +274,10 @@ const EventsPage = () => {
                 minute: '2-digit',
                 meridiem: 'short'
               }}
+              eventDidMount={(info) => {
+                // Add data-event-id attribute to the event element
+                info.el.setAttribute('data-event-id', info.event.id);
+              }}
             />
           </CardContent>
         </Card>
@@ -260,7 +293,7 @@ const EventsPage = () => {
                   {calendarEvents
                     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
                     .map(event => (
-                      <Card key={event.id} className="p-4">
+                      <Card key={event.id} className="p-4 border-l-4 border-primary bg-card/80 dark:bg-zinc-900/80 dark:border-primary/70 shadow-md transition-colors hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl">
                         <div className="space-y-2">
                           <div className="flex justify-between items-start">
                             <h3 className="font-semibold">{event.title}</h3>
@@ -300,79 +333,87 @@ const EventsPage = () => {
         </div>
       )}
 
-      {/* Event Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{selectedEvent ? t('editEvent') || 'Edit Event' : t('addEvent') || 'Add Event'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">{t('title') || 'Title'}</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">{t('description') || 'Description'}</Label>
-              <Textarea
-                id="description"
-                value={formData.description || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="start">{t('startDate') || 'Start Date'}</Label>
-              <Input
-                id="start"
-                type="datetime-local"
-                value={formData.start ? new Date(formData.start).toISOString().slice(0, 16) : ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, start: new Date(e.target.value).toISOString() }))}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end">{t('endDate') || 'End Date (Optional)'}</Label>
-              <Input
-                id="end"
-                type="datetime-local"
-                value={formData.end ? new Date(formData.end).toISOString().slice(0, 16) : ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  end: e.target.value ? new Date(e.target.value).toISOString() : null 
-                }))}
-                disabled={isLoading}
-              />
-            </div>
-            <DialogFooter>
-              {selectedEvent && user?.role === 'admin' && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={isLoading}
-                  className="mr-auto flex items-center gap-1"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {t('delete') || 'Delete'}
-                </Button>
+      {/* Modal for event info (read-only for non-admins) */}
+      {isDialogOpen && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{formData.title}</DialogTitle>
+            </DialogHeader>
+            <div className="mb-2">
+              <div className="text-sm text-muted-foreground mb-1">
+                <span className="font-semibold">{t('start')}:</span> {formatDate(formData.start as string)}
+              </div>
+              {formData.end && (
+                <div className="text-sm text-muted-foreground mb-1">
+                  <span className="font-semibold">{t('end')}:</span> {formatDate(formData.end as string)}
+                </div>
               )}
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isLoading}>
-                {t('cancel') || 'Cancel'}
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (t('saving') || 'Saving...') : (selectedEvent ? t('save') || 'Save' : t('add') || 'Add')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              {formData.description && (
+                <div className="text-sm mt-2">
+                  {formData.description}
+                </div>
+              )}
+            </div>
+            {/* Only show edit/delete for admin */}
+            {user?.role === 'admin' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="event-title">{t('title') || 'Title'}</Label>
+                  <Input
+                    id="event-title"
+                    value={formData.title}
+                    onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="event-description">{t('description') || 'Description'}</Label>
+                  <Textarea
+                    id="event-description"
+                    value={formData.description || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="event-start">{t('start') || 'Start'}</Label>
+                  <Input
+                    id="event-start"
+                    type="datetime-local"
+                    value={formData.start ? new Date(formData.start).toISOString().slice(0, 16) : ''}
+                    onChange={e => setFormData(prev => ({ ...prev, start: new Date(e.target.value).toISOString() }))}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="event-end">{t('end') || 'End'}</Label>
+                  <Input
+                    id="event-end"
+                    type="datetime-local"
+                    value={formData.end ? new Date(formData.end).toISOString().slice(0, 16) : ''}
+                    onChange={e => setFormData(prev => ({ ...prev, end: e.target.value ? new Date(e.target.value).toISOString() : null }))}
+                    disabled={isLoading}
+                  />
+                </div>
+                <DialogFooter className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>{t('close') || 'Close'}</Button>
+                  <Button type="submit" variant="default" disabled={isLoading}>{t('save') || 'Save'}</Button>
+                  {selectedEvent && (
+                    <Button type="button" variant="destructive" onClick={handleDelete} disabled={isLoading}>{t('delete') || 'Delete'}</Button>
+                  )}
+                </DialogFooter>
+              </form>
+            ) : (
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t('close') || 'Close'}</Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

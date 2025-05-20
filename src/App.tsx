@@ -23,6 +23,7 @@ import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import EventsPage from '@/pages/EventsPage';
+import React, { useState } from 'react';
 
 
 const queryClient = new QueryClient({
@@ -80,6 +81,7 @@ const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
 
 // This component is outside the BrowserRouter but inside the other providers
 const AppWithAuth = () => {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -93,7 +95,7 @@ const AppWithAuth = () => {
                   path="/dashboard" 
                   element={
                     <AdminRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <Dashboard />
                       </SidebarNavigation>
                     </AdminRoute>
@@ -103,7 +105,7 @@ const AppWithAuth = () => {
                   path="/employee-dashboard" 
                   element={
                     <EmployeeRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <EmployeeDashboard />
                       </SidebarNavigation>
                     </EmployeeRoute>
@@ -113,7 +115,7 @@ const AppWithAuth = () => {
                   path="/check-in" 
                   element={
                     <PrivateRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <CheckInPage />
                       </SidebarNavigation>
                     </PrivateRoute>
@@ -123,7 +125,7 @@ const AppWithAuth = () => {
                   path="/report" 
                   element={
                     <PrivateRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <ReportPage />
                       </SidebarNavigation>
                     </PrivateRoute>
@@ -133,7 +135,7 @@ const AppWithAuth = () => {
                   path="/employees" 
                   element={
                     <AdminRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <AdminEmployeesPage />
                       </SidebarNavigation>
                     </AdminRoute>
@@ -143,7 +145,7 @@ const AppWithAuth = () => {
                   path="/reports" 
                   element={
                     <AdminRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <AdminReportsPage />
                       </SidebarNavigation>
                     </AdminRoute>
@@ -153,7 +155,7 @@ const AppWithAuth = () => {
                   path="/tasks" 
                   element={
                     <AdminRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <AdminTasksPage />
                       </SidebarNavigation>
                     </AdminRoute>
@@ -163,7 +165,7 @@ const AppWithAuth = () => {
                   path="/employee-tasks" 
                   element={
                     <EmployeeRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <EmployeeTasksPage />
                       </SidebarNavigation>
                     </EmployeeRoute>
@@ -173,7 +175,7 @@ const AppWithAuth = () => {
                   path="/settings" 
                   element={
                     <PrivateRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <SettingsPage />
                       </SidebarNavigation>
                     </PrivateRoute>
@@ -183,7 +185,7 @@ const AppWithAuth = () => {
                   path="/events" 
                   element={
                     <PrivateRoute>
-                      <SidebarNavigation>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <EventsPage />
                       </SidebarNavigation>
                     </PrivateRoute>

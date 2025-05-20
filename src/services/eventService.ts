@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { createNotification } from '@/lib/notifications';
 
 export interface Event {
   id: string;
@@ -8,6 +9,32 @@ export interface Event {
   end: string | null;
   created_by: string | null;
   created_at: string;
+}
+
+// Function to create notifications for all users
+async function createEventNotifications(event: Event) {
+  try {
+    // Get all users
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id');
+
+    if (usersError) throw usersError;
+
+    // Create notifications for all users
+    for (const user of users) {
+      await createNotification({
+        user_id: user.id,
+        title: 'New Event Created',
+        message: `A new event "${event.title}" has been added to the calendar`,
+        related_to: 'event',
+        related_id: event.id
+      });
+    }
+  } catch (error) {
+    console.error('Error creating event notifications:', error);
+    // Don't throw the error - we don't want to fail event creation if notifications fail
+  }
 }
 
 export const eventService = {
@@ -31,6 +58,10 @@ export const eventService = {
       .single();
 
     if (error) throw error;
+
+    // Create notifications for all users
+    await createEventNotifications(data as Event);
+
     return data as Event;
   },
 

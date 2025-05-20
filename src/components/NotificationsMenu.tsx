@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { playNotificationSound } from '@/lib/notifications';
 
 type Notification = {
   id: string;
@@ -91,12 +92,8 @@ const NotificationsMenu = () => {
           setNotifications(prev => [payload.new as Notification, ...prev]);
           // Trigger the bell animation
           setHasNewNotifications(true);
-          // Play notification sound if preferred
-          const audio = new Audio('/notification-sound.mp3');
-          audio.play().catch(error => {
-            // Handle error or silence it (browser might block autoplay)
-            console.log('Could not play notification sound');
-          });
+          // Play notification sound
+          playNotificationSound();
         }
       )
       .subscribe();
@@ -204,6 +201,10 @@ const NotificationsMenu = () => {
     } else if (notification.related_to === 'check_in' && notification.related_id) {
       // Navigate to check in
       navigate('/check-in');
+    } else if (notification.related_to === 'event' && notification.related_id) {
+      // Navigate to events page
+      navigate('/events', { state: { eventId: notification.related_id } });
+      toast.info(`Navigating to event: ${notification.related_id}`);
     }
   };
 

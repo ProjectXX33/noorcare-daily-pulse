@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Task, User } from '@/types';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
+import { createNotification } from '@/lib/notifications';
 
 // Fetch all tasks
 export const fetchTasks = async (): Promise<Task[]> => {
@@ -180,20 +181,17 @@ export const updateTask = async (
     if (updates.title) dbUpdates.title = updates.title;
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     
-    // Set status based on progress percentage
+    // Always set status based on progress percentage
     if (updates.progressPercentage !== undefined) {
       dbUpdates.progress_percentage = updates.progressPercentage;
       if (updates.progressPercentage === 0) {
         dbUpdates.status = 'Not Started';
       } else if (updates.progressPercentage === 100) {
         dbUpdates.status = 'Complete';
-      } else if (updates.status) {
-        dbUpdates.status = updates.status;
+      } else {
+        dbUpdates.status = 'In Progress';
       }
-    } else if (updates.status) {
-      dbUpdates.status = updates.status;
     }
-    
     if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
     
     // Get current task details for notification purposes
@@ -230,7 +228,7 @@ export const updateTask = async (
     }
     
     // Create status update notification
-    if (updates.status && currentTask && currentTask.status !== updates.status) {
+    if (updates.progressPercentage !== undefined && currentTask && currentTask.progress_percentage !== updates.progressPercentage) {
       // Notify task creator if status updated by assignee
       if (currentUserId === data.assigned_to.id && data.created_by.id !== currentUserId) {
         await createTaskNotification(
@@ -238,10 +236,9 @@ export const updateTask = async (
           taskId, 
           data.title, 
           'status_update', 
-          updates.status
+          dbUpdates.status
         );
       }
-      
       // Notify assignee if status updated by someone else
       if (currentUserId !== data.assigned_to.id) {
         await createTaskNotification(
@@ -249,8 +246,27 @@ export const updateTask = async (
           taskId, 
           data.title, 
           'status_update', 
-          updates.status
+          dbUpdates.status
         );
+      }
+    }
+
+    // Send notification to all admins about the update
+    const { data: admins, error: adminError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'admin');
+    if (adminError) {
+      console.error('Error fetching admins for notification:', adminError);
+    } else if (admins && admins.length > 0) {
+      for (const admin of admins) {
+        await createNotification({
+          user_id: admin.id,
+          title: 'Task Updated',
+          message: `Task "${data.title}" was updated. Status: ${dbUpdates.status || data.status}, Progress: ${dbUpdates.progress_percentage ?? data.progress_percentage}%`,
+          related_to: 'task',
+          related_id: taskId
+        });
       }
     }
     
@@ -433,37 +449,25 @@ export const sendNotification = async (params: {
       
       // Create notifications for all users
       if (users && users.length > 0) {
-        const notifications = users.map(user => ({
-          user_id: user.id,
-          title,
-          message,
-          related_to: 'admin',
-          related_id: adminId
-        }));
-        
-        const { error } = await supabase
-          .from('notifications')
-          .insert(notifications);
-        
-        if (error) {
-          throw error;
+        for (const user of users) {
+          await createNotification({
+            user_id: user.id,
+            title,
+            message,
+            related_to: 'admin',
+            related_id: adminId
+          });
         }
       }
     } else if (userId) {
       // Create notification for a specific user
-      const { error } = await supabase
-        .from('notifications')
-        .insert([{
-          user_id: userId,
-          title,
-          message,
-          related_to: 'admin',
-          related_id: adminId
-        }]);
-      
-      if (error) {
-        throw error;
-      }
+      await createNotification({
+        user_id: userId,
+        title,
+        message,
+        related_to: 'admin',
+        related_id: adminId
+      });
     }
   } catch (error) {
     console.error('Error sending notification:', error);

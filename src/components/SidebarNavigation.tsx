@@ -39,10 +39,12 @@ import {
 import { supabase } from '@/lib/supabase';
 
 interface SidebarNavigationProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
+export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigationProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { language, t } = useLanguage();
@@ -124,20 +126,16 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navItems = user?.role === 'admin' ? adminNavItems : employeeNavItems;
   
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
+    <SidebarProvider open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <Sidebar variant="inset" className="sticky top-0 h-screen" side={language === 'ar' ? 'right' : 'left'}>
-          <SidebarHeader className="flex h-14 items-center border-b px-4">
-            <div className="flex items-center gap-2">
-              <img
-                src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png"
-                alt="NoorCare Logo"
-                className="h-8 w-8"
-              />
-              <span className="text-lg font-bold text-primary">NoorCare</span>
-            </div>
+        <Sidebar
+          className={`sidebar-glass sticky top-0 h-screen transition-all duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+          side={language === 'ar' ? 'right' : 'left'}
+        >
+          <SidebarHeader className="flex h-16 items-center border-b px-6">
+            <img src="/NQ-ICON.png" alt="Logo" className="h-10 w-10 rounded-full shadow" />
           </SidebarHeader>
-          <SidebarContent>
+          <SidebarContent className="flex-1 overflow-y-auto py-4">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.name}>
@@ -145,9 +143,11 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                     onClick={() => navigate(item.path)}
                     tooltip={item.name}
                     isActive={window.location.pathname === item.path}
-                    className={`w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                    className={`w-full px-3 py-2 rounded-lg transition-colors ${
+                      window.location.pathname === item.path ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-accent'
+                    } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-5 w-5 mr-3" />
                     <span className="w-full">{item.name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -185,7 +185,7 @@ export const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               </SidebarTrigger>
             </div>
             <div className={`flex items-center gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
-              <NotificationsMenu notifications={notifications} />
+              <NotificationsMenu />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 w-auto flex items-center gap-2 rounded-full p-0">
