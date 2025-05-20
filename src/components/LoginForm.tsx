@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,7 +68,7 @@ const LoginForm = () => {
         <CardHeader className="space-y-1 text-center pb-2">
           <div className="flex justify-center items-center mb-2">
             <img
-              src="/lovable-uploads/da15fff1-1f54-460e-ab4d-bec7311e7ed0.png"
+              src="/NQ-ICON.png"
               alt="NoorCare Logo"
               className="h-12 w-12"
             />
