@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckIn, WorkReport } from '@/types';
 import { format } from 'date-fns';
+import { supabase } from '@/lib/supabase';
 
 interface DashboardStatsProps {
   title: string;
@@ -17,6 +18,29 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
   workReports,
   isAdmin = false 
 }) => {
+  const [employeeCount, setEmployeeCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchEmployeeCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true });
+          
+        if (error) {
+          console.error('Error fetching employee count:', error);
+          return;
+        }
+        
+        setEmployeeCount(count || 0);
+      } catch (error) {
+        console.error('Error fetching employee count:', error);
+      }
+    };
+
+    fetchEmployeeCount();
+  }, []);
+  
   // Get today's check-ins
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -64,12 +88,12 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       </Card>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{workReports.length || '0'}</div>
+          <div className="text-2xl font-bold">{isAdmin ? employeeCount : '1'}</div>
           <p className="text-xs text-muted-foreground">
-            {isAdmin ? 'All reports in the system' : 'Your total submitted reports'}
+            {isAdmin ? 'Active employees in the system' : 'Your account'}
           </p>
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckIn, WorkReport } from '@/types';
+import DashboardStats from '@/components/DashboardStats';
 import { 
   UsersIcon, 
   ClipboardCheckIcon, 
@@ -78,23 +79,6 @@ const Dashboard = () => {
 
   const checkedInToday = hasCheckedInToday(user.id);
 
-  // Calculate today's check-ins
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const todayCheckIns = checkIns.filter((checkIn: any) => {
-    const checkInDate = new Date(checkIn.timestamp);
-    checkInDate.setHours(0, 0, 0, 0);
-    return checkInDate.getTime() === today.getTime();
-  });
-
-  // Get today's reports
-  const todayReports = workReports.filter((report: any) => {
-    const reportDate = new Date(report.date);
-    reportDate.setHours(0, 0, 0, 0);
-    return reportDate.getTime() === today.getTime();
-  });
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -122,39 +106,13 @@ const Dashboard = () => {
         </p>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <DashboardCard 
-          title="Today's Check-ins" 
-          value={todayCheckIns.length.toString()}
-          description={user.role === 'admin' ? "Total employee check-ins today" : checkedInToday ? "You've checked in today" : "You haven't checked in yet"}
-          icon={<Clock className="h-4 w-4" />}
-          variant={user.role === 'admin' ? "default" : checkedInToday ? "success" : "warning"}
-        />
-        
-        <DashboardCard 
-          title="Today's Reports" 
-          value={todayReports.length.toString()}
-          description="Reports submitted today"
-          icon={<ClipboardCheckIcon className="h-4 w-4" />}
-          variant="default"
-        />
-        
-        <DashboardCard 
-          title="Total Employees" 
-          value={(user.role === 'admin' ? "25" : "1")}
-          description={user.role === 'admin' ? "Active employees in the system" : "Your account"}
-          icon={<UsersIcon className="h-4 w-4" />}
-          variant="info"
-        />
-        
-        <DashboardCard 
-          title="Total Reports" 
-          value={workReports.length.toString()}
-          description="All submitted reports"
-          icon={<CalendarDays className="h-4 w-4" />}
-          variant="default"
-        />
-      </div>
+      {/* Replace the grid of DashboardCard with DashboardStats component */}
+      <DashboardStats 
+        title={t.dashboard} 
+        checkIns={checkIns as unknown as CheckIn[]}
+        workReports={workReports as unknown as WorkReport[]}
+        isAdmin={user.role === 'admin'}
+      />
 
       {!checkedInToday && user.role !== 'admin' && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">

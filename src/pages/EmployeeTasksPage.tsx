@@ -10,6 +10,9 @@ import TaskAttachmentsList from '@/components/TaskAttachmentsList';
 import TaskComments from '@/components/TaskComments';
 import TaskFileUpload from '@/components/TaskFileUpload';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 // Mock tasks data
 const mockTasks = [
@@ -72,6 +75,8 @@ const EmployeeTasksPage = () => {
     '2': [],
     '3': []
   });
+  const [progressType, setProgressType] = useState<'preset' | 'custom'>('preset');
+  const [customProgress, setCustomProgress] = useState<number>(0);
   
   // Status badge color variants
   const getStatusColor = (status: string) => {
@@ -102,12 +107,27 @@ const EmployeeTasksPage = () => {
   
   const handleOpenTask = (task: any) => {
     setSelectedTask(task);
+    setProgressType('preset');
+    setCustomProgress(task.progress_percentage);
     setIsDialogOpen(true);
   };
   
   const handleUpdateProgress = (taskId: string, newProgress: number) => {
     // Implement this function to update task progress
     setUpdateStatus("Progress updated successfully");
+    
+    // Update the progress in the mock tasks
+    const updatedTasks = mockTasks.map(task => {
+      if (task.id === taskId) {
+        return { ...task, progress_percentage: newProgress };
+      }
+      return task;
+    });
+    
+    // Update the selected task with the new progress
+    if (selectedTask) {
+      setSelectedTask({ ...selectedTask, progress_percentage: newProgress });
+    }
   };
 
   const handleCommentAdded = (taskId: string, newComments: any[]) => {
@@ -119,6 +139,17 @@ const EmployeeTasksPage = () => {
 
   const handleFileUploaded = () => {
     setRefreshAttachments(prev => prev + 1);
+  };
+
+  const handleCustomProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    setCustomProgress(isNaN(value) ? 0 : Math.max(0, Math.min(100, value)));
+  };
+  
+  const handleApplyCustomProgress = () => {
+    if (selectedTask) {
+      handleUpdateProgress(selectedTask.id, customProgress);
+    }
   };
   
   return (
@@ -211,18 +242,55 @@ const EmployeeTasksPage = () => {
                   <span className="text-sm font-medium">{selectedTask.progress_percentage}%</span>
                 </div>
                 
-                <div className="flex gap-2 mt-3">
-                  {[0, 25, 50, 75, 100].map((progress) => (
-                    <Button 
-                      key={progress}
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleUpdateProgress(selectedTask.id, progress)}
-                      className={selectedTask.progress_percentage === progress ? 'border-primary text-primary' : ''}
-                    >
-                      {progress}%
-                    </Button>
-                  ))}
+                <div className="mt-4 space-y-4">
+                  <RadioGroup 
+                    value={progressType} 
+                    onValueChange={(value) => setProgressType(value as 'preset' | 'custom')}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="preset" id="preset" />
+                      <Label htmlFor="preset">Use preset values</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="custom" id="custom" />
+                      <Label htmlFor="custom">Set custom value</Label>
+                    </div>
+                  </RadioGroup>
+                  
+                  {progressType === 'preset' ? (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {[0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 75, 80, 85, 90, 95, 100].map((progress) => (
+                        <Button 
+                          key={progress}
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleUpdateProgress(selectedTask.id, progress)}
+                          className={selectedTask.progress_percentage === progress ? 'border-primary text-primary' : ''}
+                        >
+                          {progress}%
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        value={customProgress}
+                        onChange={handleCustomProgressChange}
+                        className="w-24" 
+                      />
+                      <span>%</span>
+                      <Button 
+                        onClick={handleApplyCustomProgress} 
+                        size="sm"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 
                 {updateStatus && (
