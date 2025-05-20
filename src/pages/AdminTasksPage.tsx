@@ -420,24 +420,14 @@ const AdminTasksPage = () => {
 
   return (
     <MainLayout>
-      <div className="flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 sticky top-0 z-10 bg-background pt-2 pb-4 gap-2 md:gap-0">
-          <h1 className="text-2xl font-bold">{t.tasks}</h1>
-          <div className="flex flex-col gap-2 md:flex-row md:gap-2 w-full md:w-auto">
-            <Button 
-              variant="outline"
-              onClick={() => setIsNotificationDialogOpen(true)}
-              className="w-full md:w-auto"
-            >
-              {t.sendNotification}
-            </Button>
-            <Button 
-              className="bg-primary hover:bg-primary/90 w-full md:w-auto"
-              onClick={() => setIsTaskDialogOpen(true)}
-            >
-              {t.addTask}
-            </Button>
-          </div>
+      <div className="p-6">
+        <div className="flex justify-end gap-2 mb-6">
+          <Button onClick={() => setIsTaskDialogOpen(true)}>
+            {t.addTask}
+          </Button>
+          <Button variant="outline" onClick={() => setIsNotificationDialogOpen(true)}>
+            {t.sendNotification}
+          </Button>
         </div>
         
         <Tabs defaultValue="tasks" className="mb-6">

@@ -378,42 +378,42 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       let fileAttachments: string[] = [];
       
-      // Handle file attachment if provided
+        // Handle file attachment if provided
       if (fileAttachment && newReport) {
-        const fileName = fileAttachment.name;
+          const fileName = fileAttachment.name;
         const filePath = `${userId}/${newReport.id}/${fileName}`;
-        
-        // Upload file to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('attachments')
+          
+          // Upload file to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('attachments')
           .upload(filePath, fileAttachment, {
             cacheControl: '3600',
             upsert: false
           });
-          
-        if (uploadError) {
-          console.error('Error uploading file:', uploadError);
-          toast.error('Failed to upload attachment');
-        } else {
-          // Record file attachment in the database
-          const { error: attachmentError } = await supabase
-            .from('file_attachments')
-            .insert([{
-              work_report_id: newReport.id,
-              file_name: fileName,
-              file_path: filePath,
-              file_type: fileAttachment.type
-            }]);
             
-          if (attachmentError) {
-            console.error('Error recording file attachment:', attachmentError);
-            toast.error('Failed to record attachment');
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError);
+          toast.error('Failed to upload attachment');
           } else {
-            fileAttachments.push(fileName);
+            // Record file attachment in the database
+            const { error: attachmentError } = await supabase
+              .from('file_attachments')
+              .insert([{
+              work_report_id: newReport.id,
+                file_name: fileName,
+                file_path: filePath,
+                file_type: fileAttachment.type
+              }]);
+              
+            if (attachmentError) {
+              console.error('Error recording file attachment:', attachmentError);
+            toast.error('Failed to record attachment');
+            } else {
+              fileAttachments.push(fileName);
+            }
           }
         }
-      }
-      
+        
       // Add the new report to the local state
       if (newReport) {
         const workReport: WorkReport = {
