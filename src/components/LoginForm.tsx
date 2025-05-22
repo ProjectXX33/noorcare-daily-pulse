@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import LanguageSelector from './LanguageSelector';
+// import LanguageSelector from './LanguageSelector';
 import { Mail, Lock } from 'lucide-react';
 
 const LoginForm = () => {
@@ -60,9 +60,9 @@ const LoginForm = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-primary-50 to-white dark:from-gray-900 dark:to-gray-800" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="absolute top-4 right-4 md:top-8 md:right-8">
+      {/* <div className="absolute top-4 right-4 md:top-8 md:right-8">
         <LanguageSelector />
-      </div>
+      </div> */}
       
       <Card className="w-full max-w-md mx-auto shadow-card animate-fade-in glass-effect">
         <CardHeader className="space-y-1 text-center pb-2">

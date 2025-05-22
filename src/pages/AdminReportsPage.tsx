@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,9 +196,12 @@ const AdminReportsPage = () => {
   };
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold mb-6">All Reports</h1>
+    <div className="space-y-6">
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">All Reports</h1>
+          <p className="text-muted-foreground">View and manage employee work reports</p>
+        </div>
         
         <Card className="mb-6">
           <CardHeader className="pb-3">
@@ -374,7 +376,7 @@ const AdminReportsPage = () => {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 

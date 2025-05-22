@@ -107,35 +107,33 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     navigate('/login');
   };
   
-  const adminNavItems = [
-    { name: t('dashboard'), icon: Home, path: '/dashboard' },
-    { name: t('employees'), icon: Users, path: '/employees' },
-    { name: t('reports'), icon: ClipboardList, path: '/reports' },
-    { name: t('tasks'), icon: CheckSquare, path: '/tasks' },
-    { name: t('events'), icon: Calendar, path: '/events' },
-  ];
+  const navItems = [
+    { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home },
+    { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true },
+    { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true },
+    { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
+    { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true },
+    { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true },
+    { name: t('events') as string, path: '/events', icon: Calendar },
+  ].filter(item => {
+    if (item.adminOnly && user?.role !== 'admin') return false;
+    if (item.employeeOnly && user?.role === 'admin') return false;
+    return true;
+  });
 
-  const employeeNavItems = [
-    { name: t('dashboard'), icon: Home, path: '/employee-dashboard' },
-    { name: t('checkIn'), icon: CheckSquare, path: '/check-in' },
-    { name: t('dailyReport'), icon: ClipboardList, path: '/report' },
-    { name: t('tasks'), icon: CheckSquare, path: '/employee-tasks' },
-    { name: t('events'), icon: Calendar, path: '/events' },
-  ];
-
-  const navItems = user?.role === 'admin' ? adminNavItems : employeeNavItems;
-  
   return (
     <SidebarProvider open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
-          className={`sidebar-glass sticky top-0 h-screen transition-all duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+          className={`sidebar-glass sticky top-0 h-screen transition-all duration-300 ${
+            isOpen ? 'translate-x-0' : '-translate-x-full'
+          } md:translate-x-0`}
           side={language === 'ar' ? 'right' : 'left'}
         >
-          <SidebarHeader className="flex h-16 items-center border-b px-6">
-            <img src="/NQ-ICON.png" alt="Logo" className="h-10 w-10 rounded-full shadow" />
+          <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
+            <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
           </SidebarHeader>
-          <SidebarContent className="flex-1 overflow-y-auto py-4">
+          <SidebarContent className="flex-1 overflow-y-auto py-2 md:py-4">
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.name}>
@@ -143,12 +141,12 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
                     onClick={() => navigate(item.path)}
                     tooltip={item.name}
                     isActive={window.location.pathname === item.path}
-                    className={`w-full px-3 py-2 rounded-lg transition-colors ${
+                    className={`w-full px-2 md:px-3 py-2 rounded-lg transition-colors ${
                       window.location.pathname === item.path ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-accent'
                     } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                   >
-                    <item.icon className="h-5 w-5 mr-3" />
-                    <span className="w-full">{item.name}</span>
+                    <item.icon className="h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3" />
+                    <span className="w-full text-sm md:text-base">{item.name}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -180,17 +178,17 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         <div className="flex flex-col flex-1">
           <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background px-4 md:px-6">
             <div className={`flex items-center ${language === 'ar' ? 'order-2' : 'order-1'}`}>
-              <SidebarTrigger>
+              <SidebarTrigger className="md:hidden">
                 <Menu className="h-5 w-5" />
               </SidebarTrigger>
             </div>
-            <div className={`flex items-center gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
+            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
               <NotificationsMenu />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-9 w-auto flex items-center gap-2 rounded-full p-0">
+                  <Button variant="ghost" className="h-8 md:h-9 w-auto flex items-center gap-2 rounded-full p-0">
                     <span className="hidden md:inline-block text-sm">{user?.name}</span>
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-7 w-7 md:h-8 md:w-8">
                       <AvatarImage src="" alt={user?.name} />
                       <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
                     </Avatar>

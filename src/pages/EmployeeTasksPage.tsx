@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { fetchUserTasks, updateTaskProgress } from '@/lib/tasksApi';
+import { fetchUserTasks, updateTaskProgress, sendNotification } from '@/lib/tasksApi';
 import { toast } from 'sonner';
 
 // Mock comments data for fallback

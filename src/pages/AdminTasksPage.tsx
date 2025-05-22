@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import MainLayout from '@/components/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
@@ -235,7 +234,13 @@ const AdminTasksPage = () => {
       
       setTasks([createdTask, ...tasks]);
       setIsTaskDialogOpen(false);
-      toast.success(t.taskAdded);
+      // Only send 'New Task Assigned' notification to the assigned employee
+      await sendNotification({
+        userId: createdTask.assignedTo,
+        title: 'New Task Assigned',
+        message: `You have been assigned a new task: ${createdTask.title}`,
+        adminId: user.id
+      });
       
       // Reset form
       setNewTask({
@@ -288,8 +293,13 @@ const AdminTasksPage = () => {
       ));
       
       setIsEditTaskDialogOpen(false);
-      toast.success(t.taskUpdated);
-      
+      // Only send 'Task Updated' notification to the assigned employee
+      await sendNotification({
+        userId: updatedTask.assignedTo,
+        title: 'Task Updated',
+        message: `Task "${updatedTask.title}" was updated by admin.`,
+        adminId: user.id
+      });
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error("Failed to update task");
@@ -419,9 +429,13 @@ const AdminTasksPage = () => {
   }
 
   return (
-    <MainLayout>
-      <div className="p-6">
-        <div className="flex justify-end gap-2 mb-6">
+    <div className="space-y-6">
+      <div className="p-4 md:p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">{t.tasks}</h1>
+          <p className="text-muted-foreground">{t.manageTasksAndNotifications}</p>
+        </div>
+        <div className="flex flex-col sm:flex-row justify-end gap-2 mb-6">
           <Button onClick={() => setIsTaskDialogOpen(true)}>
             {t.addTask}
           </Button>
@@ -431,9 +445,9 @@ const AdminTasksPage = () => {
         </div>
         
         <Tabs defaultValue="tasks" className="mb-6">
-          <TabsList>
-            <TabsTrigger value="tasks">{t.tasks}</TabsTrigger>
-            <TabsTrigger value="notifications">{t.employeeNotifications}</TabsTrigger>
+          <TabsList className="w-full">
+            <TabsTrigger value="tasks" className="flex-1">{t.tasks}</TabsTrigger>
+            <TabsTrigger value="notifications" className="flex-1">{t.employeeNotifications}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="tasks">
@@ -516,16 +530,23 @@ const AdminTasksPage = () => {
                   ) : (
                     tasks.map(task => (
                       <Card key={task.id} className="p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="font-bold text-base">{task.title}</div>
-                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>{task.status === 'Not Started' ? t.notStarted : task.status === 'On Hold' ? t.onHold : task.status === 'In Progress' ? t.inProgress : t.complete}</span>
-                        </div>
-                        <div className="text-sm text-muted-foreground mb-2">{task.description}</div>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <span className="text-xs">{t.assignedTo}: <span className="font-medium">{task.assignedToName}</span></span>
-                          <span className="text-xs">{t.progress}: <span className="font-medium">{task.progressPercentage}%</span></span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex justify-between items-start">
+                            <div className="font-bold text-base">{task.title}</div>
+                            <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
+                              {task.status === 'Not Started' ? t.notStarted : 
+                               task.status === 'On Hold' ? t.onHold : 
+                               task.status === 'In Progress' ? t.inProgress : t.complete}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">{task.description}</div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs">{t.assignedTo}: <span className="font-medium">{task.assignedToName}</span></span>
+                            <div className="flex items-center gap-2">
+                              <Progress value={task.progressPercentage} className="h-2 flex-1" />
+                              <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
+                            </div>
+                          </div>
                           <Button
                             variant="outline"
                             size="sm"
@@ -551,7 +572,7 @@ const AdminTasksPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {employees.map(employee => (
                       <Card key={employee.id} className="overflow-hidden">
                         <CardHeader className="p-4">
@@ -913,7 +934,7 @@ const AdminTasksPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </MainLayout>
+    </div>
   );
 };
 

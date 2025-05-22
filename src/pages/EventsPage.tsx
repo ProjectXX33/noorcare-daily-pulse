@@ -296,7 +296,7 @@ const EventsPage = () => {
                       <Card key={event.id} className="p-4 border-l-4 border-primary bg-card/80 dark:bg-zinc-900/80 dark:border-primary/70 shadow-md transition-colors hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl">
                         <div className="space-y-2">
                           <div className="flex justify-between items-start">
-                            <h3 className="font-semibold">{event.title}</h3>
+                            <h3 className="font-semibold text-black">{event.title}</h3>
                             {user?.role === 'admin' && (
                               <Button
                                 variant="ghost"
@@ -321,7 +321,7 @@ const EventsPage = () => {
                             {event.end && ` - ${formatDate(event.end)}`}
                           </p>
                           {event.description && (
-                            <p className="text-sm">{event.description}</p>
+                            <p className="text-sm text-black">{event.description}</p>
                           )}
                         </div>
                       </Card>
@@ -414,6 +414,12 @@ const EventsPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <style>{`
+        .fc-event, .fc-event-title, .fc-event-main {
+          color: #000 !important;
+        }
+      `}</style>
     </div>
   );
 };

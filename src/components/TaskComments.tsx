@@ -135,7 +135,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                     {format(new Date(comment.createdAt), "MMM d, yyyy h:mm a")}
                   </span>
                 </div>
-                <p className="text-sm whitespace-pre-line">{comment.text}</p>
+                <p className="text-sm whitespace-pre-line break-words p-2 sm:p-0" style={{ wordBreak: 'break-word' }}>{comment.text}</p>
               </div>
             ))
           ) : (

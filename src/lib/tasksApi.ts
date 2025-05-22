@@ -229,18 +229,8 @@ export const updateTask = async (
     
     // Create status update notification
     if (updates.progressPercentage !== undefined && currentTask && currentTask.progress_percentage !== updates.progressPercentage) {
-      // Notify task creator if status updated by assignee
-      if (currentUserId === data.assigned_to.id && data.created_by.id !== currentUserId) {
-        await createTaskNotification(
-          data.created_by.id, 
-          taskId, 
-          data.title, 
-          'status_update', 
-          dbUpdates.status
-        );
-      }
-      // Notify assignee if status updated by someone else
-      if (currentUserId !== data.assigned_to.id) {
+      // Notify assignee if status updated by someone else (not admin)
+      if (currentUserId !== data.assigned_to.id && data.assigned_to.id !== data.created_by.id) {
         await createTaskNotification(
           data.assigned_to.id, 
           taskId, 
@@ -249,6 +239,7 @@ export const updateTask = async (
           dbUpdates.status
         );
       }
+      // Do NOT send status update notification to admins (only send generic 'Task Updated' below)
     }
 
     // Send notification to all admins about the update
@@ -260,13 +251,15 @@ export const updateTask = async (
       console.error('Error fetching admins for notification:', adminError);
     } else if (admins && admins.length > 0) {
       for (const admin of admins) {
-        await createNotification({
-          user_id: admin.id,
-          title: 'Task Updated',
-          message: `Task "${data.title}" was updated. Status: ${dbUpdates.status || data.status}, Progress: ${dbUpdates.progress_percentage ?? data.progress_percentage}%`,
-          related_to: 'task',
-          related_id: taskId
-        });
+        if (admin.id !== currentUserId) { // Exclude the admin who made the update
+          await createNotification({
+            user_id: admin.id,
+            title: 'Task Updated',
+            message: `Task "${data.title}" was updated. Status: ${dbUpdates.status || data.status}, Progress: ${dbUpdates.progress_percentage ?? data.progress_percentage}%`,
+            related_to: 'task',
+            related_id: taskId
+          });
+        }
       }
     }
     
@@ -339,7 +332,7 @@ export const addTaskComment = async (
     // Get current comments
     const { data: taskData, error: fetchError } = await supabase
       .from('tasks')
-      .select('comments')
+      .select('*')
       .eq('id', taskId)
       .single();
     
@@ -371,6 +364,31 @@ export const addTaskComment = async (
     if (updateError) {
       console.error('Error updating task comments:', updateError);
       throw updateError;
+    }
+
+    // Send notification to the other party
+    // If commenter is admin, notify assigned employee
+    // If commenter is employee, notify task creator (admin)
+    if (taskData.assigned_to && taskData.created_by) {
+      if (userId === taskData.created_by) {
+        // Admin commented, notify employee
+        await createNotification({
+          user_id: taskData.assigned_to,
+          title: 'New Comment on Task',
+          message: `Admin commented on your task: ${comment} on "${taskData.title}"`,
+          related_to: 'task',
+          related_id: taskId
+        });
+      } else if (userId === taskData.assigned_to) {
+        // Employee commented, notify admin
+        await createNotification({
+          user_id: taskData.created_by,
+          title: 'New Comment on Task',
+          message: `Employee commented on your task: ${comment} on "${taskData.title}"`,
+          related_to: 'task',
+          related_id: taskId
+        });
+      }
     }
     
     return true;

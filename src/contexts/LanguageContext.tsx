@@ -2,6 +2,51 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Language = 'en' | 'ar';
 
+interface TranslationType {
+  // Navigation
+  dashboard: string;
+  employees: string;
+  reports: string;
+  tasks: string;
+  checkIn: string;
+  dailyReport: string;
+  settings: string;
+  signOut: string;
+  events: string;
+  
+  // Notifications
+  notificationsTitle: string;
+  noNotifications: string;
+  markAllAsRead: string;
+  loading: string;
+  viewAll: string;
+  mentioned: string;
+  task: string;
+  moment: string;
+  minutes: string;
+  hours: string;
+  days: string;
+
+  // Settings
+  general: string;
+  generalSettingsDescription: string;
+  language: string;
+  theme: string;
+  darkMode: string;
+  lightMode: string;
+  notificationsSettings: string;
+  notificationsSettingsDescription: string;
+  notificationsDescription: string;
+  emailNotifications: string;
+  emailNotificationsDescription: string;
+  saveChanges: string;
+  changesSaved: string;
+  errorSaving: string;
+  account: string;
+  preferences: string;
+  security: string;
+}
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -116,7 +161,18 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const t = (key: string): string => {
-    return translations[language][key as keyof typeof translations[typeof language]] || key;
+    const keys = key.split('.');
+    let value: any = translations[language];
+    
+    for (const k of keys) {
+      if (value && typeof value === 'object') {
+        value = value[k];
+      } else {
+        return key;
+      }
+    }
+    
+    return typeof value === 'string' ? value : key;
   };
 
   // Initialize body direction and classes
