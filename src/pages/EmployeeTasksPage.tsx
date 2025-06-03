@@ -4,14 +4,36 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckSquare, Loader2 } from 'lucide-react';
+import { CheckSquare, Loader2, Star } from 'lucide-react';
 import TaskComments from '@/components/TaskComments';
+import StarRating from '@/components/StarRating';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { fetchUserTasks, updateTaskProgress, sendNotification } from '@/lib/tasksApi';
+import { getTaskAverageRating, getLatestTaskRating } from '@/lib/ratingsApi';
 import { toast } from 'sonner';
+
+// Enhanced Task interface with creator and rating information
+interface EnhancedTask {
+  id: string;
+  title: string;
+  description: string;
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  assignedTo: string;
+  assignedToName?: string;
+  assignedToPosition?: string;
+  createdBy: string;
+  createdByName?: string;
+  createdByPosition?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  progressPercentage: number;
+  comments?: any[];
+  averageRating?: number;
+  latestRating?: any;
+}
 
 // Mock comments data for fallback
 const mockComments = [{
@@ -25,14 +47,14 @@ const mockComments = [{
 const EmployeeTasksPage = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [selectedTask, setSelectedTask] = useState<EnhancedTask | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
   const [language, setLanguage] = useState(() => localStorage.getItem('preferredLanguage') || 'en');
   const [taskComments, setTaskComments] = useState<Record<string, any[]>>({});
   const [progressType, setProgressType] = useState<'preset' | 'custom'>('preset');
   const [customProgress, setCustomProgress] = useState<number>(0);
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<EnhancedTask[]>([]);
 
   // Fetch tasks when component mounts or user changes
   useEffect(() => {
@@ -47,11 +69,33 @@ const EmployeeTasksPage = () => {
     setIsLoading(true);
     try {
       const userTasks = await fetchUserTasks(user.id);
-      setTasks(userTasks);
+      
+      // Load rating data for each task
+      const tasksWithRatings = await Promise.all(
+        userTasks.map(async (task: any) => {
+          try {
+            const [averageRating, latestRating] = await Promise.all([
+              getTaskAverageRating(task.id),
+              getLatestTaskRating(task.id)
+            ]);
+            
+            return {
+              ...task,
+              averageRating: averageRating > 0 ? averageRating : undefined,
+              latestRating: latestRating || undefined
+            };
+          } catch (error) {
+            console.error(`Error loading ratings for task ${task.id}:`, error);
+            return task;
+          }
+        })
+      );
+      
+      setTasks(tasksWithRatings);
       
       // Initialize comments for each task
       const initialComments: Record<string, any[]> = {};
-      userTasks.forEach(task => {
+      tasksWithRatings.forEach(task => {
         initialComments[task.id] = task.comments || [];
       });
       setTaskComments(initialComments);
@@ -61,6 +105,11 @@ const EmployeeTasksPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to identify Media Buyer to Designer assignments
+  const isMediaBuyerToDesignerTask = (task: EnhancedTask) => {
+    return task.createdByPosition === 'Media Buyer' && task.assignedToPosition === 'Designer';
   };
 
   // Status badge color variants
@@ -88,7 +137,7 @@ const EmployeeTasksPage = () => {
       </div>;
   }
   
-  const handleOpenTask = (task: any) => {
+  const handleOpenTask = (task: EnhancedTask) => {
     setSelectedTask(task);
     setProgressType('preset');
     setCustomProgress(task.progressPercentage);
@@ -109,7 +158,7 @@ const EmployeeTasksPage = () => {
             status: newProgress === 0 ? 'Not Started' : 
                    newProgress === 100 ? 'Complete' : 
                    'In Progress'
-          };
+          } as EnhancedTask;
         }
         return task;
       });
@@ -171,14 +220,34 @@ const EmployeeTasksPage = () => {
       </div>
       
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        {tasks.length > 0 ? tasks.map(task => <Card key={task.id} className="border shadow-sm hover:shadow-md transition-shadow">
+        {tasks.length > 0 ? tasks.map(task => 
+          <Card 
+            key={task.id} 
+            className={`border shadow-sm hover:shadow-md transition-shadow ${
+              isMediaBuyerToDesignerTask(task) 
+                ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                : ""
+            }`}
+          >
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-lg">{task.title}</CardTitle>
+                  <div className="flex items-center gap-2 mb-1">
+                    <CardTitle className="text-lg">{task.title}</CardTitle>
+                    {isMediaBuyerToDesignerTask(task) && (
+                      <Badge className="bg-purple-100 text-purple-800 text-xs">
+                        📊 Media Buyer → Designer
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                     {task.description}
                   </p>
+                  {isMediaBuyerToDesignerTask(task) && (
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                      Assigned by: {task.createdByName}
+                    </p>
+                  )}
                 </div>
                 <Badge className={`${getStatusColor(task.status)} ml-4`}>
                   {task.status}
@@ -194,6 +263,17 @@ const EmployeeTasksPage = () => {
                   </div>
                   <Progress value={task.progressPercentage} className="h-2" />
                 </div>
+
+                {/* Task Rating Display */}
+                {(task.averageRating && task.averageRating > 0) && (
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    <StarRating rating={task.averageRating} readonly size="sm" />
+                    <span className="text-xs text-gray-600">
+                      Rating: {task.averageRating.toFixed(1)}/5
+                    </span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between items-center pt-2">
                   <div className="text-xs text-muted-foreground">
@@ -205,7 +285,9 @@ const EmployeeTasksPage = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>) : <Card>
+          </Card>
+        ) : (
+          <Card>
             <CardContent className="p-8 text-center">
               <CheckSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/60" />
               <p className="text-lg font-medium mb-2">No tasks assigned yet</p>
@@ -213,14 +295,23 @@ const EmployeeTasksPage = () => {
                 When you are assigned tasks, they will appear here.
               </p>
             </CardContent>
-          </Card>}
+          </Card>
+        )}
       </div>
       
       {/* Task details dialog - Fixed size and responsive */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {selectedTask && <DialogContent className="w-[90vw] max-w-[500px] md:max-w-[600px] h-auto max-h-[85vh] overflow-y-auto">
+        {selectedTask && (
+          <DialogContent className="w-[90vw] max-w-[500px] md:max-w-[600px] h-auto max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl">{selectedTask.title}</DialogTitle>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                {selectedTask.title}
+                {isMediaBuyerToDesignerTask(selectedTask) && (
+                  <Badge className="bg-purple-100 text-purple-800 text-xs">
+                    📊 Media Buyer → Designer
+                  </Badge>
+                )}
+              </DialogTitle>
               <DialogDescription className="flex items-center gap-2">
                 <Badge className={getStatusColor(selectedTask.status)}>
                   {selectedTask.status}
@@ -229,6 +320,11 @@ const EmployeeTasksPage = () => {
                   Created: {new Date(selectedTask.createdAt).toLocaleDateString()}
                 </span>
               </DialogDescription>
+              {isMediaBuyerToDesignerTask(selectedTask) && (
+                <p className="text-xs text-purple-600 dark:text-purple-400">
+                  This task was assigned to you by {selectedTask.createdByName} (Media Buyer)
+                </p>
+              )}
             </DialogHeader>
             
             <div className="space-y-6">
@@ -238,6 +334,32 @@ const EmployeeTasksPage = () => {
                   {selectedTask.description}
                 </p>
               </div>
+
+              {/* Task Rating Section */}
+              {(selectedTask.averageRating && selectedTask.averageRating > 0) && (
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    Task Rating
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <StarRating rating={selectedTask.averageRating} readonly />
+                      <span className="font-semibold">
+                        {selectedTask.averageRating.toFixed(1)}/5
+                      </span>
+                    </div>
+                    {selectedTask.latestRating && selectedTask.latestRating.comment && (
+                      <div className="mt-2 p-2 bg-white dark:bg-gray-700 rounded text-sm">
+                        <strong>Latest feedback:</strong> "{selectedTask.latestRating.comment}"
+                        <div className="text-xs text-gray-500 mt-1">
+                          - {selectedTask.latestRating.ratedByName} on {selectedTask.latestRating.ratedAt?.toLocaleDateString()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               <div>
                 <h3 className="font-medium mb-2">Progress</h3>
@@ -258,20 +380,45 @@ const EmployeeTasksPage = () => {
                     </div>
                   </RadioGroup>
                   
-                  {progressType === 'preset' ? <div className="flex flex-wrap gap-2 mt-3">
-                      {progressPresets.map(progress => <Button key={progress} variant="outline" size="sm" onClick={() => handleUpdateProgress(selectedTask.id, progress)} className={selectedTask.progressPercentage === progress ? 'border-primary text-primary dark:border-primary dark:text-primary' : ''} disabled={isLoading}>
+                  {progressType === 'preset' ? (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {progressPresets.map(progress => (
+                        <Button 
+                          key={progress} 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleUpdateProgress(selectedTask.id, progress)} 
+                          className={selectedTask.progressPercentage === progress ? 'border-primary text-primary dark:border-primary dark:text-primary' : ''} 
+                          disabled={isLoading}
+                        >
                           {progress}%
-                        </Button>)}
-                    </div> : <div className="flex items-center gap-2">
-                      <Input type="number" min="0" max="100" value={customProgress} onChange={handleCustomProgressChange} className="w-24" disabled={isLoading} />
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        value={customProgress} 
+                        onChange={handleCustomProgressChange} 
+                        className="w-24" 
+                        disabled={isLoading} 
+                      />
                       <span>%</span>
                       <Button onClick={handleApplyCustomProgress} size="sm" disabled={isLoading}>
-                        {isLoading ? <span className="flex items-center">
+                        {isLoading ? (
+                          <span className="flex items-center">
                             <span className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
                             Updating...
-                          </span> : 'Apply'}
+                          </span>
+                        ) : (
+                          'Apply'
+                        )}
                       </Button>
-                    </div>}
+                    </div>
+                  )}
                 </div>
                 
                 {updateStatus && <p className="text-xs text-green-600 dark:text-green-400 mt-2">{updateStatus}</p>}
@@ -287,7 +434,8 @@ const EmployeeTasksPage = () => {
                 />
               </div>
             </div>
-          </DialogContent>}
+          </DialogContent>
+        )}
       </Dialog>
     </div>;
 };

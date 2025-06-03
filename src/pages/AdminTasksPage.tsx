@@ -41,11 +41,15 @@ import {
   sendNotification, 
   updateTask 
 } from '@/lib/tasksApi';
+import { getTaskAverageRating, getLatestTaskRating } from '@/lib/ratingsApi';
 import { fetchEmployees } from '@/lib/employeesApi';
 import { User, Task } from '@/types';
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskComments from '@/components/TaskComments';
+import RateTaskModal from '@/components/RateTaskModal';
+import StarRating from '@/components/StarRating';
 import { supabase } from '@/lib/supabase';
+import { Star, MoreVertical } from 'lucide-react';
 
 // Enhanced Task interface with creator information
 interface EnhancedTask extends Task {
@@ -62,8 +66,10 @@ const AdminTasksPage = () => {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
+  const [isRateTaskOpen, setIsRateTaskOpen] = useState(false);
   const [language, setLanguage] = useState('en');
   const [selectedTask, setSelectedTask] = useState<EnhancedTask | null>(null);
+  const [taskToRate, setTaskToRate] = useState<EnhancedTask | null>(null);
   const [updatingTaskProgress, setUpdatingTaskProgress] = useState(false);
   const [currentTaskTab, setCurrentTaskTab] = useState("details");
   
@@ -104,7 +110,9 @@ const AdminTasksPage = () => {
       assignedTo: "Assigned To",
       status: "Status",
       progress: "Progress",
+      rating: "Rating",
       actions: "Actions",
+      rateTask: "Rate Task",
       notStarted: "Not Started",
       onHold: "On Hold",
       inProgress: "In Progress",
@@ -135,7 +143,8 @@ const AdminTasksPage = () => {
       viewDetails: "View Details",
       editProgress: "Edit Progress",
       comments: "Comments",
-      details: "Details"
+      details: "Details",
+      noRating: "No rating"
     },
     ar: {
       tasks: "المهام",
@@ -148,7 +157,9 @@ const AdminTasksPage = () => {
       assignedTo: "تم تعيينه إلى",
       status: "الحالة",
       progress: "التقدم",
+      rating: "التقييم",
       actions: "الإجراءات",
+      rateTask: "تقييم المهمة",
       notStarted: "لم تبدأ",
       onHold: "في الانتظار",
       inProgress: "قيد التنفيذ",
@@ -179,7 +190,8 @@ const AdminTasksPage = () => {
       viewDetails: "عرض التفاصيل",
       editProgress: "تعديل التقدم",
       comments: "التعليقات",
-      details: "التفاصيل"
+      details: "التفاصيل",
+      noRating: "لا يوجد تقييم"
     }
   };
 
@@ -206,41 +218,32 @@ const AdminTasksPage = () => {
         fetchEmployees()
       ]);
       
-      // Enhance tasks with creator position information
-      const { data: tasksWithCreator, error } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
-          created_by:users!tasks_created_by_fkey (id, name, username, department, position)
-        `)
-        .order('created_at', { ascending: false });
+      // Load rating data for each task
+      const tasksWithRatings = await Promise.all(
+        tasksData.map(async (task) => {
+          try {
+            const [averageRating, latestRating] = await Promise.all([
+              getTaskAverageRating(task.id),
+              getLatestTaskRating(task.id)
+            ]);
+            
+            return {
+              ...task,
+              averageRating: averageRating > 0 ? averageRating : undefined,
+              latestRating: latestRating || undefined
+            };
+          } catch (error) {
+            console.error(`Error loading ratings for task ${task.id}:`, error);
+            return task;
+          }
+        })
+      );
       
-      if (error) throw error;
-      
-      // Map enhanced task data
-      const enhancedTasks = tasksWithCreator.map(task => ({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        progressPercentage: task.progress_percentage,
-        assignedTo: task.assigned_to.id,
-        assignedToName: task.assigned_to.name,
-        assignedToPosition: task.assigned_to.position,
-        createdBy: task.created_by.id,
-        createdByName: task.created_by.name,
-        createdByPosition: task.created_by.position,
-        createdAt: new Date(task.created_at),
-        updatedAt: new Date(task.updated_at),
-        comments: task.comments || []
-      }));
-      
-      setTasks(enhancedTasks);
+      setTasks(tasksWithRatings);
       setEmployees(employeesData);
     } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Failed to load data');
+      console.error("Error loading data:", error);
+      toast.error("Failed to load data");
     } finally {
       setIsLoading(false);
     }
@@ -387,6 +390,15 @@ const AdminTasksPage = () => {
     setIsEditTaskDialogOpen(true);
   };
 
+  const openRateTaskDialog = (task: EnhancedTask) => {
+    setTaskToRate(task);
+    setIsRateTaskOpen(true);
+  };
+
+  const handleTaskRatingSubmitted = () => {
+    loadData(); // Refresh task data to show updated ratings
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'Complete':
@@ -492,20 +504,21 @@ const AdminTasksPage = () => {
               <CardContent>
                 {/* Table for md+ screens */}
                 <div className="hidden md:block overflow-x-auto">
-                  <Table className="min-w-[600px]">
+                  <Table className="min-w-[700px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t.title}</TableHead>
                         <TableHead>{t.assignedTo}</TableHead>
                         <TableHead>{t.status}</TableHead>
                         <TableHead>{t.progress}</TableHead>
+                        <TableHead className="hidden lg:table-cell">{t.rating}</TableHead>
                         <TableHead className="text-right">{t.actions}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isLoading ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4">
+                          <TableCell colSpan={6} className="text-center py-4">
                             <div className="flex justify-center">
                               <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                             </div>
@@ -514,7 +527,7 @@ const AdminTasksPage = () => {
                         </TableRow>
                       ) : tasks.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-4">{t.noTasks}</TableCell>
+                          <TableCell colSpan={6} className="text-center py-4">{t.noTasks}</TableCell>
                         </TableRow>
                       ) : (
                         tasks.map(task => (
@@ -558,16 +571,35 @@ const AdminTasksPage = () => {
                                 <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
                               </div>
                             </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {task.averageRating && task.averageRating > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <StarRating rating={task.averageRating} readonly size="sm" />
+                                  <span className="text-xs text-gray-500">
+                                    ({task.averageRating.toFixed(1)})
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-500">{t.noRating}</span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditTaskDialog(task)}
-                                >
-                                  {t.editTask}
-                                </Button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditTaskDialog(task)}>
+                                    {t.editTask}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openRateTaskDialog(task)}>
+                                    <Star className="mr-2 h-4 w-4" />
+                                    {t.rateTask}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         ))
@@ -1011,6 +1043,14 @@ const AdminTasksPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rate Task Modal */}
+      <RateTaskModal
+        isOpen={isRateTaskOpen}
+        onClose={() => setIsRateTaskOpen(false)}
+        task={taskToRate}
+        onRatingSubmitted={handleTaskRatingSubmitted}
+      />
     </div>
   );
 };

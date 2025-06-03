@@ -30,7 +30,10 @@ export const fetchTasks = async (): Promise<Task[]> => {
       progressPercentage: task.progress_percentage,
       assignedTo: task.assigned_to.id,
       assignedToName: task.assigned_to.name,
+      assignedToPosition: task.assigned_to.position,
       createdBy: task.created_by.id,
+      createdByName: task.created_by.name,
+      createdByPosition: task.created_by.position,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at),
       comments: task.comments || [] // Ensure comments are included
@@ -74,7 +77,10 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       progressPercentage: task.progress_percentage,
       assignedTo: task.assigned_to.id,
       assignedToName: task.assigned_to.name,
+      assignedToPosition: task.assigned_to.position,
       createdBy: task.created_by.id,
+      createdByName: task.created_by.name,
+      createdByPosition: task.created_by.position,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at),
       comments: task.comments || [] // Ensure comments are included
@@ -150,7 +156,10 @@ export const createTask = async (
       progressPercentage: data.progress_percentage,
       assignedTo: data.assigned_to.id,
       assignedToName: data.assigned_to.name,
+      assignedToPosition: data.assigned_to.position,
       createdBy: data.created_by.id,
+      createdByName: data.created_by.name,
+      createdByPosition: data.created_by.position,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at)
     };
@@ -278,7 +287,10 @@ export const updateTask = async (
       progressPercentage: data.progress_percentage,
       assignedTo: data.assigned_to.id,
       assignedToName: data.assigned_to.name,
+      assignedToPosition: data.assigned_to.position,
       createdBy: data.created_by.id,
+      createdByName: data.created_by.name,
+      createdByPosition: data.created_by.position,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at)
     };

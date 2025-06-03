@@ -14,8 +14,9 @@ import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
-import AdminShiftManagement from "./pages/AdminShiftManagement";
+import AdminRatingsPage from "./pages/AdminRatingsPage";
 import EmployeeTasksPage from "./pages/EmployeeTasksPage";
+import EmployeeRatingsPage from "./pages/EmployeeRatingsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ShiftsPage from "./pages/ShiftsPage";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ import EventsPage from '@/pages/EventsPage';
 import MediaBuyerTasksPage from "./pages/MediaBuyerTasksPage";
 import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
+import AdminShiftManagement from "./pages/AdminShiftManagement";
 
 
 const queryClient = new QueryClient({
@@ -229,11 +231,31 @@ const AppWithAuth = () => {
                   } 
                 />
                 <Route 
+                  path="/admin-ratings" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminRatingsPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
                   path="/employee-tasks" 
                   element={
                     <EmployeeRoute>
                       <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <EmployeeTasksPage />
+                      </SidebarNavigation>
+                    </EmployeeRoute>
+                  } 
+                />
+                <Route 
+                  path="/my-ratings" 
+                  element={
+                    <EmployeeRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <EmployeeRatingsPage />
                       </SidebarNavigation>
                     </EmployeeRoute>
                   } 

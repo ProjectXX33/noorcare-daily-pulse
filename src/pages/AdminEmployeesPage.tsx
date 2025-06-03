@@ -28,8 +28,11 @@ import {
 import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
+import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Star } from 'lucide-react';
+import RateEmployeeModal from '@/components/RateEmployeeModal';
+import StarRating from '@/components/StarRating';
 
 const AdminEmployeesPage = () => {
   const { user } = useAuth();
@@ -38,7 +41,9 @@ const AdminEmployeesPage = () => {
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isRateEmployeeOpen, setIsRateEmployeeOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
+  const [employeeToRate, setEmployeeToRate] = useState<User | null>(null);
   const [language, setLanguage] = useState('en');
   const [newEmployee, setNewEmployee] = useState({
     username: '',
@@ -65,9 +70,11 @@ const AdminEmployeesPage = () => {
       department: "Department",
       position: "Position",
       lastCheckIn: "Last Check-in",
+      rating: "Rating",
       actions: "Actions",
       edit: "Edit",
       resetPassword: "Reset Password",
+      rateEmployee: "Rate Employee",
       never: "Never checked in",
       addNewEmployee: "Add New Employee",
       createAccount: "Create a new employee account",
@@ -84,7 +91,8 @@ const AdminEmployeesPage = () => {
       email: "Email",
       role: "Role",
       admin: "Admin",
-      employee: "Employee"
+      employee: "Employee",
+      noRating: "No rating"
     },
     ar: {
       employees: "الموظفين",
@@ -96,10 +104,12 @@ const AdminEmployeesPage = () => {
       department: "القسم",
       position: "المنصب",
       lastCheckIn: "آخر تسجيل دخول",
+      rating: "التقييم",
       actions: "الإجراءات",
       edit: "تعديل",
-      resetPassword: "إعادة تعيين كلمة المر����ر",
-      never: "لم يسجل الدخول أبدًا",
+      resetPassword: "إعادة تعيين كلمة المرور",
+      rateEmployee: "تقييم الموظف",
+      never: "لم يسجل الدخول أبداً",
       addNewEmployee: "إضافة موظف جديد",
       createAccount: "إنشاء حساب موظف جديد",
       editEmployee: "تعديل الموظف",
@@ -115,7 +125,8 @@ const AdminEmployeesPage = () => {
       email: "البريد الإلكتروني",
       role: "الدور",
       admin: "مدير",
-      employee: "موظف"
+      employee: "موظف",
+      noRating: "لا يوجد تقييم"
     }
   };
 
@@ -145,7 +156,30 @@ const AdminEmployeesPage = () => {
     setIsLoading(true);
     try {
       const data = await fetchEmployees();
-      setEmployees(data.filter(u => u.id !== user?.id)); // Exclude current user
+      const filteredEmployees = data.filter(u => u.id !== user?.id); // Exclude current user
+      
+      // Load rating data for each employee
+      const employeesWithRatings = await Promise.all(
+        filteredEmployees.map(async (employee) => {
+          try {
+            const [averageRating, latestRating] = await Promise.all([
+              getEmployeeAverageRating(employee.id),
+              getLatestEmployeeRating(employee.id)
+            ]);
+            
+            return {
+              ...employee,
+              averageRating: averageRating > 0 ? averageRating : undefined,
+              latestRating: latestRating || undefined
+            };
+          } catch (error) {
+            console.error(`Error loading ratings for employee ${employee.id}:`, error);
+            return employee;
+          }
+        })
+      );
+      
+      setEmployees(employeesWithRatings);
     } catch (error) {
       console.error("Error loading employees:", error);
       toast.error("Failed to load employees");
@@ -266,6 +300,15 @@ const AdminEmployeesPage = () => {
     setIsResetPasswordOpen(true);
   };
 
+  const openRateEmployeeDialog = (employee: User) => {
+    setEmployeeToRate(employee);
+    setIsRateEmployeeOpen(true);
+  };
+
+  const handleRatingSubmitted = () => {
+    loadEmployees(); // Refresh employee data to show updated ratings
+  };
+
   const handleEmployeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setSelectedEmployee(prev => prev ? {...prev, [name]: value} : null);
@@ -302,6 +345,7 @@ const AdminEmployeesPage = () => {
                       <TableHead className="hidden sm:table-cell">{t.username}</TableHead>
                       <TableHead className="hidden md:table-cell">{t.department}</TableHead>
                       <TableHead className="hidden md:table-cell">{t.position}</TableHead>
+                      <TableHead className="hidden lg:table-cell">{t.rating}</TableHead>
                       <TableHead className="hidden sm:table-cell">{t.lastCheckIn}</TableHead>
                       <TableHead className="text-right">{t.actions}</TableHead>
                     </TableRow>
@@ -309,7 +353,7 @@ const AdminEmployeesPage = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">
+                        <TableCell colSpan={7} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                           </div>
@@ -317,7 +361,7 @@ const AdminEmployeesPage = () => {
                       </TableRow>
                     ) : employees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">No employees found</TableCell>
+                        <TableCell colSpan={7} className="text-center py-4">No employees found</TableCell>
                       </TableRow>
                     ) : (
                       employees.map(employee => (
@@ -326,6 +370,18 @@ const AdminEmployeesPage = () => {
                           <TableCell className="hidden sm:table-cell">{employee.username}</TableCell>
                           <TableCell className="hidden md:table-cell">{employee.department}</TableCell>
                           <TableCell className="hidden md:table-cell">{employee.position}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {employee.averageRating && employee.averageRating > 0 ? (
+                              <div className="flex items-center gap-1">
+                                <StarRating rating={employee.averageRating} readonly size="sm" />
+                                <span className="text-xs text-gray-500">
+                                  ({employee.averageRating.toFixed(1)})
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-500">{t.noRating}</span>
+                            )}
+                          </TableCell>
                           <TableCell className="hidden sm:table-cell">
                             {employee.lastCheckin 
                               ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
@@ -344,6 +400,10 @@ const AdminEmployeesPage = () => {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
                                   {t.resetPassword}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openRateEmployeeDialog(employee)}>
+                                  <Star className="mr-2 h-4 w-4" />
+                                  {t.rateEmployee}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -432,9 +492,9 @@ const AdminEmployeesPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Engineering">Engineering</SelectItem>
-                  <SelectItem value="IT">IT</SelectItem>
-                  <SelectItem value="Doctor">Doctor</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
+                  <SelectItem value="Medical">Medical</SelectItem>
+                  <SelectItem value="General">General</SelectItem>
+                  <SelectItem value="Management">Management</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -545,9 +605,9 @@ const AdminEmployeesPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="IT">IT</SelectItem>
-                    <SelectItem value="Doctor">Doctor</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
+                    <SelectItem value="Medical">Medical</SelectItem>
+                    <SelectItem value="General">General</SelectItem>
+                    <SelectItem value="Management">Management</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -678,6 +738,14 @@ const AdminEmployeesPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rate Employee Modal */}
+      <RateEmployeeModal
+        isOpen={isRateEmployeeOpen}
+        onClose={() => setIsRateEmployeeOpen(false)}
+        employee={employeeToRate}
+        onRatingSubmitted={handleRatingSubmitted}
+      />
     </>
   );
 };

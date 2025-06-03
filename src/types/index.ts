@@ -8,9 +8,11 @@ export type User = {
   lastCheckin?: Date;
   email: string;
   preferences?: UserPreferences;
+  latestRating?: EmployeeRating;
+  averageRating?: number;
 };
 
-export type Department = 'Engineering' | 'IT' | 'Doctor' | 'Manager';
+export type Department = 'Engineering' | 'Medical' | 'General' | 'Management';
 
 export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer';
 
@@ -56,11 +58,16 @@ export interface Task {
   status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
   assignedTo: string;
   assignedToName?: string;
+  assignedToPosition?: string;
   createdBy: string;
+  createdByName?: string;
+  createdByPosition?: string;
   createdAt: Date;
   updatedAt: Date;
   progressPercentage: number;
   comments?: TaskComment[];
+  latestRating?: TaskRating;
+  averageRating?: number;
 }
 
 export type TaskComment = {
@@ -113,6 +120,31 @@ export type MonthlyShift = {
   shiftEndTime?: string;
 };
 
+// Rating Types
+export type EmployeeRating = {
+  id: string;
+  employeeId: string;
+  rating: number; // 1-5 stars
+  comment?: string;
+  ratedBy: string;
+  ratedByName?: string;
+  ratedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TaskRating = {
+  id: string;
+  taskId: string;
+  rating: number; // 1-5 stars
+  comment?: string;
+  ratedBy: string;
+  ratedByName?: string;
+  ratedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 // Supabase specific types
 export type Tables = {
   users: UserRecord;
@@ -124,6 +156,8 @@ export type Tables = {
   work_time_config: WorkTimeConfigRecord;
   shifts: ShiftRecord;
   monthly_shifts: MonthlyShiftRecord;
+  employee_ratings: EmployeeRatingRecord;
+  task_ratings: TaskRatingRecord;
 };
 
 export type UserRecord = {
@@ -220,6 +254,28 @@ export type MonthlyShiftRecord = {
   check_out_time: string | null;
   regular_hours: number;
   overtime_hours: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeRatingRecord = {
+  id: string;
+  employee_id: string;
+  rating: number;
+  comment: string | null;
+  rated_by: string;
+  rated_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskRatingRecord = {
+  id: string;
+  task_id: string;
+  rating: number;
+  comment: string | null;
+  rated_by: string;
+  rated_at: string;
   created_at: string;
   updated_at: string;
 };

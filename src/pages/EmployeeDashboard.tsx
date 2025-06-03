@@ -5,9 +5,12 @@ import ReportHistory from '@/components/ReportHistory';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from 'react-router-dom';
-import { CheckIn, WorkReport } from '@/types';
-import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
+import { CheckIn, WorkReport, EmployeeRating } from '@/types';
+import { getLatestEmployeeRating, getEmployeeAverageRating } from '@/lib/ratingsApi';
+import StarRating from '@/components/StarRating';
+import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare, AlertCircle, Star, User } from 'lucide-react';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
@@ -19,6 +22,9 @@ const EmployeeDashboard = () => {
   } = useCheckIn();
   const navigate = useNavigate();
   const [language, setLanguage] = useState('en');
+  const [latestRating, setLatestRating] = useState<EmployeeRating | null>(null);
+  const [averageRating, setAverageRating] = useState<number | null>(null);
+  const [isLoadingRating, setIsLoadingRating] = useState(false);
 
   // Translation object for multilingual support
   const translations = {
@@ -35,7 +41,12 @@ const EmployeeDashboard = () => {
       viewTasks: "View Tasks",
       todayCheckIns: "Today's Check-in",
       todayReports: "Today's Report",
-      totalReports: "Total Reports"
+      totalReports: "Total Reports",
+      latestRating: "Latest Rating",
+      averageRating: "Average Rating",
+      noRating: "No rating yet",
+      ratedBy: "Rated by",
+      viewMyRatings: "View My Ratings"
     },
     ar: {
       welcome: "مرحبا",
@@ -50,7 +61,12 @@ const EmployeeDashboard = () => {
       viewTasks: "عرض المهام",
       todayCheckIns: "تسجيل الدخول اليوم",
       todayReports: "تقرير اليوم",
-      totalReports: "مجموع التقارير"
+      totalReports: "مجموع التقارير",
+      latestRating: "آخر تقييم",
+      averageRating: "متوسط التقييم",
+      noRating: "لا يوجد تقييم بعد",
+      ratedBy: "تم التقييم بواسطة",
+      viewMyRatings: "عرض تقييماتي"
     }
   };
 
@@ -60,6 +76,31 @@ const EmployeeDashboard = () => {
       setLanguage(storedLang);
     }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadRatingData();
+    }
+  }, [user]);
+
+  const loadRatingData = async () => {
+    if (!user) return;
+    
+    setIsLoadingRating(true);
+    try {
+      const [latest, average] = await Promise.all([
+        getLatestEmployeeRating(user.id),
+        getEmployeeAverageRating(user.id)
+      ]);
+      
+      setLatestRating(latest);
+      setAverageRating(average > 0 ? average : null);
+    } catch (error) {
+      console.error('Error loading rating data:', error);
+    } finally {
+      setIsLoadingRating(false);
+    }
+  };
 
   const t = translations[language as keyof typeof translations];
 
@@ -109,7 +150,7 @@ const EmployeeDashboard = () => {
         </p>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* Only show check-in card for Customer Service */}
         {hasCheckInAccess && (
           <DashboardCard 
@@ -136,7 +177,94 @@ const EmployeeDashboard = () => {
           icon={<CalendarDays className="h-4 w-4" />}
           variant="default"
         />
+
+        {/* Rating Card */}
+        <DashboardCard 
+          title={averageRating ? t.averageRating : t.latestRating}
+          value={averageRating ? averageRating.toFixed(1) : (latestRating ? latestRating.rating.toString() : t.noRating)}
+          description={averageRating ? `Based on all ratings` : (latestRating ? `by ${latestRating.ratedByName}` : "No performance rating yet")}
+          icon={<Star className="h-4 w-4" />}
+          variant={averageRating && averageRating >= 4 ? "success" : averageRating && averageRating >= 3 ? "default" : "warning"}
+        />
       </div>
+
+      {/* Rating Details Card */}
+      {(latestRating || averageRating) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-500" />
+                Performance Rating
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/my-ratings')}
+              >
+                {t.viewMyRatings}
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Your performance rating from management
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRating ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="ml-2 text-sm">Loading rating...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {averageRating && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div>
+                      <h4 className="font-medium">{t.averageRating}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Based on all your ratings
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StarRating rating={averageRating} readonly />
+                      <span className="font-bold text-lg">
+                        {averageRating.toFixed(1)}/5
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                {latestRating && (
+                  <div className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">{t.latestRating}</h4>
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={latestRating.rating} readonly />
+                        <span className="font-semibold">
+                          {latestRating.rating}/5
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <User className="h-3 w-3" />
+                      <span>{t.ratedBy}: {latestRating.ratedByName}</span>
+                      <span>•</span>
+                      <span>{latestRating.ratedAt.toLocaleDateString()}</span>
+                    </div>
+                    
+                    {latestRating.comment && (
+                      <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                        <strong>Comment:</strong> "{latestRating.comment}"
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Only show check-in reminder for Customer Service */}
       {hasCheckInAccess && !checkedInToday && (

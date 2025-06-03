@@ -19,7 +19,8 @@ import {
   ListTodo,
   FileText,
   PenTool,
-  MessageSquare
+  MessageSquare,
+  Star
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -123,9 +124,11 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home },
     { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true },
     { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true },
+    { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true },
     { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true },
     { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
     { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true },
+    { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true },
     { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceOnly: true },
     { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true },
     { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true },
