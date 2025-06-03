@@ -71,6 +71,48 @@ export type TaskComment = {
   createdAt: string;
 };
 
+// Work Time Configuration Types
+export type WorkTimeConfig = {
+  id: string;
+  name: string;
+  dailyResetTime: string; // HH:MM format
+  workDayStart: string; // HH:MM format
+  workDayEnd: string; // HH:MM format
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// Shift Types
+export type Shift = {
+  id: string;
+  name: string;
+  startTime: string; // HH:MM format
+  endTime: string; // HH:MM format
+  position: 'Customer Service';
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// Monthly Shift Tracking Types
+export type MonthlyShift = {
+  id: string;
+  userId: string;
+  shiftId: string;
+  workDate: Date;
+  checkInTime?: Date;
+  checkOutTime?: Date;
+  regularHours: number;
+  overtimeHours: number;
+  createdAt: Date;
+  updatedAt: Date;
+  // Populated fields
+  userName?: string;
+  shiftName?: string;
+  shiftStartTime?: string;
+  shiftEndTime?: string;
+};
+
 // Supabase specific types
 export type Tables = {
   users: UserRecord;
@@ -79,6 +121,9 @@ export type Tables = {
   file_attachments: FileAttachmentRecord;
   notifications: NotificationRecord;
   tasks: TaskRecord;
+  work_time_config: WorkTimeConfigRecord;
+  shifts: ShiftRecord;
+  monthly_shifts: MonthlyShiftRecord;
 };
 
 export type UserRecord = {
@@ -144,6 +189,40 @@ export type TaskRecord = {
   created_by: string;
   comments: TaskComment[];
 }
+
+export type WorkTimeConfigRecord = {
+  id: string;
+  name: string;
+  daily_reset_time: string;
+  work_day_start: string;
+  work_day_end: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ShiftRecord = {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  position: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MonthlyShiftRecord = {
+  id: string;
+  user_id: string;
+  shift_id: string;
+  work_date: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  regular_hours: number;
+  overtime_hours: number;
+  created_at: string;
+  updated_at: string;
+};
 
 export interface UserPreferences {
   notifications: {

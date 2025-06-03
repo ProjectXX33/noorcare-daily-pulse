@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import DashboardCard from '@/components/DashboardCard';
 import CheckInHistory from '@/components/CheckInHistory';
@@ -8,7 +7,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { CheckIn, WorkReport } from '@/types';
-import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare } from 'lucide-react';
+import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
@@ -70,6 +69,9 @@ const EmployeeDashboard = () => {
   const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
   const checkedInToday = hasCheckedInToday(user.id);
   
+  // Check if user has check-in access (only Customer Service)
+  const hasCheckInAccess = user.position === 'Customer Service';
+  
   // Get today's reports
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -108,13 +110,16 @@ const EmployeeDashboard = () => {
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <DashboardCard 
-          title={t.todayCheckIns}
-          value={checkedInToday ? "Completed" : "Not checked in"}
-          description={checkedInToday ? "You've checked in today" : "You haven't checked in yet"}
-          icon={<Clock className="h-4 w-4" />}
-          variant={checkedInToday ? "success" : "warning"}
-        />
+        {/* Only show check-in card for Customer Service */}
+        {hasCheckInAccess && (
+          <DashboardCard 
+            title={t.todayCheckIns}
+            value={checkedInToday ? "Completed" : "Not checked in"}
+            description={checkedInToday ? "You've checked in today" : "You haven't checked in yet"}
+            icon={<Clock className="h-4 w-4" />}
+            variant={checkedInToday ? "success" : "warning"}
+          />
+        )}
         
         <DashboardCard 
           title={t.todayReports}
@@ -133,7 +138,8 @@ const EmployeeDashboard = () => {
         />
       </div>
 
-      {!checkedInToday && (
+      {/* Only show check-in reminder for Customer Service */}
+      {hasCheckInAccess && !checkedInToday && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
@@ -147,15 +153,34 @@ const EmployeeDashboard = () => {
         </div>
       )}
 
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        <div className="bg-card rounded-lg p-4 border shadow-sm">
-          <CheckInHistory 
-            checkIns={userCheckIns.slice(0, 5)} 
-            title={t.recentCheckins} 
-          />
+      {/* Daily Reminder for Customer Service */}
+      {hasCheckInAccess && (
+        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1">⚠️ Daily Reminder</h3>
+              <p className="text-sm text-red-700 dark:text-red-400 font-medium">
+                If you do not check in, check out, or submit your daily report, 
+                that day will <strong>NOT</strong> be collected or counted in your records.
+              </p>
+            </div>
+          </div>
         </div>
+      )}
+
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        {/* Only show check-in history for Customer Service */}
+        {hasCheckInAccess && (
+          <div className="bg-card rounded-lg p-4 border shadow-sm">
+            <CheckInHistory 
+              checkIns={userCheckIns.slice(0, 5)} 
+              title={t.recentCheckins} 
+            />
+          </div>
+        )}
         
-        <div className="bg-card rounded-lg p-4 border shadow-sm">
+        <div className={`bg-card rounded-lg p-4 border shadow-sm ${!hasCheckInAccess ? 'md:col-span-2' : ''}`}>
           <ReportHistory 
             reports={userReports.slice(0, 3) as any}
             title={t.recentReports} 

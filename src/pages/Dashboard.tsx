@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import DashboardCard from '@/components/DashboardCard';
 import CheckInHistory from '@/components/CheckInHistory';
@@ -114,7 +113,7 @@ const Dashboard = () => {
         isAdmin={user.role === 'admin'}
       />
 
-      {!checkedInToday && user.role !== 'admin' && (
+      {!checkedInToday && user.role !== 'admin' && user.position === 'Customer Service' && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>

@@ -135,7 +135,9 @@ export const createTask = async (
         data.assigned_to.id, 
         data.id, 
         data.title, 
-        'assigned'
+        'assigned',
+        data.status,
+        data.created_by.id
       );
     }
     
@@ -223,7 +225,9 @@ export const updateTask = async (
         updates.assignedTo, 
         taskId, 
         data.title, 
-        'assigned'
+        'assigned',
+        data.status,
+        data.created_by.id
       );
     }
     
@@ -236,7 +240,8 @@ export const updateTask = async (
           taskId, 
           data.title, 
           'status_update', 
-          dbUpdates.status
+          dbUpdates.status,
+          data.created_by.id
         );
       }
       // Do NOT send status update notification to admins (only send generic 'Task Updated' below)
@@ -257,7 +262,8 @@ export const updateTask = async (
             title: 'Task Updated',
             message: `Task "${data.title}" was updated. Status: ${dbUpdates.status || data.status}, Progress: ${dbUpdates.progress_percentage ?? data.progress_percentage}%`,
             related_to: 'task',
-            related_id: taskId
+            related_id: taskId,
+            created_by: data.created_by.id
           });
         }
       }
@@ -329,10 +335,14 @@ export const addTaskComment = async (
   try {
     console.log(`Adding comment to task ${taskId}`);
     
-    // Get current comments
+    // Get current comments and task details including creator info
     const { data: taskData, error: fetchError } = await supabase
       .from('tasks')
-      .select('*')
+      .select(`
+        *,
+        creator:created_by(id, position),
+        assignee:assigned_to(id, position)
+      `)
       .eq('id', taskId)
       .single();
     
@@ -366,27 +376,47 @@ export const addTaskComment = async (
       throw updateError;
     }
 
-    // Send notification to the other party
-    // If commenter is admin, notify assigned employee
-    // If commenter is employee, notify task creator (admin)
+    // Enhanced notification logic for different roles
     if (taskData.assigned_to && taskData.created_by) {
+      const creatorPosition = taskData.creator?.position;
+      const assigneePosition = taskData.assignee?.position;
+      
       if (userId === taskData.created_by) {
-        // Admin commented, notify employee
+        // Task creator (Admin/Media Buyer) commented, notify assigned employee
+        let notificationTitle = 'New Comment on Task';
+        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        
+        if (creatorPosition === 'Media Buyer') {
+          notificationTitle = 'Media Buyer Comment';
+          notificationMessage = `Media Buyer commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        }
+        
         await createNotification({
           user_id: taskData.assigned_to,
-          title: 'New Comment on Task',
-          message: `Admin commented on your task: ${comment} on "${taskData.title}"`,
+          title: notificationTitle,
+          message: notificationMessage,
           related_to: 'task',
-          related_id: taskId
+          related_id: taskId,
+          created_by: userId
         });
       } else if (userId === taskData.assigned_to) {
-        // Employee commented, notify admin
+        // Assigned employee commented, notify task creator
+        let notificationTitle = 'New Comment on Task';
+        let notificationMessage = `${userName} commented on your assigned task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        
+        // Special handling for Designer commenting on Media Buyer's task
+        if (assigneePosition === 'Designer' && creatorPosition === 'Media Buyer') {
+          notificationTitle = 'Designer Update';
+          notificationMessage = `Designer ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        }
+        
         await createNotification({
           user_id: taskData.created_by,
-          title: 'New Comment on Task',
-          message: `Employee commented on your task: ${comment} on "${taskData.title}"`,
+          title: notificationTitle,
+          message: notificationMessage,
           related_to: 'task',
-          related_id: taskId
+          related_id: taskId,
+          created_by: userId
         });
       }
     }
@@ -404,7 +434,8 @@ const createTaskNotification = async (
   taskId: string, 
   taskTitle: string, 
   type: 'assigned' | 'status_update' | 'completed', 
-  status?: string
+  status?: string,
+  createdBy?: string
 ): Promise<void> => {
   try {
     let title = '';
@@ -425,19 +456,17 @@ const createTaskNotification = async (
         break;
     }
     
-    const { error } = await supabase
-      .from('notifications')
-      .insert([{
-        user_id: userId,
-        title,
-        message,
-        related_to: 'task',
-        related_id: taskId
-      }]);
+    // Get current user as fallback for created_by
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
     
-    if (error) {
-      console.error('Error creating task notification:', error);
-    }
+    await createNotification({
+      user_id: userId,
+      title,
+      message,
+      related_to: 'task',
+      related_id: taskId,
+      created_by: createdBy || currentUser?.id
+    });
   } catch (error) {
     console.error('Error creating task notification:', error);
   }
@@ -454,6 +483,8 @@ export const sendNotification = async (params: {
   try {
     const { userId, title, message, sendToAll, adminId } = params;
     
+    console.log('Sending notification with params:', params);
+    
     if (sendToAll) {
       // Get all users except the admin
       const { data: users, error: userError } = await supabase
@@ -462,6 +493,7 @@ export const sendNotification = async (params: {
         .neq('id', adminId);
       
       if (userError) {
+        console.error('Error fetching users for broadcast:', userError);
         throw userError;
       }
       
@@ -473,9 +505,11 @@ export const sendNotification = async (params: {
             title,
             message,
             related_to: 'admin',
-            related_id: adminId
+            related_id: adminId,
+            created_by: adminId
           });
         }
+        console.log(`Notification sent to ${users.length} users`);
       }
     } else if (userId) {
       // Create notification for a specific user
@@ -484,8 +518,10 @@ export const sendNotification = async (params: {
         title,
         message,
         related_to: 'admin',
-        related_id: adminId
+        related_id: adminId,
+        created_by: adminId
       });
+      console.log(`Notification sent to user ${userId}`);
     }
   } catch (error) {
     console.error('Error sending notification:', error);

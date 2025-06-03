@@ -1,12 +1,12 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import CheckInButton from '@/components/CheckInButton';
 import CheckOutButton from '@/components/CheckOutButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ArrowRightLeft, Clock, Loader2 } from 'lucide-react';
+import { ArrowRightLeft, Clock, Loader2, AlertCircle } from 'lucide-react';
+import { checkIfDayOff } from '@/lib/performanceApi';
 
 const CheckInPage = () => {
   const { user } = useAuth();
@@ -17,7 +17,39 @@ const CheckInPage = () => {
     hasCheckedOutToday
   } = useCheckIn();
   
+  const [isDayOff, setIsDayOff] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDayOffStatus() {
+      if (!user) return;
+      
+      setLoading(true);
+      const { isDayOff } = await checkIfDayOff(user.id, new Date());
+      setIsDayOff(isDayOff);
+      setLoading(false);
+    }
+    fetchDayOffStatus();
+  }, [user?.id]);
+  
   if (!user) return null;
+  
+  // Check if user is Customer Service
+  if (user.position !== 'Customer Service') {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
+            <p className="text-gray-500">
+              Check-in functionality is currently only available for Customer Service employees.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   const userCheckIns = getUserCheckIns(user.id); 
   const isCheckedIn = hasCheckedInToday(user.id);
@@ -49,7 +81,7 @@ const CheckInPage = () => {
     return checkInDate.getTime() === today.getTime();
   });
   
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center">
@@ -65,7 +97,7 @@ const CheckInPage = () => {
       <div className="flex flex-col">
         <h1 className="text-3xl font-bold mb-2">Daily Check-in</h1>
         <p className="text-muted-foreground">
-          Record your daily attendance and working hours.
+          Record your daily attendance and working hours for Customer Service shifts.
         </p>
       </div>
 
@@ -119,10 +151,34 @@ const CheckInPage = () => {
               </div>
               
               <div className="flex flex-col gap-3 min-w-[120px]">
-                {currentStatus === 'checked-in' ? (
-                  <CheckOutButton />
-                ) : (
-                  <CheckInButton />
+                {/* Day Off Warning */}
+                {isDayOff && (
+                  <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-blue-600 font-medium mb-2">
+                      🏖️ Today is your day off
+                    </div>
+                    <div className="text-blue-500 text-sm">
+                      Enjoy your rest!
+                    </div>
+                  </div>
+                )}
+                
+                {/* Check-in/Check-out Buttons */}
+                {!isDayOff && (
+                  <>
+                    {!isCheckedIn && <CheckInButton />}
+                    {isCheckedIn && !isCheckedOut && <CheckOutButton />}
+                    {isCheckedIn && isCheckedOut && (
+                      <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-green-600 font-medium">
+                          ✅ Workday Complete
+                        </div>
+                        <div className="text-green-500 text-sm">
+                          Thank you for your work today!
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -167,21 +223,43 @@ const CheckInPage = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>Daily Check-in Instructions</CardTitle>
+          <CardTitle>Customer Service Check-in Instructions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* Critical Warning Note */}
+            <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1">⚠️ Important Notice</h3>
+                  <p className="text-sm text-red-700 dark:text-red-400 font-medium">
+                    If you do not check in, check out, or submit your daily report, 
+                    that day will <strong>NOT</strong> be collected or counted in your records.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             <div>
-              <h3 className="font-medium mb-1">When to Check In</h3>
+              <h3 className="font-medium mb-1">Shift Schedule</h3>
               <p className="text-muted-foreground">
-                Please check in at the start of your work day and check out when you finish.
+                <strong>Day Shift:</strong> 9:00 AM - 4:00 PM<br />
+                <strong>Night Shift:</strong> 4:00 PM - 12:00 AM
               </p>
             </div>
             
             <div>
-              <h3 className="font-medium mb-1">Multiple Check-ins</h3>
+              <h3 className="font-medium mb-1">When to Check In</h3>
               <p className="text-muted-foreground">
-                If you take a break or leave temporarily, you can check out and check in again when you return.
+                Please check in at the start of your assigned shift and check out when you finish.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-medium mb-1">Shift Tracking</h3>
+              <p className="text-muted-foreground">
+                Your shifts are automatically tracked for monthly reports and overtime calculations.
               </p>
             </div>
             

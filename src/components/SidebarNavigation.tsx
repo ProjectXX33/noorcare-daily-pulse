@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useWorkspaceMessages } from '@/contexts/WorkspaceMessageContext';
 import { 
   Home, 
   Users, 
@@ -11,7 +12,14 @@ import {
   LogOut,
   Settings,
   Menu,
-  Calendar
+  Calendar,
+  Clock,
+  LayoutDashboard,
+  LogIn,
+  ListTodo,
+  FileText,
+  PenTool,
+  MessageSquare
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -25,6 +33,7 @@ import {
   SidebarTrigger
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import NotificationsMenu from '@/components/NotificationsMenu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -48,6 +57,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { language, t } = useLanguage();
+  const { unreadCount } = useWorkspaceMessages();
   const isMobile = useIsMobile();
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -106,18 +116,28 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     await logout();
     navigate('/login');
   };
-  
+
+  if (!user) return null;
+
   const navItems = [
     { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home },
     { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true },
     { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true },
+    { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true },
     { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
-    { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true },
+    { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true },
+    { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceOnly: true },
+    { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true },
     { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true },
-    { name: t('events') as string, path: '/events', icon: Calendar },
+    { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true },
+    { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true }, // Available to all users
   ].filter(item => {
     if (item.adminOnly && user?.role !== 'admin') return false;
     if (item.employeeOnly && user?.role === 'admin') return false;
+    if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
+    if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service')) return false;
+    if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
+    if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
     return true;
   });
 
@@ -147,6 +167,14 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
                   >
                     <item.icon className="h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3" />
                     <span className="w-full text-sm md:text-base">{item.name}</span>
+                    {item.hasCounter && unreadCount > 0 && (
+                      <Badge 
+                        variant="destructive" 
+                        className="text-xs animate-pulse ml-auto flex-shrink-0"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

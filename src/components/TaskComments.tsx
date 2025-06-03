@@ -1,28 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from '@/contexts/AuthContext';
 import { addTaskComment } from '@/lib/tasksApi';
+import { supabase } from '@/lib/supabase';
 import { toast } from "sonner";
 import { User } from '@/types';
 import { format } from "date-fns";
 
+interface TaskComment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: string;
+}
+
 interface TaskCommentsProps {
   taskId: string;
   user: User;
-  comments: any[];
-  onCommentAdded: (newComments: any[]) => void;
+  comments: TaskComment[];
+  onCommentAdded: (comments: TaskComment[]) => void;
   language: string;
 }
 
 const TaskComments: React.FC<TaskCommentsProps> = ({ 
   taskId, 
   user,
-  comments = [],
+  comments: initialComments,
   onCommentAdded,
   language 
 }) => {
+  const { user: authUser } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comments, setComments] = useState<TaskComment[]>(initialComments);
   
   // Translation object for multilingual support
   const translations = {
@@ -48,6 +60,38 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
 
   const t = translations[language as keyof typeof translations] || translations.en;
   
+  // Update comments when props change
+  useEffect(() => {
+    setComments(initialComments);
+  }, [initialComments]);
+
+  // Subscribe to task updates for realtime comments
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`task-comments-${taskId}`)
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'tasks',
+          filter: `id=eq.${taskId}`
+        }, 
+        (payload) => {
+          console.log('Task updated with new comments:', payload);
+          if (payload.new && payload.new.comments) {
+            const updatedComments = payload.new.comments as TaskComment[];
+            setComments(updatedComments);
+            onCommentAdded(updatedComments);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [taskId, onCommentAdded]);
+
   const handleSubmit = async () => {
     if (!newComment.trim()) {
       toast.error(t.enterComment);
@@ -61,26 +105,15 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
       const success = await addTaskComment(
         taskId,
         newComment,
-        user.id,
-        user.name
+        authUser.id,
+        authUser.name
       );
       
       if (success) {
         toast.success(t.commentAdded);
         console.log('Comment added successfully');
-        
-        // Add comment to local state
-        const newCommentObj = {
-          id: Date.now().toString(), // This will be replaced by the actual UUID on the backend
-          userId: user.id,
-          userName: user.name,
-          text: newComment,
-          createdAt: new Date().toISOString()
-        };
-        
-        const updatedComments = [...comments, newCommentObj];
-        onCommentAdded(updatedComments);
         setNewComment('');
+        // Note: Realtime subscription will update the comments automatically
       } else {
         console.error('Failed to add comment');
         toast.error(t.error);

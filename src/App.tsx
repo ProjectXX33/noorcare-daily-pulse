@@ -14,16 +14,21 @@ import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
+import AdminShiftManagement from "./pages/AdminShiftManagement";
 import EmployeeTasksPage from "./pages/EmployeeTasksPage";
 import SettingsPage from "./pages/SettingsPage";
+import ShiftsPage from "./pages/ShiftsPage";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
 import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { WorkspaceMessageProvider } from "./contexts/WorkspaceMessageContext";
 import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
+import MediaBuyerTasksPage from "./pages/MediaBuyerTasksPage";
+import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
 
 
@@ -80,6 +85,43 @@ const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Customer Service route component
+const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user || user.position !== 'Customer Service') {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Media Buyer route component for calendar and task assignment access (Media Buyers only)
+const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user || user.position !== 'Media Buyer') {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Route component that excludes Media Buyers (for Events page)
+const NonMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position === 'Media Buyer') {
+    return <Navigate to="/media-buyer-tasks" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 // This component is outside the BrowserRouter but inside the other providers
 const AppWithAuth = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -97,120 +139,162 @@ const AppWithAuth = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <CheckInProvider>
-          <LanguageProvider>
-            <AnimatePresence>
-              {showOpeningAnimation && <OpeningAnimation />}
-            </AnimatePresence>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <Dashboard />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/employee-dashboard" 
-                element={
-                  <EmployeeRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <EmployeeDashboard />
-                    </SidebarNavigation>
-                  </EmployeeRoute>
-                } 
-              />
-              <Route 
-                path="/check-in" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <CheckInPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/report" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <ReportPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/employees" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <AdminEmployeesPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/reports" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <AdminReportsPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/tasks" 
-                element={
-                  <AdminRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <AdminTasksPage />
-                    </SidebarNavigation>
-                  </AdminRoute>
-                } 
-              />
-              <Route 
-                path="/employee-tasks" 
-                element={
-                  <EmployeeRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <EmployeeTasksPage />
-                    </SidebarNavigation>
-                  </EmployeeRoute>
-                } 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <SettingsPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route 
-                path="/events" 
-                element={
-                  <PrivateRoute>
-                    <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
-                      <EventsPage />
-                    </SidebarNavigation>
-                  </PrivateRoute>
-                } 
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
-            <Sonner />
-          </LanguageProvider>
-        </CheckInProvider>
+        <WorkspaceMessageProvider>
+          <CheckInProvider>
+            <LanguageProvider>
+              <AnimatePresence>
+                {showOpeningAnimation && <OpeningAnimation />}
+              </AnimatePresence>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <Dashboard />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-dashboard" 
+                  element={
+                    <EmployeeRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <EmployeeDashboard />
+                      </SidebarNavigation>
+                    </EmployeeRoute>
+                  } 
+                />
+                <Route 
+                  path="/check-in" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <CheckInPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/shifts" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <ShiftsPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/report" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <ReportPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/employees" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminEmployeesPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/reports" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminReportsPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/tasks" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminTasksPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-tasks" 
+                  element={
+                    <EmployeeRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <EmployeeTasksPage />
+                      </SidebarNavigation>
+                    </EmployeeRoute>
+                  } 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SettingsPage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/events" 
+                  element={
+                    <NonMediaBuyerRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <EventsPage />
+                      </SidebarNavigation>
+                    </NonMediaBuyerRoute>
+                  } 
+                />
+                <Route 
+                  path="/media-buyer-tasks" 
+                  element={
+                    <MediaBuyerRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <MediaBuyerTasksPage />
+                      </SidebarNavigation>
+                    </MediaBuyerRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin-shift-management" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminShiftManagement />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="/workspace" 
+                  element={
+                    <PrivateRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <WorkspacePage />
+                      </SidebarNavigation>
+                    </PrivateRoute>
+                  } 
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Toaster />
+              <Sonner />
+            </LanguageProvider>
+          </CheckInProvider>
+        </WorkspaceMessageProvider>
       </AuthProvider>
     </BrowserRouter>
   );

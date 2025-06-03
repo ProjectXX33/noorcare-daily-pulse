@@ -52,17 +52,45 @@ export const createNotification = async (notification: {
   message: string;
   related_to?: string;
   related_id?: string;
+  created_by?: string;
 }) => {
   try {
+    console.log('Creating notification:', notification);
+    
     // First maintain the notification limit
     await maintainNotificationLimit(notification.user_id);
 
-    // Then create the new notification
-    const { error } = await supabase
-      .from('notifications')
-      .insert([notification]);
+    // Get current user as fallback for created_by
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
+    // Prepare notification data
+    const notificationData = {
+      user_id: notification.user_id,
+      title: notification.title,
+      message: notification.message,
+      related_to: notification.related_to || null,
+      related_id: notification.related_id || null,
+      created_by: notification.created_by || currentUser?.id || null,
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
 
-    if (error) throw error;
+    console.log('Inserting notification data:', notificationData);
+
+    // Then create the new notification
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert([notificationData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error creating notification:', error);
+      throw error;
+    }
+
+    console.log('Notification created successfully:', data);
+    return data;
   } catch (error) {
     console.error('Error creating notification:', error);
     throw error;

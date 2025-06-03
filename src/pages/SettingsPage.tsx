@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { WorkTimeConfig } from '@/types';
 
 interface Preferences {
   notifications: {
@@ -31,6 +32,12 @@ const SettingsPage = () => {
       enabled: true,
       email: true
     }
+  });
+  const [workTimeConfig, setWorkTimeConfig] = useState<WorkTimeConfig | null>(null);
+  const [workTimeForm, setWorkTimeForm] = useState({
+    dailyResetTime: '09:00',
+    workDayStart: '09:00',
+    workDayEnd: '00:00'
   });
 
   useEffect(() => {
@@ -65,7 +72,44 @@ const SettingsPage = () => {
       }
     };
 
+    const loadWorkTimeConfig = async () => {
+      if (!user || user.role !== 'admin') return;
+
+      try {
+        const { data, error } = await supabase
+          .from('work_time_config')
+          .select('*')
+          .eq('name', 'default')
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        if (data) {
+          const config: WorkTimeConfig = {
+            id: data.id,
+            name: data.name,
+            dailyResetTime: data.daily_reset_time,
+            workDayStart: data.work_day_start,
+            workDayEnd: data.work_day_end,
+            createdAt: new Date(data.created_at),
+            updatedAt: new Date(data.updated_at)
+          };
+          setWorkTimeConfig(config);
+          setWorkTimeForm({
+            dailyResetTime: config.dailyResetTime,
+            workDayStart: config.workDayStart,
+            workDayEnd: config.workDayEnd
+          });
+        }
+      } catch (error) {
+        console.error('Error loading work time config:', error);
+      }
+    };
+
     loadPreferences();
+    loadWorkTimeConfig();
   }, [user]);
 
   const handleProfileUpdate = async () => {
@@ -156,6 +200,47 @@ const SettingsPage = () => {
     }
   };
 
+  const handleWorkTimeUpdate = async () => {
+    if (!user || user.role !== 'admin') return;
+    
+    setLoading(true);
+    try {
+      if (workTimeConfig) {
+        // Update existing config
+        const { error } = await supabase
+          .from('work_time_config')
+          .update({
+            daily_reset_time: workTimeForm.dailyResetTime,
+            work_day_start: workTimeForm.workDayStart,
+            work_day_end: workTimeForm.workDayEnd,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', workTimeConfig.id);
+
+        if (error) throw error;
+      } else {
+        // Create new config
+        const { error } = await supabase
+          .from('work_time_config')
+          .insert({
+            name: 'default',
+            daily_reset_time: workTimeForm.dailyResetTime,
+            work_day_start: workTimeForm.workDayStart,
+            work_day_end: workTimeForm.workDayEnd
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success('Work time configuration updated successfully');
+    } catch (error) {
+      console.error('Error updating work time config:', error);
+      toast.error('Failed to update work time configuration');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto py-8 px-2 md:px-0">
       <Card className="shadow-lg border bg-white dark:bg-background rounded-xl">
@@ -168,6 +253,9 @@ const SettingsPage = () => {
               <TabsTrigger value="account">{t('account')}</TabsTrigger>
               <TabsTrigger value="preferences">{t('preferences')}</TabsTrigger>
               <TabsTrigger value="security">{t('security')}</TabsTrigger>
+              {user?.role === 'admin' && (
+                <TabsTrigger value="worktime">Work Time</TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="account">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,6 +328,78 @@ const SettingsPage = () => {
                 ) : t('updatePassword')}
               </Button>
             </TabsContent>
+            {user?.role === 'admin' && (
+              <TabsContent value="worktime">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Work Time Configuration</h3>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Configure daily reset times and work hours for the system.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <Label htmlFor="dailyResetTime">Daily Reset Time</Label>
+                      <Input
+                        id="dailyResetTime"
+                        type="time"
+                        value={workTimeForm.dailyResetTime}
+                        onChange={e => setWorkTimeForm({ ...workTimeForm, dailyResetTime: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        When daily reports and check-ins reset
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="workDayStart">Work Day Start</Label>
+                      <Input
+                        id="workDayStart"
+                        type="time"
+                        value={workTimeForm.workDayStart}
+                        onChange={e => setWorkTimeForm({ ...workTimeForm, workDayStart: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Standard work day start time
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="workDayEnd">Work Day End</Label>
+                      <Input
+                        id="workDayEnd"
+                        type="time"
+                        value={workTimeForm.workDayEnd}
+                        onChange={e => setWorkTimeForm({ ...workTimeForm, workDayEnd: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Standard work day end time (next day)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Current Configuration:</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• Daily reset occurs at {workTimeForm.dailyResetTime}</li>
+                      <li>• Work day starts at {workTimeForm.workDayStart}</li>
+                      <li>• Work day ends at {workTimeForm.workDayEnd} (next day)</li>
+                      <li>• Customer Service has two shifts: 9:00 AM - 4:00 PM and 4:00 PM - 12:00 AM</li>
+                    </ul>
+                  </div>
+                  
+                  <Button className="w-full md:w-auto" onClick={handleWorkTimeUpdate} disabled={loading}>
+                    {loading ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                        Updating Configuration...
+                      </div>
+                    ) : 'Update Work Time Configuration'}
+                  </Button>
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>

@@ -45,17 +45,25 @@ import { fetchEmployees } from '@/lib/employeesApi';
 import { User, Task } from '@/types';
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskComments from '@/components/TaskComments';
+import { supabase } from '@/lib/supabase';
+
+// Enhanced Task interface with creator information
+interface EnhancedTask extends Task {
+  assignedToPosition?: string;
+  createdByName?: string;
+  createdByPosition?: string;
+}
 
 const AdminTasksPage = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<EnhancedTask[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
   const [language, setLanguage] = useState('en');
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<EnhancedTask | null>(null);
   const [updatingTaskProgress, setUpdatingTaskProgress] = useState(false);
   const [currentTaskTab, setCurrentTaskTab] = useState("details");
   
@@ -198,11 +206,41 @@ const AdminTasksPage = () => {
         fetchEmployees()
       ]);
       
-      setTasks(tasksData);
-      setEmployees(employeesData.filter(emp => emp.id !== user?.id)); // Exclude current admin
+      // Enhance tasks with creator position information
+      const { data: tasksWithCreator, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assigned_to:users!tasks_assigned_to_fkey (id, name, username, department, position),
+          created_by:users!tasks_created_by_fkey (id, name, username, department, position)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Map enhanced task data
+      const enhancedTasks = tasksWithCreator.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        progressPercentage: task.progress_percentage,
+        assignedTo: task.assigned_to.id,
+        assignedToName: task.assigned_to.name,
+        assignedToPosition: task.assigned_to.position,
+        createdBy: task.created_by.id,
+        createdByName: task.created_by.name,
+        createdByPosition: task.created_by.position,
+        createdAt: new Date(task.created_at),
+        updatedAt: new Date(task.updated_at),
+        comments: task.comments || []
+      }));
+      
+      setTasks(enhancedTasks);
+      setEmployees(employeesData);
     } catch (error) {
-      console.error("Error loading data:", error);
-      toast.error("Failed to load data");
+      console.error('Error loading data:', error);
+      toast.error('Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -234,13 +272,7 @@ const AdminTasksPage = () => {
       
       setTasks([createdTask, ...tasks]);
       setIsTaskDialogOpen(false);
-      // Only send 'New Task Assigned' notification to the assigned employee
-      await sendNotification({
-        userId: createdTask.assignedTo,
-        title: 'New Task Assigned',
-        message: `You have been assigned a new task: ${createdTask.title}`,
-        adminId: user.id
-      });
+      // Note: Notification is already sent by createTask API, no need to send duplicate
       
       // Reset form
       setNewTask({
@@ -250,6 +282,7 @@ const AdminTasksPage = () => {
         status: 'Not Started',
         progressPercentage: 0
       });
+      toast.success(t.taskAdded);
     } catch (error) {
       console.error("Error creating task:", error);
       toast.error("Failed to create task");
@@ -293,13 +326,8 @@ const AdminTasksPage = () => {
       ));
       
       setIsEditTaskDialogOpen(false);
-      // Only send 'Task Updated' notification to the assigned employee
-      await sendNotification({
-        userId: updatedTask.assignedTo,
-        title: 'Task Updated',
-        message: `Task "${updatedTask.title}" was updated by admin.`,
-        adminId: user.id
-      });
+      // Note: Notification is already sent by updateTask API, no need to send duplicate
+      toast.success(t.taskUpdated);
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error("Failed to update task");
@@ -345,7 +373,7 @@ const AdminTasksPage = () => {
     }
   };
 
-  const openEditTaskDialog = (task: Task) => {
+  const openEditTaskDialog = (task: EnhancedTask) => {
     setEditingTask({
       id: task.id,
       title: task.title,
@@ -361,17 +389,22 @@ const AdminTasksPage = () => {
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case 'Not Started':
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
-      case 'On Hold':
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
-      case 'In Progress':
-        return 'bg-blue-100 text-blue-800 border border-blue-200';
       case 'Complete':
-        return 'bg-green-100 text-green-800 border border-green-200';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'In Progress':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'On Hold':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'Not Started':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
       default:
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
+  };
+
+  // Helper function to identify Media Buyer to Designer assignments
+  const isMediaBuyerToDesignerTask = (task: any) => {
+    return task.createdByPosition === 'Media Buyer' && task.assignedToPosition === 'Designer';
   };
 
   const handleNewTaskProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -485,9 +518,33 @@ const AdminTasksPage = () => {
                         </TableRow>
                       ) : (
                         tasks.map(task => (
-                          <TableRow key={task.id}>
-                            <TableCell className="font-medium">{task.title}</TableCell>
-                            <TableCell>{task.assignedToName}</TableCell>
+                          <TableRow 
+                            key={task.id}
+                            className={isMediaBuyerToDesignerTask(task) 
+                              ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                              : ""
+                            }
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <span>{task.title}</span>
+                                {isMediaBuyerToDesignerTask(task) && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    📊 Media Buyer → Designer
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{task.assignedToName}</span>
+                                {isMediaBuyerToDesignerTask(task) && (
+                                  <span className="text-xs text-purple-600 dark:text-purple-400">
+                                    Assigned by: {task.createdByName}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
                                 {task.status === 'Not Started' ? t.notStarted :
@@ -529,10 +586,23 @@ const AdminTasksPage = () => {
                     <div className="text-center py-8">{t.noTasks}</div>
                   ) : (
                     tasks.map(task => (
-                      <Card key={task.id} className="p-4">
+                      <Card 
+                        key={task.id} 
+                        className={`p-4 ${isMediaBuyerToDesignerTask(task) 
+                          ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                          : ""
+                        }`}
+                      >
                         <div className="flex flex-col gap-3">
                           <div className="flex justify-between items-start">
-                            <div className="font-bold text-base">{task.title}</div>
+                            <div className="flex flex-col gap-1">
+                              <div className="font-bold text-base">{task.title}</div>
+                              {isMediaBuyerToDesignerTask(task) && (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 w-fit">
+                                  📊 Media Buyer → Designer
+                                </span>
+                              )}
+                            </div>
                             <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
                               {task.status === 'Not Started' ? t.notStarted : 
                                task.status === 'On Hold' ? t.onHold : 
@@ -541,7 +611,14 @@ const AdminTasksPage = () => {
                           </div>
                           <div className="text-sm text-muted-foreground">{task.description}</div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs">{t.assignedTo}: <span className="font-medium">{task.assignedToName}</span></span>
+                            <span className="text-xs">
+                              {t.assignedTo}: <span className="font-medium">{task.assignedToName}</span>
+                            </span>
+                            {isMediaBuyerToDesignerTask(task) && (
+                              <span className="text-xs text-purple-600 dark:text-purple-400">
+                                Assigned by: {task.createdByName}
+                              </span>
+                            )}
                             <div className="flex items-center gap-2">
                               <Progress value={task.progressPercentage} className="h-2 flex-1" />
                               <span className="text-xs text-gray-500">{task.progressPercentage}%</span>

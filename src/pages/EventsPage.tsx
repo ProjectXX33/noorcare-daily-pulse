@@ -159,9 +159,9 @@ const EventsPage = () => {
     }
   };
 
-  // Handle date click (admin only)
+  // Handle date click (admin and Media Buyer only)
   const handleDateClick = (info: any) => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.position === 'Media Buyer') {
       setSelectedEvent(null);
       setFormData({
         title: '',
@@ -210,10 +210,10 @@ const EventsPage = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold">{t('events')}</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {user?.role === 'admin' && (
-            <Button 
-              size="sm"
-              className="w-full sm:w-auto"
+          {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
+            <Button
+              className="fixed bottom-6 right-6 rounded-full shadow-lg z-50"
+              size="lg"
               onClick={() => {
                 setSelectedEvent(null);
                 setFormData({
@@ -225,7 +225,7 @@ const EventsPage = () => {
                 setIsDialogOpen(true);
               }}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-5 w-5 mr-2" />
               {t('addEvent') || 'Add Event'}
             </Button>
           )}
@@ -260,7 +260,7 @@ const EventsPage = () => {
               locale={language === 'ar' ? 'ar' : 'en'}
               direction={language === 'ar' ? 'rtl' : 'ltr'}
               events={calendarEvents}
-              editable={user?.role === 'admin'}
+              editable={user?.role === 'admin' || user?.position === 'Media Buyer'}
               eventClick={handleEventClick}
               dateClick={handleDateClick}
               height="auto"
@@ -297,7 +297,7 @@ const EventsPage = () => {
                         <div className="space-y-2">
                           <div className="flex justify-between items-start">
                             <h3 className="font-semibold text-black">{event.title}</h3>
-                            {user?.role === 'admin' && (
+                            {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -338,79 +338,97 @@ const EventsPage = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{formData.title}</DialogTitle>
+              <DialogTitle>
+                {selectedEvent ? (t('editEvent') || 'Edit Event') : (t('createEvent') || 'Create Event')}
+              </DialogTitle>
             </DialogHeader>
-            <div className="mb-2">
-              <div className="text-sm text-muted-foreground mb-1">
-                <span className="font-semibold">{t('start')}:</span> {formatDate(formData.start as string)}
-              </div>
-              {formData.end && (
-                <div className="text-sm text-muted-foreground mb-1">
-                  <span className="font-semibold">{t('end')}:</span> {formatDate(formData.end as string)}
-                </div>
-              )}
-              {formData.description && (
-                <div className="text-sm mt-2">
-                  {formData.description}
-                </div>
-              )}
-            </div>
-            {/* Only show edit/delete for admin */}
-            {user?.role === 'admin' ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="event-title">{t('title') || 'Title'}</Label>
+            <form onSubmit={handleSubmit}>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-title" className="text-right">
+                    {t('title') || 'Title'}
+                  </Label>
                   <Input
                     id="event-title"
                     value={formData.title}
-                    onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="col-span-3"
                     required
-                    disabled={isLoading}
+                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="event-description">{t('description') || 'Description'}</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-description" className="text-right">
+                    {t('description') || 'Description'}
+                  </Label>
                   <Textarea
                     id="event-description"
                     value={formData.description || ''}
-                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    disabled={isLoading}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="col-span-3"
+                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="event-start">{t('start') || 'Start'}</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-start" className="text-right">
+                    {t('startDate') || 'Start Date'}
+                  </Label>
                   <Input
                     id="event-start"
                     type="datetime-local"
                     value={formData.start ? new Date(formData.start).toISOString().slice(0, 16) : ''}
-                    onChange={e => setFormData(prev => ({ ...prev, start: new Date(e.target.value).toISOString() }))}
+                    onChange={(e) => setFormData({ ...formData, start: e.target.value })}
+                    className="col-span-3"
                     required
-                    disabled={isLoading}
+                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="event-end">{t('end') || 'End'}</Label>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-end" className="text-right">
+                    {t('endDate') || 'End Date'} ({t('optional') || 'Optional'})
+                  </Label>
                   <Input
                     id="event-end"
                     type="datetime-local"
                     value={formData.end ? new Date(formData.end).toISOString().slice(0, 16) : ''}
-                    onChange={e => setFormData(prev => ({ ...prev, end: e.target.value ? new Date(e.target.value).toISOString() : null }))}
-                    disabled={isLoading}
+                    onChange={(e) => setFormData({ ...formData, end: e.target.value || null })}
+                    className="col-span-3"
+                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
                   />
                 </div>
-                <DialogFooter className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>{t('close') || 'Close'}</Button>
-                  <Button type="submit" variant="default" disabled={isLoading}>{t('save') || 'Save'}</Button>
-                  {selectedEvent && (
-                    <Button type="button" variant="destructive" onClick={handleDelete} disabled={isLoading}>{t('delete') || 'Delete'}</Button>
-                  )}
-                </DialogFooter>
-              </form>
-            ) : (
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>{t('close') || 'Close'}</Button>
+              </div>
+              <DialogFooter className="flex gap-2">
+                {selectedEvent && (user?.role === 'admin' || user?.position === 'Media Buyer') && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={isLoading}
+                    className="mr-auto"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {t('delete') || 'Delete'}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  {t('cancel') || 'Cancel'}
+                </Button>
+                {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading 
+                      ? (t('saving') || 'Saving...') 
+                      : selectedEvent 
+                        ? (t('updateEvent') || 'Update Event')
+                        : (t('createEvent') || 'Create Event')
+                    }
+                  </Button>
+                )}
               </DialogFooter>
-            )}
+            </form>
           </DialogContent>
         </Dialog>
       )}

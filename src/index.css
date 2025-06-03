@@ -300,3 +300,53 @@ body .fc .fc-daygrid-event:hover {
   background: #e0f2fe !important;
   color: #222 !important;
 }
+
+/* Media Buyer Calendar Text Visibility Fixes */
+.fc .fc-daygrid-day-number {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+}
+
+.fc .fc-event-title {
+  color: #1f2937 !important;
+  font-weight: 500 !important;
+}
+
+.fc .fc-event-time {
+  color: #374151 !important;
+  font-weight: 500 !important;
+}
+
+.fc .fc-toolbar-title {
+  color: #1f2937 !important;
+  font-weight: 700 !important;
+}
+
+.fc .fc-button-primary {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #047857 !important;
+  border-color: #047857 !important;
+}
+
+/* Today's date highlighting */
+.fc .fc-day-today .fc-daygrid-day-number {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}

@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, CheckIn as CheckInType, WorkReport as WorkReportType } from '@/types';
+import { User, CheckIn as CheckInType, WorkReport as WorkReportType, Shift } from '@/types';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { fetchShifts, determineShift, createOrUpdateMonthlyShift } from '@/lib/shiftsApi';
+import { useAuth } from './AuthContext';
+import { createNotification } from '@/lib/notifications';
 
 // Update interfaces to match the ones in types/index.ts
 export interface CheckIn {
@@ -48,15 +51,31 @@ interface CheckInContextType {
   getUserLatestCheckIn: (userId: string) => CheckIn | null;
   hasSubmittedReportToday: (userId: string) => boolean;
   deleteWorkReport: (reportId: string) => Promise<void>;
+  isCheckedIn: boolean;
+  currentCheckIn: CheckIn | null;
+  checkIn: () => Promise<void>;
+  checkOut: () => Promise<void>;
+  todaysHours: number;
+  refreshCheckIns: () => Promise<void>;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
 
 export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [workReports, setWorkReports] = useState<WorkReport[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [currentCheckIn, setCurrentCheckIn] = useState<CheckIn | null>(null);
+  const [todaysHours, setTodaysHours] = useState(0);
   
+  // Add state to track work day boundaries
+  const [workDayBoundaries, setWorkDayBoundaries] = useState<{
+    workDayStart: Date;
+    workDayEnd: Date;
+  } | null>(null);
+
   // Initialize with stored data
   useEffect(() => {
     async function loadData() {
@@ -102,6 +121,90 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
   
+  useEffect(() => {
+    // Load work day boundaries when component mounts
+    const loadWorkDayBoundaries = async () => {
+      try {
+        const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
+        const boundaries = await getCurrentWorkDayBoundaries();
+        setWorkDayBoundaries(boundaries);
+        console.log('🕘 Work day boundaries loaded:', boundaries);
+      } catch (error) {
+        console.error('Error loading work day boundaries:', error);
+        // Fallback to midnight-based boundaries
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setWorkDayBoundaries({ workDayStart: today, workDayEnd: tomorrow });
+      }
+    };
+
+    loadWorkDayBoundaries();
+    
+    // Refresh boundaries every hour to handle day transitions
+    const interval = setInterval(loadWorkDayBoundaries, 60 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Notify admins when someone checks in/out
+  const notifyAdmins = async (action: 'check_in' | 'check_out', userName: string) => {
+    try {
+      // Get all admin users
+      const { data: admins, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'admin');
+
+      if (error) throw error;
+
+      const title = action === 'check_in' ? 'Employee Checked In' : 'Employee Checked Out';
+      const message = action === 'check_in' 
+        ? `${userName} has checked in`
+        : `${userName} has checked out`;
+
+      // Send notification to all admins
+      for (const admin of admins) {
+        await createNotification({
+          user_id: admin.id,
+          title,
+          message,
+          related_to: 'check_in',
+          related_id: user?.id,
+          created_by: user?.id
+        });
+      }
+    } catch (error) {
+      console.error('Error notifying admins:', error);
+    }
+  };
+
+  // Subscribe to realtime check-in updates
+  useEffect(() => {
+    if (!user) return;
+
+    const subscription = supabase
+      .channel('check-ins-realtime')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'check_ins'
+        }, 
+        (payload) => {
+          console.log('Check-in update received:', payload);
+          // Refresh check-ins when any change occurs
+          refreshCheckIns();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user]);
+
   const fetchCheckIns = async () => {
     try {
       const { data: checkInsData, error: checkInsError } = await supabase
@@ -221,15 +324,30 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
       if (userError) throw userError;
       
-      // Get today's date at the start of the day
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Get work day boundaries (falls back to midnight if not available)
+      let currentWorkDay = workDayBoundaries;
+      if (!currentWorkDay) {
+        // Load work day boundaries if not already loaded
+        try {
+          const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
+          currentWorkDay = await getCurrentWorkDayBoundaries();
+        } catch (error) {
+          console.error('Error loading work day boundaries for check-in:', error);
+          // Fallback to midnight-based boundaries
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          currentWorkDay = { workDayStart: today, workDayEnd: tomorrow };
+        }
+      }
       
-      // Check if user already checked in today
+      // Check if user already checked in today using work day boundaries
       const existingCheckIn = checkIns.find(checkIn => {
-        const checkInDate = new Date(checkIn.timestamp);
-        checkInDate.setHours(0, 0, 0, 0);
-        return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
+        const checkInTime = new Date(checkIn.timestamp);
+        return checkIn.userId === userId && 
+               checkInTime >= currentWorkDay!.workDayStart && 
+               checkInTime < currentWorkDay!.workDayEnd;
       });
       
       if (existingCheckIn) {
@@ -237,12 +355,33 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
       
+      // For Customer Service employees, check if today is a day off BEFORE check-in
+      if (userData.position === 'Customer Service') {
+        try {
+          const { checkIfDayOff } = await import('@/lib/performanceApi');
+          // Use work day start as the reference date for day-off check
+          const dayOffStatus = await checkIfDayOff(userId, currentWorkDay.workDayStart);
+          
+          if (dayOffStatus.isDayOff) {
+            toast.info('🏖️ Happy time for you! Today is your day off. Enjoy your rest! 😊', {
+              duration: 5000,
+            });
+            return;
+          }
+        } catch (dayOffError) {
+          console.error('Error checking day off status:', dayOffError);
+          // Continue with check-in if day-off check fails
+        }
+      }
+      
+      const checkInTime = new Date();
+      
       // Create a new check-in record
       const { data, error } = await supabase
         .from('check_ins')
         .insert([{
           user_id: userId,
-          timestamp: new Date().toISOString()
+          timestamp: checkInTime.toISOString()
         }])
         .select();
         
@@ -251,8 +390,85 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Update the last_checkin time for the user
       await supabase
         .from('users')
-        .update({ last_checkin: new Date().toISOString() })
+        .update({ last_checkin: checkInTime.toISOString() })
         .eq('id', userId);
+      
+      // For Customer Service employees, handle shift tracking and performance
+      if (userData.position === 'Customer Service') {
+        try {
+          console.log('🔄 Starting shift tracking for user:', userId);
+          
+          const shifts = await fetchShifts();
+          console.log('📋 Available shifts:', shifts);
+          
+          // IMPORTANT: Pass userId to get assigned shift instead of guessing by time
+          const detectedShift = await determineShift(checkInTime, shifts, userId);
+          console.log('🎯 Detected shift:', detectedShift);
+          
+          if (detectedShift) {
+            console.log('✅ Processing shift tracking for:', detectedShift.name);
+            
+            await createOrUpdateMonthlyShift(
+              userId,
+              detectedShift.id,
+              currentWorkDay.workDayStart, // Use work day start as reference date
+              checkInTime
+            );
+            console.log('✅ Monthly shift record created/updated');
+
+            // Record performance tracking with delay calculation
+            const { 
+              recordCheckInPerformance,
+              notifyAdminsAboutDelay,
+              calculateDelay
+            } = await import('@/lib/performanceApi');
+            
+            await recordCheckInPerformance(
+              userId,
+              currentWorkDay.workDayStart, // Use work day start as reference date
+              detectedShift.id,
+              detectedShift.startTime,
+              checkInTime
+            );
+            console.log('✅ Performance tracking recorded');
+
+            // Calculate delay and notify admins if late
+            const delayMinutes = calculateDelay(detectedShift.startTime, checkInTime);
+            console.log('⏱️ Delay calculation:', delayMinutes, 'minutes');
+            
+            if (delayMinutes > 5) {
+              await notifyAdminsAboutDelay(delayMinutes, userData.name, userId);
+              toast.warning(`⚠️ You are ${delayMinutes} minutes late for your ${detectedShift.name}`, {
+                duration: 5000,
+              });
+            } else if (delayMinutes < -10) {
+              toast.success(`⭐ You're early! Checked in ${Math.abs(delayMinutes)} minutes before your ${detectedShift.name}`, {
+                duration: 3000,
+              });
+            } else {
+              toast.success(`✅ On time check-in for ${detectedShift.name}`);
+            }
+          } else {
+            console.warn('⚠️ No assigned shift found for user and no matching shift for check-in time');
+            toast.success('Check-in successful - no shift assignment found');
+          }
+        } catch (shiftError) {
+          console.error('❌ Error handling shift tracking:', shiftError);
+          toast.success('Check-in successful (shift tracking failed - check console for details)');
+          
+          // Log the specific error for debugging
+          if (shiftError instanceof Error) {
+            console.error('Shift tracking error details:', {
+              message: shiftError.message,
+              stack: shiftError.stack,
+              userId,
+              checkInTime: checkInTime.toISOString()
+            });
+          }
+        }
+      } else {
+        toast.success('Check-in successful');
+      }
       
       // Add the new check-in to the local state
       if (data && data[0]) {
@@ -268,7 +484,6 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
         
         setCheckIns(prev => [newCheckIn, ...prev]);
-        toast.success('Check-in successful');
       }
     } catch (error) {
       console.error('Error checking in:', error);
@@ -278,47 +493,123 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const checkOutUser = async (userId: string) => {
     try {
-      // Get today's date at the start of the day
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Get the user data
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, department, position')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) throw userError;
       
-      // Find today's check-in record
-      const todayCheckIn = checkIns.find(checkIn => {
-        const checkInDate = new Date(checkIn.timestamp);
-        checkInDate.setHours(0, 0, 0, 0);
-        return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
+      // Get work day boundaries (falls back to midnight if not available)
+      let currentWorkDay = workDayBoundaries;
+      if (!currentWorkDay) {
+        // Load work day boundaries if not already loaded
+        try {
+          const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
+          currentWorkDay = await getCurrentWorkDayBoundaries();
+        } catch (error) {
+          console.error('Error loading work day boundaries for check-out:', error);
+          // Fallback to midnight-based boundaries
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          currentWorkDay = { workDayStart: today, workDayEnd: tomorrow };
+        }
+      }
+      
+      // Find today's check-in using work day boundaries
+      const existingCheckIn = checkIns.find(checkIn => {
+        const checkInTime = new Date(checkIn.timestamp);
+        return checkIn.userId === userId && 
+               checkInTime >= currentWorkDay!.workDayStart && 
+               checkInTime < currentWorkDay!.workDayEnd && 
+               !checkIn.checkoutTime;
       });
       
-      if (!todayCheckIn) {
-        toast.error('You need to check in before checking out');
+      if (!existingCheckIn) {
+        toast.error('No check-in found for today');
         return;
       }
       
-      if (todayCheckIn.checkoutTime) {
-        toast.error('You have already checked out today');
-        return;
-      }
+      const checkOutTime = new Date();
       
       // Update the check-in record with checkout time
       const { error } = await supabase
         .from('check_ins')
-        .update({ checkout_time: new Date().toISOString() })
-        .eq('id', todayCheckIn.id);
+        .update({ checkout_time: checkOutTime.toISOString() })
+        .eq('id', existingCheckIn.id);
         
       if (error) throw error;
       
-      // Update local state
-      setCheckIns(prev => prev.map(checkIn => {
-        if (checkIn.id === todayCheckIn.id) {
-          return {
-            ...checkIn,
-            checkoutTime: new Date()
-          };
+      // For Customer Service employees, update shift tracking and performance
+      if (userData.position === 'Customer Service') {
+        try {
+          const shifts = await fetchShifts();
+          
+          // IMPORTANT: Pass userId to get assigned shift instead of guessing by time
+          const detectedShift = await determineShift(existingCheckIn.timestamp, shifts, userId);
+          
+          if (detectedShift) {
+            // Calculate hours
+            const hoursWorked = calculateHours(existingCheckIn.timestamp, checkOutTime);
+            const { regularHours, overtimeHours } = calculateRegularAndOvertimeHours(hoursWorked, detectedShift);
+            
+            // Update monthly shift record
+            await updateMonthlyShiftCheckout(
+              userId,
+              detectedShift.id,
+              currentWorkDay.workDayStart, // Use work day start as reference date
+              checkOutTime,
+              regularHours,
+              overtimeHours
+            );
+
+            // Record performance tracking for check-out
+            const { recordCheckOutPerformance } = await import('@/lib/performanceApi');
+            await recordCheckOutPerformance(
+              userId,
+              currentWorkDay.workDayStart, // Use work day start as reference date
+              checkOutTime,
+              regularHours,
+              overtimeHours
+            );
+
+            if (overtimeHours > 0) {
+              toast.success(`✅ Check-out successful! You worked ${hoursWorked.toFixed(1)} hours (${overtimeHours.toFixed(1)}h overtime)`, {
+                duration: 4000,
+              });
+            } else {
+              toast.success(`✅ Check-out successful! You worked ${hoursWorked.toFixed(1)} hours`);
+            }
+          } else {
+            toast.success('Check-out successful');
+          }
+        } catch (shiftError) {
+          console.error('Error handling shift tracking:', shiftError);
+          toast.success('Check-out successful (shift tracking unavailable)');
         }
-        return checkIn;
-      }));
+      } else {
+        toast.success('Check-out successful');
+      }
       
-      toast.success('Check-out successful');
+      // Update the local state
+      setCheckIns(prev => prev.map(checkIn => 
+        checkIn.id === existingCheckIn.id 
+          ? { ...checkIn, checkoutTime: checkOutTime, checkOutTime: checkOutTime }
+          : checkIn
+      ));
+      
+      // Send notification to admins about check-out
+      if (userData.position === 'Customer Service') {
+        await sendNotificationToAdmins(
+          'Employee Check-out',
+          `${userData.name} checked out at ${format(checkOutTime, 'HH:mm')}`,
+          userId
+        );
+      }
     } catch (error) {
       console.error('Error checking out:', error);
       toast.error('Failed to check out');
@@ -399,40 +690,37 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const { error: attachmentError } = await supabase
               .from('file_attachments')
               .insert([{
-              work_report_id: newReport.id,
+                work_report_id: newReport.id,
                 file_name: fileName,
                 file_path: filePath,
-                file_type: fileAttachment.type
+                file_size: fileAttachment.size
               }]);
               
             if (attachmentError) {
               console.error('Error recording file attachment:', attachmentError);
-            toast.error('Failed to record attachment');
             } else {
-              fileAttachments.push(fileName);
+              fileAttachments = [fileName];
             }
           }
         }
-        
+      
       // Add the new report to the local state
-      if (newReport) {
-        const workReport: WorkReport = {
-          id: newReport.id,
-          userId: newReport.user_id,
-          userName: userData.name,
-          date: new Date(newReport.date),
-          tasksDone: newReport.tasks_done,
-          issuesFaced: newReport.issues_faced,
-          plansForTomorrow: newReport.plans_for_tomorrow,
-          createdAt: new Date(newReport.created_at),
-          department: userData.department,
-          position: userData.position,
-          fileAttachments
-        };
-        
-        setWorkReports(prev => [workReport, ...prev]);
-        toast.success('Work report submitted successfully');
-      }
+      const formattedReport: WorkReport = {
+        id: newReport.id,
+        userId: newReport.user_id,
+        userName: userData.name,
+        date: new Date(newReport.date),
+        tasksDone: newReport.tasks_done,
+        issuesFaced: newReport.issues_faced,
+        plansForTomorrow: newReport.plans_for_tomorrow,
+        createdAt: new Date(newReport.created_at),
+        department: userData.department,
+        position: userData.position,
+        fileAttachments
+      };
+      
+      setWorkReports(prev => [formattedReport, ...prev]);
+      toast.success('Work report submitted successfully');
     } catch (error) {
       console.error('Error submitting work report:', error);
       toast.error('Failed to submit work report');
@@ -440,31 +728,49 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
   
   const hasCheckedInToday = (userId: string): boolean => {
-    // Get today's date at the start of the day in user's local timezone
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+    if (!workDayBoundaries) {
+      // Fallback to midnight-based logic if boundaries not loaded yet
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      return checkIns.some(checkIn => {
+        const checkInDate = new Date(checkIn.timestamp);
+        checkInDate.setHours(0, 0, 0, 0);
+        return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
+      });
+    }
+
     return checkIns.some(checkIn => {
-      const checkInDate = new Date(checkIn.timestamp);
-      checkInDate.setHours(0, 0, 0, 0);
-      return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
+      const checkInTime = new Date(checkIn.timestamp);
+      return checkIn.userId === userId && 
+             checkInTime >= workDayBoundaries.workDayStart && 
+             checkInTime < workDayBoundaries.workDayEnd;
     });
   };
   
   const hasCheckedOutToday = (userId: string): boolean => {
-    // Get today's date at the start of the day in user's local timezone
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return checkIns.some(checkIn => {
-      const checkInDate = new Date(checkIn.timestamp);
-      checkInDate.setHours(0, 0, 0, 0);
-      return (
-        checkIn.userId === userId && 
-        checkInDate.getTime() === today.getTime() && 
-        checkIn.checkoutTime !== undefined
-      );
+    if (!workDayBoundaries) {
+      // Fallback to midnight-based logic if boundaries not loaded yet
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayCheckIn = checkIns.find(checkIn => {
+        const checkInDate = new Date(checkIn.timestamp);
+        checkInDate.setHours(0, 0, 0, 0);
+        return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
+      });
+      
+      return todayCheckIn ? !!todayCheckIn.checkoutTime : false;
+    }
+
+    const todayCheckIn = checkIns.find(checkIn => {
+      const checkInTime = new Date(checkIn.timestamp);
+      return checkIn.userId === userId && 
+             checkInTime >= workDayBoundaries.workDayStart && 
+             checkInTime < workDayBoundaries.workDayEnd;
     });
+    
+    return todayCheckIn ? !!todayCheckIn.checkoutTime : false;
   };
   
   const getUserLatestCheckIn = (userId: string): CheckIn | null => {
@@ -473,43 +779,191 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
   
   const hasSubmittedReportToday = (userId: string): boolean => {
-    // Get today's date in user's local timezone
-    const today = new Date();
-    const formattedToday = format(today, 'yyyy-MM-dd');
-    
+    if (!workDayBoundaries) {
+      // Fallback to midnight-based logic if boundaries not loaded yet
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      return workReports.some(report => {
+        const reportDate = new Date(report.date);
+        reportDate.setHours(0, 0, 0, 0);
+        return report.userId === userId && reportDate.getTime() === today.getTime();
+      });
+    }
+
     return workReports.some(report => {
-      const reportDate = format(new Date(report.date), 'yyyy-MM-dd');
-      return report.userId === userId && reportDate === formattedToday;
+      const reportDate = new Date(report.date);
+      return report.userId === userId && 
+             reportDate >= workDayBoundaries.workDayStart && 
+             reportDate < workDayBoundaries.workDayEnd;
     });
   };
   
   const deleteWorkReport = async (reportId: string) => {
     try {
-      // First delete any associated file attachments
-      const { error: fileError } = await supabase
+      // Delete file attachments first
+      const { error: attachmentError } = await supabase
         .from('file_attachments')
         .delete()
         .eq('work_report_id', reportId);
-
-      if (fileError) throw fileError;
-
-      // Then delete the work report
+        
+      if (attachmentError) {
+        console.error('Error deleting file attachments:', attachmentError);
+      }
+      
+      // Delete the work report
       const { error } = await supabase
         .from('work_reports')
         .delete()
         .eq('id', reportId);
-
+        
       if (error) throw error;
-
+      
       // Update local state
       setWorkReports(prev => prev.filter(report => report.id !== reportId));
-      toast.success('Report deleted successfully');
+      toast.success('Work report deleted successfully');
     } catch (error) {
       console.error('Error deleting work report:', error);
-      toast.error('Failed to delete report');
+      toast.error('Failed to delete work report');
     }
   };
   
+  const refreshCheckIns = async () => {
+    if (!user) return;
+
+    try {
+      // Get all check-ins for today (for admins) or user's check-ins (for employees)
+      let query = supabase
+        .from('check_ins')
+        .select(`
+          *,
+          user:users!check_ins_user_id_fkey (id, name, position)
+        `)
+        .gte('created_at', new Date().toISOString().split('T')[0]) // Today
+        .order('created_at', { ascending: false });
+
+      // If not admin, only show user's own check-ins
+      if (user.role !== 'admin') {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      
+      setCheckIns(data || []);
+
+      // Check if current user is checked in
+      if (user.role !== 'admin') {
+        const userCheckIns = data?.filter(ci => ci.user_id === user.id) || [];
+        const activeCheckIn = userCheckIns.find(ci => !ci.checkout_time);
+        setIsCheckedIn(!!activeCheckIn);
+        setCurrentCheckIn(activeCheckIn || null);
+
+        // Calculate today's hours
+        let totalHours = 0;
+        userCheckIns.forEach(ci => {
+          if (ci.checkout_time) {
+            const checkInTime = new Date(ci.timestamp);
+            const checkOutTime = new Date(ci.checkout_time);
+            const hours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+            totalHours += hours;
+          }
+        });
+        setTodaysHours(totalHours);
+      }
+    } catch (error) {
+      console.error('Error fetching check-ins:', error);
+    }
+  };
+  
+  // Function to check in user
+  const checkIn = async () => {
+    if (!user) return;
+    await checkInUser(user.id);
+    await notifyAdmins('check_in', user.name);
+  };
+
+  // Function to check out user  
+  const checkOut = async () => {
+    if (!user) return;
+    await checkOutUser(user.id);
+    await notifyAdmins('check_out', user.name);
+  };
+
+  // Helper function to calculate work hours
+  const calculateHours = (checkInTime: Date, checkOutTime: Date): number => {
+    const diffMs = checkOutTime.getTime() - checkInTime.getTime();
+    return diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+  };
+
+  // Helper function to calculate regular and overtime hours
+  const calculateRegularAndOvertimeHours = (totalHours: number, shift: Shift) => {
+    const standardWorkHours = 8; // 8-hour standard work day
+    const regularHours = Math.min(totalHours, standardWorkHours);
+    const overtimeHours = Math.max(0, totalHours - standardWorkHours);
+    
+    return { regularHours, overtimeHours };
+  };
+
+  // Helper function to update monthly shift checkout
+  const updateMonthlyShiftCheckout = async (
+    userId: string,
+    shiftId: string,
+    workDate: Date,
+    checkOutTime: Date,
+    regularHours: number,
+    overtimeHours: number
+  ) => {
+    const workDateStr = format(workDate, 'yyyy-MM-dd');
+    
+    const { error } = await supabase
+      .from('monthly_shifts')
+      .update({
+        check_out_time: checkOutTime.toISOString(),
+        regular_hours: regularHours,
+        overtime_hours: overtimeHours,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('work_date', workDateStr);
+
+    if (error) {
+      console.error('Error updating monthly shift checkout:', error);
+      throw error;
+    }
+  };
+
+  // Helper function to send notifications to admins
+  const sendNotificationToAdmins = async (title: string, message: string, createdBy: string) => {
+    try {
+      // Get all admin users
+      const { data: admins, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'admin');
+
+      if (error) throw error;
+
+      // Send notification to all admins
+      const notifications = admins.map(admin => ({
+        user_id: admin.id,
+        title,
+        message,
+        created_by: createdBy,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (notificationError) throw notificationError;
+    } catch (error) {
+      console.error('Error sending notification to admins:', error);
+    }
+  };
+
   const contextValue: CheckInContextType = {
     checkIns,
     workReports,
@@ -524,6 +978,12 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     getUserLatestCheckIn,
     hasSubmittedReportToday,
     deleteWorkReport,
+    isCheckedIn,
+    currentCheckIn,
+    checkIn,
+    checkOut,
+    todaysHours,
+    refreshCheckIns,
   };
   
   return (

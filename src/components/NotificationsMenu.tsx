@@ -190,8 +190,15 @@ const NotificationsMenu = () => {
     
     // Navigate based on notification type
     if (notification.related_to === 'task' && notification.related_id) {
-      // Determine which task page to go to based on user role
-      const taskPath = user?.role === 'admin' ? '/tasks' : '/employee-tasks';
+      // Determine which task page to go to based on user role and position
+      let taskPath = '/employee-tasks'; // Default for regular employees
+      
+      if (user?.role === 'admin') {
+        taskPath = '/tasks'; // Admin goes to admin tasks page
+      } else if (user?.position === 'Media Buyer') {
+        taskPath = '/media-buyer-tasks'; // Media Buyer goes to their dedicated page
+      }
+      
       navigate(taskPath, { state: { taskId: notification.related_id } });
       toast.info(`Navigating to task: ${notification.related_id}`);
     } else if (notification.related_to === 'report' && notification.related_id) {
