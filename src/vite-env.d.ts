@@ -1,4 +1,3 @@
-
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
@@ -13,8 +12,6 @@ interface ImportMeta {
 // Global function declarations
 declare global {
   interface Window {
-    recalculateOvertime?: () => Promise<{ success: boolean; recordsUpdated: number; message: string; error?: string }>;
+    recalculateOvertime: () => Promise<{ success: boolean; recordsUpdated: number; message: string; error?: string }>;
   }
 }
-
-export {}

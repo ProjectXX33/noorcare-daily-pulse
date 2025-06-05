@@ -12,7 +12,7 @@ export type User = {
   averageRating?: number;
 };
 
-export type Department = 'Engineering' | 'Medical' | 'General' | 'Management' | 'IT' | 'Doctor' | 'Manager';
+export type Department = 'Engineering' | 'Medical' | 'General' | 'Management';
 
 export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer';
 
