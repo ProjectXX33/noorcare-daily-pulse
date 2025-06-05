@@ -27,8 +27,8 @@ const ShiftsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile-optimized sticky header without background */}
-      <div className="sticky top-0 z-50 border-b shadow-sm">
+      {/* Header with just text, no background or shadow */}
+      <div className="sticky top-0 z-50">
         <div className="mobile-first-container py-3 sm:py-4">
           <div className="flex flex-col gap-1 sm:gap-2">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2">
