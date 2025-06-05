@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +42,9 @@ const CustomerServiceSchedule = () => {
   const loadSchedule = async () => {
     setIsLoading(true);
     try {
-      // Get assignments for the next 14 days
+      // Get assignments for the next 5 days
       const startDate = new Date();
-      const endDate = addDays(startDate, 13);
+      const endDate = addDays(startDate, 4);
       
       const { data, error } = await supabase
         .from('shift_assignments')
@@ -171,7 +170,7 @@ const CustomerServiceSchedule = () => {
         <CardHeader className="pb-3 sm:pb-4">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-            Your Schedule (Next 14 Days)
+            <span className="break-words">Next 5 Days</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
