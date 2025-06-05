@@ -95,7 +95,7 @@ export type Shift = {
   name: string;
   startTime: string; // HH:MM format
   endTime: string; // HH:MM format
-  position: 'Customer Service';
+  position: 'Customer Service' | 'Designer';
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

@@ -29,9 +29,18 @@ import {
   TableRow, 
   TableCell 
 } from '@/components/ui/table';
-import { Star, Calendar, Filter, Users } from 'lucide-react';
+import { Star, Calendar, Filter, Users, Search, ChevronDown } from 'lucide-react';
 import RateEmployeeModal from '@/components/RateEmployeeModal';
 import StarRating from '@/components/StarRating';
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const AdminRatingsPage = () => {
   const { user } = useAuth();
@@ -75,7 +84,12 @@ const AdminRatingsPage = () => {
       never: "Never",
       today: "Today",
       loadingEmployees: "Loading employees...",
-      ratingSubmittedSuccessfully: "Rating submitted successfully!"
+      ratingSubmittedSuccessfully: "Rating submitted successfully!",
+      filters: "Filters & Search",
+      clearFilters: "Clear Filters",
+      rateEmployeeShort: "Rate",
+      searchByName: "Search by name...",
+      noEmployeesFound: "No employees found matching your criteria"
     },
     ar: {
       employeeRatings: "تقييمات الموظفين",
@@ -106,7 +120,12 @@ const AdminRatingsPage = () => {
       never: "أبداً",
       today: "اليوم",
       loadingEmployees: "جاري تحميل الموظفين...",
-      ratingSubmittedSuccessfully: "تم إرسال التقييم بنجاح!"
+      ratingSubmittedSuccessfully: "تم إرسال التقييم بنجاح!",
+      filters: "المرشحات والبحث",
+      clearFilters: "مسح المرشحات",
+      rateEmployeeShort: "تقييم",
+      searchByName: "البحث بالاسم...",
+      noEmployeesFound: "لا يوجد موظفون يطابقون معايير البحث"
     }
   };
 
@@ -222,221 +241,386 @@ const AdminRatingsPage = () => {
 
   return (
     <>
-      <div className="space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        {/* Header */}
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold">{t.employeeRatings}</h1>
-          <p className="text-muted-foreground">{t.rateAndManageEmployees}</p>
+      <div className="space-y-4 md:space-y-6 pb-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        {/* Mobile-optimized sticky header */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-4 border-b shadow-sm">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{t.employeeRatings}</h1>
+            <p className="text-xs sm:text-sm md:text-base text-muted-foreground">{t.rateAndManageEmployees}</p>
+          </div>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Mobile-responsive statistics cards */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.totalEmployees}</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalEmployees}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.totalEmployees}</p>
+                <div className="text-lg sm:text-2xl font-bold">{totalEmployees}</div>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.ratedToday}</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{todayRated}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.ratedToday}</p>
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{todayRated}</div>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.pendingRatings}</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{pendingRatings}</div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.pendingRatings}</p>
+                <div className="text-lg sm:text-2xl font-bold text-orange-600">{pendingRatings}</div>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t.averageRating}</CardTitle>
-              <Star className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {ratedEmployees > 0 
-                  ? (employees.reduce((sum, e) => sum + (e.averageRating || 0), 0) / ratedEmployees).toFixed(1)
-                  : '0.0'
-                }
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.averageRating}</p>
+                <div className="text-lg sm:text-2xl font-bold">
+                  {ratedEmployees > 0 
+                    ? (employees.reduce((sum, e) => sum + (e.averageRating || 0), 0) / ratedEmployees).toFixed(1)
+                    : '0.0'
+                  }
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters & Search
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-              <div>
-                <Input
-                  placeholder={t.searchEmployees}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.filterByDepartment} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.allDepartments}</SelectItem>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="IT">IT</SelectItem>
-                    <SelectItem value="Doctor">Doctor</SelectItem>
-                    <SelectItem value="Manager">Manager</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Select value={filterRating} onValueChange={setFilterRating}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.filterByRating} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.allRatings}</SelectItem>
-                    <SelectItem value="excellent">{t.excellent}</SelectItem>
-                    <SelectItem value="good">{t.good}</SelectItem>
-                    <SelectItem value="needs-improvement">{t.needsImprovement}</SelectItem>
-                    <SelectItem value="not-rated">{t.notRated}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFilterDepartment('all');
-                    setFilterRating('all');
-                  }}
-                  className="w-full"
-                >
-                  Clear Filters
+        {/* Mobile filters sheet */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">
+          <div className="block sm:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full min-h-[44px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  {t.filters}
+                  <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[70vh]">
+                <SheetHeader>
+                  <SheetTitle>{t.filters}</SheetTitle>
+                </SheetHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mobile-search" className="text-sm font-medium">{t.searchEmployees}</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="mobile-search"
+                        placeholder={t.searchByName}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="h-11 pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">{t.department}</Label>
+                    <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder={t.allDepartments} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.allDepartments}</SelectItem>
+                        <SelectItem value="Engineering">Engineering</SelectItem>
+                        <SelectItem value="Medical">Medical</SelectItem>
+                        <SelectItem value="General">General</SelectItem>
+                        <SelectItem value="Management">Management</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">{t.filterByRating}</Label>
+                    <Select value={filterRating} onValueChange={setFilterRating}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder={t.allRatings} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.allRatings}</SelectItem>
+                        <SelectItem value="excellent">Excellent (4+ stars)</SelectItem>
+                        <SelectItem value="good">Good (3-4 stars)</SelectItem>
+                        <SelectItem value="needs-improvement">Needs Improvement (&lt;3 stars)</SelectItem>
+                        <SelectItem value="not-rated">{t.notRated}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterDepartment('all');
+                      setFilterRating('all');
+                    }}
+                    className="w-full h-11"
+                  >
+                    {t.clearFilters}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
 
-        {/* Employee Ratings Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.dailyRatingManagement}</CardTitle>
-            <CardDescription>
+          {/* Desktop filters */}
+          <Card className="hidden sm:block">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="search" className="text-xs font-medium text-muted-foreground">{t.searchEmployees}</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-3 w-3 text-muted-foreground" />
+                    <Input
+                      id="search"
+                      placeholder={t.searchByName}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="h-9 pl-9 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">{t.department}</Label>
+                  <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={t.allDepartments} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.allDepartments}</SelectItem>
+                      <SelectItem value="Engineering">Engineering</SelectItem>
+                      <SelectItem value="Medical">Medical</SelectItem>
+                      <SelectItem value="General">General</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground">{t.filterByRating}</Label>
+                  <Select value={filterRating} onValueChange={setFilterRating}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={t.allRatings} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.allRatings}</SelectItem>
+                      <SelectItem value="excellent">Excellent (4+ stars)</SelectItem>
+                      <SelectItem value="good">Good (3-4 stars)</SelectItem>
+                      <SelectItem value="needs-improvement">Needs Improvement (&lt;3 stars)</SelectItem>
+                      <SelectItem value="not-rated">{t.notRated}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 flex items-end">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterDepartment('all');
+                      setFilterRating('all');
+                    }}
+                    className="w-full h-9 text-xs"
+                  >
+                    {t.clearFilters}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Employee Ratings Table/Cards */}
+        <Card className="flex-1">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="text-base sm:text-lg">{t.dailyRatingManagement}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Rate employee performance and track their progress
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t.employee}</TableHead>
-                    <TableHead className="hidden md:table-cell">{t.department}</TableHead>
-                    <TableHead className="hidden md:table-cell">{t.position}</TableHead>
-                    <TableHead>{t.currentRating}</TableHead>
-                    <TableHead className="hidden lg:table-cell">{t.lastRated}</TableHead>
-                    <TableHead className="text-right">{t.actions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+          <CardContent className="p-0">
+            {/* Mobile cards view */}
+            <div className="block lg:hidden">
+              <ScrollArea className="h-[60vh]">
+                <div className="space-y-3 p-4">
                   {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                          <span className="ml-2">{t.loadingEmployees}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <div className="text-center py-8">
+                      <div className="flex items-center justify-center mb-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{t.loadingEmployees}</span>
+                    </div>
                   ) : filteredEmployees.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        No employees found matching your criteria
-                      </TableCell>
-                    </TableRow>
+                    <div className="text-center py-8">
+                      <span className="text-sm text-muted-foreground">{t.noEmployeesFound}</span>
+                    </div>
                   ) : (
                     filteredEmployees.map(employee => (
-                      <TableRow key={employee.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <div className="font-medium">{employee.name}</div>
-                              <div className="text-sm text-gray-500">@{employee.username}</div>
+                      <Card key={employee.id} className="border">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-sm">{employee.name}</h4>
+                                {isRatedToday(employee) && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                    {t.today}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">@{employee.username}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {employee.department}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {employee.position}
+                                </Badge>
+                              </div>
                             </div>
-                            {isRatedToday(employee) && (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                {t.today}
-                              </Badge>
-                            )}
+                            <Button
+                              size="sm"
+                              onClick={() => openRateEmployeeDialog(employee)}
+                              className="h-8 px-3 text-xs min-h-[44px] sm:min-h-auto"
+                            >
+                              <Star className="mr-1 h-3 w-3" />
+                              {t.rateEmployeeShort}
+                            </Button>
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {employee.department}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {employee.position}
-                        </TableCell>
-                        <TableCell>
-                          {employee.averageRating && employee.averageRating > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <StarRating rating={employee.averageRating} readonly size="sm" />
-                              <span className="text-sm font-medium">
-                                {employee.averageRating.toFixed(1)}
+                          
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">{t.currentRating}</p>
+                              {employee.averageRating && employee.averageRating > 0 ? (
+                                <div className="flex items-center gap-2">
+                                  <StarRating rating={employee.averageRating} readonly size="sm" />
+                                  <span className="text-xs font-medium">
+                                    {employee.averageRating.toFixed(1)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">{t.noRating}</span>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-muted-foreground mb-1">{t.lastRated}</p>
+                              <span className="text-xs">
+                                {employee.latestRating ? 
+                                  employee.latestRating.ratedAt.toLocaleDateString() : 
+                                  t.never
+                                }
                               </span>
                             </div>
-                          ) : (
-                            <span className="text-sm text-gray-500">{t.noRating}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {employee.latestRating ? (
-                            <span className="text-sm text-gray-600">
-                              {employee.latestRating.ratedAt.toLocaleDateString()}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-500">{t.never}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            onClick={() => openRateEmployeeDialog(employee)}
-                            className="bg-primary hover:bg-primary/90"
-                          >
-                            <Star className="mr-2 h-4 w-4" />
-                            {t.rateEmployee}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))
                   )}
-                </TableBody>
-              </Table>
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden lg:block p-4">
+              <div className="mobile-table-scroll">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">{t.employee}</TableHead>
+                      <TableHead className="min-w-[120px]">{t.department}</TableHead>
+                      <TableHead className="min-w-[120px]">{t.position}</TableHead>
+                      <TableHead className="min-w-[120px]">{t.currentRating}</TableHead>
+                      <TableHead className="min-w-[100px]">{t.lastRated}</TableHead>
+                      <TableHead className="text-right min-w-[100px]">{t.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                            <span className="ml-2 text-sm">{t.loadingEmployees}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredEmployees.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <span className="text-sm">{t.noEmployeesFound}</span>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredEmployees.map(employee => (
+                        <TableRow key={employee.id}>
+                          <TableCell className="sticky left-0 bg-background z-10">
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="font-medium text-sm">{employee.name}</div>
+                                <div className="text-xs text-gray-500">@{employee.username}</div>
+                              </div>
+                              {isRatedToday(employee) && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                  {t.today}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {employee.department}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {employee.position}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {employee.averageRating && employee.averageRating > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <StarRating rating={employee.averageRating} readonly size="sm" />
+                                <span className="text-sm font-medium">
+                                  {employee.averageRating.toFixed(1)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">{t.noRating}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {employee.latestRating ? (
+                              <span className="text-xs text-gray-600">
+                                {employee.latestRating.ratedAt.toLocaleDateString()}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-500">{t.never}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => openRateEmployeeDialog(employee)}
+                              className="h-8 px-3 text-xs"
+                            >
+                              <Star className="mr-1 h-3 w-3" />
+                              {t.rateEmployee}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </CardContent>
         </Card>

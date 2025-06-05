@@ -407,7 +407,9 @@ export async function recordCheckOutPerformance(
       // Include final performance score calculated at checkout
       finalPerformanceScore: finalPerformanceScore,
       workDurationScore: workDurationScore,
-      totalWorkHours: regularHours + overtimeHours
+      totalWorkHours: regularHours + overtimeHours,
+      // ALSO include delay data from check-in for complete record
+      checkInDelay: delayMinutes
     });
 
     console.log('✅ Complete check-out performance recorded successfully');
@@ -454,7 +456,22 @@ export async function updateDashboardPerformance(
   }
 ): Promise<void> {
   try {
-    console.log('📊 Updating dashboard performance:', { userId, monthYear, updates });
+    console.log('📊 Updating dashboard performance:', { userId, employeeName, monthYear, updates });
+
+    // Test database access first
+    console.log('🔍 Testing database access...');
+    const { data: testAccess, error: accessError } = await supabase
+      .from('admin_performance_dashboard')
+      .select('count')
+      .eq('employee_id', userId)
+      .eq('month_year', monthYear)
+      .limit(1);
+
+    if (accessError) {
+      console.error('❌ Database access test failed:', accessError);
+      throw new Error(`Database access denied: ${accessError.message}`);
+    }
+    console.log('✅ Database access test passed');
 
     // Get current record if exists
     const { data: existingRecord, error: fetchError } = await supabase
@@ -465,8 +482,11 @@ export async function updateDashboardPerformance(
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
+      console.error('❌ Error fetching existing record:', fetchError);
+      throw new Error(`Failed to fetch existing record: ${fetchError.message}`);
     }
+
+    console.log('📋 Existing record:', existingRecord ? 'Found' : 'Not found');
 
     let recordData: any = {
       employee_id: userId,
@@ -480,15 +500,32 @@ export async function updateDashboardPerformance(
       punctuality_percentage: existingRecord?.punctuality_percentage || 100,
     };
 
-    // Update with new data
-    if (updates.workingDay && !existingRecord) {
-      // Only increment working days when creating a NEW record (not on check-out)
+    // Update with new data - NEW LOGIC: Working days incremented only at checkout
+    if (updates.finalPerformanceScore !== undefined) {
+      // This is a checkout update with complete performance data
+      if (!existingRecord) {
+        // First checkout - create new record
+        recordData.total_working_days = 1;
+        console.log('🆕 Checkout: Creating new performance record - working days set to 1');
+      } else {
+        // Existing record - check if this is a new working day
+        const today = new Date().toISOString().split('T')[0];
+        const lastUpdate = existingRecord.updated_at ? new Date(existingRecord.updated_at).toISOString().split('T')[0] : null;
+        
+        if (lastUpdate !== today) {
+          // Different day - increment working days
+          recordData.total_working_days = existingRecord.total_working_days + 1;
+          console.log('📈 Checkout: New working day - incrementing to:', recordData.total_working_days);
+        } else {
+          // Same day update - don't increment
+          recordData.total_working_days = existingRecord.total_working_days;
+          console.log('🔄 Checkout: Same day update - keeping working days at:', recordData.total_working_days);
+        }
+      }
+    } else if (updates.workingDay && !existingRecord) {
+      // Legacy check-in only logic (should rarely be used now)
       recordData.total_working_days = 1;
-      console.log('🆕 Creating new performance record - working days set to 1');
-    } else if (updates.workingDay && existingRecord && updates.checkInDelay !== undefined) {
-      // Only increment if this is a new check-in (has delay data)
-      recordData.total_working_days = existingRecord.total_working_days + 1;
-      console.log('📈 Incrementing working days to:', recordData.total_working_days);
+      console.log('🆕 Legacy: Creating new record - working days set to 1');
     }
 
     if (updates.checkInDelay !== undefined) {
@@ -496,7 +533,7 @@ export async function updateDashboardPerformance(
       const delayToAdd = Math.max(0, updates.checkInDelay);
       recordData.total_delay_minutes = (existingRecord?.total_delay_minutes || 0) + delayToAdd;
       recordData.total_delay_hours = Math.round((recordData.total_delay_minutes / 60) * 100) / 100;
-      console.log('⏰ Updated delay:', { 
+      console.log('⏰ Check-in: Updated delay:', { 
         newDelay: delayToAdd, 
         totalDelayMinutes: recordData.total_delay_minutes,
         totalDelayHours: recordData.total_delay_hours 
@@ -506,6 +543,7 @@ export async function updateDashboardPerformance(
     if (updates.overtimeHours !== undefined) {
       recordData.total_overtime_hours = (existingRecord?.total_overtime_hours || 0) + updates.overtimeHours;
       recordData.total_overtime_hours = Math.round(recordData.total_overtime_hours * 100) / 100;
+      console.log('⏰ Updated overtime hours:', recordData.total_overtime_hours);
     }
 
     if (updates.performanceScore !== undefined) {
@@ -608,20 +646,45 @@ export async function updateDashboardPerformance(
       finalStatus: recordData.performance_status
     });
 
-    // Upsert the record
-    const { error: upsertError } = await supabase
+    // Add timestamps
+    recordData.updated_at = new Date().toISOString();
+    if (!existingRecord) {
+      recordData.created_at = new Date().toISOString();
+    }
+
+    console.log('💾 Attempting to save record data:', recordData);
+
+    // Upsert the record with detailed error handling
+    const { data: upsertResult, error: upsertError } = await supabase
       .from('admin_performance_dashboard')
       .upsert(recordData, {
         onConflict: 'employee_id,month_year'
+      })
+      .select();
+
+    if (upsertError) {
+      console.error('❌ Detailed upsert error:', {
+        message: upsertError.message,
+        details: upsertError.details,
+        hint: upsertError.hint,
+        code: upsertError.code,
+        recordData: recordData
       });
+      throw new Error(`Failed to save performance data: ${upsertError.message}`);
+    }
 
-    if (upsertError) throw upsertError;
-
-    console.log('✅ Dashboard performance updated:', recordData);
+    console.log('✅ Dashboard performance updated successfully:', upsertResult);
 
   } catch (error) {
-    console.error('❌ Error updating dashboard performance:', error);
-    throw error;
+    console.error('❌ Complete error in updateDashboardPerformance:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+    
+    // Re-throw with more context
+    if (error instanceof Error) {
+      throw new Error(`Performance update failed: ${error.message}`);
+    } else {
+      throw new Error(`Performance update failed: ${String(error)}`);
+    }
   }
 }
 

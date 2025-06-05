@@ -242,167 +242,293 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto py-8 px-2 md:px-0">
-      <Card className="shadow-lg border bg-white dark:bg-background rounded-xl">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">{t('settings')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="account" className="w-full">
-            <TabsList className="flex flex-col md:flex-row gap-2 mb-6">
-              <TabsTrigger value="account">{t('account')}</TabsTrigger>
-              <TabsTrigger value="preferences">{t('preferences')}</TabsTrigger>
-              <TabsTrigger value="security">{t('security')}</TabsTrigger>
-              {user?.role === 'admin' && (
-                <TabsTrigger value="worktime">Work Time</TabsTrigger>
-              )}
-            </TabsList>
-            <TabsContent value="account">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-4 md:space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
+          {t('settings') || 'Settings'}
+        </h1>
+        <p className="text-sm md:text-base text-muted-foreground">
+          {t('manageSettings') || 'Manage your account settings and preferences'}
+        </p>
+      </div>
+
+      {/* Mobile-optimized tabs */}
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 h-auto p-1">
+          <TabsTrigger value="profile" className="text-xs sm:text-sm py-2 px-3">
+            {t('profile') || 'Profile'}
+          </TabsTrigger>
+          <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2 px-3">
+            {t('preferences') || 'Preferences'}
+          </TabsTrigger>
+          {user?.role === 'admin' && (
+            <>
+              <TabsTrigger value="system" className="text-xs sm:text-sm py-2 px-3 col-span-2 lg:col-span-1">
+                {t('system') || 'System'}
+              </TabsTrigger>
+              <TabsTrigger value="worktime" className="text-xs sm:text-sm py-2 px-3 col-span-2 lg:col-span-1">
+                {t('workTime') || 'Work Time'}
+              </TabsTrigger>
+            </>
+          )}
+        </TabsList>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile" className="mt-4 md:mt-6">
+          <Card>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">{t('personalInformation') || 'Personal Information'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 sm:space-y-6">
+              {/* Mobile-responsive form */}
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="name">{t('name')}</Label>
+                  <Label htmlFor="name" className="text-xs sm:text-sm">{t('fullName') || 'Full Name'}</Label>
                   <Input
                     id="name"
                     value={userProfile.name}
-                    onChange={e => setUserProfile({ ...userProfile, name: e.target.value })}
+                    onChange={(e) => setUserProfile({ ...userProfile, name: e.target.value })}
+                    className="h-9 sm:h-10 text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">{t('email')}</Label>
+                  <Label htmlFor="email" className="text-xs sm:text-sm">{t('email') || 'Email'}</Label>
                   <Input
                     id="email"
                     type="email"
                     value={userProfile.email}
-                    onChange={e => setUserProfile({ ...userProfile, email: e.target.value })}
+                    onChange={(e) => setUserProfile({ ...userProfile, email: e.target.value })}
+                    className="h-9 sm:h-10 text-sm"
                   />
                 </div>
               </div>
-              <Button className="mt-6 w-full md:w-auto" onClick={handleProfileUpdate} disabled={loading}>
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                    {t('updateProfile')}
-                  </div>
-                ) : t('updateProfile')}
+              <Button 
+                onClick={handleProfileUpdate} 
+                disabled={loading}
+                className="w-full sm:w-auto min-h-[44px] text-sm"
+              >
+                {t('updateProfile') || 'Update Profile'}
               </Button>
-            </TabsContent>
-            <TabsContent value="preferences">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <Label className="mb-0">{t('language')}</Label>
-                  <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">Coming Soon</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Label className="mb-0">Dark Mode</Label>
-                  <span className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">Coming Soon</span>
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="security">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            </CardContent>
+          </Card>
+
+          {/* Password Section */}
+          <Card className="mt-4 md:mt-6">
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">{t('changePassword') || 'Change Password'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 sm:space-y-6">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="password">{t('newPassword')}</Label>
+                  <Label htmlFor="password" className="text-xs sm:text-sm">{t('newPassword') || 'New Password'}</Label>
                   <Input
                     id="password"
                     type="password"
                     value={userProfile.password}
-                    onChange={e => setUserProfile({ ...userProfile, password: e.target.value })}
+                    onChange={(e) => setUserProfile({ ...userProfile, password: e.target.value })}
+                    className="h-9 sm:h-10 text-sm"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+                  <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">{t('confirmPassword') || 'Confirm Password'}</Label>
                   <Input
                     id="confirmPassword"
                     type="password"
                     value={userProfile.confirmPassword}
-                    onChange={e => setUserProfile({ ...userProfile, confirmPassword: e.target.value })}
+                    onChange={(e) => setUserProfile({ ...userProfile, confirmPassword: e.target.value })}
+                    className="h-9 sm:h-10 text-sm"
                   />
                 </div>
               </div>
-              <Button className="mt-6 w-full md:w-auto" onClick={handlePasswordUpdate} disabled={loading}>
-                {loading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                    {t('updatePassword')}
-                  </div>
-                ) : t('updatePassword')}
+              <Button 
+                onClick={handlePasswordUpdate} 
+                disabled={loading || !userProfile.password}
+                className="w-full sm:w-auto min-h-[44px] text-sm"
+              >
+                {t('updatePassword') || 'Update Password'}
               </Button>
-            </TabsContent>
-            {user?.role === 'admin' && (
-              <TabsContent value="worktime">
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Work Time Configuration</h3>
-                    <p className="text-sm text-muted-foreground mb-6">
-                      Configure daily reset times and work hours for the system.
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Preferences Tab */}
+        <TabsContent value="preferences" className="mt-4 md:mt-6">
+          <Card>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className="text-base sm:text-lg">{t('notificationSettings') || 'Notification Settings'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 sm:space-y-6">
+              {/* Mobile-responsive preference toggles */}
+              <div className="space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm sm:text-base">{t('enableNotifications') || 'Enable Notifications'}</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t('receiveNotifications') || 'Receive notifications for tasks and events'}
                     </p>
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <Label htmlFor="dailyResetTime">Daily Reset Time</Label>
-                      <Input
-                        id="dailyResetTime"
-                        type="time"
-                        value={workTimeForm.dailyResetTime}
-                        onChange={e => setWorkTimeForm({ ...workTimeForm, dailyResetTime: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        When daily reports and check-ins reset
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="workDayStart">Work Day Start</Label>
-                      <Input
-                        id="workDayStart"
-                        type="time"
-                        value={workTimeForm.workDayStart}
-                        onChange={e => setWorkTimeForm({ ...workTimeForm, workDayStart: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Standard work day start time
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="workDayEnd">Work Day End</Label>
-                      <Input
-                        id="workDayEnd"
-                        type="time"
-                        value={workTimeForm.workDayEnd}
-                        onChange={e => setWorkTimeForm({ ...workTimeForm, workDayEnd: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Standard work day end time (next day)
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Current Configuration:</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• Daily reset occurs at {workTimeForm.dailyResetTime}</li>
-                      <li>• Work day starts at {workTimeForm.workDayStart}</li>
-                      <li>• Work day ends at {workTimeForm.workDayEnd} (next day)</li>
-                      <li>• Customer Service has two shifts: 9:00 AM - 4:00 PM and 4:00 PM - 12:00 AM</li>
-                    </ul>
-                  </div>
-                  
-                  <Button className="w-full md:w-auto" onClick={handleWorkTimeUpdate} disabled={loading}>
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                        Updating Configuration...
-                      </div>
-                    ) : 'Update Work Time Configuration'}
-                  </Button>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preferences.notifications.enabled}
+                      onChange={(e) => setPreferences({
+                        ...preferences,
+                        notifications: { ...preferences.notifications, enabled: e.target.checked }
+                      })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                  </label>
                 </div>
-              </TabsContent>
-            )}
-          </Tabs>
-        </CardContent>
-      </Card>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-sm sm:text-base">{t('emailNotifications') || 'Email Notifications'}</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t('receiveEmailNotifications') || 'Receive notifications via email'}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={preferences.notifications.email}
+                      onChange={(e) => setPreferences({
+                        ...preferences,
+                        notifications: { ...preferences.notifications, email: e.target.checked }
+                      })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+              </div>
+
+              <Button 
+                onClick={handlePreferencesUpdate} 
+                disabled={loading}
+                className="w-full sm:w-auto min-h-[44px] text-sm"
+              >
+                {t('savePreferences') || 'Save Preferences'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* System Tab - Admin only */}
+        {user?.role === 'admin' && (
+          <TabsContent value="system" className="mt-4 md:mt-6">
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">{t('systemSettings') || 'System Settings'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+                    <h4 className="font-medium text-sm sm:text-base text-blue-800 dark:text-blue-200 mb-2">
+                      {t('databaseMaintenance') || 'Database Maintenance'}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 mb-3">
+                      {t('systemMaintenanceDescription') || 'Perform system maintenance tasks and data cleanup'}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="min-h-[44px] sm:min-h-auto text-xs sm:text-sm"
+                    >
+                      {t('performMaintenance') || 'Perform Maintenance'}
+                    </Button>
+                  </div>
+
+                  <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-800">
+                    <h4 className="font-medium text-sm sm:text-base text-amber-800 dark:text-amber-200 mb-2">
+                      {t('systemBackup') || 'System Backup'}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 mb-3">
+                      {t('backupDescription') || 'Create a backup of all system data'}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="min-h-[44px] sm:min-h-auto text-xs sm:text-sm"
+                    >
+                      {t('createBackup') || 'Create Backup'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* Work Time Tab - Admin only */}
+        {user?.role === 'admin' && (
+          <TabsContent value="worktime" className="mt-4 md:mt-6">
+            <Card>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-base sm:text-lg">{t('workTimeConfiguration') || 'Work Time Configuration'}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 sm:space-y-6">
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+                  <div>
+                    <Label htmlFor="dailyResetTime" className="text-xs sm:text-sm">
+                      {t('dailyResetTime') || 'Daily Reset Time'}
+                    </Label>
+                    <Input
+                      id="dailyResetTime"
+                      type="time"
+                      value={workTimeForm.dailyResetTime}
+                      onChange={(e) => setWorkTimeForm({ ...workTimeForm, dailyResetTime: e.target.value })}
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="workDayStart" className="text-xs sm:text-sm">
+                      {t('workDayStart') || 'Work Day Start'}
+                    </Label>
+                    <Input
+                      id="workDayStart"
+                      type="time"
+                      value={workTimeForm.workDayStart}
+                      onChange={(e) => setWorkTimeForm({ ...workTimeForm, workDayStart: e.target.value })}
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="workDayEnd" className="text-xs sm:text-sm">
+                      {t('workDayEnd') || 'Work Day End'}
+                    </Label>
+                    <Input
+                      id="workDayEnd"
+                      type="time"
+                      value={workTimeForm.workDayEnd}
+                      onChange={(e) => setWorkTimeForm({ ...workTimeForm, workDayEnd: e.target.value })}
+                      className="h-9 sm:h-10 text-sm"
+                    />
+                  </div>
+                </div>
+                
+                <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700">
+                  <h4 className="font-medium text-sm sm:text-base mb-2">{t('configurationInfo') || 'Configuration Info'}</h4>
+                  <div className="space-y-1 text-xs sm:text-sm text-muted-foreground">
+                    <p>• {t('dailyResetTimeDescription') || 'Daily Reset Time: When daily counters reset'}</p>
+                    <p>• {t('workDayStartDescription') || 'Work Day Start: Official work day begins'}</p>
+                    <p>• {t('workDayEndDescription') || 'Work Day End: Official work day ends'}</p>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleWorkTimeUpdate} 
+                  disabled={loading}
+                  className="w-full sm:w-auto min-h-[44px] text-sm"
+                >
+                  {t('updateWorkTime') || 'Update Work Time Settings'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 };

@@ -129,7 +129,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
     { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true },
     { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true },
-    { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceOnly: true },
+    { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceAndDesignerOnly: true },
     { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true },
     { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true },
     { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true },
@@ -137,8 +137,8 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
   ].filter(item => {
     if (item.adminOnly && user?.role !== 'admin') return false;
     if (item.employeeOnly && user?.role === 'admin') return false;
-    if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
-    if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service')) return false;
+    if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
+    if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
     if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
     if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
     return true;
@@ -207,7 +207,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background px-4 md:px-6">
+          <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 shadow-sm">
             <div className={`flex items-center ${language === 'ar' ? 'order-2' : 'order-1'}`}>
               <SidebarTrigger className="md:hidden">
                 <Menu className="h-5 w-5" />
@@ -245,7 +245,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
               </DropdownMenu>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>

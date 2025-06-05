@@ -1,22 +1,39 @@
 import React from 'react';
 import ReportForm from '@/components/ReportForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText } from 'lucide-react';
+import { FileText, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 
 const ReportPage = () => {
   return (
-    <div className="p-6 space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">All Reports</h1>
-        <p className="text-muted-foreground">Search and filter employee reports</p>
+    <div className="space-y-4 md:space-y-6">
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Daily Work Report</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Submit your daily work activities and progress</p>
       </div>
+
+      {/* Mobile-optimized important notice */}
+      <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-900/20 dark:border-amber-900/30">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-amber-800 dark:text-amber-300 mb-1 text-sm sm:text-base">⚠️ Daily Reminder</h3>
+            <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-400 font-medium">
+              Please submit your daily report before the end of your work day. 
+              Failure to submit reports will affect your attendance records.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile-optimized report form card */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Daily Work Report
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs sm:text-sm">
             Please provide details about your work activities for today
           </CardDescription>
         </CardHeader>
@@ -24,28 +41,83 @@ const ReportPage = () => {
           <ReportForm />
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Report Guidelines</CardTitle>
+
+      {/* Mobile-optimized guidelines */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Clock className="h-4 w-4 text-blue-500" />
+              Submission Time
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Please submit your daily report before the end of your work day to ensure accurate tracking.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <FileText className="h-4 w-4 text-green-500" />
+              Report Content
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Include specific details about tasks completed, challenges faced, and progress made on your projects.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <CheckCircle className="h-4 w-4 text-purple-500" />
+              Report Quality
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Clear and concise reports help management track progress and identify areas that need support.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Mobile-optimized additional tips */}
+      <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm sm:text-base text-blue-800 dark:text-blue-200">
+            💡 Tips for Better Reports
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-medium mb-1">Submission Time</h3>
-              <p className="text-muted-foreground">
-                Please submit your daily report before the end of your work day.
+        <CardContent className="pt-0">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="flex items-start gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                <strong>Be specific:</strong> Instead of "worked on project", write "completed user authentication module for mobile app"
               </p>
             </div>
-            <div>
-              <h3 className="font-medium mb-1">Report Content</h3>
-              <p className="text-muted-foreground">
-                Include specific details about tasks completed, challenges faced, and progress made.
+            <div className="flex items-start gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                <strong>Include metrics:</strong> Mention numbers, percentages, or time spent when relevant
               </p>
             </div>
-            <div>
-              <h3 className="font-medium mb-1">Report Quality</h3>
-              <p className="text-muted-foreground">
-                Clear and concise reports help management track progress and identify areas that need support.
+            <div className="flex items-start gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                <strong>Note blockers:</strong> Clearly identify any obstacles and how you plan to resolve them
+              </p>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                <strong>Plan ahead:</strong> Use the "Plans for Tomorrow" section to set clear goals for the next day
               </p>
             </div>
           </div>

@@ -2,7 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enhanced Mobile First Responsive Design */
+@media (max-width: 640px) {
+  /* Mobile table improvements */
+  .mobile-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Mobile card spacing */
+  .mobile-card-spacing {
+    margin: 0.5rem;
+    padding: 0.75rem;
+  }
+  
+  /* Mobile text scaling */
+  .mobile-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  /* Mobile button improvements */
+  .mobile-button {
+    min-height: 44px; /* iOS touch target minimum */
+    padding: 0.75rem 1rem;
+  }
+}
 
+/* Header z-index improvements */
+.admin-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode support for sticky headers */
+@media (prefers-color-scheme: dark) {
+  .admin-header-sticky {
+    background: rgba(0, 0, 0, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
 
 /* Add to your global CSS or Tailwind config */
 .sidebar-glass {
@@ -10,6 +54,42 @@
   backdrop-filter: blur(12px);
   border-right: 1px solid rgba(255,255,255,0.08);
   box-shadow: 2px 0 16px 0 rgba(0,0,0,0.08);
+  z-index: 40; /* Ensure sidebar stays below header */
+}
+
+/* Enhanced mobile table responsiveness */
+@media (max-width: 768px) {
+  .responsive-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .responsive-table table {
+    min-width: 600px;
+  }
+  
+  .responsive-table th,
+  .responsive-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Improved dropdown menu positioning on mobile */
+@media (max-width: 640px) {
+  .dropdown-menu-mobile {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 1rem !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    width: auto !important;
+    transform: none !important;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
 }
 
 /* Custom FullCalendar toolbar button styles for mobile optimization */
@@ -72,6 +152,73 @@
     padding: 0.35rem 0.7rem !important;
     min-width: 2.2rem;
     min-height: 2.2rem;
+  }
+}
+
+/* Enhanced Dialog/Modal mobile support */
+@media (max-width: 640px) {
+  .mobile-dialog {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100vh - 1rem);
+    width: auto;
+  }
+  
+  .mobile-dialog-content {
+    padding: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+  
+  .mobile-dialog-header {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* Enhanced form responsiveness */
+@media (max-width: 640px) {
+  .mobile-form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .mobile-form-label {
+    text-align: left !important;
+    margin-bottom: 0.5rem;
+  }
+  
+  .mobile-form-input {
+    width: 100%;
+  }
+}
+
+/* Improved card layouts for mobile */
+@media (max-width: 768px) {
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .mobile-card {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+  }
+  
+  .mobile-card-header {
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Safe area support for iOS devices */
+@supports (padding: max(0px)) {
+  .safe-area-padding {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 
@@ -166,6 +313,15 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Enhanced focus indicators for accessibility */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #22c55e;
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -184,6 +340,43 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Mobile-first responsive utilities */
+  .mobile-first-container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-first-container {
+      max-width: 640px;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .mobile-first-container {
+      max-width: 768px;
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .mobile-first-container {
+      max-width: 1024px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .mobile-first-container {
+      max-width: 1280px;
+    }
   }
 }
 
@@ -247,6 +440,20 @@ body.dark .fc .fc-day-today {
   color: #fff !important;
   border-radius: 0.5rem !important;
 }
+
+/* Enhanced dark mode for sticky headers */
+body.dark .admin-header-sticky {
+  background: rgba(0, 0, 0, 0.95) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Ensure proper stacking context for all z-index layers */
+.z-layer-modal { z-index: 100; }
+.z-layer-dropdown { z-index: 60; }
+.z-layer-header { z-index: 50; }
+.z-layer-sidebar { z-index: 40; }
+.z-layer-content { z-index: 10; }
+.z-layer-background { z-index: 1; }
 
 body.dark .fc .fc-event.fc-event-selected,
 body.dark .fc .fc-event:active {

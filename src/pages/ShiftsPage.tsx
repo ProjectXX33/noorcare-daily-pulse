@@ -10,9 +10,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { MonthlyShift, Shift, User } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek } from 'date-fns';
-import { CalendarIcon, Clock, TrendingUp, Users } from 'lucide-react';
+import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import CustomerServiceSchedule from '@/components/CustomerServiceSchedule';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const ShiftsPage = () => {
   const { user } = useAuth();
@@ -21,7 +29,6 @@ const ShiftsPage = () => {
   const [customerServiceEmployees, setCustomerServiceEmployees] = useState<User[]>([]);
   const [weeklyAssignments, setWeeklyAssignments] = useState<{[key: string]: {[key: string]: string}}>({});
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    // Always start with current date, not a future date
     const now = new Date();
     console.log('Current date initialized:', now.toISOString());
     return now;
@@ -33,9 +40,9 @@ const ShiftsPage = () => {
 
   const translations = {
     en: {
-      shifts: "Shifts Management",
+      shifts: "My Shifts",
       monthlyShifts: "Monthly Shifts",
-      manageShifts: "Manage employee shifts and track overtime",
+      manageShifts: "View your shifts and track hours",
       employee: "Employee",
       allEmployees: "All Employees",
       month: "Month",
@@ -56,12 +63,15 @@ const ShiftsPage = () => {
       averageHoursPerDay: "Average Hours/Day",
       noData: "No shift data for selected period",
       loading: "Loading...",
-      hours: "hours"
+      hours: "hours",
+      filters: "Filters",
+      viewDetails: "View Details",
+      todaysSchedule: "Today's Schedule"
     },
     ar: {
-      shifts: "إدارة المناوبات",
+      shifts: "مناوباتي",
       monthlyShifts: "المناوبات الشهرية",
-      manageShifts: "إدارة مناوبات الموظفين وتتبع العمل الإضافي",
+      manageShifts: "اعرض مناوباتك وتتبع الساعات",
       employee: "الموظف",
       allEmployees: "جميع الموظفين",
       month: "الشهر",
@@ -82,18 +92,20 @@ const ShiftsPage = () => {
       averageHoursPerDay: "متوسط الساعات/اليوم",
       noData: "لا توجد بيانات مناوبات للفترة المحددة",
       loading: "جاري التحميل...",
-      hours: "ساعات"
+      hours: "ساعات",
+      filters: "المرشحات",
+      viewDetails: "عرض التفاصيل",
+      todaysSchedule: "جدول اليوم"
     }
   };
 
-  const hasAccess = user?.position === 'Customer Service' || user?.role === 'admin';
+  const hasAccess = user?.position === 'Customer Service' || user?.position === 'Designer' || user?.role === 'admin';
 
   const loadShifts = async () => {
     try {
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
-        .eq('position', 'Customer Service')
         .eq('is_active', true)
         .order('start_time');
 
@@ -104,7 +116,7 @@ const ShiftsPage = () => {
         name: item.name,
         startTime: item.start_time,
         endTime: item.end_time,
-        position: item.position as 'Customer Service',
+        position: item.position as 'Customer Service' | 'Designer',
         isActive: item.is_active,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at)
@@ -121,7 +133,7 @@ const ShiftsPage = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('position', 'Customer Service')
+        .in('position', ['Customer Service', 'Designer'])
         .eq('role', 'employee')
         .order('name');
 
@@ -140,7 +152,7 @@ const ShiftsPage = () => {
 
       setCustomerServiceEmployees(employees);
     } catch (error) {
-      console.error('Error loading Customer Service employees:', error);
+      console.error('Error loading Customer Service and Designer employees:', error);
     }
   };
 
@@ -174,7 +186,6 @@ const ShiftsPage = () => {
     loadLanguage();
   }, [user, hasAccess]);
 
-  // Add useEffect to reload data when selectedDate or selectedEmployee changes
   useEffect(() => {
     if (hasAccess) {
       loadMonthlyShifts();
@@ -211,7 +222,6 @@ const ShiftsPage = () => {
       if (selectedEmployee !== 'all') {
         query = query.eq('user_id', selectedEmployee);
       } else if (user?.role !== 'admin') {
-        // If user is not admin, only show their own shifts
         query = query.eq('user_id', user.id);
       }
 
@@ -273,11 +283,11 @@ const ShiftsPage = () => {
   const getShiftBadgeColor = (shiftName: string | undefined) => {
     switch (shiftName) {
       case 'Day Shift':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
       case 'Night Shift':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
@@ -336,237 +346,379 @@ const ShiftsPage = () => {
     }
   };
 
-  if (!user || (user.role !== 'admin' && user.position !== 'Customer Service')) {
+  if (!hasAccess) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-700">Access Denied</h2>
-          <p className="text-gray-500 mt-2">This page is only available for Customer Service employees and administrators.</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[50vh] p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-4 sm:p-6 text-center">
+            <Clock className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500 mx-auto mb-3 sm:mb-4" />
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
+            <p className="text-sm sm:text-base text-gray-500">
+              Shift management is available for Customer Service, Designer employees, and administrators.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col">
-        <h1 className="text-3xl font-bold mb-2">{t.shifts}</h1>
-        <p className="text-muted-foreground">{t.manageShifts}</p>
+    <div className="space-y-3 sm:space-y-4 md:space-y-6 pb-4 sm:pb-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Mobile-optimized sticky header */}
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-3 sm:pb-4 border-b shadow-sm">
+        <div className="px-3 sm:px-4 md:px-6">
+          <div className="flex flex-col gap-1 sm:gap-2">
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground">{t.shifts}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-tight">{t.manageShifts}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Customer Service Schedule - Show their personal schedule first */}
-      {user.position === 'Customer Service' && <CustomerServiceSchedule />}
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {t.monthlyShifts}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                console.log('Manual refresh triggered');
-                loadMonthlyShifts();
-              }}
-              disabled={isLoading}
-            >
-              🔄 Refresh
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">{t.month}</label>
-              <div className="flex gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="flex-1 justify-start">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(selectedDate, 'MMMM yyyy')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          console.log('Date selected:', date.toISOString());
-                          setSelectedDate(date);
-                        }
-                      }}
-                      disabled={(date) => {
-                        // Disable future months beyond current month
-                        const today = new Date();
-                        const endOfCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                        return date > endOfCurrentMonth;
-                      }}
-                      defaultMonth={new Date()} // Always start with current month
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    const now = new Date();
-                    console.log('Reset to current month:', now.toISOString());
-                    setSelectedDate(now);
-                  }}
-                  title="Go to current month"
-                  className={startOfMonth(selectedDate) > startOfMonth(new Date()) ? "bg-blue-50 border-blue-300 text-blue-700" : ""}
-                >
-                  📅 Current Month
-                </Button>
+      <div className="px-3 sm:px-4 md:px-6 space-y-3 sm:space-y-4 md:space-y-6">
+        {/* Mobile-responsive summary cards */}
+        <div className="grid gap-2 sm:gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+          <Card className="border border-border/50 shadow-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-blue-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">{t.totalRegularHours}</p>
+                <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-foreground">{summary.totalRegular.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">{t.hours}</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50 shadow-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-orange-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">{t.totalOvertimeHours}</p>
+                <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-orange-600">{summary.totalOvertime.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">{t.hours}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50 shadow-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">{t.totalWorkingDays}</p>
+                <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-green-600">{summary.workingDays}</div>
+                <p className="text-xs text-muted-foreground">days</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50 shadow-sm">
+            <CardContent className="p-3 sm:p-4">
+              <div className="text-center space-y-1">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-500 mx-auto" />
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">{t.averageHoursPerDay}</p>
+                <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-purple-600">{summary.averagePerDay.toFixed(1)}</div>
+                <p className="text-xs text-muted-foreground">{t.hours}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile filters sheet */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">
+          <div className="block sm:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full min-h-[48px] h-12 text-sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  {t.filters}
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[70vh]">
+                <SheetHeader className="pb-4">
+                  <SheetTitle className="text-lg">{t.filters}</SheetTitle>
+                </SheetHeader>
+                <div className="grid gap-6 py-2">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium block">{t.employee}</label>
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="h-12 text-sm">
+                        <SelectValue placeholder={t.allEmployees} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.allEmployees}</SelectItem>
+                        {customerServiceEmployees.map(employee => (
+                          <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium block">{t.month}</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="h-12 w-full justify-start text-left font-normal text-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(selectedDate, "MMMM yyyy")}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {user?.role === 'admin' && (
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
+                        variant={showWeeklyAssignment ? "default" : "outline"}
+                        className="h-12 w-full text-sm"
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Weekly Assignment
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Desktop filters */}
+          <Card className="hidden sm:block">
+            <CardContent className="p-4">
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-3 lg:grid-cols-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-2 block">{t.employee}</label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={t.allEmployees} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t.allEmployees}</SelectItem>
+                      {customerServiceEmployees.map(employee => (
+                        <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-2 block">{t.month}</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="h-9 w-full justify-start text-left font-normal text-xs">
+                        <CalendarIcon className="mr-2 h-3 w-3" />
+                        {format(selectedDate, "MMM yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {user?.role === 'admin' && (
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
+                      variant={showWeeklyAssignment ? "default" : "outline"}
+                      size="sm"
+                      className="h-9 w-full text-xs"
+                    >
+                      <Users className="mr-1 h-3 w-3" />
+                      Weekly Assignment
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Customer Service and Designer Schedule */}
+        {(user.position === 'Customer Service' || user.position === 'Designer') && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-primary" />
+              <h2 className="text-base sm:text-lg font-semibold">{t.todaysSchedule}</h2>
+            </div>
+            <CustomerServiceSchedule />
+          </div>
+        )}
+
+        {/* Monthly Shifts */}
+        <Card className="border border-border/50 shadow-sm">
+          <CardHeader className="pb-3 px-4 sm:px-6">
+            <CardTitle className="text-base sm:text-lg">{t.monthlyShifts}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {/* Mobile cards view */}
+            <div className="block lg:hidden">
+              <ScrollArea className="h-[55vh] sm:h-[60vh]">
+                <div className="space-y-4">
+                  {isLoading ? (
+                    <div className="text-center py-16">
+                      <div className="flex items-center justify-center mb-6">
+                        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+                      </div>
+                      <span className="text-base text-muted-foreground">{t.loading}</span>
+                    </div>
+                  ) : monthlyShifts.length === 0 ? (
+                    <div className="text-center py-16 space-y-6">
+                      {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
+                        <div className="bg-blue-50 dark:bg-blue-950/50 p-6 rounded-2xl border border-blue-200 dark:border-blue-800">
+                          <p className="text-base text-blue-700 dark:text-blue-300 font-semibold mb-2">💡 No shift data for this month yet</p>
+                          <p className="text-sm text-blue-600 dark:text-blue-400">Data will appear after Customer Service employees check in/out.</p>
+                        </div>
+                      ) : startOfMonth(selectedDate) > startOfMonth(new Date()) ? (
+                        <div className="bg-amber-50 dark:bg-amber-950/50 p-6 rounded-2xl border border-amber-200 dark:border-amber-800">
+                          <p className="text-base text-amber-700 dark:text-amber-300 font-semibold mb-2">⚠️ Future month selected</p>
+                          <p className="text-sm text-amber-600 dark:text-amber-400">Shift data is only available for months when employees have checked in/out.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-800">
+                          <p className="text-base text-gray-600 dark:text-gray-400">No shift data found for the selected period.</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    monthlyShifts.map((shift) => (
+                      <Card key={shift.id} className="border border-border/50 shadow-md rounded-2xl bg-white dark:bg-background/80 w-full">
+                        <CardContent className="p-5 space-y-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-base leading-tight text-foreground">{format(shift.workDate, 'EEEE, dd/MM/yyyy')}</h4>
+                              {user.role === 'admin' && (
+                                <p className="text-xs text-muted-foreground mt-1">{shift.userName}</p>
+                              )}
+                            </div>
+                            <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-3 py-1 rounded-full font-semibold`}>{shift.shiftName || t.notWorked}</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs text-muted-foreground font-medium">{t.checkIn}</span>
+                              <div className="text-base font-semibold text-foreground mt-1">{formatTime(shift.checkInTime)}</div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground font-medium">{t.checkOut}</span>
+                              <div className="text-base font-semibold text-foreground mt-1">{formatTime(shift.checkOutTime)}</div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-xs text-muted-foreground font-medium">{t.regularHours}</span>
+                              <div className="text-base font-semibold text-foreground mt-1">{shift.regularHours.toFixed(1)} {t.hours}</div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground font-medium">{t.overtimeHours}</span>
+                              <div className="text-base font-semibold text-orange-600 mt-1">{shift.overtimeHours.toFixed(1)} {t.hours}</div>
+                            </div>
+                          </div>
+                          <div className="pt-3 border-t border-border/50">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground font-medium">{t.totalHours}</span>
+                              <span className="font-bold text-base text-foreground">{(shift.regularHours + shift.overtimeHours).toFixed(1)} {t.hours}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </div>
 
-            {user.role === 'admin' && (
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">{t.employee}</label>
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t.allEmployees}</SelectItem>
-                    {customerServiceEmployees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t.totalRegularHours}</p>
-                    <p className="text-2xl font-bold">{summary.totalRegular.toFixed(1)}</p>
-                  </div>
-                  <Clock className="h-8 w-8 text-blue-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t.totalOvertimeHours}</p>
-                    <p className="text-2xl font-bold text-orange-600">{summary.totalOvertime.toFixed(1)}</p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-orange-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t.totalWorkingDays}</p>
-                    <p className="text-2xl font-bold">{summary.workingDays}</p>
-                  </div>
-                  <Users className="h-8 w-8 text-green-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t.averageHoursPerDay}</p>
-                    <p className="text-2xl font-bold">{summary.averagePerDay.toFixed(1)}</p>
-                  </div>
-                  <Clock className="h-8 w-8 text-purple-500" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Shifts Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t.date}</TableHead>
-                  {user.role === 'admin' && <TableHead>{t.employee}</TableHead>}
-                  <TableHead>{t.shift}</TableHead>
-                  <TableHead>{t.checkIn}</TableHead>
-                  <TableHead>{t.checkOut}</TableHead>
-                  <TableHead>{t.regularHours}</TableHead>
-                  <TableHead>{t.overtimeHours}</TableHead>
-                  <TableHead>{t.totalHours}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-8">
-                      {t.loading}
-                    </TableCell>
-                  </TableRow>
-                ) : monthlyShifts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-8">
-                      <div className="space-y-2">
-                        {/* Show clean message for current month with no data */}
-                        {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
-                          <p className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
-                            💡 No shift data for this month yet. Data will appear after Customer Service employees check in/out.
-                          </p>
-                        ) : startOfMonth(selectedDate) > startOfMonth(new Date()) ? (
-                          /* Future month message */
-                          <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                            ⚠️ You've selected a future month. Shift data is only available for months when employees have checked in/out.
-                          </p>
-                        ) : (
-                          /* Past month with no data */
-                          <p className="text-sm text-gray-600">
-                            No shift data found for the selected period.
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  monthlyShifts.map((shift) => (
-                    <TableRow key={shift.id}>
-                      <TableCell>{format(shift.workDate, 'dd/MM/yyyy')}</TableCell>
-                      {user.role === 'admin' && <TableCell>{shift.userName}</TableCell>}
-                      <TableCell>
-                        <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                          {shift.shiftName || t.notWorked}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatTime(shift.checkInTime)}</TableCell>
-                      <TableCell>{formatTime(shift.checkOutTime)}</TableCell>
-                      <TableCell>{shift.regularHours.toFixed(1)} {t.hours}</TableCell>
-                      <TableCell className="text-orange-600 font-medium">
-                        {shift.overtimeHours.toFixed(1)} {t.hours}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {(shift.regularHours + shift.overtimeHours).toFixed(1)} {t.hours}
-                      </TableCell>
+            {/* Desktop table view */}
+            <div className="hidden lg:block">
+              <div className="mobile-table-scroll p-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 bg-background z-10">{t.date}</TableHead>
+                      {user.role === 'admin' && <TableHead>{t.employee}</TableHead>}
+                      <TableHead>{t.shift}</TableHead>
+                      <TableHead>{t.checkIn}</TableHead>
+                      <TableHead>{t.checkOut}</TableHead>
+                      <TableHead>{t.regularHours}</TableHead>
+                      <TableHead>{t.overtimeHours}</TableHead>
+                      <TableHead>{t.totalHours}</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent mr-2"></div>
+                            {t.loading}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : monthlyShifts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-8">
+                          <div className="space-y-2">
+                            {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
+                              <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                                <p className="text-sm text-blue-700 font-medium">💡 No shift data for this month yet</p>
+                                <p className="text-xs text-blue-600 mt-1">Data will appear after Customer Service employees check in/out.</p>
+                              </div>
+                            ) : startOfMonth(selectedDate) > startOfMonth(new Date()) ? (
+                              <div className="bg-amber-50 p-3 rounded border border-amber-200">
+                                <p className="text-sm text-amber-700 font-medium">⚠️ Future month selected</p>
+                                <p className="text-xs text-amber-600 mt-1">Shift data is only available for months when employees have checked in/out.</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-600">
+                                No shift data found for the selected period.
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      monthlyShifts.map((shift) => (
+                        <TableRow key={shift.id}>
+                          <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                            {format(shift.workDate, 'dd/MM/yyyy')}
+                          </TableCell>
+                          {user.role === 'admin' && <TableCell>{shift.userName}</TableCell>}
+                          <TableCell>
+                            <Badge className={getShiftBadgeColor(shift.shiftName)}>
+                              {shift.shiftName || t.notWorked}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatTime(shift.checkInTime)}</TableCell>
+                          <TableCell>{formatTime(shift.checkOutTime)}</TableCell>
+                          <TableCell>{shift.regularHours.toFixed(1)} {t.hours}</TableCell>
+                          <TableCell className="text-orange-600 font-medium">
+                            {shift.overtimeHours.toFixed(1)} {t.hours}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {(shift.regularHours + shift.overtimeHours).toFixed(1)} {t.hours}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

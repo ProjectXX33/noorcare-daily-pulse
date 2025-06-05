@@ -206,14 +206,45 @@ const EventsPage = () => {
   };
 
   return (
-    <div className={`container mx-auto py-4 px-2 sm:px-4 space-y-4 ${language === 'ar' ? 'rtl' : 'ltr'}`} dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold">{t('events')}</h1>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+    <div className="space-y-4 md:space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
+          {t('eventsCalendar') || 'Events Calendar'}
+        </h1>
+        <p className="text-sm md:text-base text-muted-foreground">
+          {t('manageEvents') || 'View and manage company events and schedules'}
+        </p>
+      </div>
+
+      {/* Mobile-responsive controls */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+          {/* View toggle - mobile optimized */}
+          <div className="flex rounded-lg border p-1 bg-muted w-fit">
+            <Button
+              variant={view === 'calendar' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setView('calendar')}
+              className="h-8 px-3 text-xs sm:text-sm min-h-[44px] sm:min-h-auto"
+            >
+              <Grid className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              {t('calendar') || 'Calendar'}
+            </Button>
+            <Button
+              variant={view === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setView('list')}
+              className="h-8 px-3 text-xs sm:text-sm min-h-[44px] sm:min-h-auto"
+            >
+              <List className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              {t('list') || 'List'}
+            </Button>
+          </div>
+
+          {/* Add event button - show for admins and Media Buyers */}
           {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
             <Button
-              className="fixed bottom-6 right-6 rounded-full shadow-lg z-50"
-              size="lg"
               onClick={() => {
                 setSelectedEvent(null);
                 setFormData({
@@ -224,220 +255,274 @@ const EventsPage = () => {
                 });
                 setIsDialogOpen(true);
               }}
+              className="min-h-[44px] text-sm"
             >
-              <Plus className="h-5 w-5 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               {t('addEvent') || 'Add Event'}
             </Button>
           )}
-          <div className="flex border rounded-md">
-            <Button
-              variant={view === 'calendar' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setView('calendar')}
-              className="rounded-r-none"
-            >
-              <Grid className="h-4 w-4" />
+        </div>
+
+        {/* Mobile events list sheet */}
+        <div className="block sm:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="w-full min-h-[44px]">
+                <Calendar className="h-4 w-4 mr-2" />
+                {t('quickEventList') || 'Quick Events'}
             </Button>
-            <Button
-              variant={view === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setView('list')}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
+            </SheetTrigger>
+            <SheetContent className="w-[85vw] sm:w-[400px]">
+              <SheetHeader>
+                <SheetTitle>{t('upcomingEvents') || 'Upcoming Events'}</SheetTitle>
+              </SheetHeader>
+              <ScrollArea className="h-[calc(100vh-100px)] mt-4">
+                <div className="space-y-2">
+                  {calendarEvents
+                    .filter(event => new Date(event.start) >= new Date())
+                    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+                    .slice(0, 10)
+                    .map(event => (
+                      <div key={event.id} className="p-3 border rounded-lg bg-card">
+                        <h4 className="font-medium text-sm">{event.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatDate(event.start)}
+                        </p>
+                        {event.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {event.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
           </div>
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
+      {/* Calendar or List View */}
       {view === 'calendar' ? (
         <Card>
-          <CardContent className="p-0 sm:p-6">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+              {t('eventsCalendar') || 'Events Calendar'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Mobile-optimized FullCalendar */}
+            <div className="calendar-container">
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
-              locale={language === 'ar' ? 'ar' : 'en'}
-              direction={language === 'ar' ? 'rtl' : 'ltr'}
-              events={calendarEvents}
-              editable={user?.role === 'admin' || user?.position === 'Media Buyer'}
+                events={calendarEvents.map(event => ({
+                  id: event.id,
+                  title: event.title,
+                  start: event.start,
+                  end: event.end,
+                  backgroundColor: '#22c55e',
+                  borderColor: '#16a34a',
+                  textColor: '#ffffff',
+                  extendedProps: {
+                    description: event.description
+                  }
+                }))}
               eventClick={handleEventClick}
               dateClick={handleDateClick}
-              height="auto"
               headerToolbar={{
-                left: language === 'ar' ? 'next prev today' : 'prev next today',
+                  left: 'prev,next today',
                 center: 'title',
                 right: 'dayGridMonth'
               }}
-              eventTimeFormat={{
-                hour: 'numeric',
-                minute: '2-digit',
-                meridiem: 'short'
-              }}
-              eventDidMount={(info) => {
-                // Add data-event-id attribute to the event element
-                info.el.setAttribute('data-event-id', info.event.id);
-              }}
+                height="auto"
+                eventDisplay="block"
+                dayMaxEvents={3}
+                moreLinkClick="popover"
+                eventClassNames="cursor-pointer"
+                locale={language === 'ar' ? 'ar' : 'en'}
+                direction={language === 'ar' ? 'rtl' : 'ltr'}
             />
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        /* Mobile-optimized list view */
           <Card>
-            <CardHeader>
-              <CardTitle>{t('upcomingEvents') || 'Upcoming Events'}</CardTitle>
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <List className="h-4 w-4 sm:h-5 sm:w-5" />
+              {t('eventsList') || 'Events List'}
+            </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[600px]">
-                <div className="space-y-4">
-                  {calendarEvents
+            <div className="space-y-3 sm:space-y-4">
+              {calendarEvents.length === 0 ? (
+                <div className="text-center py-8 sm:py-12">
+                  <Calendar className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-2">
+                    {t('noEvents') || 'No Events'}
+                  </h3>
+                  <p className="text-sm sm:text-base text-gray-500">
+                    {t('noEventsDescription') || 'There are no events scheduled at the moment.'}
+                  </p>
+                </div>
+              ) : (
+                calendarEvents
                     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
                     .map(event => (
-                      <Card key={event.id} className="p-4 border-l-4 border-primary bg-card/80 dark:bg-zinc-900/80 dark:border-primary/70 shadow-md transition-colors hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <h3 className="font-semibold text-black">{event.title}</h3>
-                            {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedEvent(event);
-                                  setFormData({
-                                    title: event.title,
-                                    description: event.description || '',
-                                    start: event.start,
-                                    end: event.end,
-                                  });
-                                  setIsDialogOpen(true);
-                                }}
-                              >
-                                {t('edit') || 'Edit'}
-                              </Button>
+                    <div 
+                      key={event.id} 
+                      className="border rounded-lg p-3 sm:p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => handleEventClick({ event: { id: event.id } })}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-sm sm:text-base mb-1">{event.title}</h3>
+                          {event.description && (
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 line-clamp-2">
+                              {event.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {formatDate(event.start)}
+                            </Badge>
+                            {event.end && (
+                              <Badge variant="outline" className="text-xs">
+                                {t('ends') || 'Ends'}: {formatDate(event.end)}
+                              </Badge>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(event.start)}
-                            {event.end && ` - ${formatDate(event.end)}`}
-                          </p>
-                          {event.description && (
-                            <p className="text-sm text-black">{event.description}</p>
-                          )}
                         </div>
-                      </Card>
-                    ))}
+                        <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                          <Badge 
+                            variant={new Date(event.start) > new Date() ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {new Date(event.start) > new Date() ? (t('upcoming') || 'Upcoming') : (t('past') || 'Past')}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
                 </div>
-              </ScrollArea>
             </CardContent>
           </Card>
-        </div>
       )}
 
-      {/* Modal for event info (read-only for non-admins) */}
-      {isDialogOpen && (
+      {/* Mobile-optimized Event Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {selectedEvent ? (t('editEvent') || 'Edit Event') : (t('createEvent') || 'Create Event')}
+            <DialogTitle className="text-base sm:text-lg">
+              {selectedEvent 
+                ? (t('editEvent') || 'Edit Event') 
+                : (t('createEvent') || 'Create Event')
+              }
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-title" className="text-right">
+          
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+            <div>
+              <Label htmlFor="title" className="text-xs sm:text-sm">
                     {t('title') || 'Title'}
                   </Label>
                   <Input
-                    id="event-title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="col-span-3"
+                id="title"
+                value={formData.title || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     required
-                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
+                className="h-9 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-description" className="text-right">
+            
+            <div>
+              <Label htmlFor="description" className="text-xs sm:text-sm">
                     {t('description') || 'Description'}
                   </Label>
                   <Textarea
-                    id="event-description"
+                id="description"
                     value={formData.description || ''}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="col-span-3"
-                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="text-sm resize-none"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-start" className="text-right">
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <Label htmlFor="start" className="text-xs sm:text-sm">
                     {t('startDate') || 'Start Date'}
                   </Label>
                   <Input
-                    id="event-start"
+                  id="start"
                     type="datetime-local"
                     value={formData.start ? new Date(formData.start).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => setFormData({ ...formData, start: e.target.value })}
-                    className="col-span-3"
+                  onChange={(e) => setFormData(prev => ({ ...prev, start: e.target.value }))}
                     required
-                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
+                  className="h-9 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-end" className="text-right">
-                    {t('endDate') || 'End Date'} ({t('optional') || 'Optional'})
+              
+              <div>
+                <Label htmlFor="end" className="text-xs sm:text-sm">
+                  {t('endDate') || 'End Date'}
                   </Label>
                   <Input
-                    id="event-end"
+                  id="end"
                     type="datetime-local"
                     value={formData.end ? new Date(formData.end).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => setFormData({ ...formData, end: e.target.value || null })}
-                    className="col-span-3"
-                    disabled={user?.role !== 'admin' && user?.position !== 'Media Buyer'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, end: e.target.value || null }))}
+                  className="h-9 text-sm"
                   />
                 </div>
               </div>
-              <DialogFooter className="flex gap-2">
+            
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
                 {selectedEvent && (user?.role === 'admin' || user?.position === 'Media Buyer') && (
                   <Button
                     type="button"
                     variant="destructive"
                     onClick={handleDelete}
                     disabled={isLoading}
-                    className="mr-auto"
+                  className="min-h-[44px] text-sm w-full sm:w-auto"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     {t('delete') || 'Delete'}
                   </Button>
                 )}
+              <div className="flex gap-2 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setIsDialogOpen(false)}
+                  className="min-h-[44px] text-sm flex-1 sm:flex-none"
                 >
                   {t('cancel') || 'Cancel'}
                 </Button>
                 {(user?.role === 'admin' || user?.position === 'Media Buyer') && (
-                  <Button type="submit" disabled={isLoading}>
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className="min-h-[44px] text-sm flex-1 sm:flex-none"
+                  >
                     {isLoading 
                       ? (t('saving') || 'Saving...') 
                       : selectedEvent 
-                        ? (t('updateEvent') || 'Update Event')
-                        : (t('createEvent') || 'Create Event')
+                        ? (t('update') || 'Update') 
+                        : (t('create') || 'Create')
                     }
                   </Button>
                 )}
+              </div>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      )}
-
-      <style>{`
-        .fc-event, .fc-event-title, .fc-event-main {
-          color: #000 !important;
-        }
-      `}</style>
     </div>
   );
 };

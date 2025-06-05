@@ -355,8 +355,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
       
-      // For Customer Service employees, check if today is a day off BEFORE check-in
-      if (userData.position === 'Customer Service') {
+      // For Customer Service and Designer employees, check if today is a day off BEFORE check-in
+      if (userData.position === 'Customer Service' || userData.position === 'Designer') {
         try {
           const { checkIfDayOff } = await import('@/lib/performanceApi');
           // Use work day start as the reference date for day-off check
@@ -393,8 +393,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .update({ last_checkin: checkInTime.toISOString() })
         .eq('id', userId);
       
-      // For Customer Service employees, handle shift tracking and performance
-      if (userData.position === 'Customer Service') {
+      // For Customer Service and Designer employees, handle shift tracking and performance
+      if (userData.position === 'Customer Service' || userData.position === 'Designer') {
         try {
           console.log('🔄 Starting shift tracking for user:', userId);
           
@@ -416,11 +416,11 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
             );
             console.log('✅ Monthly shift record created/updated');
 
-            // Record performance tracking with delay calculation
+            // RESTORE: Record performance at check-in (like before)
             const { 
               recordCheckInPerformance,
-              notifyAdminsAboutDelay,
-              calculateDelay
+              calculateDelay,
+              notifyAdminsAboutDelay
             } = await import('@/lib/performanceApi');
             
             await recordCheckInPerformance(
@@ -430,13 +430,48 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               detectedShift.startTime,
               checkInTime
             );
-            console.log('✅ Performance tracking recorded');
+            console.log('✅ Performance tracking recorded at check-in');
 
-            // Calculate delay and notify admins if late
+            // Calculate delay for notifications and admin alerts
             const delayMinutes = calculateDelay(detectedShift.startTime, checkInTime);
-            console.log('⏱️ Delay calculation:', delayMinutes, 'minutes');
-            
-            if (delayMinutes > 5) {
+
+            // SEND PERFORMANCE NOTIFICATION TO EMPLOYEE
+            try {
+              const { autoNotifyPerformanceOnCheckout } = await import('@/lib/employeeNotifications');
+              
+              // Calculate basic performance for check-in notification
+              const performanceScore = delayMinutes <= 0 ? 100 : Math.max(0, 100 - (delayMinutes / 5));
+              const punctualityScore = performanceScore; // Same as performance for check-in
+              
+              const feedback = {
+                message: delayMinutes > 0 
+                  ? `You were ${delayMinutes} minutes late. Try to arrive on time for better performance!`
+                  : `Perfect! You checked in on time. Great start to your shift!`,
+                recommendations: delayMinutes > 15 
+                  ? ['Set multiple alarms to avoid being late', 'Plan to arrive 10 minutes early', 'Check traffic conditions before leaving']
+                  : delayMinutes > 0 
+                    ? ['Try to arrive 5 minutes early next time']
+                    : []
+              };
+
+              await autoNotifyPerformanceOnCheckout(userId, {
+                finalScore: performanceScore,
+                delayMinutes,
+                actualHours: 0, // Unknown at check-in
+                expectedHours: 8, // Default
+                overtimeHours: 0, // Unknown at check-in
+                punctualityScore,
+                workDurationScore: 100, // Unknown at check-in
+                feedback
+              });
+
+              console.log('✅ Check-in performance notification sent to employee');
+            } catch (notifyError) {
+              console.error('⚠️ Error sending check-in notification:', notifyError);
+            }
+
+            // Notify admins if late
+             if (delayMinutes > 5) {
               await notifyAdminsAboutDelay(delayMinutes, userData.name, userId);
               toast.warning(`⚠️ You are ${delayMinutes} minutes late for your ${detectedShift.name}`, {
                 duration: 5000,
@@ -544,8 +579,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
       if (error) throw error;
       
-      // For Customer Service employees, update shift tracking and performance
-      if (userData.position === 'Customer Service') {
+      // For Customer Service and Designer employees, update shift tracking and performance
+      if (userData.position === 'Customer Service' || userData.position === 'Designer') {
         try {
           const shifts = await fetchShifts();
           
@@ -567,15 +602,35 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               overtimeHours
             );
 
-            // Record performance tracking for check-out
+            // Record COMPLETE performance tracking for check-out (includes delay + work duration)
             const { recordCheckOutPerformance } = await import('@/lib/performanceApi');
-            await recordCheckOutPerformance(
+            const performanceResult = await recordCheckOutPerformance(
               userId,
               currentWorkDay.workDayStart, // Use work day start as reference date
               checkOutTime,
               regularHours,
               overtimeHours
             );
+            
+            console.log('✅ Complete performance tracking recorded at checkout:', performanceResult);
+
+            // Show performance feedback
+            if (performanceResult && performanceResult.feedback) {
+              const feedback = performanceResult.feedback;
+              if (feedback.type === 'success') {
+                toast.success(feedback.message, {
+                  duration: 5000,
+                });
+              } else if (feedback.type === 'warning') {
+                toast.warning(feedback.message, {
+                  duration: 4000,
+                });
+              }
+              
+              if (feedback.recommendations && feedback.recommendations.length > 0) {
+                console.log('💡 Performance recommendations:', feedback.recommendations);
+              }
+            }
 
             if (overtimeHours > 0) {
               toast.success(`✅ Check-out successful! You worked ${hoursWorked.toFixed(1)} hours (${overtimeHours.toFixed(1)}h overtime)`, {
@@ -603,7 +658,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ));
       
       // Send notification to admins about check-out
-      if (userData.position === 'Customer Service') {
+      if (userData.position === 'Customer Service' || userData.position === 'Designer') {
         await sendNotificationToAdmins(
           'Employee Check-out',
           `${userData.name} checked out at ${format(checkOutTime, 'HH:mm')}`,
@@ -888,7 +943,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const checkOut = async () => {
     if (!user) return;
     await checkOutUser(user.id);
-    await notifyAdmins('check_out', user.name);
+    await notifyAdmins('check_out', user.id);
   };
 
   // Helper function to calculate work hours

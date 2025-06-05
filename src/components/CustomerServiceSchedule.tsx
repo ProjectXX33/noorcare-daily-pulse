@@ -32,7 +32,7 @@ const CustomerServiceSchedule = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.position === 'Customer Service') {
+    if (user?.position === 'Customer Service' || user?.position === 'Designer') {
       loadSchedule();
     }
   }, [user]);
@@ -101,7 +101,7 @@ const CustomerServiceSchedule = () => {
     return <CheckCircle className="w-4 h-4 text-blue-600" />;
   };
 
-  if (!user || user.position !== 'Customer Service') {
+  if (!user || (user.position !== 'Customer Service' && user.position !== 'Designer')) {
     return null;
   }
 

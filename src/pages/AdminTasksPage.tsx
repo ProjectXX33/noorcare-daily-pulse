@@ -474,246 +474,246 @@ const AdminTasksPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">{t.tasks}</h1>
-          <p className="text-muted-foreground">{t.manageTasksAndNotifications}</p>
+    <div className="space-y-4 md:space-y-6 min-h-0">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-4 border-b shadow-sm">
+        <div className="mb-4 md:mb-6">
+          <h1 className="text-xl md:text-2xl font-bold">{t.tasks}</h1>
+          <p className="text-sm text-muted-foreground">{t.manageTasksAndNotifications}</p>
         </div>
-        <div className="flex flex-col sm:flex-row justify-end gap-2 mb-6">
-          <Button onClick={() => setIsTaskDialogOpen(true)}>
+        <div className="flex flex-col sm:flex-row justify-end gap-2">
+          <Button onClick={() => setIsTaskDialogOpen(true)} className="w-full sm:w-auto">
             {t.addTask}
           </Button>
-          <Button variant="outline" onClick={() => setIsNotificationDialogOpen(true)}>
+          <Button variant="outline" onClick={() => setIsNotificationDialogOpen(true)} className="w-full sm:w-auto">
             {t.sendNotification}
           </Button>
         </div>
+      </div>
+      
+      <Tabs defaultValue="tasks" className="flex-1 min-h-0">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="tasks" className="text-xs sm:text-sm">{t.tasks}</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-xs sm:text-sm">{t.employeeNotifications}</TabsTrigger>
+        </TabsList>
         
-        <Tabs defaultValue="tasks" className="mb-6">
-          <TabsList className="w-full">
-            <TabsTrigger value="tasks" className="flex-1">{t.tasks}</TabsTrigger>
-            <TabsTrigger value="notifications" className="flex-1">{t.employeeNotifications}</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="tasks">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.taskManagement}</CardTitle>
-                <CardDescription>{t.manageTasksAndNotifications}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Table for md+ screens */}
-                <div className="hidden md:block overflow-x-auto">
-                  <Table className="min-w-[700px]">
-                    <TableHeader>
+        <TabsContent value="tasks">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.taskManagement}</CardTitle>
+              <CardDescription>{t.manageTasksAndNotifications}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Table for md+ screens */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table className="min-w-[700px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t.title}</TableHead>
+                      <TableHead>{t.assignedTo}</TableHead>
+                      <TableHead>{t.status}</TableHead>
+                      <TableHead>{t.progress}</TableHead>
+                      <TableHead className="hidden lg:table-cell">{t.rating}</TableHead>
+                      <TableHead className="text-right">{t.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
                       <TableRow>
-                        <TableHead>{t.title}</TableHead>
-                        <TableHead>{t.assignedTo}</TableHead>
-                        <TableHead>{t.status}</TableHead>
-                        <TableHead>{t.progress}</TableHead>
-                        <TableHead className="hidden lg:table-cell">{t.rating}</TableHead>
-                        <TableHead className="text-right">{t.actions}</TableHead>
+                        <TableCell colSpan={6} className="text-center py-4">
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                          </div>
+                          <p className="mt-2 text-sm text-gray-500">{t.loadingTasks}</p>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4">
-                            <div className="flex justify-center">
-                              <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                            </div>
-                            <p className="mt-2 text-sm text-gray-500">{t.loadingTasks}</p>
-                          </TableCell>
-                        </TableRow>
-                      ) : tasks.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4">{t.noTasks}</TableCell>
-                        </TableRow>
-                      ) : (
-                        tasks.map(task => (
-                          <TableRow 
-                            key={task.id}
-                            className={isMediaBuyerToDesignerTask(task) 
-                              ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
-                              : ""
-                            }
-                          >
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <span>{task.title}</span>
-                                {isMediaBuyerToDesignerTask(task) && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                    📊 Media Buyer → Designer
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{task.assignedToName}</span>
-                                {isMediaBuyerToDesignerTask(task) && (
-                                  <span className="text-xs text-purple-600 dark:text-purple-400">
-                                    Assigned by: {task.createdByName}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
-                                {task.status === 'Not Started' ? t.notStarted :
-                                 task.status === 'On Hold' ? t.onHold : 
-                                 task.status === 'In Progress' ? t.inProgress : t.complete}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Progress value={task.progressPercentage} className="h-2" />
-                                <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">
-                              {task.averageRating && task.averageRating > 0 ? (
-                                <div className="flex items-center gap-1">
-                                  <StarRating rating={task.averageRating} readonly size="sm" />
-                                  <span className="text-xs text-gray-500">
-                                    ({task.averageRating.toFixed(1)})
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-500">{t.noRating}</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditTaskDialog(task)}>
-                                    {t.editTask}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openRateTaskDialog(task)}>
-                                    <Star className="mr-2 h-4 w-4" />
-                                    {t.rateTask}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                {/* Card layout for mobile */}
-                <div className="block md:hidden space-y-4">
-                  {isLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-                      <p className="mt-2 text-sm text-gray-500 ml-2">{t.loadingTasks}</p>
-                    </div>
-                  ) : tasks.length === 0 ? (
-                    <div className="text-center py-8">{t.noTasks}</div>
-                  ) : (
-                    tasks.map(task => (
-                      <Card 
-                        key={task.id} 
-                        className={`p-4 ${isMediaBuyerToDesignerTask(task) 
-                          ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
-                          : ""
-                        }`}
-                      >
-                        <div className="flex flex-col gap-3">
-                          <div className="flex justify-between items-start">
-                            <div className="flex flex-col gap-1">
-                              <div className="font-bold text-base">{task.title}</div>
+                    ) : tasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">{t.noTasks}</TableCell>
+                      </TableRow>
+                    ) : (
+                      tasks.map(task => (
+                        <TableRow 
+                          key={task.id}
+                          className={isMediaBuyerToDesignerTask(task) 
+                            ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                            : ""
+                          }
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span>{task.title}</span>
                               {isMediaBuyerToDesignerTask(task) && (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 w-fit">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                                   📊 Media Buyer → Designer
                                 </span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{task.assignedToName}</span>
+                              {isMediaBuyerToDesignerTask(task) && (
+                                <span className="text-xs text-purple-600 dark:text-purple-400">
+                                  Assigned by: {task.createdByName}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
-                              {task.status === 'Not Started' ? t.notStarted : 
+                              {task.status === 'Not Started' ? t.notStarted :
                                task.status === 'On Hold' ? t.onHold : 
                                task.status === 'In Progress' ? t.inProgress : t.complete}
                             </span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">{task.description}</div>
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs">
-                              {t.assignedTo}: <span className="font-medium">{task.assignedToName}</span>
-                            </span>
-                            {isMediaBuyerToDesignerTask(task) && (
-                              <span className="text-xs text-purple-600 dark:text-purple-400">
-                                Assigned by: {task.createdByName}
-                              </span>
-                            )}
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
-                              <Progress value={task.progressPercentage} className="h-2 flex-1" />
+                              <Progress value={task.progressPercentage} className="h-2" />
                               <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
                             </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => openEditTaskDialog(task)}
-                          >
-                            {t.editTask}
-                          </Button>
-                        </div>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.employeeNotifications}</CardTitle>
-                <CardDescription>Send messages and notifications to employees</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {employees.map(employee => (
-                      <Card key={employee.id} className="overflow-hidden">
-                        <CardHeader className="p-4">
-                          <CardTitle className="text-base">{employee.name}</CardTitle>
-                          <CardDescription>{employee.position} · {employee.department}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setNotification({
-                                ...notification,
-                                userId: employee.id,
-                                sendToAll: false
-                              });
-                              setIsNotificationDialogOpen(true);
-                            }}
-                          >
-                            {t.sendMessage}
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {task.averageRating && task.averageRating > 0 ? (
+                              <div className="flex items-center gap-1">
+                                <StarRating rating={task.averageRating} readonly size="sm" />
+                                <span className="text-xs text-gray-500">
+                                  ({task.averageRating.toFixed(1)})
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-500">{t.noRating}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditTaskDialog(task)}>
+                                  {t.editTask}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openRateTaskDialog(task)}>
+                                  <Star className="mr-2 h-4 w-4" />
+                                  {t.rateTask}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Card layout for mobile */}
+              <div className="block md:hidden space-y-4">
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                    <p className="mt-2 text-sm text-gray-500 ml-2">{t.loadingTasks}</p>
                   </div>
+                ) : tasks.length === 0 ? (
+                  <div className="text-center py-8">{t.noTasks}</div>
+                ) : (
+                  tasks.map(task => (
+                    <Card 
+                      key={task.id} 
+                      className={`p-4 ${isMediaBuyerToDesignerTask(task) 
+                        ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                        : ""
+                      }`}
+                    >
+                      <div className="flex flex-col gap-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-col gap-1">
+                            <div className="font-bold text-base">{task.title}</div>
+                            {isMediaBuyerToDesignerTask(task) && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 w-fit">
+                                📊 Media Buyer → Designer
+                              </span>
+                            )}
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(task.status)}`}>
+                            {task.status === 'Not Started' ? t.notStarted : 
+                             task.status === 'On Hold' ? t.onHold : 
+                             task.status === 'In Progress' ? t.inProgress : t.complete}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">{task.description}</div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs">
+                            {t.assignedTo}: <span className="font-medium">{task.assignedToName}</span>
+                          </span>
+                          {isMediaBuyerToDesignerTask(task) && (
+                            <span className="text-xs text-purple-600 dark:text-purple-400">
+                              Assigned by: {task.createdByName}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Progress value={task.progressPercentage} className="h-2 flex-1" />
+                            <span className="text-xs text-gray-500">{task.progressPercentage}%</span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => openEditTaskDialog(task)}
+                        >
+                          {t.editTask}
+                        </Button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t.employeeNotifications}</CardTitle>
+              <CardDescription>Send messages and notifications to employees</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {employees.map(employee => (
+                    <Card key={employee.id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-base">{employee.name}</CardTitle>
+                        <CardDescription>{employee.position} · {employee.department}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setNotification({
+                              ...notification,
+                              userId: employee.id,
+                              sendToAll: false
+                            });
+                            setIsNotificationDialogOpen(true);
+                          }}
+                        >
+                          {t.sendMessage}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Task Dialog */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>

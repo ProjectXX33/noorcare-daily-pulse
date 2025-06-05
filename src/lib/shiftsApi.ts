@@ -93,7 +93,6 @@ export async function fetchShifts(): Promise<Shift[]> {
     const { data, error } = await supabase
       .from('shifts')
       .select('*')
-      .eq('position', 'Customer Service')
       .eq('is_active', true)
       .order('start_time');
 
@@ -104,7 +103,7 @@ export async function fetchShifts(): Promise<Shift[]> {
       name: item.name,
       startTime: item.start_time,
       endTime: item.end_time,
-      position: item.position as 'Customer Service',
+      position: item.position as 'Customer Service' | 'Designer',
       isActive: item.is_active,
       createdAt: new Date(item.created_at),
       updatedAt: new Date(item.updated_at)
@@ -177,18 +176,46 @@ export function calculateWorkHours(
   const [shiftStartHour, shiftStartMin] = shift.startTime.split(':').map(Number);
   const [shiftEndHour, shiftEndMin] = shift.endTime.split(':').map(Number);
   
-  // Calculate shift duration in hours
-  let shiftDurationHours: number;
-  if (shiftEndHour === 0) { // Night shift ending at midnight
-    shiftDurationHours = (24 - shiftStartHour) + (shiftEndMin / 60);
-  } else if (shiftEndHour < shiftStartHour) { // Shift crosses midnight
-    shiftDurationHours = (24 - shiftStartHour) + shiftEndHour + (shiftEndMin - shiftStartMin) / 60;
-  } else {
-    shiftDurationHours = shiftEndHour - shiftStartHour + (shiftEndMin - shiftStartMin) / 60;
+  // Create shift start and end times for the same date as check-in
+  const shiftStart = new Date(checkInTime);
+  shiftStart.setHours(shiftStartHour, shiftStartMin, 0, 0);
+  
+  const shiftEnd = new Date(checkInTime);
+  shiftEnd.setHours(shiftEndHour, shiftEndMin, 0, 0);
+  
+  // Handle shifts that cross midnight (like Night Shift 16:00-00:00)
+  if (shiftEndHour === 0 || shiftEndHour < shiftStartHour) {
+    shiftEnd.setDate(shiftEnd.getDate() + 1); // Next day
   }
   
-  const regularHours = Math.min(totalHours, shiftDurationHours);
-  const overtimeHours = Math.max(0, totalHours - shiftDurationHours);
+  console.log('📊 Calculating work hours:', {
+    checkInTime: checkInTime.toISOString(),
+    checkOutTime: checkOutTime.toISOString(),
+    shiftName: shift.name,
+    shiftStart: shiftStart.toISOString(),
+    shiftEnd: shiftEnd.toISOString(),
+    totalHours: totalHours.toFixed(2)
+  });
+  
+  // Calculate regular hours: time worked within the shift boundaries
+  const actualWorkStart = checkInTime > shiftStart ? checkInTime : shiftStart;
+  const actualWorkEnd = checkOutTime < shiftEnd ? checkOutTime : shiftEnd;
+  
+  let regularHours = 0;
+  if (actualWorkEnd > actualWorkStart) {
+    regularHours = differenceInMinutes(actualWorkEnd, actualWorkStart) / 60;
+  }
+  
+  // Calculate overtime hours: total hours - regular hours
+  const overtimeHours = Math.max(0, totalHours - regularHours);
+  
+  console.log('📊 Work hours calculated:', {
+    actualWorkStart: actualWorkStart.toISOString(),
+    actualWorkEnd: actualWorkEnd.toISOString(),
+    regularHours: regularHours.toFixed(2),
+    overtimeHours: overtimeHours.toFixed(2),
+    totalCalculated: (regularHours + overtimeHours).toFixed(2)
+  });
   
   return {
     regularHours: Math.round(regularHours * 100) / 100, // Round to 2 decimal places
@@ -343,7 +370,7 @@ export async function getAssignedShift(userId: string, workDate: Date): Promise<
       name: data.shifts.name,
       startTime: data.shifts.start_time,
       endTime: data.shifts.end_time,
-      position: data.shifts.position as 'Customer Service',
+      position: data.shifts.position as 'Customer Service' | 'Designer',
       isActive: data.shifts.is_active,
       createdAt: new Date(data.shifts.created_at),
       updatedAt: new Date(data.shifts.updated_at)

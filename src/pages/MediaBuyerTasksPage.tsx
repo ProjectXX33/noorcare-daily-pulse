@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,8 +106,8 @@ const MediaBuyerTasksPage = () => {
         }, 
         (payload) => {
           console.log('Task updated:', payload);
-          // Refresh tasks to get latest data
-          refreshTaskData();
+          // Use debounced refresh to prevent rapid multiple refreshes
+          debouncedRefreshTaskData();
         }
       )
       .subscribe();
@@ -141,12 +141,12 @@ const MediaBuyerTasksPage = () => {
   // Check if user has access (Media Buyer or Admin)
   if (!user || (user.position !== 'Media Buyer' && user.role !== 'admin')) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <Card className="max-w-md">
-          <CardContent className="p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
-            <p className="text-gray-500">
+      <div className="flex items-center justify-center min-h-[50vh] p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-4 sm:p-6 text-center">
+            <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500 mx-auto mb-3 sm:mb-4" />
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
+            <p className="text-sm sm:text-base text-gray-500">
               This functionality is only available for Media Buyers and Administrators.
             </p>
           </CardContent>
@@ -222,7 +222,7 @@ const MediaBuyerTasksPage = () => {
 
     setIsLoading(true);
     try {
-      const newTask = await createTask({
+      await createTask({
         title: taskForm.title,
         description: taskForm.description,
         assignedTo: taskForm.assignedTo,
@@ -231,7 +231,6 @@ const MediaBuyerTasksPage = () => {
         createdBy: user.id
       });
 
-      setTasks(prev => [...prev, newTask]);
       toast.success('Task assigned to designer successfully');
       setIsTaskDialogOpen(false);
       resetTaskForm();
@@ -282,14 +281,23 @@ const MediaBuyerTasksPage = () => {
     setIsTaskDetailDialogOpen(true);
   };
 
-  const refreshTaskData = async () => {
+  const refreshTaskData = useCallback(async () => {
     try {
       const tasksData = await fetchAllTasks();
       setTasks(tasksData);
     } catch (error) {
       console.error('Error refreshing tasks:', error);
     }
-  };
+  }, []);
+
+  // Debounced version to prevent rapid multiple refreshes
+  const debouncedRefreshTaskData = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(refreshTaskData, 300); // 300ms debounce
+    };
+  }, [refreshTaskData]);
 
   return (
     <div className="space-y-6">
@@ -659,7 +667,7 @@ const MediaBuyerTasksPage = () => {
                       // Also update the selected task for detail
                       setSelectedTaskForDetail({...selectedTaskForDetail, comments: newComments});
                       // Refresh task data to get latest updates
-                      refreshTaskData();
+                      debouncedRefreshTaskData();
                     }}
                     language="en"
                   />

@@ -321,39 +321,42 @@ const AdminEmployeesPage = () => {
 
   return (
     <>
-      <div className="flex flex-col w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex justify-between items-center mb-6 sticky top-0 z-[40] bg-background pt-2 pb-4">
-          <h1 className="text-2xl font-bold">{t.employees}</h1>
-          <Button onClick={() => setIsAddingEmployee(true)} className="bg-primary hover:bg-primary/90">
+      <div className="flex flex-col w-full min-h-0" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-4 border-b shadow-sm">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">{t.employees}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t.manageEmployeeAccounts}</p>
+          </div>
+          <Button onClick={() => setIsAddingEmployee(true)} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
             <UserPlus className="mr-2 h-4 w-4" />
             {t.addEmployee}
           </Button>
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.employeeDirectory}</CardTitle>
-            <CardDescription>{t.manageEmployeeAccounts}</CardDescription>
+        <Card className="flex-1 min-h-0">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">{t.employeeDirectory}</CardTitle>
+            <CardDescription className="text-sm">{t.manageEmployeeAccounts}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-hidden">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[120px] sm:w-auto">{t.name}</TableHead>
-                      <TableHead className="hidden sm:table-cell">{t.username}</TableHead>
-                      <TableHead className="hidden md:table-cell">{t.department}</TableHead>
-                      <TableHead className="hidden md:table-cell">{t.position}</TableHead>
-                      <TableHead className="hidden lg:table-cell">{t.rating}</TableHead>
-                      <TableHead className="hidden sm:table-cell">{t.lastCheckIn}</TableHead>
-                      <TableHead className="text-right">{t.actions}</TableHead>
+                      <TableHead className="w-[120px] sm:w-auto min-w-[120px]">{t.name}</TableHead>
+                      <TableHead className="hidden sm:table-cell min-w-[100px]">{t.username}</TableHead>
+                      <TableHead className="hidden md:table-cell min-w-[120px]">{t.department}</TableHead>
+                      <TableHead className="hidden md:table-cell min-w-[120px]">{t.position}</TableHead>
+                      <TableHead className="hidden lg:table-cell min-w-[140px]">{t.rating}</TableHead>
+                      <TableHead className="hidden sm:table-cell min-w-[140px]">{t.lastCheckIn}</TableHead>
+                      <TableHead className="text-right min-w-[80px]">{t.actions}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4">
+                        <TableCell colSpan={7} className="text-center py-8">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                           </div>
@@ -361,15 +364,28 @@ const AdminEmployeesPage = () => {
                       </TableRow>
                     ) : employees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4">No employees found</TableCell>
+                        <TableCell colSpan={7} className="text-center py-8">No employees found</TableCell>
                       </TableRow>
                     ) : (
                       employees.map(employee => (
                         <TableRow key={employee.id}>
-                          <TableCell className="font-medium">{employee.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span className="font-medium truncate">{employee.name}</span>
+                              <span className="text-xs text-muted-foreground sm:hidden truncate">@{employee.username}</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="hidden sm:table-cell">{employee.username}</TableCell>
-                          <TableCell className="hidden md:table-cell">{employee.department}</TableCell>
-                          <TableCell className="hidden md:table-cell">{employee.position}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted">
+                              {employee.department}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                              {employee.position}
+                            </span>
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             {employee.averageRating && employee.averageRating > 0 ? (
                               <div className="flex items-center gap-1">
@@ -383,18 +399,23 @@ const AdminEmployeesPage = () => {
                             )}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            {employee.lastCheckin 
-                              ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US') 
-                              : t.never}
+                            <span className="text-xs">
+                              {employee.lastCheckin 
+                                ? new Date(employee.lastCheckin).toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short'
+                                  })
+                                : t.never}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
                                   {t.actions}
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent>
+                              <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => openEditDialog(employee)}>
                                   {t.edit}
                                 </DropdownMenuItem>

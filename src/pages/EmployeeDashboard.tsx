@@ -110,8 +110,8 @@ const EmployeeDashboard = () => {
   const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
   const checkedInToday = hasCheckedInToday(user.id);
   
-  // Check if user has check-in access (only Customer Service)
-  const hasCheckInAccess = user.position === 'Customer Service';
+  // Check if user has check-in access (Customer Service and Designer)
+  const hasCheckInAccess = user.position === 'Customer Service' || user.position === 'Designer';
   
   // Get today's reports
   const today = new Date();
@@ -135,12 +135,13 @@ const EmployeeDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Mobile-optimized header */}
       <div className="flex flex-col">
-        <h1 className="text-3xl font-bold mb-2">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
           {t.welcome}, {user.name}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm md:text-base text-muted-foreground">
           {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
             weekday: 'long',
             year: 'numeric',
@@ -150,8 +151,9 @@ const EmployeeDashboard = () => {
         </p>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Only show check-in card for Customer Service */}
+      {/* Mobile-responsive dashboard cards */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Only show check-in card for Customer Service and Designer */}
         {hasCheckInAccess && (
           <DashboardCard 
             title={t.todayCheckIns}
@@ -188,107 +190,88 @@ const EmployeeDashboard = () => {
         />
       </div>
 
-      {/* Rating Details Card */}
+      {/* Mobile-optimized rating details card */}
       {(latestRating || averageRating) && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+          <CardHeader className="pb-3 sm:pb-4">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-yellow-500" />
-                Performance Rating
+                <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
+                <span className="text-base sm:text-lg">Performance Rating</span>
               </div>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => navigate('/my-ratings')}
+                className="w-full sm:w-auto min-h-[44px] text-xs sm:text-sm"
               >
+                <User className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 {t.viewMyRatings}
               </Button>
             </CardTitle>
-            <CardDescription>
-              Your performance rating from management
-            </CardDescription>
           </CardHeader>
-          <CardContent>
-            {isLoadingRating ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="ml-2 text-sm">Loading rating...</span>
-              </div>
-            ) : (
-              <div className="space-y-4">
+          <CardContent className="pt-0">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
                 {averageRating && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{t.averageRating}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Based on all your ratings
-                      </p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">{t.averageRating}</span>
+                    <span className="text-lg sm:text-xl font-bold">{averageRating.toFixed(1)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={averageRating} readonly />
-                      <span className="font-bold text-lg">
-                        {averageRating.toFixed(1)}/5
-                      </span>
-                    </div>
+                  <StarRating rating={averageRating} readonly size="sm" />
+                  <p className="text-xs text-muted-foreground">Based on all your ratings</p>
                   </div>
                 )}
                 
                 {latestRating && (
-                  <div className="border rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{t.latestRating}</h4>
-                      <div className="flex items-center gap-2">
-                        <StarRating rating={latestRating.rating} readonly />
-                        <span className="font-semibold">
-                          {latestRating.rating}/5
-                        </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">{t.latestRating}</span>
+                    <span className="text-lg sm:text-xl font-bold">{latestRating.rating}</span>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <User className="h-3 w-3" />
-                      <span>{t.ratedBy}: {latestRating.ratedByName}</span>
-                      <span>•</span>
-                      <span>{latestRating.ratedAt.toLocaleDateString()}</span>
-                    </div>
-                    
+                  <StarRating rating={latestRating.rating} readonly size="sm" />
+                  <p className="text-xs text-muted-foreground">
+                    {t.ratedBy} {latestRating.ratedByName} • {new Date(latestRating.ratedAt).toLocaleDateString()}
+                  </p>
                     {latestRating.comment && (
-                      <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                        <strong>Comment:</strong> "{latestRating.comment}"
+                    <div className="mt-2 p-2 sm:p-3 bg-muted rounded-lg">
+                      <p className="text-xs sm:text-sm italic">{latestRating.comment}</p>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Only show check-in reminder for Customer Service */}
+      {/* Mobile-optimized check-in reminder */}
       {hasCheckInAccess && !checkedInToday && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="font-medium text-amber-800 dark:text-amber-200">{t.checkInToday}</h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300">{t.checkInDesc}</p>
+        <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-800 dark:text-amber-200 text-sm sm:text-base">{t.checkInToday}</h3>
+              <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 mt-1">{t.checkInDesc}</p>
             </div>
-            <Button onClick={() => navigate('/check-in')} className="bg-primary hover:bg-primary/90">
+            <Button 
+              onClick={() => navigate('/check-in')} 
+              className="bg-primary hover:bg-primary/90 w-full sm:w-auto min-h-[44px]"
+              size="sm"
+            >
               {t.checkInNow}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Daily Reminder for Customer Service */}
+      {/* Mobile-optimized daily reminder */}
       {hasCheckInAccess && (
-        <div className="p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1">⚠️ Daily Reminder</h3>
-              <p className="text-sm text-red-700 dark:text-red-400 font-medium">
+        <div className="p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1 text-sm sm:text-base">⚠️ Daily Reminder</h3>
+              <p className="text-xs sm:text-sm text-red-700 dark:text-red-400 font-medium">
                 If you do not check in, check out, or submit your daily report, 
                 that day will <strong>NOT</strong> be collected or counted in your records.
               </p>
@@ -297,10 +280,11 @@ const EmployeeDashboard = () => {
         </div>
       )}
 
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        {/* Only show check-in history for Customer Service */}
+      {/* Mobile-responsive history grid */}
+      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
+        {/* Only show check-in history for Customer Service and Designer */}
         {hasCheckInAccess && (
-          <div className="bg-card rounded-lg p-4 border shadow-sm">
+          <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
             <CheckInHistory 
               checkIns={userCheckIns.slice(0, 5)} 
               title={t.recentCheckins} 
@@ -308,7 +292,7 @@ const EmployeeDashboard = () => {
           </div>
         )}
         
-        <div className={`bg-card rounded-lg p-4 border shadow-sm ${!hasCheckInAccess ? 'md:col-span-2' : ''}`}>
+        <div className={`bg-card rounded-lg p-3 sm:p-4 border shadow-sm ${!hasCheckInAccess ? 'lg:col-span-2' : ''}`}>
           <ReportHistory 
             reports={userReports.slice(0, 3) as any}
             title={t.recentReports} 
@@ -316,13 +300,14 @@ const EmployeeDashboard = () => {
         </div>
       </div>
           
+      {/* Mobile-optimized action button */}
       <div className="flex">
         <Button 
-          className="bg-primary hover:bg-primary/90 px-6" 
+          className="bg-primary hover:bg-primary/90 px-4 sm:px-6 min-h-[44px] w-full sm:w-auto" 
           onClick={() => navigate('/employee-tasks')}
         >
           <CheckSquare className="mr-2 h-4 w-4" />
-          {t.viewTasks}
+          <span className="text-sm sm:text-base">{t.viewTasks}</span>
         </Button>
       </div>
     </div>
