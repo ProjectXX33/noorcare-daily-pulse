@@ -30,7 +30,7 @@ import { User, Department, Position } from '@/types';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
 import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus, Star } from 'lucide-react';
+import { UserPlus, Star, Plus } from 'lucide-react';
 import RateEmployeeModal from '@/components/RateEmployeeModal';
 import StarRating from '@/components/StarRating';
 
@@ -92,7 +92,9 @@ const AdminEmployeesPage = () => {
       role: "Role",
       admin: "Admin",
       employee: "Employee",
-      noRating: "No rating"
+      noRating: "No rating",
+      employeeManagement: "Employee Management",
+      manageAllEmployees: "Manage all employees and their access"
     },
     ar: {
       employees: "الموظفين",
@@ -126,7 +128,9 @@ const AdminEmployeesPage = () => {
       role: "الدور",
       admin: "مدير",
       employee: "موظف",
-      noRating: "لا يوجد تقييم"
+      noRating: "لا يوجد تقييم",
+      employeeManagement: "إدارة الموظفين",
+      manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول"
     }
   };
 
@@ -320,19 +324,29 @@ const AdminEmployeesPage = () => {
   };
 
   return (
-    <>
-      <div className="flex flex-col w-full min-h-0" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-4 border-b shadow-sm">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">{t.employees}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{t.manageEmployeeAccounts}</p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">{t.employeeManagement}</h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">{t.manageAllEmployees}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={() => setIsAddingEmployee(true)}
+                className="min-h-[44px] text-sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {t.addEmployee}
+              </Button>
+            </div>
           </div>
-          <Button onClick={() => setIsAddingEmployee(true)} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-            <UserPlus className="mr-2 h-4 w-4" />
-            {t.addEmployee}
-          </Button>
         </div>
-        
+      </div>
+
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
         <Card className="flex-1 min-h-0">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">{t.employeeDirectory}</CardTitle>
@@ -767,7 +781,7 @@ const AdminEmployeesPage = () => {
         employee={employeeToRate}
         onRatingSubmitted={handleRatingSubmitted}
       />
-    </>
+    </div>
   );
 };
 

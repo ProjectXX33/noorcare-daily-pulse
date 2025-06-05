@@ -428,10 +428,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Mobile cards view */}
+          {/* Mobile cards view - Fixed mobile viewing */}
           <div className="block lg:hidden">
-            <ScrollArea className="h-[60vh]">
-              <div className="space-y-3 p-4">
+            <div className="max-h-none overflow-y-auto">
+              <div className="space-y-3 p-4 max-h-[calc(100vh-350px)] overflow-y-auto">
                 {/* Add New Record Card */}
                 {isAddingNew && (
                   <Card className="border-2 border-blue-200 bg-blue-50/50">
@@ -735,7 +735,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   })
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Desktop table view */}

@@ -216,6 +216,24 @@ const MediaBuyerTasksPage = () => {
     }
   };
 
+  const handleEventDelete = async () => {
+    if (!selectedEvent) return;
+
+    setIsLoading(true);
+    try {
+      await eventService.deleteEvent(selectedEvent.id);
+      setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
+      toast.success('Event deleted successfully');
+      setIsEventDialogOpen(false);
+      resetEventForm();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Error deleting event');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !taskForm.assignedTo) return;
@@ -240,6 +258,21 @@ const MediaBuyerTasksPage = () => {
       toast.error('Error creating task');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddTaskComment = (taskId: string, comments: any[]) => {
+    // Update the task in the local state with the new comments array
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId) {
+        return { ...task, comments: comments };
+      }
+      return task;
+    }));
+
+    // Update selectedTaskForDetail if it's the same task
+    if (selectedTaskForDetail && selectedTaskForDetail.id === taskId) {
+      setSelectedTaskForDetail({ ...selectedTaskForDetail, comments: comments });
     }
   };
 
@@ -300,389 +333,396 @@ const MediaBuyerTasksPage = () => {
   }, [refreshTaskData]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Media Buyer Dashboard</h1>
-          <p className="text-gray-600">Manage calendar events and assign tasks to designers</p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden">
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">Media Buyer Dashboard</h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">Manage calendar events and assign tasks to designers</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="calendar" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Calendar & Events
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4" />
-            Design Tasks
-          </TabsTrigger>
-        </TabsList>
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
+        <Tabs defaultValue="calendar" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="calendar" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Calendar & Events
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Design Tasks
+            </TabsTrigger>
+          </TabsList>
+        
+          <TabsContent value="calendar" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Calendar Management
+                </CardTitle>
+                <Button onClick={() => setIsEventDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Event
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-background border rounded-lg overflow-hidden">
+                  <FullCalendar
+                    plugins={[dayGridPlugin, interactionPlugin]}
+                    initialView="dayGridMonth"
+                    events={events.map(event => ({
+                      id: event.id,
+                      title: event.title,
+                      start: event.start,
+                      end: event.end || event.start,
+                      backgroundColor: '#3b82f6',
+                      borderColor: '#1d4ed8',
+                    }))}
+                    eventClick={(info) => {
+                      const event = events.find(e => e.id === info.event.id);
+                      if (event) {
+                        setSelectedEvent(event);
+                        setEventForm({
+                          title: event.title,
+                          description: event.description,
+                          start: new Date(event.start).toISOString().slice(0, 16),
+                          end: event.end ? new Date(event.end).toISOString().slice(0, 16) : ''
+                        });
+                        setIsEventDialogOpen(true);
+                      }
+                    }}
+                    height="auto"
+                    headerToolbar={{
+                      left: 'prev,next today',
+                      center: 'title',
+                      right: 'dayGridMonth'
+                    }}
+                    eventDisplay="block"
+                    displayEventTime={true}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="calendar" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Calendar Management
-              </CardTitle>
-              <Button onClick={() => setIsEventDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Event
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <FullCalendar
-                plugins={[dayGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                events={events}
-                editable={true}
-                eventClick={handleEventClick}
-                dateClick={handleDateClick}
-                height="auto"
-                headerToolbar={{
-                  left: 'prev,next today',
-                  center: 'title',
-                  right: 'dayGridMonth'
-                }}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tasks" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <PenTool className="h-5 w-5" />
-                Assign Tasks to Designers
-              </CardTitle>
-              <Button onClick={() => setIsTaskDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Assign Task
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {getTasksAssignedByUser().length === 0 ? (
-                  <div className="text-center py-8">
-                    <CheckSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-500">No tasks assigned yet</p>
-                    <p className="text-sm text-gray-400">Start by assigning tasks to designers</p>
-                  </div>
-                ) : (
-                  getTasksAssignedByUser().map((task) => (
-                    <Card key={task.id} className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold">{task.title}</h3>
-                        <Badge className={getStatusColor(task.status)}>
-                          {task.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">{task.description}</p>
-                      <div className="flex justify-between items-center text-sm mb-3">
-                        <div className="flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          <span>Assigned to: {task.assignedToName}</span>
+          <TabsContent value="tasks" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <PenTool className="h-5 w-5" />
+                  Assign Tasks to Designers
+                </CardTitle>
+                <Button onClick={() => setIsTaskDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assign Task
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {getTasksAssignedByUser().length === 0 ? (
+                    <div className="text-center py-8">
+                      <CheckSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-500">No tasks assigned yet</p>
+                      <p className="text-sm text-gray-400">Start by assigning tasks to designers</p>
+                    </div>
+                  ) :
+                    getTasksAssignedByUser().map((task) => (
+                      <Card key={task.id} className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold">{task.title}</h3>
+                          <Badge className={getStatusColor(task.status)}>
+                            {task.status}
+                          </Badge>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{new Date(task.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      {task.progressPercentage !== undefined && (
-                        <div className="mb-3">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>Progress</span>
-                            <span>{task.progressPercentage}%</span>
+                        <p className="text-sm text-gray-600 mb-3">{task.description}</p>
+                        <div className="flex justify-between items-center text-sm mb-3">
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4" />
+                            <span>Assigned to: {task.assignedToName}</span>
                           </div>
-                          <Progress value={task.progressPercentage} className="h-2" />
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            <span>{new Date(task.createdAt).toLocaleDateString()}</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openTaskDetail(task)}
-                          className="flex-1"
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </Button>
-                        {(task.comments && task.comments.length > 0) && (
+                        {task.progressPercentage !== undefined && (
+                          <div className="mb-3">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span>Progress</span>
+                              <span>{task.progressPercentage}%</span>
+                            </div>
+                            <Progress value={task.progressPercentage} className="h-2" />
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => openTaskDetail(task)}
+                            className="flex items-center gap-1"
                           >
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            {task.comments.length}
+                            <Eye className="h-3 w-3" />
+                            View Details
+                            {task.comments && task.comments.length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                {task.comments.length}
+                              </span>
+                            )}
                           </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Event Dialog */}
-      <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedEvent ? 'Edit Event' : 'Create New Event'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEventSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="event-title">Title</Label>
-              <Input
-                id="event-title"
-                value={eventForm.title}
-                onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="event-description">Description</Label>
-              <Textarea
-                id="event-description"
-                value={eventForm.description}
-                onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="event-start">Start Date & Time</Label>
-              <Input
-                id="event-start"
-                type="datetime-local"
-                value={eventForm.start}
-                onChange={(e) => setEventForm(prev => ({ ...prev, start: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="event-end">End Date & Time (Optional)</Label>
-              <Input
-                id="event-end"
-                type="datetime-local"
-                value={eventForm.end}
-                onChange={(e) => setEventForm(prev => ({ ...prev, end: e.target.value }))}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEventDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Saving...' : (selectedEvent ? 'Update Event' : 'Create Event')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task Assignment Dialog */}
-      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Task to Designer</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleTaskSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="task-title">Task Title</Label>
-              <Input
-                id="task-title"
-                value={taskForm.title}
-                onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="task-description">Description</Label>
-              <Textarea
-                id="task-description"
-                value={taskForm.description}
-                onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Describe the design task in detail..."
-              />
-            </div>
-            <div>
-              <Label htmlFor="task-designer">Assign to Designer</Label>
-              <Select
-                value={taskForm.assignedTo}
-                onValueChange={(value) => setTaskForm(prev => ({ ...prev, assignedTo: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a designer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {designers.map((designer) => (
-                    <SelectItem key={designer.id} value={designer.id}>
-                      {designer.name} - {designer.position}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="task-status">Initial Status</Label>
-              <Select
-                value={taskForm.status}
-                onValueChange={(value) => setTaskForm(prev => ({ 
-                  ...prev, 
-                  status: value as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete'
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Not Started">Not Started</SelectItem>
-                  <SelectItem value="On Hold">On Hold</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Complete">Complete</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading || !taskForm.assignedTo}>
-                {isLoading ? 'Assigning...' : 'Assign Task'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task Detail Dialog */}
-      <Dialog open={isTaskDetailDialogOpen} onOpenChange={setIsTaskDetailDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[600px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckSquare className="h-5 w-5" />
-              Task Details
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedTaskForDetail && (
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="comments" className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Comments
-                  {selectedTaskForDetail.comments && selectedTaskForDetail.comments.length > 0 && (
-                    <Badge variant="secondary" className="ml-1">
-                      {selectedTaskForDetail.comments.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-4 mt-4">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Task Title</Label>
-                    <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
-                      {selectedTaskForDetail.title}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Description</Label>
-                    <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
-                      {selectedTaskForDetail.description}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Assigned To</Label>
-                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {selectedTaskForDetail.assignedToName}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Status</Label>
-                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
-                        <Badge className={getStatusColor(selectedTaskForDetail.status)}>
-                          {selectedTaskForDetail.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Progress</Label>
-                    <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span>Progress</span>
-                        <span>{selectedTaskForDetail.progressPercentage}%</span>
-                      </div>
-                      <Progress value={selectedTaskForDetail.progressPercentage} className="h-3" />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Created</Label>
-                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {new Date(selectedTaskForDetail.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Last Updated</Label>
-                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {new Date(selectedTaskForDetail.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
+                          
+                          {task.status === 'Complete' && (
+                            <div className="text-green-600 text-sm font-medium">
+                              ✓ Completed
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    ))
+                  }
                 </div>
-              </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Add Event Dialog */}
+        <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedEvent ? 'Edit Event' : 'Add New Event'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEventSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Event Title</Label>
+                <Input
+                  id="title"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter event title"
+                  required
+                />
+              </div>
               
-              <TabsContent value="comments" className="space-y-4 mt-4">
-                {user && selectedTaskForDetail && (
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter event description"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="start">Start Date & Time</Label>
+                <Input
+                  id="start"
+                  type="datetime-local"
+                  value={eventForm.start}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, start: e.target.value }))}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="end">End Date & Time (Optional)</Label>
+                <Input
+                  id="end"
+                  type="datetime-local"
+                  value={eventForm.end}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, end: e.target.value }))}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => {
+                  setIsEventDialogOpen(false);
+                  setSelectedEvent(null);
+                  setEventForm({ title: '', description: '', start: new Date().toISOString().slice(0, 16), end: '' });
+                }}>
+                  Cancel
+                </Button>
+                {selectedEvent && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleEventDelete}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Deleting...' : 'Delete'}
+                  </Button>
+                )}
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? 'Saving...' : selectedEvent ? 'Update Event' : 'Add Event'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Task Dialog */}
+        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Assign Task to Designer</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleTaskSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="taskTitle">Task Title</Label>
+                <Input
+                  id="taskTitle"
+                  value={taskForm.title}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter task title"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="taskDescription">Task Description</Label>
+                <Textarea
+                  id="taskDescription"
+                  value={taskForm.description}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe the task in detail"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="assignedTo">Assign to Designer</Label>
+                <Select value={taskForm.assignedTo} onValueChange={(value) => setTaskForm(prev => ({ ...prev, assignedTo: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a designer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {designers.map((designer) => (
+                      <SelectItem key={designer.id} value={designer.id}>
+                        {designer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading || !taskForm.assignedTo}>
+                  {isLoading ? 'Assigning...' : 'Assign Task'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Task Detail Dialog */}
+        <Dialog open={isTaskDetailDialogOpen} onOpenChange={setIsTaskDetailDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-[600px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckSquare className="h-5 w-5" />
+                Task Details
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedTaskForDetail && (
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="comments" className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Comments
+                    {selectedTaskForDetail.comments && selectedTaskForDetail.comments.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full dark:bg-blue-900 dark:text-blue-200">
+                        {selectedTaskForDetail.comments.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="space-y-4">
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Task Title</Label>
+                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
+                        {selectedTaskForDetail.title}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Description</Label>
+                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
+                        {selectedTaskForDetail.description}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Assigned To</Label>
+                        <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800 flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {selectedTaskForDetail.assignedToName}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Status</Label>
+                        <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
+                          <Badge className={getStatusColor(selectedTaskForDetail.status)}>
+                            {selectedTaskForDetail.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Progress</Label>
+                      <div className="p-3 bg-gray-50 rounded-md dark:bg-gray-800">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">{selectedTaskForDetail.progressPercentage}%</span>
+                        </div>
+                        <Progress value={selectedTaskForDetail.progressPercentage} className="h-2" />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 text-sm text-gray-500">
+                      <div>
+                        <span className="font-medium">Created:</span> {new Date(selectedTaskForDetail.createdAt).toLocaleDateString()}
+                      </div>
+                      <div>
+                        <span className="font-medium">Last Updated:</span> {new Date(selectedTaskForDetail.updatedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="comments" className="space-y-4">
                   <TaskComments
                     taskId={selectedTaskForDetail.id}
                     user={user}
                     comments={selectedTaskForDetail.comments || []}
-                    onCommentAdded={(newComments) => {
-                      // Update the task comments in the local state
-                      setTasks(tasks.map(task => 
-                        task.id === selectedTaskForDetail.id 
-                          ? {...task, comments: newComments} 
-                          : task
-                      ));
-                      // Also update the selected task for detail
-                      setSelectedTaskForDetail({...selectedTaskForDetail, comments: newComments});
-                      // Refresh task data to get latest updates
-                      debouncedRefreshTaskData();
-                    }}
+                    onCommentAdded={(comments) => handleAddTaskComment(selectedTaskForDetail.id, comments)}
                     language="en"
                   />
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTaskDetailDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                </TabsContent>
+              </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 };

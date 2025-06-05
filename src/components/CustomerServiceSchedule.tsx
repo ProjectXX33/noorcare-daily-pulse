@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { format, addDays, startOfWeek, isSameDay, isToday } from 'date-fns';
@@ -40,9 +41,9 @@ const CustomerServiceSchedule = () => {
   const loadSchedule = async () => {
     setIsLoading(true);
     try {
-      // Get assignments for the next 14 days
+      // Get assignments for the next 5 days
       const startDate = new Date();
-      const endDate = addDays(startDate, 13);
+      const endDate = addDays(startDate, 4); // Changed from 13 to 4 (5 days total: 0-4)
       
       const { data, error } = await supabase
         .from('shift_assignments')
@@ -81,24 +82,24 @@ const CustomerServiceSchedule = () => {
   };
 
   const getShiftBadgeStyle = (assignment: ShiftAssignment) => {
-    if (assignment.isDayOff) return 'bg-green-100 text-green-800 border-green-200';
+    if (assignment.isDayOff) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200';
     switch (assignment.shiftName) {
-      case 'Day Shift': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'Night Shift': return 'bg-purple-100 text-purple-800 border-purple-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'Day Shift': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
+      case 'Night Shift': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
 
   const getShiftIcon = (assignment: ShiftAssignment) => {
-    if (assignment.isDayOff) return <Coffee className="w-4 h-4" />;
-    if (assignment.shiftName === 'Day Shift') return <Sun className="w-4 h-4" />;
-    if (assignment.shiftName === 'Night Shift') return <Moon className="w-4 h-4" />;
-    return <Clock className="w-4 h-4" />;
+    if (assignment.isDayOff) return <Coffee className="w-4 h-4 shrink-0" />;
+    if (assignment.shiftName === 'Day Shift') return <Sun className="w-4 h-4 shrink-0" />;
+    if (assignment.shiftName === 'Night Shift') return <Moon className="w-4 h-4 shrink-0" />;
+    return <Clock className="w-4 h-4 shrink-0" />;
   };
 
   const getStatusIcon = (assignment: ShiftAssignment) => {
-    if (assignment.isDayOff) return <XCircle className="w-4 h-4 text-green-600" />;
-    return <CheckCircle className="w-4 h-4 text-blue-600" />;
+    if (assignment.isDayOff) return <XCircle className="w-4 h-4 shrink-0 text-green-600" />;
+    return <CheckCircle className="w-4 h-4 shrink-0 text-blue-600" />;
   };
 
   if (!user || (user.position !== 'Customer Service' && user.position !== 'Designer')) {
@@ -106,182 +107,269 @@ const CustomerServiceSchedule = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Today's Shift Card */}
-      <Card className="border-2 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Today's Schedule - {format(new Date(), 'EEEE, MMMM dd, yyyy')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {todayAssignment ? (
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                {getShiftIcon(todayAssignment)}
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    {todayAssignment.isDayOff ? '🏖️ Day Off' : todayAssignment.shiftName || 'No Shift Assigned'}
-                  </h3>
-                  {!todayAssignment.isDayOff && todayAssignment.shiftStartTime && (
-                    <p className="text-sm text-gray-600">
-                      {todayAssignment.shiftStartTime} - {todayAssignment.shiftEndTime}
-                    </p>
-                  )}
+    <div className="w-full max-w-full overflow-hidden">
+      <div className="space-y-3 sm:space-y-4">
+        {/* Mobile-optimized Today's Shift Card - No horizontal overflow */}
+        <Card className="w-full border border-border/50 shadow-sm">
+          <CardHeader className="pb-2 px-3 sm:px-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base truncate">
+              <Calendar className="w-4 h-4 shrink-0" />
+              <span className="truncate">Today - {format(new Date(), 'EEE, MMM dd')}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 sm:px-4 pb-3">
+            {todayAssignment ? (
+              <div className="w-full">
+                <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+                  <div className="p-1.5 rounded-full bg-background shadow-sm shrink-0">
+                    {getShiftIcon(todayAssignment)}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <h3 className="font-semibold text-xs sm:text-sm leading-tight truncate">
+                      {todayAssignment.isDayOff ? '🏖️ Day Off' : todayAssignment.shiftName || 'No Shift Assigned'}
+                    </h3>
+                    {!todayAssignment.isDayOff && todayAssignment.shiftStartTime && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {todayAssignment.shiftStartTime} - {todayAssignment.shiftEndTime}
+                      </p>
+                    )}
+                    <Badge className={`${getShiftBadgeStyle(todayAssignment)} text-xs px-2 py-0.5 font-medium w-fit`}>
+                      {todayAssignment.isDayOff ? 'Day Off' : 'Working'}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-              <Badge className={`${getShiftBadgeStyle(todayAssignment)} text-sm px-3 py-1`}>
-                {todayAssignment.isDayOff ? 'Day Off' : 'Working Day'}
-              </Badge>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-lg">
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <div>
-                <h3 className="font-semibold text-yellow-800">No Assignment Today</h3>
-                <p className="text-sm text-yellow-600">Please check with your admin for today's schedule</p>
+            ) : (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                <div className="p-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 shrink-0">
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-amber-800 dark:text-amber-200 text-xs sm:text-sm">No Assignment Today</h3>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 leading-tight">Contact admin for schedule</p>
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Upcoming Schedule */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            Your Schedule (Next 14 Days)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">Loading your schedule...</div>
-          ) : assignments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No schedule assigned yet. Please contact your admin.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Day</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assignments.map((assignment) => (
-                    <TableRow 
-                      key={assignment.id}
-                      className={isToday(assignment.workDate) ? 'bg-blue-50 border-blue-200' : ''}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {format(assignment.workDate, 'MMM dd, yyyy')}
-                          {isToday(assignment.workDate) && (
-                            <Badge variant="secondary" className="text-xs">Today</Badge>
-                          )}
+        {/* Mobile-optimized Schedule - Cards only, no tables on mobile */}
+        <Card className="w-full border border-border/50 shadow-sm">
+          <CardHeader className="pb-2 px-3 sm:px-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-base truncate">
+              <Clock className="w-4 h-4 shrink-0" />
+              <span className="truncate">Next 5 Days</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="text-center py-8 px-3">
+                <div className="flex items-center justify-center mb-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">Loading...</span>
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="text-center py-8 px-3">
+                <div className="bg-muted/50 rounded-lg p-4 max-w-xs mx-auto">
+                  <Calendar className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                  <h3 className="font-semibold text-muted-foreground text-sm mb-1">No Schedule</h3>
+                  <p className="text-xs text-muted-foreground">Contact your admin</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Mobile Cards View - Optimized for small screens */}
+                <div className="block xl:hidden">
+                  <div className="max-h-none overflow-y-auto">
+                    <div className="space-y-2 p-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+                      {assignments.map((assignment) => (
+                        <div 
+                          key={assignment.id} 
+                          className={`w-full border rounded-lg p-3 ${
+                            isToday(assignment.workDate) 
+                              ? 'border-primary/50 bg-primary/5' 
+                              : 'border-border/50 bg-background'
+                          }`}
+                        >
+                          {/* Date and status row */}
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <h4 className="font-semibold text-xs leading-tight truncate">
+                                {format(assignment.workDate, 'EEE, MMM dd')}
+                              </h4>
+                              {isToday(assignment.workDate) && (
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0.5 shrink-0">Today</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {getStatusIcon(assignment)}
+                              <span className={`text-xs font-medium ${assignment.isDayOff ? 'text-green-600' : 'text-blue-600'}`}>
+                                {assignment.isDayOff ? 'Off' : 'Work'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Shift info row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {getShiftIcon(assignment)}
+                              <span className="text-xs font-medium text-muted-foreground truncate">
+                                {assignment.isDayOff ? 'Day Off' : assignment.shiftName || 'Not Assigned'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-medium shrink-0">
+                              {assignment.isDayOff ? (
+                                <span className="text-green-600">😊</span>
+                              ) : assignment.shiftStartTime ? (
+                                <span className="text-foreground">
+                                  {assignment.shiftStartTime.slice(0, 5)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">TBD</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell>{format(assignment.workDate, 'EEEE')}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(assignment)}
-                          <span className={assignment.isDayOff ? 'text-green-600' : 'text-blue-600'}>
-                            {assignment.isDayOff ? 'Day Off' : 'Working'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getShiftIcon(assignment)}
-                          <Badge className={`text-xs ${getShiftBadgeStyle(assignment)}`}>
-                            {assignment.isDayOff ? '🏖️ Day Off' : assignment.shiftName || 'Not Assigned'}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {assignment.isDayOff ? (
-                          <span className="text-green-600 font-medium">Enjoy your day! 😊</span>
-                        ) : assignment.shiftStartTime ? (
-                          <span className="text-gray-700">
-                            {assignment.shiftStartTime} - {assignment.shiftEndTime}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">Time TBD</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-      {/* Schedule Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Working Days</p>
-                <p className="text-2xl font-bold text-blue-600">
+                {/* Desktop Table View - Only for very large screens */}
+                <div className="hidden xl:block">
+                  <div className="w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-border/50">
+                          <TableHead className="font-semibold text-xs">Date</TableHead>
+                          <TableHead className="font-semibold text-xs">Day</TableHead>
+                          <TableHead className="font-semibold text-xs">Status</TableHead>
+                          <TableHead className="font-semibold text-xs">Shift</TableHead>
+                          <TableHead className="font-semibold text-xs">Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {assignments.map((assignment) => (
+                          <TableRow 
+                            key={assignment.id}
+                            className={`hover:bg-muted/50 transition-colors ${
+                              isToday(assignment.workDate) ? 'bg-primary/5 border-primary/20' : ''
+                            }`}
+                          >
+                            <TableCell className="font-medium text-xs">
+                              <div className="flex items-center gap-2">
+                                {format(assignment.workDate, 'MMM dd')}
+                                {isToday(assignment.workDate) && (
+                                  <Badge variant="secondary" className="text-xs">Today</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">{format(assignment.workDate, 'EEE')}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(assignment)}
+                                <span className={`text-xs ${assignment.isDayOff ? 'text-green-600' : 'text-blue-600'}`}>
+                                  {assignment.isDayOff ? 'Day Off' : 'Working'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getShiftIcon(assignment)}
+                                <Badge className={`text-xs ${getShiftBadgeStyle(assignment)}`}>
+                                  {assignment.isDayOff ? 'Day Off' : assignment.shiftName || 'Not Assigned'}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {assignment.isDayOff ? (
+                                <span className="text-green-600 font-medium">Enjoy! 😊</span>
+                              ) : assignment.shiftStartTime ? (
+                                <span className="text-foreground">
+                                  {assignment.shiftStartTime} - {assignment.shiftEndTime}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">Time TBD</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Mobile-optimized Summary Cards - 2x2 grid for mobile */}
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <Card className="w-full border border-border/50 shadow-sm">
+            <CardContent className="p-2 sm:p-3">
+              <div className="text-center space-y-1">
+                <div className="flex justify-center">
+                  <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground leading-tight">Work Days</p>
+                <div className="text-sm sm:text-lg font-bold text-blue-600">
                   {assignments.filter(a => !a.isDayOff).length}
-                </p>
+                </div>
               </div>
-              <CheckCircle className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Days Off</p>
-                <p className="text-2xl font-bold text-green-600">
+          <Card className="w-full border border-border/50 shadow-sm">
+            <CardContent className="p-2 sm:p-3">
+              <div className="text-center space-y-1">
+                <div className="flex justify-center">
+                  <div className="p-1.5 rounded-full bg-green-100 dark:bg-green-900/30">
+                    <Coffee className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground leading-tight">Days Off</p>
+                <div className="text-sm sm:text-lg font-bold text-green-600">
                   {assignments.filter(a => a.isDayOff).length}
-                </p>
+                </div>
               </div>
-              <Coffee className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Day Shifts</p>
-                <p className="text-2xl font-bold text-yellow-600">
+          <Card className="w-full border border-border/50 shadow-sm">
+            <CardContent className="p-2 sm:p-3">
+              <div className="text-center space-y-1">
+                <div className="flex justify-center">
+                  <div className="p-1.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                    <Sun className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground leading-tight">Day Shifts</p>
+                <div className="text-sm sm:text-lg font-bold text-yellow-600">
                   {assignments.filter(a => a.shiftName === 'Day Shift').length}
-                </p>
+                </div>
               </div>
-              <Sun className="h-8 w-8 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Night Shifts</p>
-                <p className="text-2xl font-bold text-purple-600">
+          <Card className="w-full border border-border/50 shadow-sm">
+            <CardContent className="p-2 sm:p-3">
+              <div className="text-center space-y-1">
+                <div className="flex justify-center">
+                  <div className="p-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
+                    <Moon className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground leading-tight">Night Shifts</p>
+                <div className="text-sm sm:text-lg font-bold text-purple-600">
                   {assignments.filter(a => a.shiftName === 'Night Shift').length}
-                </p>
+                </div>
               </div>
-              <Moon className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

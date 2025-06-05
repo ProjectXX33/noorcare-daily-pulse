@@ -675,3 +675,68 @@ body .fc .fc-daygrid-event:hover {
   align-items: center !important;
   justify-content: center !important;
 }
+
+/* Global overflow prevention */
+* {
+  /* Prevent any element from creating vertical overflow */
+  max-width: 100vw;
+}
+
+/* Natural scrolling for all containers */
+.scroll-area-fix {
+  /* Use natural scrolling instead of fixed height */
+  height: auto !important;
+  max-height: none !important;
+}
+
+.natural-height {
+  /* Force natural height for scroll containers */
+  height: auto !important;
+  max-height: inherit !important;
+}
+
+.flex-container-fix {
+  /* Better flex container behavior */
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+@media (max-width: 768px) {
+  .mobile-no-fixed-height {
+    /* Remove fixed heights on mobile */
+    height: auto !important;
+    max-height: 70vh !important;
+  }
+  
+  [data-radix-scroll-area-viewport] {
+    /* Better scroll area behavior on mobile */
+    height: auto !important;
+    max-height: inherit !important;
+  }
+}
+
+/* Enhanced Z-Index Hierarchy */
+.tooltip-high-z {
+  z-index: 100 !important;
+}
+
+/* Tooltip specific styles */
+[data-radix-tooltip-content] {
+  z-index: 100 !important;
+}
+
+/* Ensure tooltips are always on top */
+.tooltip-portal {
+  z-index: 100 !important;
+}
+
+/* Z-index hierarchy for better control */
+.z-tooltip { z-index: 100 !important; }
+.z-modal { z-index: 90 !important; }
+.z-dropdown { z-index: 80 !important; }
+.z-header-main { z-index: 50 !important; }
+.z-header-page { z-index: 40 !important; }
+.z-sidebar { z-index: 40 !important; }
+.z-overlay { z-index: 30 !important; }
+.z-sticky { z-index: 20 !important; }
+.z-content { z-index: 10 !important; }

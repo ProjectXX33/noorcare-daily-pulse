@@ -32,6 +32,7 @@ import MediaBuyerTasksPage from "./pages/MediaBuyerTasksPage";
 import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
+import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 
 
 const queryClient = new QueryClient({
@@ -308,6 +309,16 @@ const AppWithAuth = () => {
                         <WorkspacePage />
                       </SidebarNavigation>
                     </PrivateRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin-bug-reports" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminBugReportsPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
                   } 
                 />
                 <Route path="*" element={<NotFound />} />

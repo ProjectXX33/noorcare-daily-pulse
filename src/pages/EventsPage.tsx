@@ -206,17 +206,24 @@ const EventsPage = () => {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Mobile-optimized header */}
-      <div className="flex flex-col">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
-          {t('eventsCalendar') || 'Events Calendar'}
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          {t('manageEvents') || 'View and manage company events and schedules'}
-        </p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+                {t('Events') || 'Events'}
+              </h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+                {t('Upcoming Events') || 'Upcoming Events'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
       {/* Mobile-responsive controls */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
@@ -276,7 +283,7 @@ const EventsPage = () => {
               <SheetHeader>
                 <SheetTitle>{t('upcomingEvents') || 'Upcoming Events'}</SheetTitle>
               </SheetHeader>
-              <ScrollArea className="h-[calc(100vh-100px)] mt-4">
+              <div className="flex-1 overflow-y-auto mt-4">
                 <div className="space-y-2">
                   {calendarEvents
                     .filter(event => new Date(event.start) >= new Date())
@@ -296,7 +303,7 @@ const EventsPage = () => {
                       </div>
                     ))}
           </div>
-              </ScrollArea>
+              </div>
             </SheetContent>
           </Sheet>
         </div>
@@ -523,6 +530,7 @@ const EventsPage = () => {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
     </div>
   );
 };

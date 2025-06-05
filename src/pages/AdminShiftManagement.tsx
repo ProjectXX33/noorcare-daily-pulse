@@ -338,302 +338,308 @@ const AdminShiftManagement = () => {
   const dayNames = [t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday, t.sunday];
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-6">
-      {/* Mobile-optimized sticky header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-2 pb-4 border-b shadow-sm">
-        <div className="flex flex-col gap-2">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{t.shiftManagement}</h1>
-          <p className="text-xs sm:text-sm md:text-base text-muted-foreground">
-            {t.assignShiftsTrackPerformance} {t.customerServiceDesigners}
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden">
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">{t.shiftManagement}</h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+                {t.assignShiftsTrackPerformance} {t.customerServiceDesigners}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Mobile-optimized tabs */}
-      <Tabs defaultValue="assignments" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-auto p-1">
-          <TabsTrigger value="assignments" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
-            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            {t.assignShifts}
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            {t.performance}
-          </TabsTrigger>
-        </TabsList>
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
+        {/* Mobile-optimized tabs */}
+        <Tabs defaultValue="assignments" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-auto p-1">
+            <TabsTrigger value="assignments" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              {t.assignShifts}
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              {t.performance}
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="assignments" className="space-y-4 mt-4 md:mt-6">
-          {/* Mobile employee filter */}
-          <div className="block sm:hidden">
+          <TabsContent value="assignments" className="space-y-4 mt-4 md:mt-6">
+            {/* Mobile employee filter */}
+            <div className="block sm:hidden">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">{t.employee}</label>
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder={t.allEmployees} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.allEmployees}</SelectItem>
+                        {employees.map(employee => (
+                          <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <label className="text-sm font-medium">{t.employee}</label>
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder={t.allEmployees} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t.allEmployees}</SelectItem>
-                      {employees.map(employee => (
-                        <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
+                  
+                  {/* Week navigation */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
+                      className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
+                    >
+                      <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline ml-1">{t.previousWeek}</span>
+                    </Button>
+                    <div className="text-xs sm:text-sm font-medium text-center min-w-[120px]">
+                      {t.weekOf}<br className="sm:hidden" />
+                      <span className="font-bold">{format(selectedWeekStart, 'MMM dd, yyyy')}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
+                      className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
+                    >
+                      <span className="hidden sm:inline mr-1">{t.nextWeek}</span>
+                      <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </Button>
+                  </div>
+                </CardTitle>
+                
+                {/* Desktop employee filter */}
+                <div className="hidden sm:block">
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium">{t.employee}:</label>
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="w-[200px] h-9">
+                        <SelectValue placeholder={t.allEmployees} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t.allEmployees}</SelectItem>
+                        {employees.map(employee => (
+                          <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Mobile cards view - Fixed mobile viewing */}
+                <div className="block lg:hidden">
+                  <div className="max-h-none overflow-y-auto">
+                    <div className="space-y-3 p-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                      {filteredEmployees.map((employee) => (
+                        <Card key={employee.id} className="border">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium text-sm">{employee.name}</h4>
+                                <Badge variant="outline" className="text-xs">
+                                  {employee.position}
+                                </Badge>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-2">
+                                {weekDays.slice(0, 4).map((day, index) => {
+                                  const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
+                                  return (
+                                    <div key={day.toISOString()} className="space-y-1">
+                                      <div className="text-xs font-medium text-muted-foreground">
+                                        {dayNames[index]} {format(day, 'dd')}
+                                      </div>
+                                      <Select
+                                        value={
+                                          assignment?.isDayOff ? 'day_off' : 
+                                          assignment?.assignedShiftId || 'unassigned'
+                                        }
+                                        onValueChange={(value) => {
+                                          if (value === 'day_off') {
+                                            updateAssignment(employee.id, day, null, true);
+                                          } else if (value === 'unassigned') {
+                                            updateAssignment(employee.id, day, null, false);
+                                          } else {
+                                            updateAssignment(employee.id, day, value, false);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-9 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
+                                          {shifts.map((shift) => (
+                                            <SelectItem key={shift.id} value={shift.id}>
+                                              {shift.name}
+                                            </SelectItem>
+                                          ))}
+                                          <SelectItem value="day_off">
+                                            <div className="flex items-center gap-1">
+                                              <Coffee className="w-3 h-3" />
+                                              {t.dayOff}
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-2 pt-2 border-t">
+                                {weekDays.slice(4).map((day, index) => {
+                                  const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
+                                  return (
+                                    <div key={day.toISOString()} className="space-y-1">
+                                      <div className="text-xs font-medium text-muted-foreground">
+                                        {dayNames[index + 4]} {format(day, 'dd')}
+                                      </div>
+                                      <Select
+                                        value={
+                                          assignment?.isDayOff ? 'day_off' : 
+                                          assignment?.assignedShiftId || 'unassigned'
+                                        }
+                                        onValueChange={(value) => {
+                                          if (value === 'day_off') {
+                                            updateAssignment(employee.id, day, null, true);
+                                          } else if (value === 'unassigned') {
+                                            updateAssignment(employee.id, day, null, false);
+                                          } else {
+                                            updateAssignment(employee.id, day, value, false);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-9 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
+                                          {shifts.map((shift) => (
+                                            <SelectItem key={shift.id} value={shift.id}>
+                                              {shift.name}
+                                            </SelectItem>
+                                          ))}
+                                          <SelectItem value="day_off">
+                                            <div className="flex items-center gap-1">
+                                              <Coffee className="w-3 h-3" />
+                                              {t.dayOff}
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop table view */}
+                <div className="hidden lg:block p-4">
+                  <div className="mobile-table-scroll">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 bg-background z-10 w-40">{t.employee}</TableHead>
+                          {weekDays.map((day, index) => (
+                            <TableHead key={day.toISOString()} className="text-center min-w-32">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{dayNames[index]}</span>
+                                <span className="text-xs text-gray-500">{format(day, 'MMM dd')}</span>
+                              </div>
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredEmployees.map((employee) => (
+                          <TableRow key={employee.id}>
+                            <TableCell className="sticky left-0 bg-background z-10 font-medium">{employee.name}</TableCell>
+                            {weekDays.map((day) => {
+                              const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
+                              return (
+                                <TableCell key={day.toISOString()} className="text-center">
+                                  <Select
+                                    value={
+                                      assignment?.isDayOff ? 'day_off' : 
+                                      assignment?.assignedShiftId || 'unassigned'
+                                    }
+                                    onValueChange={(value) => {
+                                      if (value === 'day_off') {
+                                        updateAssignment(employee.id, day, null, true);
+                                      } else if (value === 'unassigned') {
+                                        updateAssignment(employee.id, day, null, false);
+                                      } else {
+                                        updateAssignment(employee.id, day, value, false);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
+                                      {shifts.map((shift) => (
+                                        <SelectItem key={shift.id} value={shift.id}>
+                                          {shift.name}
+                                        </SelectItem>
+                                      ))}
+                                      <SelectItem value="day_off">
+                                        <div className="flex items-center gap-1">
+                                          <Coffee className="w-3 h-3" />
+                                          {t.dayOff}
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {assignment && (
+                                    <div className="mt-1">
+                                      <Badge 
+                                        className={`text-xs ${getShiftBadgeStyle(assignment.shiftName, assignment.isDayOff)}`}
+                                      >
+                                        {assignment.isDayOff ? '🏖️ Day Off' : assignment.shiftName}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
+          </TabsContent>
 
-          <Card>
-            <CardHeader className="pb-3 sm:pb-4">
-              <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
-                
-                {/* Week navigation */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
-                    className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
-                  >
-                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline ml-1">{t.previousWeek}</span>
-                  </Button>
-                  <div className="text-xs sm:text-sm font-medium text-center min-w-[120px]">
-                    {t.weekOf}<br className="sm:hidden" />
-                    <span className="font-bold">{format(selectedWeekStart, 'MMM dd, yyyy')}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
-                    className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
-                  >
-                    <span className="hidden sm:inline mr-1">{t.nextWeek}</span>
-                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </Button>
-                </div>
-              </CardTitle>
-              
-              {/* Desktop employee filter */}
-              <div className="hidden sm:block">
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium">{t.employee}:</label>
-                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                    <SelectTrigger className="w-[200px] h-9">
-                      <SelectValue placeholder={t.allEmployees} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t.allEmployees}</SelectItem>
-                      {employees.map(employee => (
-                        <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Mobile cards view */}
-              <div className="block lg:hidden">
-                <ScrollArea className="h-[60vh]">
-                  <div className="space-y-3 p-4">
-                    {filteredEmployees.map((employee) => (
-                      <Card key={employee.id} className="border">
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-sm">{employee.name}</h4>
-                              <Badge variant="outline" className="text-xs">
-                                {employee.position}
-                              </Badge>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2">
-                              {weekDays.slice(0, 4).map((day, index) => {
-                                const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
-                                return (
-                                  <div key={day.toISOString()} className="space-y-1">
-                                    <div className="text-xs font-medium text-muted-foreground">
-                                      {dayNames[index]} {format(day, 'dd')}
-                                    </div>
-                                    <Select
-                                      value={
-                                        assignment?.isDayOff ? 'day_off' : 
-                                        assignment?.assignedShiftId || 'unassigned'
-                                      }
-                                      onValueChange={(value) => {
-                                        if (value === 'day_off') {
-                                          updateAssignment(employee.id, day, null, true);
-                                        } else if (value === 'unassigned') {
-                                          updateAssignment(employee.id, day, null, false);
-                                        } else {
-                                          updateAssignment(employee.id, day, value, false);
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-9 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
-                                        {shifts.map((shift) => (
-                                          <SelectItem key={shift.id} value={shift.id}>
-                                            {shift.name}
-                                          </SelectItem>
-                                        ))}
-                                        <SelectItem value="day_off">
-                                          <div className="flex items-center gap-1">
-                                            <Coffee className="w-3 h-3" />
-                                            {t.dayOff}
-                                          </div>
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                              {weekDays.slice(4).map((day, index) => {
-                                const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
-                                return (
-                                  <div key={day.toISOString()} className="space-y-1">
-                                    <div className="text-xs font-medium text-muted-foreground">
-                                      {dayNames[index + 4]} {format(day, 'dd')}
-                                    </div>
-                                    <Select
-                                      value={
-                                        assignment?.isDayOff ? 'day_off' : 
-                                        assignment?.assignedShiftId || 'unassigned'
-                                      }
-                                      onValueChange={(value) => {
-                                        if (value === 'day_off') {
-                                          updateAssignment(employee.id, day, null, true);
-                                        } else if (value === 'unassigned') {
-                                          updateAssignment(employee.id, day, null, false);
-                                        } else {
-                                          updateAssignment(employee.id, day, value, false);
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-9 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
-                                        {shifts.map((shift) => (
-                                          <SelectItem key={shift.id} value={shift.id}>
-                                            {shift.name}
-                                          </SelectItem>
-                                        ))}
-                                        <SelectItem value="day_off">
-                                          <div className="flex items-center gap-1">
-                                            <Coffee className="w-3 h-3" />
-                                            {t.dayOff}
-                                          </div>
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-
-              {/* Desktop table view */}
-              <div className="hidden lg:block p-4">
-                <div className="mobile-table-scroll">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="sticky left-0 bg-background z-10 w-40">{t.employee}</TableHead>
-                        {weekDays.map((day, index) => (
-                          <TableHead key={day.toISOString()} className="text-center min-w-32">
-                            <div className="flex flex-col">
-                              <span className="font-medium">{dayNames[index]}</span>
-                              <span className="text-xs text-gray-500">{format(day, 'MMM dd')}</span>
-                            </div>
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEmployees.map((employee) => (
-                        <TableRow key={employee.id}>
-                          <TableCell className="sticky left-0 bg-background z-10 font-medium">{employee.name}</TableCell>
-                          {weekDays.map((day) => {
-                            const assignment = getAssignmentForEmployeeAndDate(employee.id, day);
-                            return (
-                              <TableCell key={day.toISOString()} className="text-center">
-                                <Select
-                                  value={
-                                    assignment?.isDayOff ? 'day_off' : 
-                                    assignment?.assignedShiftId || 'unassigned'
-                                  }
-                                  onValueChange={(value) => {
-                                    if (value === 'day_off') {
-                                      updateAssignment(employee.id, day, null, true);
-                                    } else if (value === 'unassigned') {
-                                      updateAssignment(employee.id, day, null, false);
-                                    } else {
-                                      updateAssignment(employee.id, day, value, false);
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="unassigned">{t.notAssigned}</SelectItem>
-                                    {shifts.map((shift) => (
-                                      <SelectItem key={shift.id} value={shift.id}>
-                                        {shift.name}
-                                      </SelectItem>
-                                    ))}
-                                    <SelectItem value="day_off">
-                                      <div className="flex items-center gap-1">
-                                        <Coffee className="w-3 h-3" />
-                                        {t.dayOff}
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {assignment && (
-                                  <div className="mt-1">
-                                    <Badge 
-                                      className={`text-xs ${getShiftBadgeStyle(assignment.shiftName, assignment.isDayOff)}`}
-                                    >
-                                      {assignment.isDayOff ? '🏖️ Day Off' : assignment.shiftName}
-                                    </Badge>
-                                  </div>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-4 mt-4 md:mt-6">
-          <EditablePerformanceDashboard />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="performance" className="space-y-4 mt-4 md:mt-6">
+            <EditablePerformanceDashboard />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };

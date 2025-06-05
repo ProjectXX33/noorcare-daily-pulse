@@ -135,180 +135,180 @@ const EmployeeDashboard = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Mobile-optimized header */}
-      <div className="flex flex-col">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
-          {t.welcome}, {user.name}
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
-      </div>
-
-      {/* Mobile-responsive dashboard cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Only show check-in card for Customer Service and Designer */}
-        {hasCheckInAccess && (
-          <DashboardCard 
-            title={t.todayCheckIns}
-            value={checkedInToday ? "Completed" : "Not checked in"}
-            description={checkedInToday ? "You've checked in today" : "You haven't checked in yet"}
-            icon={<Clock className="h-4 w-4" />}
-            variant={checkedInToday ? "success" : "warning"}
-          />
-        )}
-        
-        <DashboardCard 
-          title={t.todayReports}
-          value={todayReports.length > 0 ? "Submitted" : "Not submitted"}
-          description={todayReports.length > 0 ? "You've submitted today's report" : "You haven't submitted today's report"}
-          icon={<ClipboardList className="h-4 w-4" />}
-          variant={todayReports.length > 0 ? "success" : "warning"}
-        />
-        
-        <DashboardCard 
-          title={t.totalReports}
-          value={userReports.length.toString()}
-          description="Your total submitted reports"
-          icon={<CalendarDays className="h-4 w-4" />}
-          variant="default"
-        />
-
-        {/* Rating Card */}
-        <DashboardCard 
-          title={averageRating ? t.averageRating : t.latestRating}
-          value={averageRating ? averageRating.toFixed(1) : (latestRating ? latestRating.rating.toString() : t.noRating)}
-          description={averageRating ? `Based on all ratings` : (latestRating ? `by ${latestRating.ratedByName}` : "No performance rating yet")}
-          icon={<Star className="h-4 w-4" />}
-          variant={averageRating && averageRating >= 4 ? "success" : averageRating && averageRating >= 3 ? "default" : "warning"}
-        />
-      </div>
-
-      {/* Mobile-optimized rating details card */}
-      {(latestRating || averageRating) && (
-        <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                <span className="text-base sm:text-lg">Performance Rating</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate('/my-ratings')}
-                className="w-full sm:w-auto min-h-[44px] text-xs sm:text-sm"
-              >
-                <User className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                {t.viewMyRatings}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-                {averageRating && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">{t.averageRating}</span>
-                    <span className="text-lg sm:text-xl font-bold">{averageRating.toFixed(1)}</span>
-                    </div>
-                  <StarRating rating={averageRating} readonly size="sm" />
-                  <p className="text-xs text-muted-foreground">Based on all your ratings</p>
-                  </div>
-                )}
-                
-                {latestRating && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">{t.latestRating}</span>
-                    <span className="text-lg sm:text-xl font-bold">{latestRating.rating}</span>
-                      </div>
-                  <StarRating rating={latestRating.rating} readonly size="sm" />
-                  <p className="text-xs text-muted-foreground">
-                    {t.ratedBy} {latestRating.ratedByName} • {new Date(latestRating.ratedAt).toLocaleDateString()}
-                  </p>
-                    {latestRating.comment && (
-                    <div className="mt-2 p-2 sm:p-3 bg-muted rounded-lg">
-                      <p className="text-xs sm:text-sm italic">{latestRating.comment}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Mobile-optimized check-in reminder */}
-      {hasCheckInAccess && !checkedInToday && (
-        <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="flex-1">
-              <h3 className="font-medium text-amber-800 dark:text-amber-200 text-sm sm:text-base">{t.checkInToday}</h3>
-              <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 mt-1">{t.checkInDesc}</p>
-            </div>
-            <Button 
-              onClick={() => navigate('/check-in')} 
-              className="bg-primary hover:bg-primary/90 w-full sm:w-auto min-h-[44px]"
-              size="sm"
-            >
-              {t.checkInNow}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile-optimized daily reminder */}
-      {hasCheckInAccess && (
-        <div className="p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
-          <div className="flex items-start gap-2 sm:gap-3">
-            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1 text-sm sm:text-base">⚠️ Daily Reminder</h3>
-              <p className="text-xs sm:text-sm text-red-700 dark:text-red-400 font-medium">
-                If you do not check in, check out, or submit your daily report, 
-                that day will <strong>NOT</strong> be collected or counted in your records.
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+                {t.welcome}, {user.name}
+              </h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+                {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
               </p>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Mobile-responsive history grid */}
-      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
-        {/* Only show check-in history for Customer Service and Designer */}
-        {hasCheckInAccess && (
-          <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
-            <CheckInHistory 
-              checkIns={userCheckIns.slice(0, 5)} 
-              title={t.recentCheckins} 
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
+        {/* Mobile-responsive dashboard cards */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Only show check-in card for Customer Service and Designer */}
+          {hasCheckInAccess && (
+            <DashboardCard 
+              title={t.todayCheckIns}
+              value={checkedInToday ? "Completed" : "Not checked in"}
+              description={checkedInToday ? "You've checked in today" : "You haven't checked in yet"}
+              icon={<Clock className="h-4 w-4" />}
+              variant={checkedInToday ? "success" : "warning"}
             />
+          )}
+          
+          <DashboardCard 
+            title={t.todayReports}
+            value={todayReports.length > 0 ? "Submitted" : "Not submitted"}
+            description={todayReports.length > 0 ? "You've submitted today's report" : "You haven't submitted today's report"}
+            icon={<ClipboardList className="h-4 w-4" />}
+            variant={todayReports.length > 0 ? "success" : "warning"}
+          />
+          
+          <DashboardCard 
+            title={t.totalReports}
+            value={userReports.length.toString()}
+            description="Your total submitted reports"
+            icon={<CalendarDays className="h-4 w-4" />}
+            variant="default"
+          />
+
+          {/* Rating Card */}
+          <Card className="p-3 sm:p-4">
+            <CardHeader className="p-0 mb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Star className="h-4 w-4 text-yellow-500" />
+                {t.latestRating}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoadingRating ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : latestRating ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <StarRating rating={latestRating.rating} readonly size="sm" />
+                    <span className="text-lg font-bold">{latestRating.rating}/5</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t.ratedBy}: {latestRating.ratedByName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {latestRating.ratedAt.toLocaleDateString()}
+                  </p>
+                  {averageRating && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      {t.averageRating}: {averageRating.toFixed(1)}/5
+                    </p>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate('/my-ratings')}
+                    className="w-full h-8 text-xs"
+                  >
+                    {t.viewMyRatings}
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <div className="text-2xl mb-2">⭐</div>
+                  <p className="text-xs text-muted-foreground mb-2">{t.noRating}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate('/my-ratings')}
+                    className="w-full h-8 text-xs"
+                  >
+                    {t.viewMyRatings}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mobile-optimized check-in reminder - only for Customer Service and Designer */}
+        {hasCheckInAccess && !checkedInToday && (
+          <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex-1">
+                <h3 className="font-medium text-amber-800 dark:text-amber-200 text-sm sm:text-base">{t.checkInToday}</h3>
+                <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-300 mt-1">{t.checkInDesc}</p>
+              </div>
+              <Button 
+                onClick={() => navigate('/check-in')} 
+                className="bg-primary hover:bg-primary/90 w-full sm:w-auto min-h-[44px]"
+                size="sm"
+              >
+                {t.checkInNow}
+              </Button>
+            </div>
           </div>
         )}
-        
-        <div className={`bg-card rounded-lg p-3 sm:p-4 border shadow-sm ${!hasCheckInAccess ? 'lg:col-span-2' : ''}`}>
-          <ReportHistory 
-            reports={userReports.slice(0, 3) as any}
-            title={t.recentReports} 
-          />
-        </div>
-      </div>
+
+        {/* Mobile-optimized daily reminder */}
+        {hasCheckInAccess && (
+          <div className="p-3 sm:p-4 bg-red-50 border-2 border-red-200 rounded-lg dark:bg-red-950/20 dark:border-red-900/50">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-800 dark:text-red-300 mb-1 text-sm sm:text-base">⚠️ Daily Reminder</h3>
+                <p className="text-xs sm:text-sm text-red-700 dark:text-red-400 font-medium">
+                  If you do not check in, check out, or submit your daily report, 
+                  that day will <strong>NOT</strong> be collected or counted in your records.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile-responsive history grid */}
+        <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
+          {/* Only show check-in history for Customer Service and Designer */}
+          {hasCheckInAccess && (
+            <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
+              <CheckInHistory 
+                checkIns={userCheckIns.slice(0, 5)} 
+                title={t.recentCheckins} 
+              />
+            </div>
+          )}
           
-      {/* Mobile-optimized action button */}
-      <div className="flex">
-        <Button 
-          className="bg-primary hover:bg-primary/90 px-4 sm:px-6 min-h-[44px] w-full sm:w-auto" 
-          onClick={() => navigate('/employee-tasks')}
-        >
-          <CheckSquare className="mr-2 h-4 w-4" />
-          <span className="text-sm sm:text-base">{t.viewTasks}</span>
-        </Button>
+          <div className={`bg-card rounded-lg p-3 sm:p-4 border shadow-sm ${!hasCheckInAccess ? 'lg:col-span-2' : ''}`}>
+            <ReportHistory 
+              reports={userReports.slice(0, 3) as any}
+              title={t.recentReports} 
+            />
+          </div>
+        </div>
+            
+        {/* Mobile-optimized action button */}
+        <div className="flex">
+          <Button 
+            className="bg-primary hover:bg-primary/90 px-4 sm:px-6 min-h-[44px] w-full sm:w-auto" 
+            onClick={() => navigate('/employee-tasks')}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            <span className="text-sm sm:text-base">{t.viewTasks}</span>
+          </Button>
+        </div>
       </div>
     </div>
   );

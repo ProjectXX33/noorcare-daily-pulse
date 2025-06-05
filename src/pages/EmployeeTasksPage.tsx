@@ -212,234 +212,250 @@ const EmployeeTasksPage = () => {
   const progressPresets = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
   
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Mobile-optimized header */}
-      <div className="flex flex-col">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
-          My Tasks
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Track and update your assigned tasks and progress
-        </p>
-      </div>
-
-      {/* Mobile-responsive task cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1">
-        {tasks.length === 0 ? (
-          <div className="text-center py-12">
-            <CheckSquare className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg sm:text-xl font-medium text-gray-700 mb-2">No tasks assigned</h3>
-            <p className="text-sm sm:text-base text-gray-500">
-              You don't have any tasks assigned at the moment.
-            </p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden">
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">My Tasks</h1>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">Track and update your assigned tasks and progress</p>
+            </div>
           </div>
-        ) : (
-          tasks.map((task) => (
-            <Card 
-              key={task.id} 
-              className={`p-3 sm:p-4 border shadow-sm transition-all hover:shadow-md ${
-                isMediaBuyerToDesignerTask(task) 
-                  ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
-                  : ""
-              }`}
-            >
-              <div className="space-y-3">
-                {/* Task header */}
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-base sm:text-lg mb-1">{task.title}</h3>
-                    {isMediaBuyerToDesignerTask(task) && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                          📊 Media Buyer → Designer
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                    <Badge 
-                      variant="outline" 
-                      className={`${getStatusColor(task.status)} text-xs sm:text-sm px-2 py-1 w-fit`}
-                    >
-                      {task.status}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Task description */}
-                <p className="text-sm sm:text-base text-muted-foreground line-clamp-2 sm:line-clamp-3">
-                  {task.description}
-                </p>
-
-                {/* Progress section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-medium">Progress</span>
-                    <span className="text-xs sm:text-sm text-muted-foreground">
-                      {task.progressPercentage}%
-                    </span>
-                  </div>
-                  <Progress value={task.progressPercentage} className="h-2" />
-                </div>
-
-                {/* Task metadata */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground border-t pt-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
-                    {isMediaBuyerToDesignerTask(task) && (
-                      <span className="text-purple-600 dark:text-purple-400">
-                        By: {task.createdByName}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Rating display */}
-                  {task.averageRating && task.averageRating > 0 && (
-                    <div className="flex items-center gap-1">
-                      <StarRating rating={task.averageRating} readonly size="sm" />
-                      <span className="text-xs">({task.averageRating.toFixed(1)})</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action button */}
-                <Button
-                  onClick={() => handleOpenTask(task)}
-                  className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
-                  variant="outline"
-                >
-                  <CheckSquare className="mr-2 h-4 w-4" />
-                  View & Update Task
-                </Button>
-              </div>
-            </Card>
-          ))
-        )}
+        </div>
       </div>
 
-      {/* Mobile-optimized task dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          {selectedTask && (
-            <>
-              <DialogHeader className="pb-4">
-                <DialogTitle className="text-lg sm:text-xl pr-8">
-                  {selectedTask.title}
-                </DialogTitle>
-                <DialogDescription className="text-sm sm:text-base">
-                  Update your task progress and add comments
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4 sm:space-y-6">
-                {/* Mobile-responsive task info */}
-                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-muted-foreground">Status</label>
-                    <Badge 
-                      variant="outline" 
-                      className={`${getStatusColor(selectedTask.status)} mt-1 text-xs sm:text-sm`}
-                    >
-                      {selectedTask.status}
-                    </Badge>
-                  </div>
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium text-muted-foreground">Current Progress</label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Progress value={selectedTask.progressPercentage} className="flex-1 h-2" />
-                      <span className="text-xs sm:text-sm font-medium">{selectedTask.progressPercentage}%</span>
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
+        {/* Mobile-responsive task cards */}
+        <div className="grid gap-3 sm:gap-4 grid-cols-1">
+          {tasks.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckSquare className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg sm:text-xl font-medium text-gray-700 mb-2">No tasks assigned</h3>
+              <p className="text-sm sm:text-base text-gray-500">
+                You don't have any tasks assigned at the moment.
+              </p>
+            </div>
+          ) :
+            tasks.map((task) => (
+              <Card 
+                key={task.id} 
+                className={`p-3 sm:p-4 border shadow-sm transition-all hover:shadow-md ${
+                  isMediaBuyerToDesignerTask(task) 
+                    ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
+                    : ""
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* Task header */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-base sm:text-lg mb-1">{task.title}</h3>
+                      {isMediaBuyerToDesignerTask(task) && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                            📊 Media Buyer → Designer
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <Badge 
+                        variant="outline" 
+                        className={`${getStatusColor(task.status)} text-xs sm:text-sm px-2 py-1 w-fit`}
+                      >
+                        {task.status}
+                      </Badge>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-xs sm:text-sm font-medium text-muted-foreground">Description</label>
-                  <p className="text-sm sm:text-base mt-1 p-3 bg-muted rounded-lg">
-                    {selectedTask.description}
+                  {/* Task description */}
+                  <p className="text-sm sm:text-base text-muted-foreground line-clamp-2 sm:line-clamp-3">
+                    {task.description}
                   </p>
+
+                  {/* Progress section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs sm:text-sm font-medium">Progress</span>
+                      <span className="text-xs sm:text-sm text-muted-foreground">
+                        {task.progressPercentage}%
+                      </span>
+                    </div>
+                    <Progress value={task.progressPercentage} className="h-2" />
+                  </div>
+
+                  {/* Task metadata */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground border-t pt-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                      <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                      {isMediaBuyerToDesignerTask(task) && (
+                        <span className="text-purple-600 dark:text-purple-400">
+                          By: {task.createdByName}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Rating display */}
+                    {task.averageRating && task.averageRating > 0 && (
+                      <div className="flex items-center gap-1">
+                        <StarRating rating={task.averageRating} readonly size="sm" />
+                        <span className="text-xs">({task.averageRating.toFixed(1)})</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action button */}
+                  <Button
+                    onClick={() => handleOpenTask(task)}
+                    className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
+                    variant="outline"
+                  >
+                    <CheckSquare className="mr-2 h-4 w-4" />
+                    View & Update Task
+                  </Button>
                 </div>
+              </Card>
+            ))
+          }
+        </div>
 
-                {/* Mobile-responsive progress update */}
-                <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm sm:text-base">Update Progress</h4>
-                  
-                  <RadioGroup value={progressType} onValueChange={(value) => setProgressType(value as 'preset' | 'custom')}>
-                    <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="preset" id="preset" />
-                        <Label htmlFor="preset" className="text-xs sm:text-sm">Quick Update</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="custom" />
-                        <Label htmlFor="custom" className="text-xs sm:text-sm">Custom Progress</Label>
+        {/* Mobile-optimized task dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+            {selectedTask && (
+              <>
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="text-lg sm:text-xl pr-8">
+                    {selectedTask.title}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm sm:text-base">
+                    Update your task progress and add comments
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Mobile-responsive task info */}
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium text-muted-foreground">Status</label>
+                      <Badge 
+                        variant="outline" 
+                        className={`${getStatusColor(selectedTask.status)} mt-1 text-xs sm:text-sm`}
+                      >
+                        {selectedTask.status}
+                      </Badge>
+                    </div>
+                    <div>
+                      <label className="text-xs sm:text-sm font-medium text-muted-foreground">Current Progress</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Progress value={selectedTask.progressPercentage} className="flex-1 h-2" />
+                        <span className="text-xs sm:text-sm font-medium">{selectedTask.progressPercentage}%</span>
                       </div>
                     </div>
-                  </RadioGroup>
+                  </div>
 
-                  {progressType === 'preset' ? (
-                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-                      {[0, 25, 50, 75, 100].map((progress) => (
-                        <Button
-                          key={progress}
-                          variant={selectedTask.progressPercentage === progress ? "default" : "outline"}
-                          onClick={() => handleUpdateProgress(selectedTask.id, progress)}
-                          disabled={isLoading}
-                          className="h-12 sm:h-10 text-xs sm:text-sm"
-                        >
-                          {progress}%
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={customProgress}
-                          onChange={handleCustomProgressChange}
-                          className="w-20 text-sm"
-                        />
-                        <span className="text-xs sm:text-sm">%</span>
-                        <Progress value={customProgress} className="flex-1 h-2" />
-                      </div>
+                  {/* Progress update */}
+                  <div className="border-t pt-4">
+                    <h3 className="font-medium mb-3">Update Progress</h3>
+                    <div className="space-y-4">
+                      <RadioGroup 
+                        value={progressType} 
+                        onValueChange={(value) => setProgressType(value as 'preset' | 'custom')}
+                        className="flex gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="preset" id="preset" />
+                          <Label htmlFor="preset">Quick select</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="custom" id="custom" />
+                          <Label htmlFor="custom">Custom value</Label>
+                        </div>
+                      </RadioGroup>
+
+                      {progressType === 'preset' ? (
+                        <div className="grid grid-cols-5 gap-2">
+                          {progressPresets.map((preset) => (
+                            <Button
+                              key={preset}
+                              variant={customProgress === preset ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCustomProgress(preset)}
+                              className="h-8 text-xs"
+                            >
+                              {preset}%
+                            </Button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="customProgress">Progress Percentage</Label>
+                          <Input
+                            id="customProgress"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={customProgress}
+                            onChange={(e) => setCustomProgress(parseInt(e.target.value) || 0)}
+                            placeholder="Enter percentage (0-100)"
+                          />
+                        </div>
+                      )}
+
                       <Button
                         onClick={handleApplyCustomProgress}
                         disabled={isLoading}
-                        className="w-full sm:w-auto min-h-[44px] text-sm"
+                        className="w-full sm:w-auto"
                       >
-                        Update to {customProgress}%
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          'Update Progress'
+                        )}
                       </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                {/* Mobile-responsive comments section */}
-                {user && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm sm:text-base">Comments & Discussion</h4>
+                  {/* Comments section */}
+                  <div className="border-t pt-4">
                     <TaskComments
                       taskId={selectedTask.id}
                       user={user}
                       comments={taskComments[selectedTask.id] || []}
-                      onCommentAdded={(newComments) => handleCommentAdded(selectedTask.id, newComments)}
+                      onCommentAdded={(comments) => handleCommentAdded(selectedTask.id, comments)}
                       language={language}
                     />
                   </div>
-                )}
 
-                {/* Update status display */}
-                {updateStatus && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                    {updateStatus}
+                  {/* Task metadata */}
+                  <div className="border-t pt-4 grid gap-3 text-sm text-muted-foreground">
+                    <div>
+                      <span className="font-medium">Created:</span> {new Date(selectedTask.createdAt).toLocaleDateString()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Last Updated:</span> {new Date(selectedTask.updatedAt).toLocaleDateString()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Created By:</span> {selectedTask.createdByName}
+                    </div>
+                    {selectedTask.averageRating && selectedTask.averageRating > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Average Rating:</span>
+                        <StarRating rating={selectedTask.averageRating} readonly size="sm" />
+                        <span>({selectedTask.averageRating.toFixed(1)})</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 };

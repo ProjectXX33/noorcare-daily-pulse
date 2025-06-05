@@ -932,409 +932,391 @@ const WorkspacePage = () => {
   if (!user) return null;
 
   return (
-    <div className="h-[100vh] sm:h-[calc(100vh-2rem)] flex flex-col">
-      {/* Mobile Header */}
-      <div className="flex flex-col space-y-3 p-4 sm:p-0 sm:space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 truncate">
-              <Hash className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
-              <span className="truncate">Workspace Chat</span>
-              {unreadCount > 0 && (
-                <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">
-                  {unreadCount}
-                </Badge>
-              )}
-            </h1>
-          </div>
-          
-          {/* Mobile Controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleSound}
-              className="h-8 w-8 p-0"
-              title={soundEnabled ? 'Mute notifications' : 'Enable notifications'}
-            >
-              {soundEnabled ? (
-                <Volume2 className="h-4 w-4 text-green-600" />
-              ) : (
-                <VolumeX className="h-4 w-4 text-red-500" />
-              )}
-            </Button>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden">
+      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+      <div className="border-b border-border/50 bg-background/98 w-full">
+        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
+              <div className="flex items-center gap-2">
+                <Hash className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+                  Workspace Chat
+                </h1>
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+                Real-time team communication • {getOnlineCount()} online • {messages.length}/50 messages
+              </p>
+            </div>
             
-            {isMobile && (
+            {/* Header Controls */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-                className="h-8 w-8 p-0"
-                title="Show team members"
+                onClick={toggleSound}
+                className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+                title={soundEnabled ? 'Mute notifications' : 'Enable notifications'}
               >
-                <Users className="h-4 w-4" />
+                {soundEnabled ? (
+                  <Volume2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <VolumeX className="h-4 w-4 text-red-500" />
+                )}
               </Button>
-            )}
-          </div>
-        </div>
-        
-        {/* Desktop Stats Row */}
-        {!isMobile && (
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              Real-time communication • Max 50 messages • Oldest deleted when limit exceeded
-            </p>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>{getOnlineCount()} online</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MessageSquare className="h-4 w-4" />
-                <span>{messages.length}/50</span>
-              </div>
+              
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+                  className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+                  title="Show team members"
+                >
+                  <Users className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
-        )}
-        
-        {/* Mobile Stats Row */}
-        {isMobile && (
-          <div className="flex justify-between items-center text-xs text-muted-foreground">
-            <span>{getOnlineCount()} online • {messages.length}/50 messages</span>
-            <span>Max 50 messages kept</span>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 relative min-h-0">
-        {/* Chat Area - Full width on mobile, 3/4 on desktop */}
-        <div className={`${isMobile ? 'absolute inset-0' : 'grid grid-cols-1 lg:grid-cols-4 gap-4 h-full px-4 sm:px-0'}`}>
-          <Card className={`${isMobile ? 'h-full border-0 rounded-none' : 'lg:col-span-3'} flex flex-col overflow-hidden`}>
-            <CardHeader className="flex-shrink-0 p-3 sm:p-6">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
-                General Chat
-              </CardTitle>
-            </CardHeader>
-            
-            <CardContent className="flex-1 flex flex-col min-h-0 p-0 overflow-hidden">
-              {/* Messages Area */}
-              <ScrollArea 
-                className={`${isMobile ? 'px-3 sm:px-6' : 'px-3 sm:px-6'}`} 
-                ref={scrollAreaRef} 
-                onScrollCapture={handleScroll}
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mb-2" />
-                    <p className="text-center text-sm">No messages yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 relative">
-                    {messages.map((message, index) => {
-                      const isOwnMessage = message.user_id === user.id;
-                      const showAvatar = index === 0 || messages[index - 1].user_id !== message.user_id;
-                      
-                      return (
-                        <div key={message.id} className={`flex gap-2 sm:gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
-                          {showAvatar && (
-                            <div className="flex-shrink-0">
-                              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
-                                isOwnMessage 
-                                  ? 'bg-primary text-primary-foreground' 
-                                  : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {message.user_name.charAt(0).toUpperCase()}
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className={`flex-1 ${showAvatar ? '' : 'ml-8 sm:ml-11'} ${isOwnMessage ? 'mr-8 sm:mr-11' : ''}`}>
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 w-full max-w-full overflow-x-hidden">
+        <div className="h-[calc(100vh-200px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-240px)]">
+          {/* Chat Area - Full width on mobile, 3/4 on desktop */}
+          <div className={`${isMobile ? 'h-full' : 'grid grid-cols-1 lg:grid-cols-4 gap-4 h-full'}`}>
+            <Card className={`${isMobile ? 'h-full border-0 rounded-lg' : 'lg:col-span-3'} flex flex-col overflow-hidden`}>
+              <CardHeader className="flex-shrink-0 p-3 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
+                  General Chat
+                </CardTitle>
+              </CardHeader>
+              
+              <CardContent className="flex-1 flex flex-col min-h-0 p-0 overflow-hidden">
+                {/* Messages Area */}
+                <div 
+                  className={`flex-1 overflow-y-auto ${isMobile ? 'px-3 sm:px-6' : 'px-3 sm:px-6'}`} 
+                  ref={scrollAreaRef} 
+                  onScrollCapture={handleScroll}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                      <MessageSquare className="h-12 w-12 mb-2" />
+                      <p className="text-center text-sm">No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 relative">
+                      {messages.map((message, index) => {
+                        const isOwnMessage = message.user_id === user.id;
+                        const showAvatar = index === 0 || messages[index - 1].user_id !== message.user_id;
+                        
+                        return (
+                          <div key={message.id} className={`flex gap-2 sm:gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
                             {showAvatar && (
-                              <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
-                                <span className="font-medium text-xs sm:text-sm truncate">{message.user_name}</span>
-                                {getUserRoleBadge(message.user_role, message.user_position)}
-                                <span className="text-xs text-muted-foreground flex-shrink-0">
-                                  {formatMessageTime(message.created_at)}
-                                </span>
+                              <div className="flex-shrink-0">
+                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
+                                  isOwnMessage 
+                                    ? 'bg-primary text-primary-foreground' 
+                                    : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {message.user_name.charAt(0).toUpperCase()}
+                                </div>
                               </div>
                             )}
                             
-                            <div className={`rounded-lg px-3 py-2 max-w-[85%] sm:max-w-[70%] ${
-                              isOwnMessage 
-                                ? 'bg-primary text-primary-foreground ml-auto' 
-                                : 'bg-muted'
-                            }`}>
-                              <p className="text-sm whitespace-pre-wrap break-words">{message.message}</p>
+                            <div className={`flex-1 ${showAvatar ? '' : 'ml-8 sm:ml-11'} ${isOwnMessage ? 'mr-8 sm:mr-11' : ''}`}>
+                              {showAvatar && (
+                                <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+                                  <span className="font-medium text-xs sm:text-sm truncate">{message.user_name}</span>
+                                  {getUserRoleBadge(message.user_role, message.user_position)}
+                                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                                    {formatMessageTime(message.created_at)}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              <div className={`rounded-lg px-3 py-2 max-w-[85%] sm:max-w-[70%] ${
+                                isOwnMessage 
+                                  ? 'bg-primary text-primary-foreground ml-auto' 
+                                  : 'bg-muted'
+                              }`}>
+                                <p className="text-sm whitespace-pre-wrap break-words">{message.message}</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                    
-                    {/* Typing Indicator */}
-                    <TypingIndicator />
-                    
-                    <div ref={messagesEndRef} />
-                    
-                    {/* Scroll to Bottom Button */}
-                    {userScrolledUp && (
-                      <div className={`fixed z-10 ${isMobile ? 'bottom-20 right-4' : 'bottom-32 right-8'}`}>
-                        <Button
-                          onClick={() => {
-                            shouldAutoScroll.current = true;
-                            setUserScrolledUp(false);
-                            isNearBottom.current = true;
-                            hasUserManuallyScrolled.current = false;
-                            scrollToBottom();
-                            markMessagesAsRead();
-                          }}
-                          size="sm"
-                          className="rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 animate-pulse text-xs sm:text-sm"
-                        >
-                          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          {isMobile ? `New (${unreadCount > 0 ? unreadCount : ''})` : `New messages ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </ScrollArea>
-              
-              <Separator />
-              
-              {/* Message Input */}
-              <div className="p-3 sm:p-4 bg-muted/30">
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Input
-                      value={newMessage}
-                      onChange={handleInputChange}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message..."
-                      disabled={isSending}
-                      className={`${isMobile ? 'pr-16 text-base' : 'pr-24'}`}
-                      maxLength={1000}
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'} p-0`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowEmojiMenu(!showEmojiMenu);
-                          }}
-                        >
-                          <Smile className="h-4 w-4" />
-                        </Button>
-                        
-                        {/* Emoji Menu */}
-                        {showEmojiMenu && (
-                          <div 
-                            className={`absolute ${isMobile ? 'bottom-10 right-0 w-72 max-h-56' : 'bottom-8 right-0 w-64 max-h-48'} bg-background border rounded-lg shadow-lg p-3 overflow-y-auto z-50`}
-                            onClick={(e) => e.stopPropagation()}
+                        );
+                      })}
+                      
+                      {/* Typing Indicator */}
+                      <TypingIndicator />
+                      
+                      <div ref={messagesEndRef} />
+                      
+                      {/* Scroll to Bottom Button */}
+                      {userScrolledUp && (
+                        <div className={`fixed z-10 ${isMobile ? 'bottom-20 right-4' : 'bottom-32 right-8'}`}>
+                          <Button
+                            onClick={() => {
+                              shouldAutoScroll.current = true;
+                              setUserScrolledUp(false);
+                              isNearBottom.current = true;
+                              hasUserManuallyScrolled.current = false;
+                              scrollToBottom();
+                              markMessagesAsRead();
+                            }}
+                            size="sm"
+                            className="rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 animate-pulse text-xs sm:text-sm"
                           >
-                            <div className={`grid ${isMobile ? 'grid-cols-9' : 'grid-cols-8'} gap-1`}>
-                              {popularEmojis.map((emoji, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => selectEmoji(emoji)}
-                                  className={`${isMobile ? 'text-xl p-2' : 'text-lg p-1'} hover:bg-muted rounded transition-colors`}
-                                  title={emoji}
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      {!isMobile && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
+                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                            {isMobile ? `New (${unreadCount > 0 ? unreadCount : ''})` : `New messages ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
+                          </Button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <Button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || isSending}
-                    size={isMobile ? "default" : "sm"}
-                    className={`${isMobile ? 'px-4' : ''}`}
-                  >
-                    <Send className="h-4 w-4" />
-                    {isMobile && <span className="ml-2">Send</span>}
-                  </Button>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {newMessage.length}/1000 characters {!isMobile && '• Click 😊 for emoji menu'}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Desktop Sidebar */}
-          {!isMobile && (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-4 w-4" />
-                  Team Members
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-full">
-                  <div className="space-y-1 p-4">
-                    {/* Current User */}
-                    <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{user.name} (You)</p>
-                        <div className="flex items-center gap-1">
-                          {getUserRoleBadge(user.role, user.position)}
-                        </div>
-                        {isTyping && (
-                          <p className="text-xs text-muted-foreground italic">typing...</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Other Users */}
-                    {onlineUsers.map((otherUser) => {
-                      const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
-                      const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
-                      
-                      return (
-                        <div key={otherUser.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                              {otherUser.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
-                              isOnline ? 'bg-green-500' : 'bg-gray-400'
-                            }`}></div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{otherUser.name}</p>
-                            <div className="flex items-center gap-1">
-                              {getUserRoleBadge(otherUser.role, otherUser.position)}
-                            </div>
-                            {isUserTyping ? (
-                              <p className="text-xs text-primary italic">typing...</p>
-                            ) : !isOnline && (
-                              <p className="text-xs text-muted-foreground">
-                                {statusText}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Mobile Sidebar Overlay */}
-        {isMobile && showMobileSidebar && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="absolute inset-0 bg-black/50 z-40"
-              onClick={() => setShowMobileSidebar(false)}
-            />
-            
-            {/* Sidebar */}
-            <div className="absolute top-0 right-0 h-full w-80 max-w-[80vw] bg-background border-l z-50 overflow-hidden">
-              <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between p-4 border-b">
-                  <h3 className="font-semibold">Team Members</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowMobileSidebar(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    ×
-                  </Button>
+                  )}
                 </div>
                 
-                <ScrollArea className="flex-1">
-                  <div className="space-y-1 p-4">
-                    {/* Current User */}
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                      <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                          {user.name.charAt(0).toUpperCase()}
+                <Separator />
+                
+                {/* Message Input */}
+                <div className="p-3 sm:p-4 bg-muted/30">
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        value={newMessage}
+                        onChange={handleInputChange}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Type your message..."
+                        disabled={isSending}
+                        className={`${isMobile ? 'pr-16 text-base' : 'pr-24'}`}
+                        maxLength={1000}
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                        <div className="relative">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'} p-0`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowEmojiMenu(!showEmojiMenu);
+                            }}
+                          >
+                            <Smile className="h-4 w-4" />
+                          </Button>
+                          
+                          {/* Emoji Menu */}
+                          {showEmojiMenu && (
+                            <div 
+                              className={`absolute ${isMobile ? 'bottom-10 right-0 w-72 max-h-56' : 'bottom-8 right-0 w-64 max-h-48'} bg-background border rounded-lg shadow-lg p-3 overflow-y-auto z-50`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className={`grid ${isMobile ? 'grid-cols-9' : 'grid-cols-8'} gap-1`}>
+                                {popularEmojis.map((emoji, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => selectEmoji(emoji)}
+                                    className={`${isMobile ? 'text-xl p-2' : 'text-lg p-1'} hover:bg-muted rounded transition-colors`}
+                                    title={emoji}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{user.name} (You)</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          {getUserRoleBadge(user.role, user.position)}
-                        </div>
-                        {isTyping && (
-                          <p className="text-xs text-muted-foreground italic mt-1">typing...</p>
+                        {!isMobile && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
                     </div>
-
-                    {/* Other Users */}
-                    {onlineUsers.map((otherUser) => {
-                      const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
-                      const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
-                      
-                      return (
-                        <div key={otherUser.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                              {otherUser.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
-                              isOnline ? 'bg-green-500' : 'bg-gray-400'
-                            }`}></div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{otherUser.name}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              {getUserRoleBadge(otherUser.role, otherUser.position)}
-                            </div>
-                            {isUserTyping ? (
-                              <p className="text-xs text-primary italic mt-1">typing...</p>
-                            ) : !isOnline && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {statusText}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <Button
+                      onClick={sendMessage}
+                      disabled={!newMessage.trim() || isSending}
+                      size={isMobile ? "default" : "sm"}
+                      className={`${isMobile ? 'px-4' : ''}`}
+                    >
+                      <Send className="h-4 w-4" />
+                      {isMobile && <span className="ml-2">Send</span>}
+                    </Button>
                   </div>
-                </ScrollArea>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {newMessage.length}/1000 characters {!isMobile && '• Click 😊 for emoji menu'}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Desktop Sidebar */}
+            {!isMobile && (
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="h-4 w-4" />
+                    Team Members
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-1 p-4">
+                      {/* Current User */}
+                      <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                        <div className="relative">
+                          <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{user.name} (You)</p>
+                          <div className="flex items-center gap-1">
+                            {getUserRoleBadge(user.role, user.position)}
+                          </div>
+                          {isTyping && (
+                            <p className="text-xs text-muted-foreground italic">typing...</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Other Users */}
+                      {onlineUsers.map((otherUser) => {
+                        const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
+                        const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
+                        
+                        return (
+                          <div key={otherUser.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                            <div className="relative">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                                {otherUser.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
+                                isOnline ? 'bg-green-500' : 'bg-gray-400'
+                              }`}></div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{otherUser.name}</p>
+                              <div className="flex items-center gap-1">
+                                {getUserRoleBadge(otherUser.role, otherUser.position)}
+                              </div>
+                              {isUserTyping ? (
+                                <p className="text-xs text-primary italic">typing...</p>
+                              ) : !isOnline && (
+                                <p className="text-xs text-muted-foreground">
+                                  {statusText}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Mobile Sidebar Overlay */}
+          {isMobile && showMobileSidebar && (
+            <>
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-black/50 z-40"
+                onClick={() => setShowMobileSidebar(false)}
+              />
+              
+              {/* Sidebar */}
+              <div className="absolute top-0 right-0 h-full w-80 max-w-[80vw] bg-background border-l z-50 overflow-hidden">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h3 className="font-semibold">Team Members</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowMobileSidebar(false)}
+                      className="h-8 w-8 p-0"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-1 p-4">
+                      {/* Current User */}
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="relative">
+                          <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{user.name} (You)</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {getUserRoleBadge(user.role, user.position)}
+                          </div>
+                          {isTyping && (
+                            <p className="text-xs text-muted-foreground italic mt-1">typing...</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Other Users */}
+                      {onlineUsers.map((otherUser) => {
+                        const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
+                        const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
+                        
+                        return (
+                          <div key={otherUser.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                            <div className="relative">
+                              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                                {otherUser.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
+                                isOnline ? 'bg-green-500' : 'bg-gray-400'
+                              }`}></div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{otherUser.name}</p>
+                              <div className="flex items-center gap-1 mt-1">
+                                {getUserRoleBadge(otherUser.role, otherUser.position)}
+                              </div>
+                              {isUserTyping ? (
+                                <p className="text-xs text-primary italic mt-1">typing...</p>
+                              ) : !isOnline && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {statusText}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

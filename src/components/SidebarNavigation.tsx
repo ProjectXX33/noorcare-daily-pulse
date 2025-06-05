@@ -20,7 +20,8 @@ import {
   FileText,
   PenTool,
   MessageSquare,
-  Star
+  Star,
+  Bug
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -36,6 +37,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import NotificationsMenu from '@/components/NotificationsMenu';
+import ReportBugModal from '@/components/ReportBugModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
@@ -61,6 +63,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
   const { unreadCount } = useWorkspaceMessages();
   const isMobile = useIsMobile();
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isReportBugOpen, setIsReportBugOpen] = useState(false);
 
   useEffect(() => {
     // Subscribe to notifications changes
@@ -124,6 +127,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home },
     { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true },
     { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true },
+    { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true },
     { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true },
     { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true },
     { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
@@ -150,7 +154,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         <Sidebar
           className={`sidebar-glass sticky top-0 h-screen transition-all duration-300 ${
             isOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0`}
+          } md:translate-x-0 z-40`}
           side={language === 'ar' ? 'right' : 'left'}
         >
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
@@ -215,6 +219,18 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
             </div>
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
               <NotificationsMenu />
+              
+              {/* Report Bug Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsReportBugOpen(true)}
+                className="h-8 w-8 md:h-9 md:w-9 p-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                title="Report Bug"
+              >
+                <Bug className="h-4 w-4" />
+              </Button>
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 md:h-9 w-auto flex items-center gap-2 rounded-full p-0">
@@ -248,6 +264,12 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
           <main className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">{children}</main>
         </div>
       </div>
+      
+      {/* Report Bug Modal */}
+      <ReportBugModal 
+        isOpen={isReportBugOpen} 
+        onClose={() => setIsReportBugOpen(false)} 
+      />
     </SidebarProvider>
   );
 };
