@@ -59,13 +59,13 @@ const NotificationBanner: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white p-3 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-green-600 text-white p-3 shadow-lg">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Bell className="h-5 w-5" />
           <div>
             <p className="font-medium">Enable Push Notifications</p>
-            <p className="text-sm text-blue-100">
+            <p className="text-sm text-green-100">
               Get notified about new tasks, messages, and updates
             </p>
           </div>
@@ -77,7 +77,7 @@ const NotificationBanner: React.FC = () => {
             disabled={isLoading}
             variant="secondary"
             size="sm"
-            className="bg-white text-blue-600 hover:bg-gray-100"
+            className="bg-white text-green-600 hover:bg-gray-100"
           >
             {isLoading ? 'Enabling...' : 'Enable'}
           </Button>
@@ -86,7 +86,7 @@ const NotificationBanner: React.FC = () => {
             onClick={() => setShowBanner(false)}
             variant="ghost"
             size="sm"
-            className="text-white hover:bg-blue-700 h-8 w-8 p-0"
+            className="text-white hover:bg-green-700 h-8 w-8 p-0"
           >
             <X className="h-4 w-4" />
           </Button>
