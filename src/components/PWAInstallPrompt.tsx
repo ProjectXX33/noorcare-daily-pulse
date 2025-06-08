@@ -23,7 +23,6 @@ const PWAInstallPrompt: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     // Check if app is already installed
@@ -36,75 +35,44 @@ const PWAInstallPrompt: React.FC = () => {
 
     // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
-      console.log('beforeinstallprompt event fired!', e);
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
-      setDebugInfo('Install prompt available');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Show prompt for testing even without beforeinstallprompt
-    const fallbackTimer = setTimeout(() => {
-      if (!deferredPrompt && !iOS && !isInstalled) {
-        setShowPrompt(true);
-        setDebugInfo('Showing test prompt (no native support)');
-      }
-    }, 2000);
 
-    // For iOS, show prompt after a delay if not installed
+
+    // For iOS, show prompt after user engagement
     if (iOS && !isInstalled) {
       const iosTimer = setTimeout(() => {
         setShowPrompt(true);
-      }, 3000); // Show after 3 seconds for testing
+      }, 60000); // Show after 1 minute on iOS for better user experience
 
       return () => {
         clearTimeout(iosTimer);
-        clearTimeout(fallbackTimer);
         window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       };
     }
 
-    // For testing - show prompt on all devices after 5 seconds
-    const testTimer = setTimeout(() => {
-      if (!isInstalled) {
-        setShowPrompt(true);
-      }
-    }, 5000);
-
     return () => {
-      clearTimeout(fallbackTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    console.log('Install button clicked. deferredPrompt:', deferredPrompt);
-    
     if (deferredPrompt) {
       try {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        console.log('User choice:', outcome);
         if (outcome === 'accepted') {
           setDeferredPrompt(null);
           setShowPrompt(false);
         }
       } catch (error) {
         console.error('Install prompt failed:', error);
-        setDebugInfo('Install failed: ' + error);
       }
-    } else {
-      // Fallback: show manual instructions
-      setDebugInfo('No native install support. Manual install required.');
-      alert(`To install this app:
-      
-1. Open browser menu (⋮)
-2. Look for "Install app" or "Add to Home Screen"
-3. Follow the instructions
-
-Or bookmark this page for quick access!`);
     }
   };
 
@@ -117,11 +85,10 @@ Or bookmark this page for quick access!`);
   // Don't show if already installed or dismissed recently
   if (isInstalled) return null;
   
-  // Comment out for testing - show even if dismissed
-  // const dismissedTime = localStorage.getItem('pwa-install-dismissed');
-  // if (dismissedTime && Date.now() - parseInt(dismissedTime) < 24 * 60 * 60 * 1000) {
-  //   return null;
-  // }
+  const dismissedTime = localStorage.getItem('pwa-install-dismissed');
+  if (dismissedTime && Date.now() - parseInt(dismissedTime) < 24 * 60 * 60 * 1000) {
+    return null;
+  }
 
   if (!showPrompt) return null;
 
@@ -135,17 +102,12 @@ Or bookmark this page for quick access!`);
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-sm mb-1">Install NoorCare App</h3>
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="text-xs text-muted-foreground mb-3">
                 {isIOS 
                   ? "Add to Home Screen for a better experience!" 
                   : "Install our app for faster access and offline support!"
                 }
               </p>
-              {debugInfo && (
-                <p className="text-xs text-blue-600 mb-2 font-mono">
-                  Debug: {debugInfo}
-                </p>
-              )}
               
               {isIOS ? (
                 <div className="text-xs text-muted-foreground space-y-1">
@@ -158,9 +120,10 @@ Or bookmark this page for quick access!`);
                   onClick={handleInstallClick}
                   size="sm" 
                   className="w-full"
+                  disabled={!deferredPrompt}
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  {deferredPrompt ? 'Install App' : 'Manual Install'}
+                  Install App
                 </Button>
               )}
             </div>
