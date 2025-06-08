@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/notifications';
+import NotificationManager from '@/utils/notificationManager';
 
 type Notification = {
   id: string;
@@ -32,6 +33,7 @@ const NotificationsMenu = () => {
   const { user } = useAuth();
   const [language, setLanguage] = useState('en');
   const navigate = useNavigate();
+  const [notificationManager] = useState(() => NotificationManager.getInstance());
 
   // Translation object for multilingual support
   const translations = {
@@ -72,10 +74,15 @@ const NotificationsMenu = () => {
 
   const t = translations[language as keyof typeof translations];
 
+  const initializeNotifications = async () => {
+    await notificationManager.initialize();
+  };
+
   useEffect(() => {
     if (user) {
       fetchNotifications();
       subscribeToNotifications();
+      initializeNotifications();
     }
   }, [user]);
 
@@ -88,12 +95,20 @@ const NotificationsMenu = () => {
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
         payload => {
           console.log('New notification received:', payload);
+          const newNotification = payload.new as Notification;
+          
           // Add the new notification to the state
-          setNotifications(prev => [payload.new as Notification, ...prev]);
+          setNotifications(prev => [newNotification, ...prev]);
           // Trigger the bell animation
           setHasNewNotifications(true);
           // Play notification sound
           playNotificationSound();
+          
+          // Show push notification if permission is granted
+          notificationManager.showGeneralNotification(
+            newNotification.title,
+            newNotification.message
+          );
         }
       )
       .subscribe();

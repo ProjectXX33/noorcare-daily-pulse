@@ -36,6 +36,9 @@ import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import NotificationPermission from "./components/NotificationPermission";
+import NotificationHandler from "./components/NotificationHandler";
+import NotificationTestPage from "./pages/NotificationTestPage";
 
 
 const queryClient = new QueryClient({
@@ -158,6 +161,7 @@ const AppWithAuth = () => {
               <AnimatePresence>
                 {showOpeningAnimation && <OpeningAnimation />}
               </AnimatePresence>
+              <NotificationHandler />
               <Routes>
                 <Route path="/" element={<PageTransition><Index /></PageTransition>} />
                 <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
@@ -341,9 +345,11 @@ const AppWithAuth = () => {
                     </AdminRoute>
                   } 
                 />
+                <Route path="/test-notifications" element={<PageTransition><NotificationTestPage /></PageTransition>} />
                 <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
               </Routes>
               <PWAInstallPrompt />
+              <NotificationPermission showAsCard={false} autoShow={true} />
               <Toaster />
               <Sonner />
             </LanguageProvider>

@@ -8,6 +8,23 @@
   "theme_color": "#15803d",
   "orientation": "portrait-primary",
   "categories": ["business", "productivity"],
+  "gcm_sender_id": "103953800507",
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/NQ-ICON.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Check In",
+      "short_name": "Check In",
+      "description": "Quick check in",
+      "url": "/check-in",
+      "icons": [{ "src": "/NQ-ICON.png", "sizes": "192x192" }]
+    }
+  ],
   "lang": "en",
   "dir": "auto",
   "icons": [
