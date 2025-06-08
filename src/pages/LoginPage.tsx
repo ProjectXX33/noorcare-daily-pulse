@@ -50,7 +50,7 @@ const LoginPage = () => {
             Welcome Back
           </h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
-            Sign in to your NoorCare account
+            Sign in to your NoorHub account
           </p>
         </div>
 

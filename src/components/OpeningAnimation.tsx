@@ -30,7 +30,7 @@ const OpeningAnimation: React.FC = () => {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-2xl font-bold mb-2"
         >
-          Welcome to NoorCare
+          Welcome to NoorHub
         </motion.h1>
         <motion.p
           initial={{ y: 20, opacity: 0 }}

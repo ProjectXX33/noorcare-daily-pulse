@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noorcare-v1';
+const CACHE_NAME = 'noorhub-v1';
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
@@ -80,7 +80,7 @@ function doBackgroundSync() {
 // Push notification handling
 self.addEventListener('push', event => {
   const options = {
-    body: event.data ? event.data.text() : 'New notification from NoorCare',
+    body: event.data ? event.data.text() : 'New notification from NoorHub',
     icon: '/NQ-ICON.png',
     badge: '/NQ-ICON.png',
     vibrate: [100, 50, 100],
@@ -91,7 +91,7 @@ self.addEventListener('push', event => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('NoorCare Daily Pulse', options)
+    self.registration.showNotification('NoorHub', options)
   );
 });
 

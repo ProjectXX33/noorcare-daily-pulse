@@ -55,13 +55,13 @@ const Index = () => {
   if (isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4 text-primary">NoorCare</h1>
-          <div className="flex justify-center items-center mt-4">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
-          </div>
-          <p className="text-xl text-gray-600 mt-4">Loading...</p>
+              <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4 text-primary">NoorHub</h1>
+        <div className="flex justify-center items-center mt-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
         </div>
+        <p className="text-xl text-gray-600 mt-4">Loading...</p>
+      </div>
       </div>
     );
   }
@@ -70,7 +70,7 @@ const Index = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-primary">NoorCare</h1>
+        <h1 className="text-4xl font-bold mb-4 text-primary">NoorHub</h1>
         <p className="text-xl text-gray-600 mb-8">Employee Management System</p>
         <div className="space-x-4">
           <button 

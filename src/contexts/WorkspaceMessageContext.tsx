@@ -105,9 +105,9 @@ export const WorkspaceMessageProvider = ({ children }: WorkspaceMessageProviderP
 
   const updateDocumentTitle = (count: number) => {
     if (count > 0) {
-      document.title = `(${count}) NoorCare - Daily Pulse`;
-    } else {
-      document.title = 'NoorCare - Daily Pulse';
+              document.title = `(${count}) NoorHub`;
+      } else {
+        document.title = 'NoorHub';
     }
   };
 

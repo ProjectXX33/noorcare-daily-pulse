@@ -101,7 +101,7 @@ const PWAInstallPrompt: React.FC = () => {
               <Smartphone className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-sm mb-1">Install NoorCare App</h3>
+              <h3 className="font-semibold text-sm mb-1">Install NoorHub App</h3>
               <p className="text-xs text-muted-foreground mb-3">
                 {isIOS 
                   ? "Add to Home Screen for a better experience!" 
