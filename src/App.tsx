@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import OpeningAnimation from "./components/OpeningAnimation";
+import PageTransition from "./components/PageTransition";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -33,6 +34,8 @@ import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
+import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 
 const queryClient = new QueryClient({
@@ -139,6 +142,13 @@ const AppWithAuth = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Disable browser scroll restoration to prevent jumping
+  useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -149,8 +159,8 @@ const AppWithAuth = () => {
                 {showOpeningAnimation && <OpeningAnimation />}
               </AnimatePresence>
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<PageTransition><Index /></PageTransition>} />
+                <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
                 <Route 
                   path="/dashboard" 
                   element={
@@ -264,11 +274,11 @@ const AppWithAuth = () => {
                 <Route 
                   path="/settings" 
                   element={
-                    <PrivateRoute>
+                    <AdminRoute>
                       <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                         <SettingsPage />
                       </SidebarNavigation>
-                    </PrivateRoute>
+                    </AdminRoute>
                   } 
                 />
                 <Route 
@@ -312,6 +322,16 @@ const AppWithAuth = () => {
                   } 
                 />
                 <Route 
+                  path="/analytics" 
+                  element={
+                    <AdminRoute>
+                      <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <AdminAnalyticsPage />
+                      </SidebarNavigation>
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
                   path="/admin-bug-reports" 
                   element={
                     <AdminRoute>
@@ -321,8 +341,9 @@ const AppWithAuth = () => {
                     </AdminRoute>
                   } 
                 />
-                <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
               </Routes>
+              <PWAInstallPrompt />
               <Toaster />
               <Sonner />
             </LanguageProvider>

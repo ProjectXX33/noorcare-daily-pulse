@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useWorkspaceMessages } from '@/contexts/WorkspaceMessageContext';
@@ -21,7 +21,8 @@ import {
   PenTool,
   MessageSquare,
   Star,
-  Bug
+  Bug,
+  BarChart3
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -32,7 +33,10 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarFooter,
-  SidebarTrigger
+  SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,12 +62,53 @@ interface SidebarNavigationProps {
 
 export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigationProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { language, t } = useLanguage();
   const { unreadCount } = useWorkspaceMessages();
   const isMobile = useIsMobile();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
+  
+  // Ref to track sidebar scroll position
+  const sidebarContentRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number>(0);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Navigation with simple scroll preservation
+  const handleNavigation = (path: string) => {
+    // Save current scroll position immediately before navigation
+    if (sidebarContentRef.current) {
+      const scrollTop = sidebarContentRef.current.scrollTop;
+      scrollPositionRef.current = scrollTop;
+      sessionStorage.setItem('sidebar-scroll-position', scrollTop.toString());
+    }
+    navigate(path);
+  };
+
+  // Restore scroll position immediately after route change - no delays
+  useEffect(() => {
+    if (sidebarContentRef.current && scrollPositionRef.current > 0) {
+      // Set scroll position directly without setTimeout to prevent jumping
+      sidebarContentRef.current.scrollTop = scrollPositionRef.current;
+    }
+  }, [location.pathname]);
+
+  // Track scroll position continuously
+  const handleScroll = () => {
+    if (sidebarContentRef.current) {
+      const scrollTop = sidebarContentRef.current.scrollTop;
+      scrollPositionRef.current = scrollTop;
+      
+      // Throttle sessionStorage updates
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        sessionStorage.setItem('sidebar-scroll-position', scrollTop.toString());
+      }, 100);
+    }
+  };
 
   useEffect(() => {
     // Subscribe to notifications changes
@@ -116,6 +161,18 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     };
   }, [user]);
 
+  // Load initial scroll position on mount
+  useEffect(() => {
+    if (sidebarContentRef.current) {
+      const savedPosition = sessionStorage.getItem('sidebar-scroll-position');
+      if (savedPosition) {
+        const scrollPosition = parseInt(savedPosition, 10);
+        sidebarContentRef.current.scrollTop = scrollPosition;
+        scrollPositionRef.current = scrollPosition;
+      }
+    }
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
@@ -123,30 +180,188 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
 
   if (!user) return null;
 
-  const navItems = [
-    { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home },
-    { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true },
-    { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true },
-    { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true },
-    { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true },
-    { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true },
-    { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare },
-    { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true },
-    { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true },
-    { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceAndDesignerOnly: true },
-    { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true },
-    { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true },
-    { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true },
-    { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true }, // Available to all users
-  ].filter(item => {
-    if (item.adminOnly && user?.role !== 'admin') return false;
-    if (item.employeeOnly && user?.role === 'admin') return false;
-    if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
-    if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
-    if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
-    if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
-    return true;
-  });
+  // Define interface for nav items
+  interface NavItem {
+    name: string;
+    path: string;
+    icon: any;
+    color?: string;
+    adminOnly?: boolean;
+    employeeOnly?: boolean;
+    customerServiceAndDesignerOnly?: boolean;
+    shiftsAccess?: boolean;
+    mediaBuyerOnly?: boolean;
+    excludeMediaBuyer?: boolean;
+    hasCounter?: boolean;
+  }
+
+  // Organize navigation items into groups with colors
+  const navGroups = [
+    {
+      label: 'Overview',
+      color: 'blue',
+      items: [
+        { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home, color: 'blue' },
+        { name: 'Analytics', path: '/analytics', icon: BarChart3, adminOnly: true, color: 'purple' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Employee Management',
+      color: 'green',
+      items: [
+        { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true, color: 'green' },
+        { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true, color: 'yellow' },
+        { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true, color: 'teal' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Task Management',
+      color: 'orange',
+      items: [
+        { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange' },
+        { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true, color: 'amber' },
+        { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, color: 'yellow' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Reports & Data',
+      color: 'indigo',
+      items: [
+        { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true, color: 'indigo' },
+        { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true, color: 'red' },
+        { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true, color: 'blue' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Time & Attendance',
+      color: 'cyan',
+      items: [
+        { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceAndDesignerOnly: true, color: 'cyan' },
+        { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true, color: 'slate' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Communication',
+      color: 'pink',
+      items: [
+        { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true, color: 'pink' },
+        { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true, color: 'violet' },
+      ] as NavItem[]
+    }
+  ];
+
+  // Color mapping function
+  const getColorClasses = (color: string = 'gray', isActive: boolean = false) => {
+    const colorMap: Record<string, { icon: string; text: string; activeIcon: string; activeText: string; activeBg: string }> = {
+      blue: { 
+        icon: 'text-blue-500', 
+        text: 'text-blue-700', 
+        activeIcon: 'text-blue-600', 
+        activeText: 'text-blue-800', 
+        activeBg: 'bg-blue-50 border-blue-200' 
+      },
+      purple: { 
+        icon: 'text-purple-500', 
+        text: 'text-purple-700', 
+        activeIcon: 'text-purple-600', 
+        activeText: 'text-purple-800', 
+        activeBg: 'bg-purple-50 border-purple-200' 
+      },
+      green: { 
+        icon: 'text-green-500', 
+        text: 'text-green-700', 
+        activeIcon: 'text-green-600', 
+        activeText: 'text-green-800', 
+        activeBg: 'bg-green-50 border-green-200' 
+      },
+      yellow: { 
+        icon: 'text-yellow-500', 
+        text: 'text-yellow-700', 
+        activeIcon: 'text-yellow-600', 
+        activeText: 'text-yellow-800', 
+        activeBg: 'bg-yellow-50 border-yellow-200' 
+      },
+      orange: { 
+        icon: 'text-orange-500', 
+        text: 'text-orange-700', 
+        activeIcon: 'text-orange-600', 
+        activeText: 'text-orange-800', 
+        activeBg: 'bg-orange-50 border-orange-200' 
+      },
+      red: { 
+        icon: 'text-red-500', 
+        text: 'text-red-700', 
+        activeIcon: 'text-red-600', 
+        activeText: 'text-red-800', 
+        activeBg: 'bg-red-50 border-red-200' 
+      },
+      indigo: { 
+        icon: 'text-indigo-500', 
+        text: 'text-indigo-700', 
+        activeIcon: 'text-indigo-600', 
+        activeText: 'text-indigo-800', 
+        activeBg: 'bg-indigo-50 border-indigo-200' 
+      },
+      cyan: { 
+        icon: 'text-cyan-500', 
+        text: 'text-cyan-700', 
+        activeIcon: 'text-cyan-600', 
+        activeText: 'text-cyan-800', 
+        activeBg: 'bg-cyan-50 border-cyan-200' 
+      },
+      pink: { 
+        icon: 'text-pink-500', 
+        text: 'text-pink-700', 
+        activeIcon: 'text-pink-600', 
+        activeText: 'text-pink-800', 
+        activeBg: 'bg-pink-50 border-pink-200' 
+      },
+      violet: { 
+        icon: 'text-violet-500', 
+        text: 'text-violet-700', 
+        activeIcon: 'text-violet-600', 
+        activeText: 'text-violet-800', 
+        activeBg: 'bg-violet-50 border-violet-200' 
+      },
+      teal: { 
+        icon: 'text-teal-500', 
+        text: 'text-teal-700', 
+        activeIcon: 'text-teal-600', 
+        activeText: 'text-teal-800', 
+        activeBg: 'bg-teal-50 border-teal-200' 
+      },
+      amber: { 
+        icon: 'text-amber-500', 
+        text: 'text-amber-700', 
+        activeIcon: 'text-amber-600', 
+        activeText: 'text-amber-800', 
+        activeBg: 'bg-amber-50 border-amber-200' 
+      },
+      slate: { 
+        icon: 'text-slate-500', 
+        text: 'text-slate-700', 
+        activeIcon: 'text-slate-600', 
+        activeText: 'text-slate-800', 
+        activeBg: 'bg-slate-50 border-slate-200' 
+      },
+    };
+    
+    return colorMap[color] || colorMap.blue;
+  };
+
+  // Filter items based on user role and permissions
+  const filteredNavGroups = navGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (item.adminOnly && user?.role !== 'admin') return false;
+      if (item.employeeOnly && user?.role === 'admin') return false;
+      if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
+      if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
+      if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
+      if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
+      return true;
+    })
+  })).filter(group => group.items.length > 0); // Only show groups that have items
 
   return (
     <SidebarProvider open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
@@ -160,44 +375,74 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
             <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
           </SidebarHeader>
-          <SidebarContent className="flex-1 overflow-y-auto py-2 md:py-4">
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.name}>
-                  <SidebarMenuButton
-                    onClick={() => navigate(item.path)}
-                    tooltip={item.name}
-                    isActive={window.location.pathname === item.path}
-                    className={`w-full px-2 md:px-3 py-2 rounded-lg transition-colors ${
-                      window.location.pathname === item.path ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-accent'
-                    } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                  >
-                    <item.icon className="h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3" />
-                    <span className="w-full text-sm md:text-base">{item.name}</span>
-                    {item.hasCounter && unreadCount > 0 && (
-                      <Badge 
-                        variant="destructive" 
-                        className="text-xs animate-pulse ml-auto flex-shrink-0"
-                      >
-                        {unreadCount}
-                      </Badge>
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarContent>
+          <SidebarContent 
+            ref={sidebarContentRef}
+            className="flex-1 overflow-y-auto py-2 md:py-4 scrollbar-hide"
+            onScroll={handleScroll}
+          >
+            {filteredNavGroups.map((group) => {
+              const groupColorClasses = getColorClasses(group.color);
+              
+              return (
+                <SidebarGroup key={group.label}>
+                  <SidebarGroupLabel className={`text-xs font-semibold uppercase tracking-wider mb-2 px-2 ${groupColorClasses.text}`}>
+                    {group.label}
+                  </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((item) => {
+                      const isActive = window.location.pathname === item.path;
+                      const colorClasses = getColorClasses(item.color, isActive);
+                      
+                      return (
+                        <SidebarMenuItem key={item.name}>
+                          <SidebarMenuButton
+                            onClick={() => {
+                              handleNavigation(item.path);
+                            }}
+                            tooltip={item.name}
+                            isActive={isActive}
+                            className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-200 border border-transparent ${
+                              isActive 
+                                ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm` 
+                                : `hover:bg-gray-50 ${colorClasses.text} hover:border-gray-200`
+                            } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                          >
+                            <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${
+                              isActive ? colorClasses.activeIcon : colorClasses.icon
+                            }`} />
+                            <span className="w-full text-sm md:text-base">{item.name}</span>
+                            {item.hasCounter && unreadCount > 0 && (
+                              <Badge 
+                                variant="destructive" 
+                                className="text-xs animate-pulse ml-auto flex-shrink-0"
+                              >
+                                {unreadCount}
+                              </Badge>
+                            )}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                                  </SidebarGroupContent>
+                </SidebarGroup>
+              );
+            })}
+            </SidebarContent>
           
           <SidebarFooter>
             <div className="flex flex-col gap-2 p-2">
-              <Button 
-                variant="ghost" 
-                className={`justify-start w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                onClick={() => navigate('/settings')}
-              >
-                <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                {t('settings')}
-              </Button>
+{user?.role === 'admin' && (
+                <Button 
+                  variant="ghost" 
+                  className={`justify-start w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                  onClick={() => handleNavigation('/settings')}
+                >
+                  <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                  {t('settings')}
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
                 className={`justify-start w-full text-red-500 hover:bg-red-50 hover:text-red-600 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
@@ -249,10 +494,12 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
-                    <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                    {t('settings')}
-                  </DropdownMenuItem>
+{user?.role === 'admin' && (
+                    <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
+                      <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                      {t('settings')}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={handleLogout} className={`text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
                     <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
                     {t('signOut')}

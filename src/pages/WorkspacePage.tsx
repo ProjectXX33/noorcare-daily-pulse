@@ -949,9 +949,7 @@ const WorkspacePage = () => {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                Real-time team communication • {getOnlineCount()} online • {messages.length}/50 messages
-              </p>
+
             </div>
             
             {/* Header Controls */}
@@ -1063,26 +1061,7 @@ const WorkspacePage = () => {
                       
                       <div ref={messagesEndRef} />
                       
-                      {/* Scroll to Bottom Button */}
-                      {userScrolledUp && (
-                        <div className={`fixed z-10 ${isMobile ? 'bottom-20 right-4' : 'bottom-32 right-8'}`}>
-                          <Button
-                            onClick={() => {
-                              shouldAutoScroll.current = true;
-                              setUserScrolledUp(false);
-                              isNearBottom.current = true;
-                              hasUserManuallyScrolled.current = false;
-                              scrollToBottom();
-                              markMessagesAsRead();
-                            }}
-                            size="sm"
-                            className="rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90 animate-pulse text-xs sm:text-sm"
-                          >
-                            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            {isMobile ? `New (${unreadCount > 0 ? unreadCount : ''})` : `New messages ${unreadCount > 0 ? `(${unreadCount})` : ''}`}
-                          </Button>
-                        </div>
-                      )}
+
                     </div>
                   )}
                 </div>

@@ -100,6 +100,32 @@ const AdminShiftManagement = () => {
     }
   }, [user, selectedWeekStart]);
 
+  // Add real-time subscription for shift assignments
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+
+    const subscription = supabase
+      .channel('shift_assignments_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shift_assignments'
+        },
+        (payload) => {
+          console.log('Real-time shift assignment change:', payload);
+          // Reload assignments when changes occur from other sources
+          loadAssignments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user]);
+
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
@@ -206,6 +232,40 @@ const AdminShiftManagement = () => {
         isDayOff,
         adminId: user?.id
       });
+
+      // Immediately update UI state for responsive feedback
+      const selectedShift = shiftId ? shifts.find(s => s.id === shiftId) : null;
+      const shiftName = selectedShift ? selectedShift.name : undefined;
+      const employee = employees.find(e => e.id === employeeId);
+
+      setAssignments(prev => {
+        const updated = [...prev];
+        const index = updated.findIndex(a => 
+          a.employeeId === employeeId && isSameDay(a.workDate, date)
+        );
+        
+        if (index >= 0) {
+          updated[index] = {
+            ...updated[index],
+            assignedShiftId: isDayOff ? null : shiftId,
+            isDayOff,
+            shiftName: isDayOff ? undefined : shiftName
+          };
+        } else {
+          updated.push({
+            id: `temp-${Date.now()}`,
+            employeeId,
+            workDate: date,
+            assignedShiftId: isDayOff ? null : shiftId,
+            isDayOff,
+            assignedBy: user?.id || '',
+            employeeName: employee?.name,
+            shiftName: isDayOff ? undefined : shiftName
+          });
+        }
+        
+        return updated;
+      });
       
       const assignmentData = {
         employee_id: employeeId,
@@ -224,34 +284,10 @@ const AdminShiftManagement = () => {
 
       if (error) throw error;
 
-      // Update local state
-      setAssignments(prev => {
-        const updated = [...prev];
-        const index = updated.findIndex(a => 
-          a.employeeId === employeeId && isSameDay(a.workDate, date)
-        );
-        
-        if (index >= 0) {
-          updated[index] = {
-            ...updated[index],
-            assignedShiftId: isDayOff ? null : shiftId,
-            isDayOff
-          };
-        } else {
-          updated.push({
-            id: `temp-${Date.now()}`,
-            employeeId,
-            workDate: date,
-            assignedShiftId: isDayOff ? null : shiftId,
-            isDayOff,
-            assignedBy: user?.id || ''
-          });
-        }
-        
-        return updated;
-      });
-
       console.log('Assignment updated successfully');
+      
+      // Show success feedback
+      toast.success('Shift assignment updated!');
     } catch (error) {
       console.error('Error updating assignment:', error);
       toast.error('Failed to update assignment');

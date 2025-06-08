@@ -1,3 +1,6 @@
+/* Import mobile analytics styles */
+@import './styles/analytics-mobile.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -47,10 +50,15 @@
     font-size: 16px !important;
   }
 
-  /* Smooth scrolling for mobile */
+  /* Smooth scrolling for mobile - but not for navigation */
   * {
-    scroll-behavior: smooth;
+    scroll-behavior: auto; /* Changed from smooth to auto to prevent page transition jumps */
     -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Apply smooth scrolling only to specific scroll containers, not globally */
+  .smooth-scroll {
+    scroll-behavior: smooth;
   }
 }
 
