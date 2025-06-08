@@ -1,6 +1,7 @@
 import React from 'react';
 import NotificationTester from '@/components/NotificationTester';
 import NotificationPermission from '@/components/NotificationPermission';
+import DatabaseNotificationTester from '@/components/DatabaseNotificationTester';
 
 const NotificationTestPage: React.FC = () => {
   return (
@@ -22,9 +23,14 @@ const NotificationTestPage: React.FC = () => {
           </div>
           
           <div>
-            <h2 className="text-xl font-semibold mb-4">Test Notifications</h2>
+            <h2 className="text-xl font-semibold mb-4">Direct API Test</h2>
             <NotificationTester />
           </div>
+        </div>
+        
+        <div>
+          <h2 className="text-xl font-semibold mb-4">🔔 Real Push Notification Test</h2>
+          <DatabaseNotificationTester />
         </div>
         
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">

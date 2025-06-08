@@ -34,6 +34,8 @@ const NotificationPermission: React.FC<NotificationPermissionProps> = ({
       if (status === 'default' && autoShow) {
         setIsVisible(true);
       }
+      
+      console.log('Permission status:', status, 'AutoShow:', autoShow, 'Visible:', status === 'default' && autoShow);
     }
   };
 

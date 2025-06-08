@@ -38,6 +38,7 @@ import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationPermission from "./components/NotificationPermission";
 import NotificationHandler from "./components/NotificationHandler";
+import NotificationBanner from "./components/NotificationBanner";
 import NotificationTestPage from "./pages/NotificationTestPage";
 
 
@@ -161,6 +162,7 @@ const AppWithAuth = () => {
               <AnimatePresence>
                 {showOpeningAnimation && <OpeningAnimation />}
               </AnimatePresence>
+              <NotificationBanner />
               <NotificationHandler />
               <Routes>
                 <Route path="/" element={<PageTransition><Index /></PageTransition>} />

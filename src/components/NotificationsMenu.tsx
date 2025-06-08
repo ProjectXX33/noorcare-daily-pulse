@@ -105,10 +105,34 @@ const NotificationsMenu = () => {
           playNotificationSound();
           
           // Show push notification if permission is granted
-          notificationManager.showGeneralNotification(
-            newNotification.title,
-            newNotification.message
-          );
+          if (Notification.permission === 'granted') {
+            // Use service worker for proper push notifications
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              // Send through service worker for better push notification support
+              navigator.serviceWorker.ready.then(registration => {
+                const notificationOptions: any = {
+                  body: newNotification.message,
+                  icon: '/NQ-ICON.png',
+                  badge: '/NQ-ICON.png',
+                  tag: 'noorhub-notification',
+                  requireInteraction: false,
+                  vibrate: [200, 100, 200],
+                  data: {
+                    type: 'general',
+                    timestamp: Date.now(),
+                    url: '/'
+                  }
+                };
+                registration.showNotification(newNotification.title, notificationOptions);
+              });
+            } else {
+              // Fallback to notification manager
+              notificationManager.showGeneralNotification(
+                newNotification.title,
+                newNotification.message
+              );
+            }
+          }
         }
       )
       .subscribe();
