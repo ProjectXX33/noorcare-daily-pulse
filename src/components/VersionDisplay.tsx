@@ -13,18 +13,38 @@ const VersionDisplay: React.FC = () => {
     loadVersionInfo();
   }, []);
 
-  const loadVersionInfo = () => {
-    // Get current version from localStorage or meta tag
+  const loadVersionInfo = async () => {
+    try {
+      // First try to get version from version.json (most reliable)
+      const response = await fetch('/version.json?t=' + Date.now());
+      if (response.ok) {
+        const versionData = await response.json();
+        const correctVersion = versionData.version || '1.0.0';
+        
+        // Update localStorage with correct version to sync all components
+        localStorage.setItem('app-version', correctVersion);
+        
+        setCurrentVersion(correctVersion);
+        console.log('[VersionDisplay] Loaded and synced version from version.json:', correctVersion);
+        return;
+      }
+    } catch (error) {
+      console.log('[VersionDisplay] Could not fetch version.json, using fallback');
+    }
+
+    // Fallback to localStorage or meta tag
     const storedVersion = localStorage.getItem('app-version');
     const buildTime = document.querySelector('meta[name="build-time"]')?.getAttribute('content');
     
     let displayVersion = '1.0.0';
     if (storedVersion) {
-      // Format long versions to short display (e.g., 1.0.1749491283913 -> 1.0)
+      // Only format versions that are actually timestamp-based (e.g., 1.0.1749491283913)
       const parts = storedVersion.split('.');
-      if (parts.length > 2 && parts[2].length > 6) {
-        displayVersion = `${parts[0]}.${parts[1]}`;
+      if (parts.length === 3 && parts[2].length > 10) {
+        // This is a timestamp version, format it nicely
+        displayVersion = `${parts[0]}.${parts[1]}.${parts[2].slice(-3)}`;
       } else {
+        // This is a normal semantic version, use as-is
         displayVersion = storedVersion;
       }
     } else if (buildTime) {
