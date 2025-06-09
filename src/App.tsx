@@ -38,6 +38,7 @@ import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
+import { useLocation } from 'react-router-dom';
 
 
 
@@ -161,7 +162,7 @@ const AppWithAuth = () => {
                 <AnimatePresence>
                   {showOpeningAnimation && <OpeningAnimation />}
                 </AnimatePresence>
-                <NotificationBanner />
+                <AuthenticatedNotificationBanner />
                 <NotificationHandler />
                 <Routes>
                   <Route path="/" element={<PageTransition><Index /></PageTransition>} />
@@ -358,6 +359,22 @@ const AppWithAuth = () => {
         </AuthProvider>
       </BrowserRouter>
   );
+};
+
+// Component to conditionally show NotificationBanner only for authenticated users
+const AuthenticatedNotificationBanner = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  
+  // Don't show notification banner on login page or index page
+  const hideOnPages = ['/', '/login'];
+  
+  // Only show if user is authenticated and not on excluded pages
+  if (!user || hideOnPages.includes(location.pathname)) {
+    return null;
+  }
+  
+  return <NotificationBanner />;
 };
 
 const App = () => {
