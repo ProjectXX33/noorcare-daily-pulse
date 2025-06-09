@@ -24,7 +24,8 @@ import {
   Bug,
   BarChart3,
   ShoppingCart,
-  Wrench
+  Wrench,
+  Crown
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -55,6 +56,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
+import WorkShiftTimer from '@/components/WorkShiftTimer';
 
 interface SidebarNavigationProps {
   children?: React.ReactNode;
@@ -256,6 +258,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       color: 'emerald',
       items: [
         { name: 'Create Order', path: '/create-order', icon: ShoppingCart, customerServiceOnly: true, color: 'emerald' },
+        { name: 'Loyal Customers', path: '/loyal-customers', icon: Crown, customerServiceOnly: true, color: 'amber' },
       ] as NavItem[]
     }
   ];
@@ -475,10 +478,11 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         
         <div className="flex flex-col flex-1">
           <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 shadow-sm">
-            <div className={`flex items-center ${language === 'ar' ? 'order-2' : 'order-1'}`}>
+            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'}`}>
               <SidebarTrigger className="md:hidden">
                 <Menu className="h-5 w-5" />
               </SidebarTrigger>
+              <WorkShiftTimer />
             </div>
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
               <NotificationsMenu />

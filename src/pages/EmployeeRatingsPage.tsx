@@ -147,14 +147,19 @@ const EmployeeRatingsPage = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Enhanced mobile-optimized header with modern design */}
       <div className="border-b border-border/50 bg-background/98 w-full">
         <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              </div>
             <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">{t.myRatings}</h1>
-              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">{t.viewYourRatingHistory}</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent leading-tight">{t.myRatings}</h1>
+                <p className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed max-w-2xl">{t.viewYourRatingHistory}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -180,74 +185,82 @@ const EmployeeRatingsPage = () => {
           </Card>
         ) : (
           <>
-            {/* Mobile-responsive performance overview - 2x2 grid on mobile */}
+            {/* Mobile-responsive performance overview - Enhanced 2x2 grid on mobile */}
             <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-4">
-              <Card>
+              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 mx-auto" />
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.averageRating}</p>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-100 flex items-center justify-center mx-auto">
+                      <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.averageRating}</p>
                     <div className="flex flex-col items-center gap-1">
-                      <div className="text-lg sm:text-2xl font-bold">
+                      <div className="text-lg sm:text-2xl font-bold text-purple-600">
                         {averageRating ? averageRating.toFixed(1) : '0.0'}
                       </div>
                       {averageRating && (
                         <div className="flex justify-center">
-                          <StarRating rating={averageRating} readonly size="sm" />
+                          <StarRating rating={averageRating} readonly size="sm" spacing="tight" />
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       {averageRating ? getRatingDescription(averageRating) : t.noRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <Star className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500 mx-auto" />
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.totalRatings}</p>
-                    <div className="text-lg sm:text-2xl font-bold">{ratings.length}</div>
-                    <p className="text-xs text-muted-foreground">
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+                      <Star className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.totalRatings}</p>
+                    <div className="text-lg sm:text-2xl font-bold text-amber-600">{ratings.length}</div>
+                    <p className="text-xs text-muted-foreground truncate">
                       {t.basedOnRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1">
+              <Card className="col-span-2 sm:col-span-1 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 mx-auto" />
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">{t.latestRating}</p>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.latestRating}</p>
                     <div className="flex flex-col items-center gap-1">
-                      <div className="text-lg sm:text-2xl font-bold">
+                      <div className="text-lg sm:text-2xl font-bold text-blue-600">
                         {ratings[0]?.rating || '—'}
                       </div>
                       {ratings[0] && (
                         <div className="flex justify-center">
-                          <StarRating rating={ratings[0].rating} readonly size="sm" />
+                          <StarRating rating={ratings[0].rating} readonly size="sm" spacing="tight" />
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       {ratings[0] ? ratings[0].ratedAt.toLocaleDateString() : t.noRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1">
+              <Card className="col-span-2 sm:col-span-1 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <Award className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500 mx-auto" />
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Best Rating</p>
-                    <div className="text-lg sm:text-2xl font-bold">
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+                      <Award className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Best Rating</p>
+                    <div className="text-lg sm:text-2xl font-bold text-emerald-600">
                       {Math.max(...ratings.map(r => r.rating)).toFixed(1)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       {getRatingDescription(Math.max(...ratings.map(r => r.rating)))}
                     </p>
                   </div>
@@ -274,7 +287,7 @@ const EmployeeRatingsPage = () => {
                         <div key={rating} className="space-y-2">
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
-                              <StarRating rating={rating} readonly size="sm" />
+                              <StarRating rating={rating} readonly size="sm" spacing="tight" />
                               <span className="text-sm font-medium">{rating}.0</span>
                             </div>
                             <span className="text-sm text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
@@ -307,7 +320,7 @@ const EmployeeRatingsPage = () => {
                     <div key={rating} className="space-y-2">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <StarRating rating={rating} readonly size="sm" />
+                          <StarRating rating={rating} readonly size="sm" spacing="tight" />
                           <span className="text-sm font-medium">{rating}.0</span>
                         </div>
                         <span className="text-sm text-muted-foreground">{count}</span>
@@ -369,23 +382,24 @@ const EmployeeRatingsPage = () => {
                   <div className="max-h-none overflow-y-auto">
                     <div className="space-y-3 p-4">
                       {(showAllRatings ? ratings : ratings.slice(0, 3)).map((rating, index) => (
-                        <Card key={rating.id} className={`border-l-4 ${rating.rating >= 4 ? 'border-l-green-500' : rating.rating >= 3 ? 'border-l-yellow-500' : 'border-l-red-500'}`}>
-                          <CardContent className="p-4 space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <StarRating rating={rating.rating} readonly size="sm" />
-                                  <span className="font-semibold text-sm">
+                        <Card key={rating.id} className={`border-l-4 hover:shadow-md transition-shadow ${rating.rating >= 4 ? 'border-l-emerald-500 bg-gradient-to-r from-emerald-50 to-white' : rating.rating >= 3 ? 'border-l-amber-500 bg-gradient-to-r from-amber-50 to-white' : 'border-l-red-500 bg-gradient-to-r from-red-50 to-white'}`}>
+                          <CardContent className="p-4 space-y-3 min-h-[120px]">
+                            <div className="flex justify-between items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <StarRating rating={rating.rating} readonly size="sm" spacing="tight" />
+                                  <span className="font-bold text-base">
                                     {rating.rating}/5
                                   </span>
                                 </div>
-                                <Badge variant="outline" className={`text-xs ${getRatingColor(rating.rating)}`}>
+                                <Badge variant="outline" className={`text-xs font-medium ${getRatingColor(rating.rating)}`}>
                                   {getRatingDescription(rating.rating)}
                                 </Badge>
                               </div>
-                              <div className="text-right text-xs text-muted-foreground">
+                              <div className="text-right text-xs text-muted-foreground flex-shrink-0">
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
+                                  <span className="whitespace-nowrap">
                                   {rating.ratedAt.toLocaleDateString(
                                     language === 'ar' ? 'ar-SA' : 'en-US',
                                     { 
@@ -394,6 +408,7 @@ const EmployeeRatingsPage = () => {
                                       day: 'numeric' 
                                     }
                                   )}
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -423,14 +438,28 @@ const EmployeeRatingsPage = () => {
                       
                       {/* Bottom "View All" button for better mobile UX */}
                       {!showAllRatings && ratings.length > 3 && (
-                        <div className="pt-2">
+                        <div className="pt-4">
                           <Button
                             variant="outline"
                             onClick={() => setShowAllRatings(true)}
-                            className="w-full min-h-[44px] text-sm"
+                            className="w-full min-h-[44px] text-sm border-purple-200 hover:bg-purple-50 transition-colors"
                           >
-                            <ChevronDown className="h-4 w-4 mr-2" />
-                            View All {ratings.length} Ratings
+                            <ChevronDown className="h-4 w-4 mr-2 text-purple-600" />
+                            <span className="text-purple-700 font-medium">View All {ratings.length} Ratings</span>
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Collapse button */}
+                      {showAllRatings && ratings.length > 3 && (
+                        <div className="pt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowAllRatings(false)}
+                            className="w-full min-h-[44px] text-sm border-gray-200 hover:bg-gray-50 transition-colors"
+                          >
+                            <ChevronUp className="h-4 w-4 mr-2 text-gray-600" />
+                            <span className="text-gray-700 font-medium">Show Less</span>
                           </Button>
                         </div>
                       )}
@@ -449,7 +478,7 @@ const EmployeeRatingsPage = () => {
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-3">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <div className="flex items-center gap-2">
-                              <StarRating rating={rating.rating} readonly size="sm" />
+                              <StarRating rating={rating.rating} readonly size="sm" spacing="tight" />
                               <span className="font-semibold text-lg">
                                 {rating.rating}/5
                               </span>

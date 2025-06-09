@@ -337,19 +337,28 @@ const WorkspacePage = () => {
   // Reset counter when workspace page becomes active
   useEffect(() => {
     // Reset counter immediately when workspace page is accessed (but keep messages)
-    console.log('🏠 Workspace page mounted - resetting counter only');
-    resetCounterOnly();
+    console.log('🏠 Workspace page mounted - resetting counter immediately');
+    markAllAsRead(); // Reset global counter immediately
     
     // Also reset when page becomes visible (tab switching)
     const handleFocus = () => {
-      console.log('🏠 Workspace page focused - resetting counter only');
-      resetCounterOnly();
+      console.log('🏠 Workspace page focused - resetting counter immediately');
+      markAllAsRead(); // Reset global counter immediately
+    };
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden && window.location.pathname === '/workspace') {
+        console.log('🏠 Workspace page visible - resetting counter immediately');
+        markAllAsRead(); // Reset global counter immediately
+      }
     };
     
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []); // Run only on mount
 
@@ -365,34 +374,23 @@ const WorkspacePage = () => {
       userScrolledUp
     });
     
-    // Only update counter, don't automatically reset when on workspace page
-    // Let user interactions handle the reset instead
+    // Always keep counter at 0 when on workspace page
     if (window.location.pathname === '/workspace') {
-      // Keep counter at 0 only if user is at bottom of chat (not scrolled up)
-      if (!userScrolledUp) {
-        resetCounterOnly();
-      }
+      console.log('📍 On workspace page - keeping counter at 0');
+      markAllAsRead(); // Always reset when on workspace page
     } else {
       // Update counter when NOT on workspace page
+      console.log('📍 Not on workspace page - updating counter to:', count);
       setUnreadCount(count);
     }
-  }, [messages, lastReadMessageId, user?.id, userScrolledUp, setUnreadCount]);
+  }, [messages, lastReadMessageId, user?.id, setUnreadCount]);
 
-  // Mark messages as read when user scrolls to bottom or when page becomes visible
+  // Mark messages as read when user scrolls to bottom
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      console.log('👁️ Visibility changed:', { 
-        hidden: document.hidden, 
-        userScrolledUp,
-        messagesLength: messages.length 
-      });
-      if (!document.hidden && !userScrolledUp && window.location.pathname === '/workspace') {
-        markMessagesAsRead();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // Auto-mark as read when at bottom of chat
+    if (!userScrolledUp && window.location.pathname === '/workspace') {
+      markMessagesAsRead();
+    }
   }, [messages, userScrolledUp]);
 
   const cleanupSubscriptions = () => {

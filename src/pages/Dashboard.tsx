@@ -9,23 +9,27 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckIn, WorkReport } from '@/types';
+import { CheckIn, WorkReport, User } from '@/types';
 import DashboardStats from '@/components/DashboardStats';
 import AnimatedLoader from '@/components/AnimatedLoader';
+import { fetchEmployees } from '@/lib/employeesApi';
 import { 
   UsersIcon, 
   ClipboardCheckIcon, 
   Clock,
   CalendarDays,
   CheckSquare,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { checkIns, workReports, getUserCheckIns, getUserWorkReports, hasCheckedInToday, isLoading } = useCheckIn();
+  const { checkIns, workReports, getUserCheckIns, getUserWorkReports, hasCheckedInToday, isLoading, refreshCheckIns, refreshWorkReports } = useCheckIn();
   const navigate = useNavigate();
   const [language, setLanguage] = useState('en');
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [allEmployees, setAllEmployees] = useState<User[]>([]);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -97,6 +101,45 @@ const Dashboard = () => {
     }
   }, []);
 
+  // Auto refresh data every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        await refreshCheckIns();
+        await refreshWorkReports();
+        if (user?.role === 'admin') {
+          await loadAllEmployees(); // Also refresh employee list for admins
+        }
+        setLastUpdated(new Date());
+      } catch (error) {
+        console.error('Error refreshing dashboard data:', error);
+      }
+    }, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [refreshCheckIns, refreshWorkReports, user]);
+
+  // Update last updated time when data changes
+  useEffect(() => {
+    setLastUpdated(new Date());
+  }, [checkIns, workReports]);
+
+  // Load all employees for the "not checked in" filter
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadAllEmployees();
+    }
+  }, [user]);
+
+  const loadAllEmployees = async () => {
+    try {
+      const employees = await fetchEmployees();
+      setAllEmployees(employees);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+    }
+  };
+
   const t = translations[language as keyof typeof translations];
 
   // Debug log
@@ -157,6 +200,23 @@ const Dashboard = () => {
     return Array.from(allNames).sort();
   };
 
+  // Get employees who haven't checked in today
+  const getEmployeesNotCheckedInToday = () => {
+    if (!allEmployees.length) return [];
+    
+    const today = new Date().toDateString();
+    const checkedInUserIds = new Set(
+      userCheckIns
+        .filter(checkIn => new Date(checkIn.timestamp).toDateString() === today)
+        .map(checkIn => checkIn.userId)
+    );
+
+    return allEmployees.filter(employee => 
+      employee.role === 'employee' && // Only include employees, not admins
+      !checkedInUserIds.has(employee.id)
+    );
+  };
+
   // Filter check-ins based on current filters
   const filteredCheckIns = (userCheckIns || []).filter(checkIn => {
     if (!checkIn) return false;
@@ -184,14 +244,17 @@ const Dashboard = () => {
         
         switch (filters.checkInStatus) {
           case 'checked-in':
+            // Show only today's check-ins that haven't checked out yet
             if (!checkInToday || hasCheckOut) return false;
             break;
           case 'checked-out':
+            // Show only check-ins that have been checked out
             if (!hasCheckOut) return false;
             break;
           case 'not-checked-in':
-            if (checkInToday) return false;
-            break;
+            // For "not checked in", we should show no check-in records
+            // because this filter is meant to show people who haven't checked in
+            return false;
         }
       }
 
@@ -267,6 +330,36 @@ const Dashboard = () => {
                   day: 'numeric',
                 })}
               </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 animate-spin" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span>Auto-refreshing every 30s</span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await refreshCheckIns();
+                    await refreshWorkReports();
+                    if (user?.role === 'admin') {
+                      await loadAllEmployees();
+                    }
+                    setLastUpdated(new Date());
+                  } catch (error) {
+                    console.error('Error manually refreshing:', error);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
             </div>
           </div>
         </div>
@@ -376,10 +469,67 @@ const Dashboard = () => {
         {/* Recent activity section */}
         <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
           <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
-            <CheckInHistory 
-              checkIns={filteredCheckIns.slice(0, 10)} 
-              title={t.checkInsHistory}
-            />
+            {filters.checkInStatus === 'not-checked-in' ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Employees Not Checked In Today</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const notCheckedInEmployees = getEmployeesNotCheckedInToday();
+                    
+                    if (notCheckedInEmployees.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <div className="text-4xl mb-2">✅</div>
+                          <p className="text-muted-foreground font-medium">
+                            All employees have checked in today!
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Great attendance record for today.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm text-muted-foreground">
+                            {notCheckedInEmployees.length} employee{notCheckedInEmployees.length !== 1 ? 's' : ''} haven't checked in today
+                          </p>
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                            {new Date().toLocaleDateString()}
+                          </span>
+                        </div>
+                        
+                        <div className="grid gap-2">
+                          {notCheckedInEmployees.map(employee => (
+                            <div key={employee.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{employee.name}</h4>
+                                <p className="text-xs text-muted-foreground">
+                                  {employee.department} • {employee.position}
+                                </p>
+                              </div>
+                              <div className="flex items-center text-orange-600">
+                                <Clock className="h-4 w-4 mr-1" />
+                                <span className="text-xs font-medium">Not checked in</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            ) : (
+              <CheckInHistory 
+                checkIns={filteredCheckIns.slice(0, 10)} 
+                title={t.checkInsHistory}
+              />
+            )}
           </div>
           <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
             <ReportHistory 

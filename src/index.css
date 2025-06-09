@@ -748,3 +748,34 @@ body .fc .fc-daygrid-event:hover {
 .z-overlay { z-index: 30 !important; }
 .z-sticky { z-index: 20 !important; }
 .z-content { z-index: 10 !important; }
+
+/* Star Rating Component - Force zero spacing */
+.star-rating-container {
+  gap: 0 !important;
+}
+
+.star-rating-container button {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.star-rating-container.tight {
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.star-rating-container.tight button {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: auto !important;
+  min-height: auto !important;
+}
+
+.star-rating-container.tight svg {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}

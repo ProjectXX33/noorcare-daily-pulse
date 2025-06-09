@@ -110,13 +110,13 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-center sm:text-left">
             <Star className="h-5 w-5 text-yellow-500" />
             Rate Employee
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-center sm:text-left">
             Rate {employee.name} and optionally add a comment about their performance.
           </DialogDescription>
         </DialogHeader>
@@ -124,17 +124,22 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
         <div className="space-y-4">
           {/* Employee Info */}
           <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h3 className="font-medium">{employee.name}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {employee.position} • {employee.department}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="flex sm:justify-end">
                 {employee.averageRating && employee.averageRating > 0 ? (
-                  <div className="flex items-center gap-1">
-                    <StarRating rating={employee.averageRating} readonly size="sm" />
+                  <div className="flex items-center gap-2">
+                    <StarRating 
+                      rating={employee.averageRating} 
+                      readonly 
+                      size="sm" 
+                      spacing="tight"
+                    />
                     <span className="text-xs text-gray-500">
                       Avg: {employee.averageRating.toFixed(1)}
                     </span>
@@ -154,14 +159,15 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
             </div>
           ) : previousRating ? (
             <div className="p-3 border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                 <h4 className="text-sm font-medium">Latest Rating</h4>
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleUpdatePrevious}
                     disabled={isUpdating}
+                    className="flex-1 sm:flex-none"
                   >
                     Update
                   </Button>
@@ -170,14 +176,20 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
                     size="sm"
                     onClick={handleCreateNew}
                     disabled={!isUpdating}
+                    className="flex-1 sm:flex-none"
                   >
                     New Rating
                   </Button>
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <StarRating rating={previousRating.rating} readonly size="sm" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <StarRating 
+                    rating={previousRating.rating} 
+                    readonly 
+                    size="sm" 
+                    spacing="tight"
+                  />
                   <span className="text-sm text-gray-600">
                     by {previousRating.ratedByName}
                   </span>
@@ -201,13 +213,17 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
               <Label className="text-base font-medium">
                 {isUpdating ? 'Update Rating' : 'Select Rating'}
               </Label>
-              <div className="mt-2">
+              <div className="mt-3 flex flex-col items-center sm:items-start">
                 <StarRating
                   rating={rating}
                   onRatingChange={setRating}
                   size="lg"
+                  spacing="tight"
                   showValue
                 />
+                <p className="text-xs text-gray-500 mt-2 text-center sm:text-left">
+                  Tap to select rating
+                </p>
               </div>
             </div>
 
@@ -225,14 +241,18 @@ const RateEmployeeModal: React.FC<RateEmployeeModalProps> = ({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className="w-full sm:w-auto order-2 sm:order-1"
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit} 
             disabled={rating === 0 || isLoading}
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary hover:bg-primary/90 w-full sm:w-auto order-1 sm:order-2"
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isUpdating ? 'Update Rating' : 'Submit Rating'}

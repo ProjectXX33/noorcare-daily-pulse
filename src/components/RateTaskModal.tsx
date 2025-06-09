@@ -165,7 +165,12 @@ const RateTaskModal: React.FC<RateTaskModalProps> = ({
                 <div className="text-right">
                   {task.averageRating && task.averageRating > 0 ? (
                     <div className="flex items-center gap-1">
-                      <StarRating rating={task.averageRating} readonly size="sm" />
+                      <StarRating 
+                        rating={task.averageRating} 
+                        readonly 
+                        size="sm" 
+                        spacing="tight"
+                      />
                       <span className="text-xs text-gray-500">
                         Avg: {task.averageRating.toFixed(1)}
                       </span>
@@ -209,7 +214,12 @@ const RateTaskModal: React.FC<RateTaskModalProps> = ({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <StarRating rating={previousRating.rating} readonly size="sm" />
+                  <StarRating 
+                    rating={previousRating.rating} 
+                    readonly 
+                    size="sm" 
+                    spacing="tight"
+                  />
                   <span className="text-sm text-gray-600">
                     by {previousRating.ratedByName}
                   </span>

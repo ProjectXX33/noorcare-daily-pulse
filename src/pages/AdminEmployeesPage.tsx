@@ -402,14 +402,19 @@ const AdminEmployeesPage = () => {
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             {employee.averageRating && employee.averageRating > 0 ? (
-                              <div className="flex items-center gap-1">
-                                <StarRating rating={employee.averageRating} readonly size="sm" />
-                                <span className="text-xs text-gray-500">
+                              <div className="flex items-center gap-2">
+                                <StarRating 
+                                  rating={employee.averageRating} 
+                                  readonly 
+                                  size="sm" 
+                                  spacing="tight"
+                                />
+                                <span className="text-xs text-muted-foreground">
                                   ({employee.averageRating.toFixed(1)})
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-xs text-gray-500">{t.noRating}</span>
+                              <span className="text-xs text-muted-foreground">{t.noRating}</span>
                             )}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">

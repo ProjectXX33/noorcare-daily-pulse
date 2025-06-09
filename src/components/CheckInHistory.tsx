@@ -12,10 +12,10 @@ interface CheckInHistoryProps {
 const CheckInHistory: React.FC<CheckInHistoryProps> = ({ checkIns, title }) => {
   // Function to calculate hours worked
   const calculateHoursWorked = (checkIn: CheckIn): string => {
-    if (!checkIn.checkoutTime) return "Not recorded";
+    if (!checkIn.checkOutTime) return "Not recorded";
     
     const checkInTime = new Date(checkIn.timestamp);
-    const checkOutTime = new Date(checkIn.checkoutTime);
+    const checkOutTime = new Date(checkIn.checkOutTime);
     
     const diffInMs = checkOutTime.getTime() - checkInTime.getTime();
     const hours = Math.floor(diffInMs / (1000 * 60 * 60));
@@ -62,7 +62,7 @@ const CheckInHistory: React.FC<CheckInHistoryProps> = ({ checkIns, title }) => {
                   </div>
                   <div className="flex justify-between sm:justify-start gap-2">
                     <span className="text-gray-600">Check-out:</span>
-                    <span className="font-medium">{formatTime(checkIn.checkoutTime)}</span>
+                    <span className="font-medium">{formatTime(checkIn.checkOutTime)}</span>
                   </div>
                 </div>
               </div>

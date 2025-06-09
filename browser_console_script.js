@@ -1,4 +1,4 @@
-// Complete Browser Console Script - Copy and paste this entire block
+jn// Complete Browser Console Script - Copy and paste this entire block
 (async function checkCurrentRecords() {
   console.log('🔍 Checking current performance records...');
   

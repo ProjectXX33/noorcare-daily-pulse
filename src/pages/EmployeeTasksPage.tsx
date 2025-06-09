@@ -298,9 +298,16 @@ const EmployeeTasksPage = () => {
                     
                     {/* Rating display */}
                     {task.averageRating && task.averageRating > 0 && (
-                      <div className="flex items-center gap-1">
-                        <StarRating rating={task.averageRating} readonly size="sm" />
-                        <span className="text-xs">({task.averageRating.toFixed(1)})</span>
+                      <div className="flex items-center gap-2">
+                        <StarRating 
+                          rating={task.averageRating} 
+                          readonly 
+                          size="sm" 
+                          spacing="tight"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          ({task.averageRating.toFixed(1)})
+                        </span>
                       </div>
                     )}
                   </div>
@@ -443,10 +450,19 @@ const EmployeeTasksPage = () => {
                       <span className="font-medium">Created By:</span> {selectedTask.createdByName}
                     </div>
                     {selectedTask.averageRating && selectedTask.averageRating > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <span className="font-medium">Average Rating:</span>
-                        <StarRating rating={selectedTask.averageRating} readonly size="sm" />
-                        <span>({selectedTask.averageRating.toFixed(1)})</span>
+                        <div className="flex items-center gap-2">
+                          <StarRating 
+                            rating={selectedTask.averageRating} 
+                            readonly 
+                            size="sm" 
+                            spacing="tight"
+                          />
+                          <span className="text-muted-foreground">
+                            ({selectedTask.averageRating.toFixed(1)})
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>

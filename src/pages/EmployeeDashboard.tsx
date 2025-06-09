@@ -201,11 +201,16 @@ const EmployeeDashboard = () => {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               ) : latestRating ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <StarRating rating={latestRating.rating} readonly size="sm" />
-                    <span className="text-lg font-bold">{latestRating.rating}/5</span>
-                  </div>
+                                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <StarRating 
+                        rating={latestRating.rating} 
+                        readonly 
+                        size="sm" 
+                        spacing="tight"
+                      />
+                      <span className="text-lg font-bold">{latestRating.rating}/5</span>
+                    </div>
                   <p className="text-xs text-muted-foreground">
                     {t.ratedBy}: {latestRating.ratedByName}
                   </p>

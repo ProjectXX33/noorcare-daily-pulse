@@ -506,7 +506,12 @@ const AdminRatingsPage = () => {
                                 <p className="text-xs text-muted-foreground mb-1">{t.currentRating}</p>
                                 {employee.averageRating && employee.averageRating > 0 ? (
                                   <div className="flex items-center gap-2">
-                                    <StarRating rating={employee.averageRating} readonly size="sm" />
+                                    <StarRating 
+                                      rating={employee.averageRating} 
+                                      readonly 
+                                      size="sm" 
+                                      spacing="tight"
+                                    />
                                     <span className="text-xs font-medium">
                                       {employee.averageRating.toFixed(1)}
                                     </span>
@@ -592,13 +597,18 @@ const AdminRatingsPage = () => {
                             <TableCell>
                               {employee.averageRating && employee.averageRating > 0 ? (
                                 <div className="flex items-center gap-2">
-                                  <StarRating rating={employee.averageRating} readonly size="sm" />
+                                  <StarRating 
+                                    rating={employee.averageRating} 
+                                    readonly 
+                                    size="sm" 
+                                    spacing="tight"
+                                  />
                                   <span className="text-sm font-medium">
                                     {employee.averageRating.toFixed(1)}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-sm text-gray-500">{t.noRating}</span>
+                                <span className="text-sm text-muted-foreground">{t.noRating}</span>
                               )}
                             </TableCell>
                             <TableCell>

@@ -581,7 +581,12 @@ const AdminTasksPage = () => {
                             <TableCell className="hidden lg:table-cell">
                               {task.averageRating && task.averageRating > 0 ? (
                                 <div className="flex items-center gap-1">
-                                  <StarRating rating={task.averageRating} readonly size="sm" />
+                                  <StarRating 
+                        rating={task.averageRating} 
+                        readonly 
+                        size="sm" 
+                        spacing="tight"
+                      />
                                   <span className="text-xs text-gray-500">
                                     ({task.averageRating.toFixed(1)})
                                   </span>
