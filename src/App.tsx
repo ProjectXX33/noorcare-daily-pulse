@@ -41,6 +41,7 @@ import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
 import AppUpdateManager from "./components/AppUpdateManager";
+import UpdateTrigger from "./components/UpdateTrigger";
 import PWAVersionChecker from "./components/PWAVersionChecker";
 import PWATestPanel from "./components/PWATestPanel";
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
@@ -377,6 +378,7 @@ const AppWithAuth = () => {
                   <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
                 </Routes>
                 <AppUpdateManager />
+                <UpdateTrigger />
                 <PWAVersionChecker />
                 <PWAUpdateInstructions />
                 <PWATestPanel />

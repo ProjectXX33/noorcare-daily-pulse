@@ -30,6 +30,18 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
     initializeUpdateManager();
     checkIfPWA();
     registerServiceWorker();
+
+    // Listen for force update check events
+    const handleForceUpdateCheck = () => {
+      console.log('[AppUpdateManager] Force update check triggered');
+      checkForUpdates();
+    };
+
+    window.addEventListener('force-update-check', handleForceUpdateCheck);
+    
+    return () => {
+      window.removeEventListener('force-update-check', handleForceUpdateCheck);
+    };
   }, []);
 
   const initializeUpdateManager = () => {
@@ -165,23 +177,66 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
 
   const checkServerVersion = async () => {
     try {
-      // You can implement a version endpoint on your server
-      // For now, we'll use a timestamp-based approach
+      // Check multiple sources for version detection
       const buildTime = document.querySelector('meta[name="build-time"]')?.getAttribute('content');
       const currentBuildTime = localStorage.getItem('app-build-time');
+      const appVersion = localStorage.getItem('app-version');
+      const lastUpdateCheck = localStorage.getItem('last-update-check');
       
-      if (buildTime && currentBuildTime && buildTime !== currentBuildTime) {
+      console.log('[UpdateManager] Version check:', {
+        buildTime,
+        currentBuildTime,
+        appVersion,
+        lastUpdateCheck
+      });
+
+      // If build time changed or no previous version stored
+      if (buildTime && buildTime !== 'BUILD_TIME_PLACEHOLDER' && buildTime !== currentBuildTime) {
+        console.log('[UpdateManager] Build time changed, triggering update');
         setUpdateInfo({
           available: true,
           version: 'Latest',
           message: 'A new version is available! Please refresh to get the latest updates.'
         });
         setShowUpdatePrompt(true);
+        return;
+      }
+
+      // Force update check if no previous version or very old
+      if (!appVersion || !lastUpdateCheck) {
+        console.log('[UpdateManager] No version history, checking for updates');
+        setUpdateInfo({
+          available: true,
+          version: 'Latest',
+          message: 'Welcome! Please refresh to ensure you have the latest version.'
+        });
+        setShowUpdatePrompt(true);
+        return;
+      }
+
+      // Check if it's been more than 30 minutes since last update check
+      const timeSinceLastCheck = Date.now() - parseInt(lastUpdateCheck || '0');
+      const thirtyMinutes = 30 * 60 * 1000;
+      
+      if (timeSinceLastCheck > thirtyMinutes) {
+        console.log('[UpdateManager] Periodic update check triggered');
+        setUpdateInfo({
+          available: true,
+          version: 'Latest',
+          message: 'Checking for updates... Please refresh to ensure you have the latest version.'
+        });
+        setShowUpdatePrompt(true);
+        return;
       }
       
-      if (buildTime) {
+      // Store current build time if we have it
+      if (buildTime && buildTime !== 'BUILD_TIME_PLACEHOLDER') {
         localStorage.setItem('app-build-time', buildTime);
       }
+
+      // Update last check time
+      localStorage.setItem('last-update-check', Date.now().toString());
+      
     } catch (error) {
       console.error('[UpdateManager] Error checking server version:', error);
     }

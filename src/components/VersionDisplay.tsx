@@ -111,14 +111,29 @@ const VersionDisplay: React.FC = () => {
                 <div className="break-all">Full: {getFullVersion()}</div>
               </div>
               
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={loadVersionInfo}
-                className="w-full text-xs"
-              >
-                Refresh
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={loadVersionInfo}
+                  className="flex-1 text-xs"
+                >
+                  Refresh
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    // Trigger manual update check
+                    localStorage.removeItem('last-update-check');
+                    localStorage.removeItem('app-build-time');
+                    window.location.reload();
+                  }}
+                  className="flex-1 text-xs"
+                >
+                  Force Update
+                </Button>
+              </div>
             </div>
           )}
         </div>
