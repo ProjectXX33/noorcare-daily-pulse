@@ -1,7 +1,7 @@
 {
   "name": "NoorHub",
   "short_name": "NoorHub",
-  "description": "Team management and communication platform for NoorHub - v1.0.1749490310429",
+  "description": "Team management and communication platform for NoorHub - v1.0.1749490871392",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -98,5 +98,5 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "1.0.1749490310429"
+  "version": "1.0.1749490871392"
 }

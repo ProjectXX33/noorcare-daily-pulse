@@ -92,7 +92,15 @@ const createVersionInfo = (version) => {
     buildTimestamp,
     buildDate: new Date().toLocaleDateString(),
     gitCommit: process.env.GIT_COMMIT || 'unknown',
-    environment: process.env.NODE_ENV || 'production'
+    environment: process.env.NODE_ENV || 'production',
+    releaseNotes: [
+      "Bug fixes and performance improvements",
+      "Enhanced security features", 
+      "Fresh app cache for better performance",
+      "Updated offline capabilities"
+    ],
+    minimumSupportedVersion: "1.0.0",
+    forceUpdate: false
   };
 
   const versionPath = path.join(__dirname, 'public', 'version.json');

@@ -1,8 +1,16 @@
 {
-  "version": "1.0.1749490310429",
-  "buildTime": "2025-06-09T17:31:50.429Z",
-  "buildTimestamp": "1749490310429",
+  "version": "1.0.1749490871392",
+  "buildTime": "2025-06-09T17:41:11.391Z",
+  "buildTimestamp": "1749490871392",
   "buildDate": "6/9/2025",
   "gitCommit": "unknown",
-  "environment": "production"
+  "environment": "production",
+  "releaseNotes": [
+    "Bug fixes and performance improvements",
+    "Enhanced security features",
+    "Fresh app cache for better performance",
+    "Updated offline capabilities"
+  ],
+  "minimumSupportedVersion": "1.0.0",
+  "forceUpdate": false
 }

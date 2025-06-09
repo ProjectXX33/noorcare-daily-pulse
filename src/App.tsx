@@ -41,6 +41,8 @@ import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
 import AppUpdateManager from "./components/AppUpdateManager";
+import PWAVersionChecker from "./components/PWAVersionChecker";
+import PWATestPanel from "./components/PWATestPanel";
 import { useLocation } from 'react-router-dom';
 
 
@@ -374,6 +376,8 @@ const AppWithAuth = () => {
                   <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
                 </Routes>
                 <AppUpdateManager />
+                <PWAVersionChecker />
+                <PWATestPanel />
                 <PWAInstallPrompt />
                 <Toaster />
                 <Sonner />
