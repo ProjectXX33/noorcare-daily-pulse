@@ -217,6 +217,13 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
       return false;
     }
 
+    // Don't show if this update was already completed
+    const completedVersion = localStorage.getItem('update-completed');
+    if (completedVersion === version) {
+      console.log('[UpdateManager] Skipping popup - update already completed for version:', version);
+      return false;
+    }
+
     // Don't show if this is the current version we already have
     const currentVersion = localStorage.getItem('app-version');
     if (currentVersion === version) {
@@ -348,14 +355,17 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         duration: 2000,
       });
       
-      // Mark this version as seen BEFORE doing anything else
+      // Mark this version as seen BEFORE doing anything else  
       if (updateInfo?.version) {
+        const currentTime = Date.now().toString();
         localStorage.setItem('app-version', updateInfo.version);
         localStorage.setItem('dismissed-update-version', updateInfo.version);
-        localStorage.setItem('dismissed-update-time', Date.now().toString());
-        localStorage.setItem('last-update-check', Date.now().toString());
+        localStorage.setItem('dismissed-update-time', currentTime);
+        localStorage.setItem('last-update-check', currentTime);
+        localStorage.setItem('update-completed', updateInfo.version);
+        localStorage.setItem('update-completed-time', currentTime);
         cacheManager.markAsUpdated(updateInfo.version);
-        console.log('[UpdateManager] Marked version as updated:', updateInfo.version);
+        console.log('[UpdateManager] Marked version as completed:', updateInfo.version);
       }
       
       // Hide the popup immediately to prevent spam
@@ -368,8 +378,45 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         setUpdateCooldown(false);
       }, 10000); // 10 second cooldown
       
+      // Preserve authentication and user preferences during update
+      const authData: Record<string, string | null> = {};
+      
+      // Preserve specific auth keys
+      const keysToPreserve = [
+        'supabase.auth.token',
+        'user-session', 
+        'auth-user',
+        'theme',
+        'language', 
+        'chatSoundEnabled'
+      ];
+      
+      keysToPreserve.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value) authData[key] = value;
+      });
+      
+      // Find all Supabase auth keys
+      const authKeys = Object.keys(localStorage).filter(key => 
+        key.includes('sb-') && key.includes('auth') || 
+        key.includes('supabase') ||
+        key.includes('user') ||
+        key.includes('session')
+      );
+      
+      authKeys.forEach(key => {
+        authData[key] = localStorage.getItem(key);
+      });
+
       // Use the cache manager for comprehensive cache clearing
       const cacheCleared = await cacheManager.clearAllCaches();
+      
+      // Restore authentication data
+      Object.keys(authData).forEach(key => {
+        if (authData[key]) {
+          localStorage.setItem(key, authData[key]);
+        }
+      });
       
       if (!cacheCleared) {
         throw new Error('Failed to clear cache');
@@ -381,17 +428,26 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
       }
       
       // Show success message
-      toast.success('Update successful! Refreshing app...', {
-        duration: 2000,
+      toast.success('Update successful! App updated in background.', {
+        duration: 3000,
       });
       
-      // Disable all further update checks
-      localStorage.setItem('update-in-progress', 'true');
+      // Mark update as complete
+      localStorage.setItem('update-in-progress', 'false');
+      localStorage.removeItem('update-in-progress');
       
-      // Use cache manager's force refresh method
+      console.log('[UpdateManager] Update completed successfully for version:', updateInfo.version);
+      
+      // Optional: Gentle refresh after delay (user can continue working)
       setTimeout(() => {
-        cacheManager.forceRefresh();
-      }, 1000);
+        toast.info('App updated! Refresh page when convenient.', {
+          duration: 5000,
+          action: {
+            label: 'Refresh Now',
+            onClick: () => window.location.reload()
+          }
+        });
+      }, 2000);
       
     } catch (error) {
       console.error('[UpdateManager] Error during update:', error);

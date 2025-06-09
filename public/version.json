@@ -1,16 +1,13 @@
 {
-  "version": "1.2.0",
-  "buildTime": "2025-06-09T18:35:01.400Z",
-  "buildTimestamp": "1749494101400",
+  "version": "1.3.0",
+  "buildTime": "2025-06-09T18:43:08.671Z",
+  "buildTimestamp": "1749494588671",
   "buildDate": "6/9/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
     "Fixed update notification spam - no more popup spam!",
-    "nnnnnnnnnnn",
-    "Enhanced security and performance",
-    "Improved PWA update detection",
-    "Better user experience overall"
+    "Enhanced Customer Service Features"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

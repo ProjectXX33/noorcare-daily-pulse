@@ -51,8 +51,31 @@ export class CacheManager {
         console.log('[CacheManager] All caches deleted successfully');
       }
 
-      // Clear localStorage (except user preferences)
-      this.clearLocalStorage(['theme', 'language', 'chatSoundEnabled']);
+      // Clear localStorage (except user preferences and auth data)
+      const preserveKeys = [
+        'theme', 
+        'language', 
+        'chatSoundEnabled',
+        'app-version',
+        'dismissed-update-version',
+        'dismissed-update-time',
+        'last-update-check',
+        'update-completed',
+        'update-completed-time'
+      ];
+      
+      // Preserve all authentication keys
+      const allKeys = Object.keys(localStorage);
+      const authKeys = allKeys.filter(key => 
+        key.includes('sb-') ||
+        key.includes('supabase') ||
+        key.includes('auth') ||
+        key.includes('session') ||
+        key.includes('user')
+      );
+      
+      preserveKeys.push(...authKeys);
+      this.clearLocalStorage(preserveKeys);
 
       // Clear sessionStorage
       sessionStorage.clear();
