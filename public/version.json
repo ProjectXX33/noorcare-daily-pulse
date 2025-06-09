@@ -7,9 +7,7 @@
   "environment": "production",
   "releaseNotes": [
     "Bug fixes and performance improvements",
-    "Enhanced security features",
-    "Fresh app cache for better performance",
-    "Updated offline capabilities"
+    "Enhanced security features"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

@@ -63,6 +63,7 @@ const VersionDisplay: React.FC = () => {
             <Globe className="h-3 w-3 text-blue-600" />
           )}
           <span>v{currentVersion}</span>
+          <span className="ml-1 text-xs opacity-60">DEBUG</span>
         </Button>
       </PopoverTrigger>
       
