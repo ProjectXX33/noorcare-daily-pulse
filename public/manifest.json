@@ -1,13 +1,16 @@
 {
   "name": "NoorHub",
   "short_name": "NoorHub",
-  "description": "Team management and communication platform for NoorHub",
+  "description": "Team management and communication platform for NoorHub - v1.0.1749490310429",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#15803d",
   "orientation": "portrait-primary",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "gcm_sender_id": "103953800507",
   "shortcuts": [
     {
@@ -15,14 +18,24 @@
       "short_name": "Dashboard",
       "description": "Go to dashboard",
       "url": "/dashboard",
-      "icons": [{ "src": "/NQ-ICON.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/NQ-ICON.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Check In",
       "short_name": "Check In",
       "description": "Quick check in",
       "url": "/check-in",
-      "icons": [{ "src": "/NQ-ICON.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/NQ-ICON.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "lang": "en",
@@ -84,5 +97,6 @@
   "id": "/",
   "launch_handler": {
     "client_mode": "focus-existing"
-  }
-} 
+  },
+  "version": "1.0.1749490310429"
+}

@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '1.0.1'; // Update this version when deploying new changes
+const APP_VERSION = '1.0.1749490310429'; // Update this version when deploying new changes
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
