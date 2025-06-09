@@ -35,6 +35,7 @@ import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
+import CreateOrderPage from "./pages/CreateOrderPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
@@ -345,6 +346,16 @@ const AppWithAuth = () => {
                           <AdminBugReportsPage />
                         </SidebarNavigation>
                       </AdminRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/create-order" 
+                    element={
+                      <CustomerServiceRoute>
+                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                          <CreateOrderPage />
+                        </SidebarNavigation>
+                      </CustomerServiceRoute>
                     } 
                   />
 

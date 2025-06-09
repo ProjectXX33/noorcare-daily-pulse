@@ -22,7 +22,9 @@ import {
   MessageSquare,
   Star,
   Bug,
-  BarChart3
+  BarChart3,
+  ShoppingCart,
+  Wrench
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -189,6 +191,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     adminOnly?: boolean;
     employeeOnly?: boolean;
     customerServiceAndDesignerOnly?: boolean;
+    customerServiceOnly?: boolean;
     shiftsAccess?: boolean;
     mediaBuyerOnly?: boolean;
     excludeMediaBuyer?: boolean;
@@ -246,6 +249,13 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       items: [
         { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true, color: 'pink' },
         { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true, color: 'violet' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Customer Service Tools',
+      color: 'emerald',
+      items: [
+        { name: 'Create Order', path: '/create-order', icon: ShoppingCart, customerServiceOnly: true, color: 'emerald' },
       ] as NavItem[]
     }
   ];
@@ -344,6 +354,13 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         activeText: 'text-slate-800', 
         activeBg: 'bg-slate-50 border-slate-200' 
       },
+      emerald: { 
+        icon: 'text-emerald-500', 
+        text: 'text-emerald-700', 
+        activeIcon: 'text-emerald-600', 
+        activeText: 'text-emerald-800', 
+        activeBg: 'bg-emerald-50 border-emerald-200' 
+      },
     };
     
     return colorMap[color] || colorMap.blue;
@@ -356,6 +373,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       if (item.adminOnly && user?.role !== 'admin') return false;
       if (item.employeeOnly && user?.role === 'admin') return false;
       if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
+      if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
