@@ -26,6 +26,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import wooCommerceAPI, { isWooCommerceConfigured } from '@/lib/woocommerceApi';
 
 interface Product {
@@ -65,6 +66,34 @@ interface CouponInfo {
 
 const CreateOrderPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  
+  // Strict access control - redirect if not Customer Service
+  useEffect(() => {
+    if (!user) {
+      navigate('/login', { replace: true });
+      return;
+    }
+    
+    if (user.position !== 'Customer Service') {
+      console.warn('Access denied: User is not Customer Service');
+      navigate(user.role === 'admin' ? '/dashboard' : '/employee-dashboard', { replace: true });
+      return;
+    }
+  }, [user, navigate]);
+
+  // Don't render page content if user is not Customer Service
+  if (!user || user.position !== 'Customer Service') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
