@@ -39,7 +39,7 @@ import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationPermission from "./components/NotificationPermission";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
-import NotificationTestPage from "./pages/NotificationTestPage";
+
 
 
 const queryClient = new QueryClient({
@@ -347,7 +347,7 @@ const AppWithAuth = () => {
                     </AdminRoute>
                   } 
                 />
-                <Route path="/test-notifications" element={<PageTransition><NotificationTestPage /></PageTransition>} />
+
                 <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
               </Routes>
               <PWAInstallPrompt />
