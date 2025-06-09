@@ -36,7 +36,6 @@ import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
-import NotificationPermission from "./components/NotificationPermission";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
 
@@ -351,7 +350,6 @@ const AppWithAuth = () => {
                 <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
               </Routes>
               <PWAInstallPrompt />
-              <NotificationPermission showAsCard={false} autoShow={true} />
               <Toaster />
               <Sonner />
             </LanguageProvider>

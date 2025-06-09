@@ -16,6 +16,12 @@ async function deployToPlesk() {
   
   try {
     console.log('🚀 Starting deployment to Plesk...');
+    console.log('📋 Configuration:', {
+      host: FTP_CONFIG.host,
+      user: FTP_CONFIG.user,
+      localDir: LOCAL_BUILD_DIR,
+      remoteDir: REMOTE_DIR
+    });
     
     // Connect to FTP
     await client.access(FTP_CONFIG);
@@ -25,15 +31,25 @@ async function deployToPlesk() {
     await client.ensureDir(REMOTE_DIR);
     console.log(`📁 Changed to directory: ${REMOTE_DIR}`);
     
+    // List current remote files for debugging
+    const remoteFiles = await client.list(REMOTE_DIR);
+    console.log('📂 Current remote files:', remoteFiles.map(f => f.name).slice(0, 10));
+    
     // Upload all files from build directory
+    console.log(`📤 Uploading from ${LOCAL_BUILD_DIR} to ${REMOTE_DIR}...`);
     await client.uploadFromDir(LOCAL_BUILD_DIR, REMOTE_DIR);
     console.log('📤 Files uploaded successfully!');
     
-    // Optional: Clear cache files if needed
+    // List remote files after upload
+    const updatedFiles = await client.list(REMOTE_DIR);
+    console.log('📂 Updated remote files:', updatedFiles.map(f => f.name).slice(0, 10));
+    
+    // Verify specific files exist
     try {
-      await client.remove('/.htaccess.backup');
+      const indexExists = await client.list(`${REMOTE_DIR}/index.html`);
+      console.log('✅ index.html exists on server');
     } catch (err) {
-      // Ignore if backup doesn't exist
+      console.log('❌ index.html not found on server');
     }
     
     console.log('🎉 Deployment completed successfully!');
@@ -41,6 +57,7 @@ async function deployToPlesk() {
     
   } catch (error) {
     console.error('❌ Deployment failed:', error.message);
+    console.error('Full error:', error);
   } finally {
     client.close();
   }
