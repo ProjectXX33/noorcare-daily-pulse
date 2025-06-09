@@ -11,7 +11,7 @@ const buildTime = new Date().toISOString();
 const buildTimestamp = Date.now().toString();
 
 // Check if we should use manual versioning
-const useManualVersioning = process.env.MANUAL_VERSION === 'true' || fs.existsSync('./version-config.js');
+const useManualVersioning = process.env.MANUAL_VERSION === 'true' || fs.existsSync('./version-config.js') || hasManualVersionJson();
 
 let versionConfig = {
   version: `1.0.${buildTimestamp}`,
@@ -26,6 +26,22 @@ let versionConfig = {
 };
 
 console.log(`📅 Build time: ${buildTime}`);
+
+// Check if version.json has manual version (not timestamp-based)
+function hasManualVersionJson() {
+  const versionPath = path.join(__dirname, 'public', 'version.json');
+  if (fs.existsSync(versionPath)) {
+    try {
+      const versionData = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+      // If version doesn't look like timestamp (1.0.123456789), it's manual
+      const isTimestampVersion = /^1\.0\.\d{13}$/.test(versionData.version);
+      return !isTimestampVersion;
+    } catch (error) {
+      return false;
+    }
+  }
+  return false;
+}
 
 // Update service worker version
 const updateServiceWorkerVersion = (version) => {
@@ -161,27 +177,51 @@ const main = async () => {
 
 // Setup version configuration
 const setupVersionConfig = async () => {
-  if (useManualVersioning && fs.existsSync('./version-config.js')) {
-    try {
-      // Load manual version config
-      const { createRequire } = await import('module');
-      const require = createRequire(import.meta.url);
-      const { VERSION_CONFIG, getVersionString } = require('./version-config.js');
-      
-      versionConfig.version = getVersionString();
-      versionConfig.releaseNotes = VERSION_CONFIG.releaseNotes;
-      versionConfig.forceUpdate = VERSION_CONFIG.forceUpdate;
-      versionConfig.minimumSupportedVersion = VERSION_CONFIG.minimumSupportedVersion;
-      
-      console.log('🔨 Using MANUAL versioning...');
-      console.log(`📋 Version: ${versionConfig.version}`);
-    } catch (error) {
-      console.log('⚠️ Error loading manual version config, using automatic versioning');
-      console.log('🔨 Using AUTOMATIC versioning...');
+  if (useManualVersioning) {
+    // First check if version.json already has manual settings
+    if (hasManualVersionJson()) {
+      try {
+        const versionPath = path.join(__dirname, 'public', 'version.json');
+        const existingData = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+        
+        versionConfig.version = existingData.version;
+        versionConfig.releaseNotes = existingData.releaseNotes;
+        versionConfig.forceUpdate = existingData.forceUpdate || false;
+        versionConfig.minimumSupportedVersion = existingData.minimumSupportedVersion || "1.0.0";
+        
+        console.log('🔨 Using EXISTING MANUAL version.json...');
+        console.log(`📋 Version: ${versionConfig.version}`);
+        console.log(`📝 Release Notes: ${versionConfig.releaseNotes.length} items`);
+        return;
+      } catch (error) {
+        console.log('⚠️ Error reading existing version.json');
+      }
     }
-  } else {
-    console.log('🔨 Using AUTOMATIC versioning...');
+    
+    // Try to load from version-config.js
+    if (fs.existsSync('./version-config.js')) {
+      try {
+        const { createRequire } = await import('module');
+        const require = createRequire(import.meta.url);
+        const { VERSION_CONFIG, getVersionString } = require('./version-config.js');
+        
+        versionConfig.version = getVersionString();
+        versionConfig.releaseNotes = VERSION_CONFIG.releaseNotes;
+        versionConfig.forceUpdate = VERSION_CONFIG.forceUpdate;
+        versionConfig.minimumSupportedVersion = VERSION_CONFIG.minimumSupportedVersion;
+        
+        console.log('🔨 Using MANUAL version-config.js...');
+        console.log(`📋 Version: ${versionConfig.version}`);
+        return;
+      } catch (error) {
+        console.log('⚠️ Error loading manual version config');
+      }
+    }
+    
+    console.log('⚠️ Manual versioning requested but no valid config found, using automatic');
   }
+  
+  console.log('🔨 Using AUTOMATIC versioning...');
 };
 
 // Run the script

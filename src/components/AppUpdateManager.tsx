@@ -27,8 +27,12 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
   const [isPWA, setIsPWA] = useState(false);
   const [serviceWorkerRegistration, setServiceWorkerRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [lastShownVersion, setLastShownVersion] = useState<string>('');
+  const [updateCooldown, setUpdateCooldown] = useState(false);
 
   useEffect(() => {
+    // Clear any update-in-progress flag on app load
+    localStorage.removeItem('update-in-progress');
+    
     initializeUpdateManager();
     checkIfPWA();
     registerServiceWorker();
@@ -195,8 +199,28 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
   };
 
   const shouldShowUpdatePopup = (version: string): boolean => {
+    // Don't show if update is in progress
+    if (localStorage.getItem('update-in-progress') === 'true') {
+      console.log('[UpdateManager] Skipping popup - update in progress');
+      return false;
+    }
+
+    // Don't show if in cooldown period
+    if (updateCooldown) {
+      console.log('[UpdateManager] Skipping popup - in cooldown period');
+      return false;
+    }
+
     // Don't show if already showing
     if (showUpdatePrompt) {
+      console.log('[UpdateManager] Skipping popup - already showing');
+      return false;
+    }
+
+    // Don't show if this is the current version we already have
+    const currentVersion = localStorage.getItem('app-version');
+    if (currentVersion === version) {
+      console.log('[UpdateManager] Skipping popup - same as current version:', version);
       return false;
     }
 
@@ -324,6 +348,26 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         duration: 2000,
       });
       
+      // Mark this version as seen BEFORE doing anything else
+      if (updateInfo?.version) {
+        localStorage.setItem('app-version', updateInfo.version);
+        localStorage.setItem('dismissed-update-version', updateInfo.version);
+        localStorage.setItem('dismissed-update-time', Date.now().toString());
+        localStorage.setItem('last-update-check', Date.now().toString());
+        cacheManager.markAsUpdated(updateInfo.version);
+        console.log('[UpdateManager] Marked version as updated:', updateInfo.version);
+      }
+      
+      // Hide the popup immediately to prevent spam
+      setShowUpdatePrompt(false);
+      setUpdateInfo(null);
+      
+      // Set cooldown to prevent immediate re-showing
+      setUpdateCooldown(true);
+      setTimeout(() => {
+        setUpdateCooldown(false);
+      }, 10000); // 10 second cooldown
+      
       // Use the cache manager for comprehensive cache clearing
       const cacheCleared = await cacheManager.clearAllCaches();
       
@@ -336,15 +380,13 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
       
-      // Mark app as updated
-      if (updateInfo?.version) {
-        cacheManager.markAsUpdated(updateInfo.version);
-      }
-      
       // Show success message
       toast.success('Update successful! Refreshing app...', {
         duration: 2000,
       });
+      
+      // Disable all further update checks
+      localStorage.setItem('update-in-progress', 'true');
       
       // Use cache manager's force refresh method
       setTimeout(() => {
