@@ -10,14 +10,16 @@ const UpdateTrigger = () => {
       const lastCheck = localStorage.getItem('last-update-check');
       const timeSinceLastCheck = lastCheck ? Date.now() - parseInt(lastCheck) : Infinity;
       
-      // If more than 5 minutes since last check, trigger new check
-      if (timeSinceLastCheck > 5 * 60 * 1000) {
-        localStorage.removeItem('last-update-check');
+      // If more than 2 hours since last check, trigger new check
+      if (timeSinceLastCheck > 2 * 60 * 60 * 1000) {
+        console.log('[UpdateTrigger] Triggering update check - been', Math.round(timeSinceLastCheck / 60000), 'minutes since last check');
         
         // Dispatch custom event that AppUpdateManager can listen for
         window.dispatchEvent(new CustomEvent('force-update-check', {
           detail: { reason: 'app-load', timestamp: Date.now() }
         }));
+      } else {
+        console.log('[UpdateTrigger] Skipping update check - only been', Math.round(timeSinceLastCheck / 60000), 'minutes since last check');
       }
     };
 

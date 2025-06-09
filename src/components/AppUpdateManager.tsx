@@ -14,6 +14,7 @@ interface UpdateInfo {
   available: boolean;
   version: string;
   message: string;
+  releaseNotes?: string[];
   forced?: boolean;
 }
 
@@ -25,6 +26,7 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
   const [isPWA, setIsPWA] = useState(false);
   const [serviceWorkerRegistration, setServiceWorkerRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [lastShownVersion, setLastShownVersion] = useState<string>('');
 
   useEffect(() => {
     initializeUpdateManager();
@@ -53,8 +55,8 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
     // Check for updates on app focus
     window.addEventListener('focus', checkForUpdates);
     
-    // Check for updates periodically (every 5 minutes)
-    const updateCheckInterval = setInterval(checkForUpdates, 5 * 60 * 1000);
+    // Check for updates periodically (every 2 hours)
+    const updateCheckInterval = setInterval(checkForUpdates, 2 * 60 * 60 * 1000);
 
     return () => {
       window.removeEventListener('focus', checkForUpdates);
@@ -86,13 +88,15 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
+            newWorker.addEventListener('statechange', async () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New service worker installed, show update prompt
+                const versionInfo = await fetchVersionInfo();
                 setUpdateInfo({
                   available: true,
-                  version: 'Latest',
-                  message: 'A new version is available with bug fixes and improvements!'
+                  version: versionInfo?.version || 'Latest',
+                  message: 'A new version is available with bug fixes and improvements!',
+                  releaseNotes: versionInfo?.releaseNotes || ['Bug fixes and performance improvements']
                 });
                 setShowUpdatePrompt(true);
               }
@@ -116,7 +120,8 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         setUpdateInfo({
           available: true,
           version: data.version,
-          message: data.message || 'App has been updated!'
+          message: data.message || 'App has been updated!',
+          releaseNotes: data.releaseNotes || ['App has been updated with latest improvements']
         });
         setShowUpdatePrompt(true);
         break;
@@ -175,6 +180,56 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
     }
   };
 
+  const fetchVersionInfo = async () => {
+    try {
+      // Fetch version info from server with cache busting
+      const response = await fetch(`/version.json?t=${Date.now()}`);
+      if (response.ok) {
+        const versionData = await response.json();
+        return versionData;
+      }
+    } catch (error) {
+      console.error('[UpdateManager] Error fetching version info:', error);
+    }
+    return null;
+  };
+
+  const shouldShowUpdatePopup = (version: string): boolean => {
+    // Don't show if already showing
+    if (showUpdatePrompt) {
+      return false;
+    }
+
+    // Don't show if we already showed this version
+    const dismissedVersion = localStorage.getItem('dismissed-update-version');
+    const dismissedTime = localStorage.getItem('dismissed-update-time');
+    
+    if (dismissedVersion === version && dismissedTime) {
+      const timeSinceDismissal = Date.now() - parseInt(dismissedTime);
+      const oneHour = 60 * 60 * 1000;
+      
+      // Don't show same version again for 1 hour
+      if (timeSinceDismissal < oneHour) {
+        console.log('[UpdateManager] Skipping popup - same version dismissed recently');
+        return false;
+      }
+    }
+
+    // Don't show if we just showed any update popup recently
+    const lastPopupTime = localStorage.getItem('last-popup-time');
+    if (lastPopupTime) {
+      const timeSinceLastPopup = Date.now() - parseInt(lastPopupTime);
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      if (timeSinceLastPopup < fiveMinutes) {
+        console.log('[UpdateManager] Skipping popup - too soon since last popup');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const checkServerVersion = async () => {
     try {
       // Check multiple sources for version detection
@@ -183,49 +238,67 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
       const appVersion = localStorage.getItem('app-version');
       const lastUpdateCheck = localStorage.getItem('last-update-check');
       
+      // Fetch latest version info
+      const versionInfo = await fetchVersionInfo();
+      
       console.log('[UpdateManager] Version check:', {
         buildTime,
         currentBuildTime,
         appVersion,
-        lastUpdateCheck
+        lastUpdateCheck,
+        serverVersion: versionInfo?.version
       });
+
+      const updateVersion = versionInfo?.version || 'Latest';
 
       // If build time changed or no previous version stored
       if (buildTime && buildTime !== 'BUILD_TIME_PLACEHOLDER' && buildTime !== currentBuildTime) {
         console.log('[UpdateManager] Build time changed, triggering update');
-        setUpdateInfo({
-          available: true,
-          version: 'Latest',
-          message: 'A new version is available! Please refresh to get the latest updates.'
-        });
-        setShowUpdatePrompt(true);
+        if (shouldShowUpdatePopup(updateVersion)) {
+          setUpdateInfo({
+            available: true,
+            version: updateVersion,
+            message: 'A new version is available! Please refresh to get the latest updates.',
+            releaseNotes: versionInfo?.releaseNotes || ['Bug fixes and performance improvements']
+          });
+          setShowUpdatePrompt(true);
+          localStorage.setItem('last-popup-time', Date.now().toString());
+        }
         return;
       }
 
-      // Force update check if no previous version or very old
-      if (!appVersion || !lastUpdateCheck) {
-        console.log('[UpdateManager] No version history, checking for updates');
-        setUpdateInfo({
-          available: true,
-          version: 'Latest',
-          message: 'Welcome! Please refresh to ensure you have the latest version.'
-        });
-        setShowUpdatePrompt(true);
+      // Only show welcome popup for first-time users
+      if (!appVersion && !lastUpdateCheck) {
+        console.log('[UpdateManager] First time user, showing welcome');
+        if (shouldShowUpdatePopup(updateVersion)) {
+          setUpdateInfo({
+            available: true,
+            version: updateVersion,
+            message: 'Welcome! Please refresh to ensure you have the latest version.',
+            releaseNotes: versionInfo?.releaseNotes || ['Welcome to the latest version!']
+          });
+          setShowUpdatePrompt(true);
+          localStorage.setItem('last-popup-time', Date.now().toString());
+        }
         return;
       }
 
-      // Check if it's been more than 30 minutes since last update check
+      // Only show periodic checks if version actually changed
       const timeSinceLastCheck = Date.now() - parseInt(lastUpdateCheck || '0');
-      const thirtyMinutes = 30 * 60 * 1000;
+      const twoHours = 2 * 60 * 60 * 1000; // Increased to 2 hours to reduce spam
       
-      if (timeSinceLastCheck > thirtyMinutes) {
-        console.log('[UpdateManager] Periodic update check triggered');
-        setUpdateInfo({
-          available: true,
-          version: 'Latest',
-          message: 'Checking for updates... Please refresh to ensure you have the latest version.'
-        });
-        setShowUpdatePrompt(true);
+      if (timeSinceLastCheck > twoHours && versionInfo && appVersion !== versionInfo.version) {
+        console.log('[UpdateManager] Version changed, showing update');
+        if (shouldShowUpdatePopup(updateVersion)) {
+          setUpdateInfo({
+            available: true,
+            version: updateVersion,
+            message: 'A new version is available with the latest features!',
+            releaseNotes: versionInfo?.releaseNotes || ['Latest features and improvements']
+          });
+          setShowUpdatePrompt(true);
+          localStorage.setItem('last-popup-time', Date.now().toString());
+        }
         return;
       }
       
@@ -287,6 +360,13 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
 
   const dismissUpdate = () => {
     setShowUpdatePrompt(false);
+    
+    // Track dismissed version to prevent showing again
+    if (updateInfo?.version) {
+      localStorage.setItem('dismissed-update-version', updateInfo.version);
+      localStorage.setItem('dismissed-update-time', Date.now().toString());
+    }
+    
     setUpdateInfo(null);
   };
 
@@ -324,9 +404,17 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
                 What's included:
               </div>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>• Bug fixes and performance improvements</li>
-                <li>• Enhanced security features</li>
-                <li>• Fresh app cache for better performance</li>
+                {updateInfo.releaseNotes && updateInfo.releaseNotes.length > 0 ? (
+                  updateInfo.releaseNotes.map((note, index) => (
+                    <li key={index}>• {note}</li>
+                  ))
+                ) : (
+                  <>
+                    <li>• Bug fixes and performance improvements</li>
+                    <li>• Enhanced security features</li>
+                    <li>• Fresh app cache for better performance</li>
+                  </>
+                )}
                 {isPWA && <li>• Updated offline capabilities</li>}
               </ul>
             </div>
