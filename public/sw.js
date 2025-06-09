@@ -1,68 +1,194 @@
-const CACHE_NAME = 'noorhub-v1';
+// App version and cache configuration
+const APP_VERSION = '1.0.1'; // Update this version when deploying new changes
+const CACHE_NAME = `noorhub-v${APP_VERSION}`;
+const CACHE_VERSION_KEY = 'noorhub-cache-version';
+
+// Static assets to cache
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
   '/NQ-ICON.png',
-  '/manifest.json'
+  '/manifest.json',
+  '/notification-sound.mp3'
 ];
 
-// Install service worker
+// Dynamic cache patterns
+const cachePatterns = [
+  /\.(?:js|css|html|png|jpg|jpeg|svg|gif|ico|woff|woff2)$/,
+  /^https:\/\/fonts\.googleapis\.com/,
+  /^https:\/\/fonts\.gstatic\.com/
+];
+
+// Install service worker and clear old caches
 self.addEventListener('install', event => {
+  console.log(`[SW] Installing version ${APP_VERSION}`);
+  
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
+    Promise.all([
+      // Cache new assets
+      caches.open(CACHE_NAME).then(cache => {
+        console.log('[SW] Caching app assets');
         return cache.addAll(urlsToCache);
-      })
+      }),
+      // Store version info
+      self.clients.claim(),
+      self.skipWaiting() // Force activation of new SW
+    ])
   );
 });
 
-// Fetch event - serve from cache when offline
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then(
-          response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        );
-      })
-  );
-});
-
-// Activate service worker
+// Activate service worker and clean up old caches
 self.addEventListener('activate', event => {
+  console.log(`[SW] Activating version ${APP_VERSION}`);
+  
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
+    Promise.all([
+      // Clear all old caches
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheName !== CACHE_NAME) {
+              console.log(`[SW] Deleting old cache: ${cacheName}`);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
+      // Clear all stored data for fresh start
+      clearStorageData(),
+      // Take control of all clients
+      self.clients.claim(),
+      // Notify clients about update
+      notifyClientsOfUpdate()
+    ])
+  );
+});
+
+// Clear storage data for fresh app state
+async function clearStorageData() {
+  try {
+    // Clear all localStorage data related to the app (except user preferences)
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'CLEAR_STORAGE',
+        version: APP_VERSION,
+        preserveKeys: ['theme', 'language', 'chatSoundEnabled'] // Keep user preferences
+      });
+    });
+    
+    console.log('[SW] Storage data clearing initiated');
+  } catch (error) {
+    console.error('[SW] Error clearing storage:', error);
+  }
+}
+
+// Notify all clients about the update
+async function notifyClientsOfUpdate() {
+  try {
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'APP_UPDATED',
+        version: APP_VERSION,
+        message: 'App has been updated! Refresh to get the latest version.'
+      });
+    });
+    
+    console.log('[SW] Update notification sent to all clients');
+  } catch (error) {
+    console.error('[SW] Error notifying clients:', error);
+  }
+}
+
+// Enhanced fetch strategy with cache management
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = new URL(request.url);
+  
+  // Skip cross-origin requests and chrome-extension requests
+  if (url.origin !== self.location.origin || url.protocol === 'chrome-extension:') {
+    return;
+  }
+  
+  // Handle API requests differently (always fetch fresh)
+  if (url.pathname.includes('/api/') || url.search.includes('supabase')) {
+    event.respondWith(
+      fetch(request).catch(() => {
+        // Return offline response for API calls
+        return new Response(JSON.stringify({ 
+          error: 'Offline', 
+          message: 'You are currently offline' 
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
+    );
+    return;
+  }
+  
+  // Handle app assets with cache-first strategy
+  event.respondWith(
+    caches.match(request).then(cachedResponse => {
+      // Return cached version if available
+      if (cachedResponse) {
+        // Fetch fresh version in background for next time
+        fetch(request).then(response => {
+          if (response.ok && shouldCache(request)) {
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, response.clone());
+            });
           }
-        })
-      );
+        }).catch(() => {});
+        
+        return cachedResponse;
+      }
+      
+      // Fetch from network
+      return fetch(request).then(response => {
+        // Cache successful responses
+        if (response.ok && shouldCache(request)) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseToCache);
+          });
+        }
+        
+        return response;
+      }).catch(() => {
+        // Return offline page for navigation requests
+        if (request.mode === 'navigate') {
+          return caches.match('/') || new Response('Offline');
+        }
+        throw new Error('Network unavailable');
+      });
     })
   );
+});
+
+// Determine if request should be cached
+function shouldCache(request) {
+  const url = new URL(request.url);
+  
+  // Cache static assets
+  return cachePatterns.some(pattern => pattern.test(url.pathname)) ||
+         url.pathname === '/' ||
+         request.destination === 'document';
+}
+
+// Handle version check requests from the app
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'CHECK_VERSION') {
+    event.ports[0].postMessage({
+      version: APP_VERSION,
+      cacheCleared: true
+    });
+  }
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Background sync for offline functionality
@@ -73,7 +199,7 @@ self.addEventListener('sync', event => {
 });
 
 function doBackgroundSync() {
-  // Handle background sync when connection is restored
+  console.log('[SW] Background sync triggered');
   return Promise.resolve();
 }
 
@@ -171,4 +297,6 @@ self.addEventListener('notificationclick', event => {
       return clients.openWindow(targetUrl);
     })
   );
-}); 
+});
+
+console.log(`[SW] Service Worker loaded - Version ${APP_VERSION}`); 

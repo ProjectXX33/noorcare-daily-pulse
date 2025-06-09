@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node build-version.js",
     "build": "vite build",
+    "postbuild": "node build-version.js --post-build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "version:update": "node build-version.js",
     "deploy": "npm run build && node deploy-to-plesk.js",
     "deploy:staging": "npm run build && node deploy-to-plesk.js --env=staging",
     "quick-deploy": "node deploy-to-plesk.js",

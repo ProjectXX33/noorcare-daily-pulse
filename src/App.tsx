@@ -40,6 +40,7 @@ import LoyalCustomersPage from "./pages/LoyalCustomersPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
+import AppUpdateManager from "./components/AppUpdateManager";
 import { useLocation } from 'react-router-dom';
 
 
@@ -372,6 +373,7 @@ const AppWithAuth = () => {
 
                   <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
                 </Routes>
+                <AppUpdateManager />
                 <PWAInstallPrompt />
                 <Toaster />
                 <Sonner />
