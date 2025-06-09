@@ -409,11 +409,7 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
                     <li key={index}>• {note}</li>
                   ))
                 ) : (
-                  <>
-                    <li>• Bug fixes and performance improvements</li>
-                    <li>• Enhanced security features</li>
-                    <li>• Fresh app cache for better performance</li>
-                  </>
+                  <li>• Loading release notes...</li>
                 )}
                 {isPWA && <li>• Updated offline capabilities</li>}
               </ul>

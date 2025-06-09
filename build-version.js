@@ -10,18 +10,31 @@ const __dirname = path.dirname(__filename);
 const buildTime = new Date().toISOString();
 const buildTimestamp = Date.now().toString();
 
-console.log('🔨 Starting build version update...');
+// Check if we should use manual versioning
+const useManualVersioning = process.env.MANUAL_VERSION === 'true' || fs.existsSync('./version-config.js');
+
+let versionConfig = {
+  version: `1.0.${buildTimestamp}`,
+  releaseNotes: [
+    "Bug fixes and performance improvements",
+    "Enhanced security features", 
+    "Fresh app cache for better performance",
+    "Updated offline capabilities"
+  ],
+  forceUpdate: false,
+  minimumSupportedVersion: "1.0.0"
+};
+
 console.log(`📅 Build time: ${buildTime}`);
 
 // Update service worker version
-const updateServiceWorkerVersion = () => {
+const updateServiceWorkerVersion = (version) => {
   const swPath = path.join(__dirname, 'public', 'sw.js');
   
   try {
     let swContent = fs.readFileSync(swPath, 'utf8');
     
-    // Update version with timestamp for uniqueness
-    const version = `1.0.${buildTimestamp}`;
+    // Update version
     swContent = swContent.replace(/const APP_VERSION = '[^']*'/, `const APP_VERSION = '${version}'`);
     
     fs.writeFileSync(swPath, swContent);
@@ -29,7 +42,7 @@ const updateServiceWorkerVersion = () => {
     return version;
   } catch (error) {
     console.error('❌ Error updating service worker:', error);
-    return '1.0.0';
+    return version;
   }
 };
 
@@ -99,22 +112,17 @@ const updateIndexHtml = () => {
 };
 
 // Create version info file
-const createVersionInfo = (version) => {
+const createVersionInfo = (config) => {
   const versionInfo = {
-    version,
+    version: config.version,
     buildTime,
     buildTimestamp,
     buildDate: new Date().toLocaleDateString(),
     gitCommit: process.env.GIT_COMMIT || 'unknown',
     environment: process.env.NODE_ENV || 'production',
-    releaseNotes: [
-      "Bug fixes and performance improvements",
-      "Enhanced security features", 
-      "Fresh app cache for better performance",
-      "Updated offline capabilities"
-    ],
-    minimumSupportedVersion: "1.0.0",
-    forceUpdate: false
+    releaseNotes: config.releaseNotes,
+    minimumSupportedVersion: config.minimumSupportedVersion,
+    forceUpdate: config.forceUpdate
   };
 
   const versionPath = path.join(__dirname, 'public', 'version.json');
@@ -128,9 +136,12 @@ const createVersionInfo = (version) => {
 };
 
 // Main execution
-const main = () => {
+const main = async () => {
   const args = process.argv.slice(2);
   const isPostBuild = args.includes('--post-build');
+  
+  // Set up version config
+  await setupVersionConfig();
   
   if (isPostBuild) {
     // Post-build tasks
@@ -139,13 +150,38 @@ const main = () => {
   } else {
     // Pre-build tasks
     console.log('🚀 Running pre-build version update...');
-    const version = updateServiceWorkerVersion();
-    updatePackageVersion(version);
-    updateManifest(version);
-    createVersionInfo(version);
+    updateServiceWorkerVersion(versionConfig.version);
+    updatePackageVersion(versionConfig.version);
+    updateManifest(versionConfig.version);
+    createVersionInfo(versionConfig);
   }
   
   console.log('✨ Version update complete!');
+};
+
+// Setup version configuration
+const setupVersionConfig = async () => {
+  if (useManualVersioning && fs.existsSync('./version-config.js')) {
+    try {
+      // Load manual version config
+      const { createRequire } = await import('module');
+      const require = createRequire(import.meta.url);
+      const { VERSION_CONFIG, getVersionString } = require('./version-config.js');
+      
+      versionConfig.version = getVersionString();
+      versionConfig.releaseNotes = VERSION_CONFIG.releaseNotes;
+      versionConfig.forceUpdate = VERSION_CONFIG.forceUpdate;
+      versionConfig.minimumSupportedVersion = VERSION_CONFIG.minimumSupportedVersion;
+      
+      console.log('🔨 Using MANUAL versioning...');
+      console.log(`📋 Version: ${versionConfig.version}`);
+    } catch (error) {
+      console.log('⚠️ Error loading manual version config, using automatic versioning');
+      console.log('🔨 Using AUTOMATIC versioning...');
+    }
+  } else {
+    console.log('🔨 Using AUTOMATIC versioning...');
+  }
 };
 
 // Run the script

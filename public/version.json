@@ -1,13 +1,13 @@
 {
-  "version": "1.0.1749491576855",
-  "buildTime": "2025-06-09T17:52:56.855Z",
-  "buildTimestamp": "1749491576855",
+  "version": "2.0.0",
+  "buildTime": "2025-06-09T18:24:11.577Z",
+  "buildTimestamp": "1749493451578",
   "buildDate": "6/9/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Bug fixes and performance improvements",
-    "Nice"
+    "Version display added to header for debugging",
+    "Fixed update notification spam"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
