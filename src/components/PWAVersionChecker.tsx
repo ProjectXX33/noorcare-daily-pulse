@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cacheManager } from '@/utils/cacheManager';
+import { pwaUpdateHelper } from '@/utils/pwaUpdateHelper';
 
 interface VersionInfo {
   version: string;
@@ -200,26 +201,30 @@ const PWAVersionChecker: React.FC<PWAVersionCheckerProps> = ({
     setIsUpdating(true);
     
     try {
-      // Clear all caches and storage
-      await cacheManager.clearAllCaches();
-      
-      // Update stored version
-      if (latestVersion) {
-        cacheManager.markAsUpdated(latestVersion.version);
-      }
+      if (!latestVersion) return;
       
       // Show progress
-      toast.info('Updating app to latest version...', {
+      toast.info('Updating PWA to latest version...', {
         duration: 3000,
       });
       
-      // Force refresh with cache bypass
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // Use PWA update helper for comprehensive update
+      await pwaUpdateHelper.forcePWAUpdate(latestVersion.version);
+      
+      // Update cache manager tracking
+      cacheManager.markAsUpdated(latestVersion.version);
+      
+      // Show completion message
+      toast.success('PWA update completed!', {
+        description: 'Close and reopen the app to see the new version.',
+        duration: 5000,
+      });
+      
+      // Hide the update prompt
+      setShowUpdatePrompt(false);
       
     } catch (error) {
-      console.error('[PWAVersionChecker] Error during update:', error);
+      console.error('[PWAVersionChecker] Error during PWA update:', error);
       toast.error('Update failed. Please try again.');
       setIsUpdating(false);
     }

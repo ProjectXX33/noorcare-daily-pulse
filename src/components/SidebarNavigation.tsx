@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import WorkShiftTimer from '@/components/WorkShiftTimer';
+import VersionDisplay from '@/components/VersionDisplay';
 
 interface SidebarNavigationProps {
   children?: React.ReactNode;
@@ -393,8 +394,9 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
           } md:translate-x-0 z-40`}
           side={language === 'ar' ? 'right' : 'left'}
         >
-          <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
+          <SidebarHeader className="flex h-16 items-center justify-between border-b px-4 md:px-6">
             <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
+            <VersionDisplay />
           </SidebarHeader>
           <SidebarContent 
             ref={sidebarContentRef}
@@ -485,6 +487,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
               <WorkShiftTimer />
             </div>
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
+              <VersionDisplay />
               <NotificationsMenu />
               
               {/* Report Bug Button */}

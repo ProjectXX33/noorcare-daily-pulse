@@ -1,8 +1,8 @@
 {
-  "name": "NoorHub",
-  "short_name": "NoorHub",
-  "description": "Team management and communication platform for NoorHub - v1.0.1749490871392",
-  "start_url": "/",
+  "name": "NoorHub v1.0.1749491576855",
+  "short_name": "NoorHub v1.0",
+  "description": "Team management and communication platform for NoorHub - v1.0.1749491576855",
+  "start_url": "/?v=1.0.1749491576855",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#15803d",
@@ -94,9 +94,9 @@
   "prefer_related_applications": false,
   "related_applications": [],
   "scope": "/",
-  "id": "/",
+  "id": "/?v=1.0.1749491576855",
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "1.0.1749490871392"
+  "version": "1.0.1749491576855"
 }
