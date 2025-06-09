@@ -394,9 +394,11 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
           } md:translate-x-0 z-40`}
           side={language === 'ar' ? 'right' : 'left'}
         >
-          <SidebarHeader className="flex h-16 items-center justify-between border-b px-4 md:px-6">
-            <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
-            <VersionDisplay />
+          <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
+            <div className="flex items-center gap-3">
+              <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
+              <VersionDisplay variant="sidebar" />
+            </div>
           </SidebarHeader>
           <SidebarContent 
             ref={sidebarContentRef}
@@ -455,11 +457,12 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
             </SidebarContent>
           
           <SidebarFooter>
-            <div className="flex flex-col gap-2 p-2">
-{user?.role === 'admin' && (
+            <div className="flex flex-col gap-2 p-2 md:p-3">
+              {user?.role === 'admin' && (
                 <Button 
                   variant="ghost" 
-                  className={`justify-start w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                  size="sm"
+                  className={`justify-start w-full text-sm ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                   onClick={() => handleNavigation('/settings')}
                 >
                   <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
@@ -468,7 +471,8 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
               )}
               <Button 
                 variant="ghost" 
-                className={`justify-start w-full text-red-500 hover:bg-red-50 hover:text-red-600 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                size="sm"
+                className={`justify-start w-full text-red-500 hover:bg-red-50 hover:text-red-600 text-sm ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                 onClick={handleLogout}
               >
                 <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
@@ -487,7 +491,6 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
               <WorkShiftTimer />
             </div>
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
-              <VersionDisplay />
               <NotificationsMenu />
               
               {/* Report Bug Button */}

@@ -43,7 +43,7 @@ import NotificationBanner from "./components/NotificationBanner";
 import AppUpdateManager from "./components/AppUpdateManager";
 import UpdateTrigger from "./components/UpdateTrigger";
 import PWAVersionChecker from "./components/PWAVersionChecker";
-import PWATestPanel from "./components/PWATestPanel";
+
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
 
@@ -381,7 +381,7 @@ const AppWithAuth = () => {
                 <UpdateTrigger />
                 <PWAVersionChecker />
                 <PWAUpdateInstructions />
-                <PWATestPanel />
+
                 <PWAInstallPrompt />
                 <Toaster />
                 <Sonner />
