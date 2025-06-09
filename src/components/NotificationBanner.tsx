@@ -65,7 +65,7 @@ const NotificationBanner: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 animate-in slide-in-from-top duration-500">
+    <div className="fixed top-14 left-0 right-0 z-40 animate-in slide-in-from-top duration-500">
       <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white shadow-2xl border-b border-emerald-400/20">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
