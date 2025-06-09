@@ -38,7 +38,6 @@ import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
-import "./App.css";
 
 
 
