@@ -25,7 +25,8 @@ import {
   BarChart3,
   ShoppingCart,
   Wrench,
-  Crown
+  Crown,
+  TrendingUp
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -218,6 +219,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true, color: 'green' },
         { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true, color: 'yellow' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true, color: 'teal' },
+        { name: 'Performance', path: '/performance-dashboard', icon: TrendingUp, adminOnly: true, color: 'purple' },
       ] as NavItem[]
     },
     {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { User, Shift } from '@/types';
@@ -24,7 +24,7 @@ import {
   Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
-import EditablePerformanceDashboard from '@/components/EditablePerformanceDashboard';
+
 import {
   Sheet,
   SheetContent,
@@ -61,9 +61,8 @@ const AdminShiftManagement = () => {
 
   const translations = {
     en: {
-      shiftManagement: "Shift Management & Performance",
+      shiftManagement: "Shift Management",
       assignShifts: "Assign Shifts",
-      performance: "Performance Dashboard",
       weekOf: "Week of",
       employee: "Employee",
       allEmployees: "All Employees",
@@ -82,7 +81,7 @@ const AdminShiftManagement = () => {
       mostDelays: "⏰ Most Delays",
       mostOvertime: "💪 Most Overtime",
       customerServiceDesigners: "(Customer Service & Designers)",
-      assignShiftsTrackPerformance: "Assign shifts, track performance, and manage days off",
+      assignShiftsTrackPerformance: "Assign shifts and manage employee work schedules",
       weeklyShiftAssignments: "Weekly Shift Assignments",
       previousWeek: "Previous",
       nextWeek: "Next",
@@ -390,20 +389,8 @@ const AdminShiftManagement = () => {
       </div>
 
       <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
-        {/* Mobile-optimized tabs */}
-        <Tabs defaultValue="assignments" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-auto p-1">
-            <TabsTrigger value="assignments" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              {t.assignShifts}
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="text-xs sm:text-sm py-2 px-3 min-h-[44px] sm:min-h-auto">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              {t.performance}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="assignments" className="space-y-4 mt-4 md:mt-6">
+        {/* Shift assignments content */}
+        <div className="space-y-4 mt-4 md:mt-6">
             {/* Mobile employee filter */}
             <div className="block sm:hidden">
               <Card>
@@ -667,14 +654,9 @@ const AdminShiftManagement = () => {
                     </Table>
                   </div>
                 </div>
-              </CardContent>
+                            </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-4 mt-4 md:mt-6">
-            <EditablePerformanceDashboard />
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </div>
   );

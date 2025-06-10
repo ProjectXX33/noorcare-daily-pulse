@@ -4,6 +4,7 @@ import { User } from '../types';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { fetchUserProfile } from './useUserProfile';
+import UserActivityTracker from '@/utils/userActivityTracker';
 
 export const useSessionManager = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -62,6 +63,10 @@ export const useSessionManager = () => {
         console.log('User profile set from session:', appUser);
         setUser(appUser);
         setIsAuthenticated(true);
+        
+        // Initialize activity tracking
+        const activityTracker = UserActivityTracker.getInstance();
+        await activityTracker.initialize(appUser.id);
       } else {
         console.warn('Session exists but no user profile found');
         // If we have a valid auth session but no user profile, sign out
@@ -124,6 +129,10 @@ export const useSessionManager = () => {
       setUser(appUser);
       setIsAuthenticated(true);
       toast.success(`Welcome back, ${appUser.name}!`);
+      
+      // Initialize activity tracking
+      const activityTracker = UserActivityTracker.getInstance();
+      await activityTracker.initialize(appUser.id);
       
       // Don't navigate here - this navigation will be handled by the onAuthStateChange listener
       // We want to avoid multiple navigation attempts

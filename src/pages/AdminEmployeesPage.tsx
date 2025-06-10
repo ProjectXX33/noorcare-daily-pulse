@@ -30,13 +30,16 @@ import { User, Department, Position } from '@/types';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
 import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus, Star, Plus } from 'lucide-react';
+import { UserPlus, Star, Plus, Circle, CheckCircle } from 'lucide-react';
 import RateEmployeeModal from '@/components/RateEmployeeModal';
 import StarRating from '@/components/StarRating';
+import { Badge } from "@/components/ui/badge";
+import UserActivityTracker from '@/utils/userActivityTracker';
 
 const AdminEmployeesPage = () => {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<User[]>([]);
+  const [userActivity, setUserActivity] = useState<Map<string, { lastSeen: Date, activeToday: boolean }>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
@@ -156,32 +159,53 @@ const AdminEmployeesPage = () => {
     loadEmployees();
   }, []);
 
+  const loadUserActivity = async () => {
+    try {
+      const activity = await UserActivityTracker.getUsersActivity();
+      const activityMap = new Map();
+      
+      activity.forEach(userAct => {
+        activityMap.set(userAct.userId, {
+          lastSeen: userAct.lastSeen,
+          activeToday: userAct.lastSeenToday
+        });
+      });
+      
+      setUserActivity(activityMap);
+    } catch (error) {
+      console.error("Error loading user activity:", error);
+    }
+  };
+
   const loadEmployees = async () => {
     setIsLoading(true);
     try {
       const data = await fetchEmployees();
       const filteredEmployees = data.filter(u => u.id !== user?.id); // Exclude current user
       
-      // Load rating data for each employee
-      const employeesWithRatings = await Promise.all(
-        filteredEmployees.map(async (employee) => {
-          try {
-            const [averageRating, latestRating] = await Promise.all([
-              getEmployeeAverageRating(employee.id),
-              getLatestEmployeeRating(employee.id)
-            ]);
-            
-            return {
-              ...employee,
-              averageRating: averageRating > 0 ? averageRating : undefined,
-              latestRating: latestRating || undefined
-            };
-          } catch (error) {
-            console.error(`Error loading ratings for employee ${employee.id}:`, error);
-            return employee;
-          }
-        })
-      );
+      // Load rating data and activity for each employee
+      const [employeesWithRatings] = await Promise.all([
+        Promise.all(
+          filteredEmployees.map(async (employee) => {
+            try {
+              const [averageRating, latestRating] = await Promise.all([
+                getEmployeeAverageRating(employee.id),
+                getLatestEmployeeRating(employee.id)
+              ]);
+              
+              return {
+                ...employee,
+                averageRating: averageRating > 0 ? averageRating : undefined,
+                latestRating: latestRating || undefined
+              };
+            } catch (error) {
+              console.error(`Error loading ratings for employee ${employee.id}:`, error);
+              return employee;
+            }
+          })
+        ),
+        loadUserActivity()
+      ]);
       
       setEmployees(employeesWithRatings);
     } catch (error) {
@@ -362,7 +386,9 @@ const AdminEmployeesPage = () => {
                       <TableHead className="hidden sm:table-cell min-w-[100px]">{t.username}</TableHead>
                       <TableHead className="hidden md:table-cell min-w-[120px]">{t.department}</TableHead>
                       <TableHead className="hidden md:table-cell min-w-[120px]">{t.position}</TableHead>
-                      <TableHead className="hidden lg:table-cell min-w-[140px]">{t.rating}</TableHead>
+                      <TableHead className="hidden lg:table-cell min-w-[100px]">Active Today</TableHead>
+                      <TableHead className="hidden lg:table-cell min-w-[140px]">Last Seen</TableHead>
+                      <TableHead className="hidden xl:table-cell min-w-[140px]">{t.rating}</TableHead>
                       <TableHead className="hidden sm:table-cell min-w-[140px]">{t.lastCheckIn}</TableHead>
                       <TableHead className="text-right min-w-[80px]">{t.actions}</TableHead>
                     </TableRow>
@@ -370,7 +396,7 @@ const AdminEmployeesPage = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
+                        <TableCell colSpan={9} className="text-center py-8">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                           </div>
@@ -378,7 +404,7 @@ const AdminEmployeesPage = () => {
                       </TableRow>
                     ) : employees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">No employees found</TableCell>
+                        <TableCell colSpan={9} className="text-center py-8">No employees found</TableCell>
                       </TableRow>
                     ) : (
                       employees.map(employee => (
@@ -401,6 +427,38 @@ const AdminEmployeesPage = () => {
                             </span>
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const activity = userActivity.get(employee.id);
+                              const activeToday = activity?.activeToday || false;
+                              return (
+                                <div className="flex items-center gap-2">
+                                  {activeToday ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <Circle className="h-4 w-4 text-gray-400" />
+                                  )}
+                                  <Badge variant={activeToday ? "default" : "secondary"} className="text-xs">
+                                    {activeToday ? "Yes" : "No"}
+                                  </Badge>
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {(() => {
+                              const activity = userActivity.get(employee.id);
+                              const lastSeen = activity?.lastSeen;
+                              if (!lastSeen || lastSeen.getTime() === 0) {
+                                return <span className="text-xs text-muted-foreground">Never</span>;
+                              }
+                              return (
+                                <span className="text-xs text-muted-foreground">
+                                  {UserActivityTracker.formatLastSeen(lastSeen)}
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell">
                             {employee.averageRating && employee.averageRating > 0 ? (
                               <div className="flex items-center gap-2">
                                 <StarRating 

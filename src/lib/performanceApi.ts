@@ -409,7 +409,9 @@ export async function recordCheckOutPerformance(
       workDurationScore: workDurationScore,
       totalWorkHours: regularHours + overtimeHours,
       // ALSO include delay data from check-in for complete record
-      checkInDelay: delayMinutes
+      checkInDelay: delayMinutes,
+      // Add work date to ensure proper tracking
+      workDate: workDate.toISOString().split('T')[0]
     });
 
     console.log('✅ Complete check-out performance recorded successfully');
@@ -453,6 +455,7 @@ export async function updateDashboardPerformance(
     finalPerformanceScore?: number;
     workDurationScore?: number;
     totalWorkHours?: number;
+    workDate?: string; // Add work date to track unique days
   }
 ): Promise<void> {
   try {
@@ -500,31 +503,37 @@ export async function updateDashboardPerformance(
       punctuality_percentage: existingRecord?.punctuality_percentage || 100,
     };
 
-    // Update with new data - NEW LOGIC: Working days incremented only at checkout
+    // IMPROVED LOGIC: Count unique working days by tracking actual work dates
     if (updates.finalPerformanceScore !== undefined) {
       // This is a checkout update with complete performance data
+      const workDate = updates.workDate || new Date().toISOString().split('T')[0];
+      
       if (!existingRecord) {
         // First checkout - create new record
         recordData.total_working_days = 1;
-        console.log('🆕 Checkout: Creating new performance record - working days set to 1');
+        recordData.worked_dates = [workDate]; // Track the specific dates worked
+        console.log('🆕 Checkout: Creating new performance record - working days set to 1 for date:', workDate);
       } else {
-        // Existing record - check if this is a new working day
-        const today = new Date().toISOString().split('T')[0];
-        const lastUpdate = existingRecord.updated_at ? new Date(existingRecord.updated_at).toISOString().split('T')[0] : null;
+        // Existing record - check if this is a new working date
+        const workedDates = existingRecord.worked_dates || [];
         
-        if (lastUpdate !== today) {
-          // Different day - increment working days
+        if (!workedDates.includes(workDate)) {
+          // New working date - increment
           recordData.total_working_days = existingRecord.total_working_days + 1;
-          console.log('📈 Checkout: New working day - incrementing to:', recordData.total_working_days);
+          recordData.worked_dates = [...workedDates, workDate];
+          console.log('📈 Checkout: New working date detected - incrementing to:', recordData.total_working_days, 'for date:', workDate);
         } else {
-          // Same day update - don't increment
+          // Same date already worked - don't increment
           recordData.total_working_days = existingRecord.total_working_days;
-          console.log('🔄 Checkout: Same day update - keeping working days at:', recordData.total_working_days);
+          recordData.worked_dates = workedDates;
+          console.log('🔄 Checkout: Same date already worked - keeping working days at:', recordData.total_working_days);
         }
       }
     } else if (updates.workingDay && !existingRecord) {
       // Legacy check-in only logic (should rarely be used now)
+      const workDate = updates.workDate || new Date().toISOString().split('T')[0];
       recordData.total_working_days = 1;
+      recordData.worked_dates = [workDate];
       console.log('🆕 Legacy: Creating new record - working days set to 1');
     }
 

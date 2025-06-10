@@ -35,6 +35,7 @@ import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
+import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
 import LoyalCustomersPage from "./pages/LoyalCustomersPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
@@ -321,6 +322,16 @@ const AppWithAuth = () => {
                       <AdminRoute>
                         <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
                           <AdminShiftManagement />
+                        </SidebarNavigation>
+                      </AdminRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/performance-dashboard" 
+                    element={
+                      <AdminRoute>
+                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                          <AdminPerformancePage />
                         </SidebarNavigation>
                       </AdminRoute>
                     } 

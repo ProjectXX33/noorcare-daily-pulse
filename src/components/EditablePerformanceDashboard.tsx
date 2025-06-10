@@ -293,29 +293,134 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const calculatedPunctuality = calcPunctuality(delayMinutes);
   const calculatedStatus = calcStatus(calculatedScore, calculatedPunctuality);
 
-  const handleRecalculateOvertime = async () => {
-    if (!confirm('This will recalculate overtime hours for all existing records. Are you sure?')) {
+  const handleFixAll = async () => {
+    if (!confirm('This will recalculate and update all performance metrics for all existing records. This includes overtime hours, working days, performance scores, and punctuality. Are you sure?')) {
       return;
     }
 
     setIsRecalculating(true);
-    toast.info('🔄 Starting overtime recalculation...');
+    toast.info('🔄 Starting comprehensive fix for all performance data...');
 
     try {
-      const result = await recalculateOvertimeHours();
+      // Step 1: Recalculate overtime hours in monthly_shifts
+      toast.info('📊 Step 1: Fixing overtime calculations...');
+      const overtimeResult = await recalculateOvertimeHours();
       
-      if (result.success) {
-        toast.success(`✅ ${result.message}! Updated ${result.recordsUpdated} records.`);
+      // Step 2: Recalculate performance dashboard metrics
+      toast.info('📈 Step 2: Updating performance metrics...');
+      const performanceResult = await recalculatePerformanceMetrics();
+      
+      let totalUpdated = 0;
+      const messages = [];
+      
+      if (overtimeResult.success) {
+        totalUpdated += overtimeResult.recordsUpdated;
+        messages.push(`${overtimeResult.recordsUpdated} overtime records`);
+      }
+      
+      if (performanceResult.success) {
+        totalUpdated += performanceResult.recordsUpdated;
+        messages.push(`${performanceResult.recordsUpdated} performance records`);
+      }
+      
+      if (totalUpdated > 0) {
+        toast.success(`✅ Successfully fixed ${totalUpdated} records! Updated: ${messages.join(', ')}`);
         // Reload the performance data to show updated values
-        loadData();
+        await loadData();
       } else {
-        toast.error(`❌ Recalculation failed: ${result.error}`);
+        toast.success('✅ All records are already up to date!');
       }
     } catch (error) {
-      console.error('Error recalculating overtime:', error);
+      console.error('Error during Fix All operation:', error);
       toast.error(`❌ Error: ${error.message}`);
     } finally {
       setIsRecalculating(false);
+    }
+  };
+
+  // New function to recalculate performance metrics
+  const recalculatePerformanceMetrics = async () => {
+    try {
+      // Get all performance records for recalculation
+      const { data: performanceRecords, error: fetchError } = await supabase
+        .from('admin_performance_dashboard')
+        .select('*');
+
+      if (fetchError) throw fetchError;
+
+      let recordsUpdated = 0;
+      const updates = [];
+
+      for (const record of performanceRecords) {
+        // Recalculate metrics
+        const delayMinutes = record.total_delay_minutes || 0;
+        const workingDays = record.total_working_days || 1;
+        
+        // Recalculate performance score
+        const newPerformanceScore = delayMinutes <= 0 ? 100.0 : 
+          delayMinutes >= 500 ? 0.0 : 
+          Math.max(0, 100.0 - (delayMinutes / 5.0));
+        
+        // Recalculate punctuality percentage
+        let newPunctuality = 100.0;
+        if (record.total_delay_hours >= 1) {
+          newPunctuality = 0.0;
+        } else if (delayMinutes > 30) {
+          newPunctuality = Math.max(0, 50 - (delayMinutes * 2));
+        } else if (delayMinutes > 0) {
+          newPunctuality = Math.max(0, 90 - (delayMinutes * 3));
+        }
+        
+        // Recalculate status
+        let newStatus = 'Good';
+        if (newPerformanceScore >= 95 && newPunctuality >= 95) {
+          newStatus = 'Excellent';
+        } else if (newPerformanceScore >= 85 && newPunctuality >= 80) {
+          newStatus = 'Good';
+        } else if (newPerformanceScore >= 70 && newPunctuality >= 60) {
+          newStatus = 'Needs Improvement';
+        } else {
+          newStatus = 'Poor';
+        }
+        
+        // Check if update is needed
+        const scoreChanged = Math.abs(newPerformanceScore - record.average_performance_score) > 0.1;
+        const punctualityChanged = Math.abs(newPunctuality - record.punctuality_percentage) > 0.1;
+        const statusChanged = newStatus !== record.performance_status;
+        
+        if (scoreChanged || punctualityChanged || statusChanged) {
+          updates.push({
+            id: record.id,
+            average_performance_score: Math.round(newPerformanceScore * 100) / 100,
+            punctuality_percentage: Math.round(newPunctuality * 100) / 100,
+            performance_status: newStatus,
+            updated_at: new Date().toISOString()
+          });
+          recordsUpdated++;
+        }
+      }
+
+      if (updates.length > 0) {
+        // Batch update records
+        const updatePromises = updates.map(update => 
+          supabase
+            .from('admin_performance_dashboard')
+            .update(update)
+            .eq('id', update.id)
+        );
+
+        const results = await Promise.all(updatePromises);
+        const errors = results.filter(result => result.error);
+        
+        if (errors.length > 0) {
+          throw new Error(`${errors.length} updates failed`);
+        }
+      }
+
+      return { success: true, recordsUpdated, message: `Updated ${recordsUpdated} performance records` };
+    } catch (error) {
+      console.error('Error recalculating performance metrics:', error);
+      return { success: false, error: error.message };
     }
   };
 
@@ -385,31 +490,38 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     variant="outline" 
                     size="sm"
                     disabled={isRecalculating}
-                    className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
-                    title="Recalculate overtime hours for all existing records using the corrected formula"
+                    className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
+                    title="Fix and recalculate all performance metrics including overtime hours, working days, and performance scores"
                   >
-                    {isRecalculating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : '🔧'} 
-                    <span className="ml-1 hidden sm:inline">{isRecalculating ? 'Recalculating...' : 'Fix Overtime'}</span>
+                    {isRecalculating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : '🛠️'} 
+                    <span className="ml-1 hidden sm:inline">{isRecalculating ? 'Fixing All...' : 'Fix All'}</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-[30vh]">
+                <SheetContent side="bottom" className="h-[35vh]">
                   <SheetHeader>
-                    <SheetTitle>Recalculate Overtime</SheetTitle>
+                    <SheetTitle>Fix All Performance Data</SheetTitle>
                   </SheetHeader>
                   <div className="py-4 space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      This will recalculate overtime hours for all existing records using the corrected formula.
+                      This will comprehensively fix and recalculate all performance metrics including:
                     </p>
+                    <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
+                      <li>Overtime hours using corrected formulas</li>
+                      <li>Performance scores based on delay minutes</li>
+                      <li>Punctuality percentages</li>
+                      <li>Working days calculations</li>
+                      <li>Performance status categories</li>
+                    </ul>
                     <Button 
-                      onClick={handleRecalculateOvertime}
+                      onClick={handleFixAll}
                       disabled={isRecalculating}
                       className="w-full min-h-[44px]"
                     >
                       {isRecalculating ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       ) : (
-                        '🔧'
-                      )} {isRecalculating ? 'Recalculating...' : 'Fix Overtime Calculations'}
+                        '🛠️'
+                      )} {isRecalculating ? 'Fixing All Data...' : 'Fix All Performance Data'}
                     </Button>
                   </div>
                 </SheetContent>

@@ -1,12 +1,13 @@
 {
-  "version": "1.4.3",
-  "buildTime": "2025-06-10T20:23:24.988Z",
-  "buildTimestamp": "1749587004988",
+  "version": "1.4.4",
+  "buildTime": "2025-06-10T20:50:50.734Z",
+  "buildTimestamp": "1749588650735",
   "buildDate": "6/10/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Logo"
+    "Moved Performance Dashboard to individual page under Employee Management",
+    "Changed 'Fix Overtime' to 'Fix All' with comprehensive data recalculation"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
