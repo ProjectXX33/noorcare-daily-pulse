@@ -89,29 +89,26 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         startDate = startOfMonth(now);
     }
 
-    // Filter data by date range and department, EXCLUDING ADMIN USERS
-    const filteredUsers = (selectedDepartment === 'all' 
-      ? users 
-      : users.filter(user => user.department === selectedDepartment)
-    ).filter(user => user.role !== 'admin'); // Exclude admin users from analytics
-
-    // Get admin user IDs to filter out their check-ins and reports
-    const adminUserIds = users.filter(user => user.role === 'admin').map(user => user.id);
+    // Filter data by date range and department - EXCLUDE ADMIN USERS
+    const nonAdminUsers = users.filter(user => user.role !== 'admin');
+    const filteredUsers = selectedDepartment === 'all' 
+      ? nonAdminUsers 
+      : nonAdminUsers.filter(user => user.department === selectedDepartment);
 
     const filteredCheckIns = checkIns.filter(checkIn => {
       const checkInDate = new Date(checkIn.timestamp);
       const userInDept = selectedDepartment === 'all' || 
         filteredUsers.some(user => user.id === checkIn.userId);
-      const isNotAdmin = !adminUserIds.includes(checkIn.userId); // Exclude admin check-ins
-      return checkInDate >= startDate && checkInDate <= endDate && userInDept && isNotAdmin;
+      const isNonAdminUser = filteredUsers.some(user => user.id === checkIn.userId);
+      return checkInDate >= startDate && checkInDate <= endDate && userInDept && isNonAdminUser;
     });
 
     const filteredReports = workReports.filter(report => {
       const reportDate = new Date(report.date);
       const userInDept = selectedDepartment === 'all' || 
         filteredUsers.some(user => user.id === report.userId);
-      const isNotAdmin = !adminUserIds.includes(report.userId); // Exclude admin reports
-      return reportDate >= startDate && reportDate <= endDate && userInDept && isNotAdmin;
+      const isNonAdminUser = filteredUsers.some(user => user.id === report.userId);
+      return reportDate >= startDate && reportDate <= endDate && userInDept && isNonAdminUser;
     });
 
     // Daily attendance data
@@ -127,8 +124,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       });
     }
 
-    // Department distribution (excluding admin users)
-    const nonAdminUsers = users.filter(user => user.role !== 'admin');
+    // Department distribution - EXCLUDE ADMIN USERS
     const departmentStats = nonAdminUsers.reduce((acc, user) => {
       acc[user.department] = (acc[user.department] || 0) + 1;
       return acc;
@@ -140,7 +136,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       percentage: ((count / nonAdminUsers.length) * 100).toFixed(1)
     }));
 
-    // Position distribution (excluding admin users)
+    // Position distribution - EXCLUDE ADMIN USERS
     const positionStats = nonAdminUsers.reduce((acc, user) => {
       acc[user.position] = (acc[user.position] || 0) + 1;
       return acc;
@@ -244,7 +240,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   };
 
   const getDepartments = () => {
-    const departments = [...new Set(users.map(user => user.department))];
+    const nonAdminUsers = users.filter(user => user.role !== 'admin');
+    const departments = [...new Set(nonAdminUsers.map(user => user.department))];
     return departments;
   };
 

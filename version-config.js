@@ -5,14 +5,18 @@ const VERSION_CONFIG = {
   // Change these values manually for each release
   major: 1,
   minor: 4,
-  patch: 2,
+  patch: 1,
   
   // Optional: add build suffix (leave empty for clean versions)
   buildSuffix: '', // e.g., 'beta', 'rc1', etc.
   
   // Release notes for this version
   releaseNotes: [
-    "Icon Changed",
+    "Version display added to header for debugging",
+    "Fixed update notification spam", 
+    "Enhanced version tracking system",
+    "Improved PWA update detection",
+    "Manual version control implemented",
     "Added floating chatbot component (coming soon)"
   ],
   

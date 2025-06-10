@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarCheck, FileText, Users } from 'lucide-react';
@@ -21,13 +20,16 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
   isAdmin = false 
 }) => {
   const [employeeCount, setEmployeeCount] = useState<number>(0);
+  const [nonAdminCheckIns, setNonAdminCheckIns] = useState<CheckIn[]>([]);
+  const [nonAdminReports, setNonAdminReports] = useState<WorkReport[]>([]);
 
   useEffect(() => {
     const fetchEmployeeCount = async () => {
       try {
         const { count, error } = await supabase
           .from('users')
-          .select('*', { count: 'exact', head: true });
+          .select('*', { count: 'exact', head: true })
+          .neq('role', 'admin'); // Exclude admin users from count
           
         if (error) {
           console.error('Error fetching employee count:', error);
@@ -40,21 +42,57 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       }
     };
 
+    const filterNonAdminData = async () => {
+      try {
+        // Get all non-admin user IDs
+        const { data: nonAdminUsers, error } = await supabase
+          .from('users')
+          .select('id')
+          .neq('role', 'admin');
+          
+        if (error) {
+          console.error('Error fetching non-admin users:', error);
+          return;
+        }
+        
+        const nonAdminUserIds = nonAdminUsers.map(user => user.id);
+        
+        // Filter check-ins to exclude admin users
+        const filteredCheckIns = checkIns.filter(checkIn => 
+          nonAdminUserIds.includes(checkIn.userId)
+        );
+        
+        // Filter reports to exclude admin users  
+        const filteredReports = workReports.filter(report => 
+          nonAdminUserIds.includes(report.userId)
+        );
+        
+        setNonAdminCheckIns(filteredCheckIns);
+        setNonAdminReports(filteredReports);
+      } catch (error) {
+        console.error('Error filtering non-admin data:', error);
+        // Fallback to original data if filtering fails
+        setNonAdminCheckIns(checkIns);
+        setNonAdminReports(workReports);
+      }
+    };
+
     fetchEmployeeCount();
-  }, []);
+    filterNonAdminData();
+  }, [checkIns, workReports]);
   
-  // Get today's check-ins
+  // Get today's check-ins (excluding admin users)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  const todayCheckIns = checkIns.filter(checkIn => {
+  const todayCheckIns = nonAdminCheckIns.filter(checkIn => {
     const checkInDate = new Date(checkIn.timestamp);
     checkInDate.setHours(0, 0, 0, 0);
     return checkInDate.getTime() === today.getTime();
   });
 
-  // Get today's reports
-  const todayReports = workReports.filter(report => {
+  // Get today's reports (excluding admin users)
+  const todayReports = nonAdminReports.filter(report => {
     const reportDate = new Date(report.date);
     reportDate.setHours(0, 0, 0, 0);
     return reportDate.getTime() === today.getTime();

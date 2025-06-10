@@ -1,15 +1,17 @@
-interface CustomNotificationOptions {
+interface NotificationAction {
+  action: string;
+  title: string;
+  icon?: string;
+}
+
+interface NotificationOptions {
   title: string;
   body: string;
   icon?: string;
   badge?: string;
   tag?: string;
   requireInteraction?: boolean;
-  actions?: {
-    action: string;
-    title: string;
-    icon?: string;
-  }[];
+  actions?: NotificationAction[];
   data?: any;
   vibrate?: number[];
 }
@@ -65,19 +67,31 @@ class NotificationManager {
     }
 
     try {
-      // Handle the requestPermission API properly
-      if ('requestPermission' in Notification && typeof Notification.requestPermission === 'function') {
-        return await Notification.requestPermission();
+      let permission: NotificationPermission;
+
+      // Use both old and new API for compatibility
+      if (typeof Notification.requestPermission === 'function') {
+        const result = Notification.requestPermission();
+        
+        // Handle both callback and promise-based APIs
+        if (result && typeof result.then === 'function') {
+          permission = await result;
+        } else {
+          // For older browsers that return the permission directly
+          permission = result as unknown as NotificationPermission;
+        }
+      } else {
+        permission = 'denied';
       }
-      
-      return 'denied';
+
+      return permission;
     } catch (error) {
       console.error('Error requesting notification permission:', error);
       return 'denied';
     }
   }
 
-  async showNotification(options: CustomNotificationOptions): Promise<boolean> {
+  async showNotification(options: NotificationOptions): Promise<boolean> {
     try {
       const permission = await this.requestPermission();
       
@@ -86,25 +100,16 @@ class NotificationManager {
         return false;
       }
 
-      // Create proper notification options compatible with the Notification API
-      const notificationOptions: any = {
+      const notificationOptions: NotificationOptions = {
         body: options.body,
-        icon: options.icon || '/icons/applogo.png?v=1.4.2',
-        badge: options.badge || '/icons/applogo.png?v=1.4.2',
+        icon: options.icon || '/NQ-ICON.png',
+        badge: options.badge || '/NQ-ICON.png',
         tag: options.tag || 'noorhub-notification',
         requireInteraction: options.requireInteraction || false,
-        data: options.data || {}
+        vibrate: [200, 100, 200],
+        data: options.data || {},
+        ...options
       };
-
-      // Add vibrate pattern if supported
-      if ('vibrate' in navigator) {
-        notificationOptions.vibrate = [200, 100, 200];
-      }
-
-      // Add actions if provided and supported
-      if (options.actions && options.actions.length > 0) {
-        notificationOptions.actions = options.actions;
-      }
 
       // Use service worker notification if available (for PWA)
       if (this.registration) {
@@ -122,7 +127,7 @@ class NotificationManager {
   }
 
   async showMessageNotification(message: string, sender?: string): Promise<boolean> {
-    const options: CustomNotificationOptions = {
+    const options: NotificationOptions = {
       title: sender ? `New message from ${sender}` : 'New Message',
       body: message,
       tag: 'message-notification',
@@ -131,12 +136,12 @@ class NotificationManager {
         {
           action: 'reply',
           title: 'Reply',
-          icon: '/icons/applogo.png?v=1.4.2'
+          icon: '/NQ-ICON.png'
         },
         {
           action: 'view',
           title: 'View',
-          icon: '/icons/applogo.png?v=1.4.2'
+          icon: '/NQ-ICON.png'
         }
       ],
       data: {
@@ -150,7 +155,7 @@ class NotificationManager {
   }
 
   async showTaskNotification(task: string, dueDate?: string): Promise<boolean> {
-    const options: CustomNotificationOptions = {
+    const options: NotificationOptions = {
       title: 'Task Reminder',
       body: dueDate ? `${task} - Due: ${dueDate}` : task,
       tag: 'task-notification',
@@ -167,7 +172,7 @@ class NotificationManager {
   }
 
   async showGeneralNotification(title: string, message: string): Promise<boolean> {
-    const options: CustomNotificationOptions = {
+    const options: NotificationOptions = {
       title: title,
       body: message,
       tag: 'general-notification',

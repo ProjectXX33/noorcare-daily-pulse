@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '1.4.2'; // Update this version when deploying new changes
+const APP_VERSION = '1.4.3'; // Update this version when deploying new changes
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
@@ -8,7 +8,7 @@ const urlsToCache = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
-  '/icons/applogo.png',
+  '/NQ-ICON.png',
   '/manifest.json',
   '/notification-sound.mp3'
 ];
@@ -208,8 +208,8 @@ self.addEventListener('push', event => {
   let notificationData = {
     title: 'NoorHub',
     body: 'New notification from NoorHub',
-    icon: '/icons/applogo.png?v=1.4.2',
-    badge: '/icons/applogo.png?v=1.4.2',
+    icon: '/NQ-ICON.png',
+    badge: '/NQ-ICON.png',
     tag: 'noorhub-notification'
   };
 
@@ -219,21 +219,15 @@ self.addEventListener('push', event => {
       notificationData = {
         title: data.title || 'NoorHub',
         body: data.body || data.message || 'New notification from NoorHub',
-        icon: data.icon || '/icons/applogo.png?v=1.4.2',
-        badge: data.badge || '/icons/applogo.png?v=1.4.2',
+        icon: data.icon || '/NQ-ICON.png',
+        badge: data.badge || '/NQ-ICON.png',
         tag: data.tag || 'noorhub-notification',
         requireInteraction: data.requireInteraction || false,
         actions: data.actions || [],
         data: data.data || {}
       };
     } catch (e) {
-      console.warn('[SW] Failed to parse push data as JSON, using text:', e);
-      try {
-        notificationData.body = event.data.text();
-      } catch (textError) {
-        console.error('[SW] Failed to read push data as text:', textError);
-        notificationData.body = 'New notification from NoorHub';
-      }
+      notificationData.body = event.data.text();
     }
   }
 
@@ -254,15 +248,6 @@ self.addEventListener('push', event => {
 
   event.waitUntil(
     self.registration.showNotification(notificationData.title, options)
-      .catch(error => {
-        console.error('[SW] Failed to show notification:', error);
-        // Fallback notification with minimal options
-        return self.registration.showNotification('NoorHub', {
-          body: notificationData.body,
-          icon: '/icons/applogo.png?v=1.4.2',
-          tag: 'noorhub-fallback'
-        });
-      })
   );
 });
 

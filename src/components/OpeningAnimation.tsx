@@ -17,7 +17,7 @@ const OpeningAnimation: React.FC = () => {
         className="text-center"
       >
         <motion.img
-          src="/icons/applogo.png?v=1.4.2"
+          src="/NQ-ICON.png"
           alt="Logo"
           className="h-24 w-24 mx-auto mb-4"
           initial={{ rotate: -180 }}

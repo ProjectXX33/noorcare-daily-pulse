@@ -1,12 +1,12 @@
 {
-  "version": "1.4.2",
-  "buildTime": "2025-06-10T20:03:20.906Z",
-  "buildTimestamp": "1749585800907",
+  "version": "1.4.3",
+  "buildTime": "2025-06-10T20:23:24.988Z",
+  "buildTimestamp": "1749587004988",
   "buildDate": "6/10/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Icon Changed"
+    "Logo"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

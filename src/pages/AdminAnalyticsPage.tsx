@@ -22,6 +22,7 @@ const AdminAnalyticsPage = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
+        .neq('role', 'admin')
         .order('name');
 
       if (error) {
