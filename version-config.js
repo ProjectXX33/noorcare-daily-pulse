@@ -5,7 +5,7 @@ const VERSION_CONFIG = {
   // Change these values manually for each release
   major: 1,
   minor: 4,
-  patch: 0,
+  patch: 1,
   
   // Optional: add build suffix (leave empty for clean versions)
   buildSuffix: '', // e.g., 'beta', 'rc1', etc.
@@ -16,7 +16,8 @@ const VERSION_CONFIG = {
     "Fixed update notification spam", 
     "Enhanced version tracking system",
     "Improved PWA update detection",
-    "Manual version control implemented"
+    "Manual version control implemented",
+    "Added floating chatbot component (coming soon)"
   ],
   
   // Update settings

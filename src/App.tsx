@@ -43,6 +43,7 @@ import NotificationBanner from "./components/NotificationBanner";
 import AppUpdateManager from "./components/AppUpdateManager";
 import UpdateTrigger from "./components/UpdateTrigger";
 import PWAVersionChecker from "./components/PWAVersionChecker";
+import FloatingChatbot from "./components/FloatingChatbot";
 
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
@@ -381,6 +382,7 @@ const AppWithAuth = () => {
                 <UpdateTrigger />
                 <PWAVersionChecker />
                 <PWAUpdateInstructions />
+                <FloatingChatbot />
 
                 <PWAInstallPrompt />
                 <Toaster />

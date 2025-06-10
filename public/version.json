@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "buildTime": "2025-01-27T12:00:00.000Z",
   "buildTimestamp": "1738072800000",
   "buildDate": "1/27/2025",
@@ -10,7 +10,8 @@
     "Fixed update notification spam", 
     "Enhanced version tracking system",
     "Improved PWA update detection",
-    "Manual version control implemented"
+    "Manual version control implemented",
+    "Added floating chatbot component (coming soon)"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

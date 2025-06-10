@@ -8,7 +8,7 @@ const OpeningAnimation: React.FC = () => {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-background"
     >
       <motion.div
         initial={{ y: 20, opacity: 0 }}

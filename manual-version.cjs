@@ -90,10 +90,11 @@ const updateManifest = (version) => {
     
     const manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     manifestData.version = version;
-    manifestData.name = `NoorHub v${version}`;
-    manifestData.short_name = `NoorHub v${version.split('.').slice(0, 2).join('.')}`;
-    manifestData.start_url = `/?v=${version}`;
-    manifestData.id = `/?v=${version}`;
+    manifestData.name = "NoorHub";
+    manifestData.short_name = "NoorHub";
+    manifestData.description = "Team management and communication platform for NoorHub";
+    manifestData.start_url = "/";
+    manifestData.id = "/";
     
     fs.writeFileSync(manifestPath, JSON.stringify(manifestData, null, 2));
     console.log('✅ manifest.json updated');

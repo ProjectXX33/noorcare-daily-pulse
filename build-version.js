@@ -84,21 +84,21 @@ const updateManifest = (version) => {
   try {
     const manifestContent = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     
-    // Update version
+    // Update version only (keep name clean without version)
     manifestContent.version = version;
     
-    // Update name with version for PWA identification
-    manifestContent.name = `NoorHub v${version}`;
-    manifestContent.short_name = `NoorHub v${version.split('.').slice(0, 2).join('.')}`;
+    // Keep name clean without version
+    manifestContent.name = "NoorHub";
+    manifestContent.short_name = "NoorHub";
     
-    // Add version to description
-    manifestContent.description = `Team management and communication platform for NoorHub - v${version}`;
+    // Keep description clean without version
+    manifestContent.description = "Team management and communication platform for NoorHub";
     
-    // Add version-specific start URL to force PWA refresh
-    manifestContent.start_url = `/?v=${version}`;
+    // Use clean start URL
+    manifestContent.start_url = "/";
     
-    // Update ID to include version (this forces PWA to recognize as new version)
-    manifestContent.id = `/?v=${version}`;
+    // Use clean ID
+    manifestContent.id = "/";
     
     fs.writeFileSync(manifestPath, JSON.stringify(manifestContent, null, 2));
     console.log(`✅ Manifest updated - Name: "${manifestContent.name}", Version: ${version}`);
