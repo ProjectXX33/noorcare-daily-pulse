@@ -8,7 +8,7 @@ const urlsToCache = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
-  '/NQ-ICON.png',
+  '/icons/applogo.png',
   '/manifest.json',
   '/notification-sound.mp3'
 ];
@@ -208,8 +208,8 @@ self.addEventListener('push', event => {
   let notificationData = {
     title: 'NoorHub',
     body: 'New notification from NoorHub',
-    icon: '/NQ-ICON.png',
-    badge: '/NQ-ICON.png',
+    icon: '/icons/applogo.png?v=1.4.2',
+    badge: '/icons/applogo.png?v=1.4.2',
     tag: 'noorhub-notification'
   };
 
@@ -219,15 +219,21 @@ self.addEventListener('push', event => {
       notificationData = {
         title: data.title || 'NoorHub',
         body: data.body || data.message || 'New notification from NoorHub',
-        icon: data.icon || '/NQ-ICON.png',
-        badge: data.badge || '/NQ-ICON.png',
+        icon: data.icon || '/icons/applogo.png?v=1.4.2',
+        badge: data.badge || '/icons/applogo.png?v=1.4.2',
         tag: data.tag || 'noorhub-notification',
         requireInteraction: data.requireInteraction || false,
         actions: data.actions || [],
         data: data.data || {}
       };
     } catch (e) {
-      notificationData.body = event.data.text();
+      console.warn('[SW] Failed to parse push data as JSON, using text:', e);
+      try {
+        notificationData.body = event.data.text();
+      } catch (textError) {
+        console.error('[SW] Failed to read push data as text:', textError);
+        notificationData.body = 'New notification from NoorHub';
+      }
     }
   }
 
@@ -248,6 +254,15 @@ self.addEventListener('push', event => {
 
   event.waitUntil(
     self.registration.showNotification(notificationData.title, options)
+      .catch(error => {
+        console.error('[SW] Failed to show notification:', error);
+        // Fallback notification with minimal options
+        return self.registration.showNotification('NoorHub', {
+          body: notificationData.body,
+          icon: '/icons/applogo.png?v=1.4.2',
+          tag: 'noorhub-fallback'
+        });
+      })
   );
 });
 

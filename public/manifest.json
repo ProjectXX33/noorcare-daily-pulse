@@ -112,13 +112,13 @@
   ],
   "screenshots": [
     {
-      "src": "/NQ-ICON.png",
+      "src": "/icons/applogo.png?v=1.4.2",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide"
     },
     {
-      "src": "/NQ-ICON.png",
+      "src": "/icons/applogo.png?v=1.4.2",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow"

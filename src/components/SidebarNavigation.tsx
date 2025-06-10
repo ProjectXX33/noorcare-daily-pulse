@@ -396,7 +396,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         >
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
             <div className="flex items-center gap-3">
-              <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
+              <img src="/icons/applogo.png?v=1.4.2" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
               <VersionDisplay variant="sidebar" />
             </div>
           </SidebarHeader>

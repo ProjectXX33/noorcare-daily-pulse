@@ -68,7 +68,7 @@ const LoginForm = () => {
         <CardHeader className="space-y-1 text-center pb-2">
           <div className="flex justify-center items-center mb-2">
             <img
-              src="/NQ-ICON.png"
+              src="/icons/applogo.png?v=1.4.2"
               alt="NoorHub Logo"
               className="h-12 w-12"
             />

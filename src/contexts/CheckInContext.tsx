@@ -340,14 +340,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const checkInUser = async (userId: string) => {
     try {
-      // Get the user data
+      // Get the user data including role to check for admin exclusion
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('name, department, position')
+        .select('name, department, position, role')
         .eq('id', userId)
         .single();
         
-      if (userError) throw userError;
+              if (userError) throw userError;
+      
+      // Exclude admin users from check-in tracking
+      if (userData.role === 'admin') {
+        toast.info('Admin users are excluded from check-in tracking');
+        return;
+      }
       
       // Get work day boundaries (falls back to midnight if not available)
       let currentWorkDay = workDayBoundaries;
@@ -559,14 +565,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const checkOutUser = async (userId: string) => {
     try {
-      // Get the user data
+      // Get the user data including role to check for admin exclusion
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('name, department, position')
+        .select('name, department, position, role')
         .eq('id', userId)
         .single();
         
       if (userError) throw userError;
+      
+      // Exclude admin users from check-out tracking
+      if (userData.role === 'admin') {
+        toast.info('Admin users are excluded from check-out tracking');
+        return;
+      }
       
       // Get work day boundaries (falls back to midnight if not available)
       let currentWorkDay = workDayBoundaries;
@@ -738,14 +750,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     plansForTomorrow: string;
   }, fileAttachment?: File) => {
     try {
-      // Get user data
+      // Get user data including role to check for admin exclusion
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('name, department, position')
+        .select('name, department, position, role')
         .eq('id', userId)
         .single();
         
       if (userError) throw userError;
+      
+      // Exclude admin users from work report tracking
+      if (userData.role === 'admin') {
+        toast.info('Admin users are excluded from work report tracking');
+        return;
+      }
       
       // Use current date - this ensures the date is in the user's timezone
       const today = new Date();
