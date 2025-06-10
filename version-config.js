@@ -4,7 +4,7 @@
 const VERSION_CONFIG = {
   // Change these values manually for each release
   major: 1,
-  minor: 1,
+  minor: 4,
   patch: 0,
   
   // Optional: add build suffix (leave empty for clean versions)
