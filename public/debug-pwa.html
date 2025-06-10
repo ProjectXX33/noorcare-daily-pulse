@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Debug - NoorHub</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        .debug-section { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { color: green; } .error { color: red; } .warning { color: orange; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .icon-test { display: inline-block; margin: 10px; text-align: center; }
+        .icon-test img { border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 PWA Debug Tool - NoorHub</h1>
+    
+    <div class="debug-section">
+        <h3>📱 Manifest.json Check</h3>
+        <div id="manifest-status">Checking...</div>
+        <button onclick="checkManifest()">Refresh Manifest Check</button>
+    </div>
+
+    <div class="debug-section">
+        <h3>🖼️ Icon Accessibility Test</h3>
+        <div id="icon-tests">
+            <div class="icon-test">
+                <div>Current Icon:</div>
+                <img src="/icons/applogo.png" width="64" height="64" 
+                     onerror="this.style.border='2px solid red'; this.alt='❌ FAILED'">
+                <div>/icons/applogo.png</div>
+            </div>
+            <div class="icon-test">
+                <div>With Cache Bust:</div>
+                <img src="/icons/applogo.png?v=1.4.1" width="64" height="64" 
+                     onerror="this.style.border='2px solid red'; this.alt='❌ FAILED'">
+                <div>/icons/applogo.png?v=1.4.1</div>
+            </div>
+            <div class="icon-test">
+                <div>Old Icon (if exists):</div>
+                <img src="/NQ-ICON.png" width="64" height="64" 
+                     onerror="this.style.border='2px solid red'; this.alt='❌ FAILED'">
+                <div>/NQ-ICON.png</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h3>🧹 Cache Clearing Tools</h3>
+        <button onclick="clearCaches()">Clear All Caches</button>
+        <button onclick="unregisterSW()">Unregister Service Worker</button>
+        <button onclick="forceRefresh()">Force Full Refresh</button>
+        <div id="cache-status"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>📊 PWA Status</h3>
+        <div id="pwa-status">
+            <div>🌐 Is PWA: <span id="is-pwa">Checking...</span></div>
+            <div>📱 Is Installed: <span id="is-installed">Checking...</span></div>
+            <div>🔄 Service Worker: <span id="sw-status">Checking...</span></div>
+        </div>
+    </div>
+
+    <div class="debug-section">
+        <h3>📋 Instructions</h3>
+        <ol>
+            <li><strong>Check manifest:</strong> Verify it loads with new icons</li>
+            <li><strong>Test icons:</strong> All should load without red borders</li>
+            <li><strong>Clear caches:</strong> Click "Clear All Caches" button</li>
+            <li><strong>Force refresh:</strong> Ctrl+Shift+R or click Force Refresh</li>
+            <li><strong>Reinstall PWA:</strong> Uninstall and reinstall the app</li>
+        </ol>
+    </div>
+
+    <script>
+        // Check manifest
+        async function checkManifest() {
+            const status = document.getElementById('manifest-status');
+            try {
+                const response = await fetch('/manifest.json?t=' + Date.now());
+                const manifest = await response.json();
+                
+                const iconCount = manifest.icons ? manifest.icons.length : 0;
+                const hasAppLogo = manifest.icons ? manifest.icons.some(icon => icon.src.includes('applogo.png')) : false;
+                
+                status.innerHTML = `
+                    <div class="${hasAppLogo ? 'success' : 'error'}">
+                        ✅ Manifest loaded<br>
+                        📱 Name: ${manifest.name}<br>
+                        🆔 Version: ${manifest.version}<br>
+                        🖼️ Icons: ${iconCount} found<br>
+                        🎯 Using applogo.png: ${hasAppLogo ? 'YES' : 'NO'}<br>
+                        📄 <a href="/manifest.json?t=${Date.now()}" target="_blank">View Raw Manifest</a>
+                    </div>
+                `;
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Error loading manifest: ${error.message}</div>`;
+            }
+        }
+
+        // Clear caches
+        async function clearCaches() {
+            const status = document.getElementById('cache-status');
+            status.innerHTML = 'Clearing caches...';
+            
+            try {
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    status.innerHTML += '<div class="success">✅ Browser caches cleared</div>';
+                }
+                
+                localStorage.clear();
+                sessionStorage.clear();
+                status.innerHTML += '<div class="success">✅ Storage cleared</div>';
+                
+                status.innerHTML += '<div class="warning">⚠️ Please refresh the page</div>';
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Unregister service worker
+        async function unregisterSW() {
+            const status = document.getElementById('cache-status');
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                }
+                status.innerHTML = '<div class="success">✅ Service workers unregistered</div>';
+            } else {
+                status.innerHTML = '<div class="warning">⚠️ Service Worker not supported</div>';
+            }
+        }
+
+        // Force refresh
+        function forceRefresh() {
+            window.location.reload(true);
+        }
+
+        // Check PWA status
+        function checkPWAStatus() {
+            // Is PWA
+            const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                         window.navigator.standalone === true ||
+                         document.referrer.includes('android-app://');
+            document.getElementById('is-pwa').innerHTML = isPWA ? '✅ YES' : '❌ NO (Browser)';
+            
+            // Check if installed
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+            document.getElementById('is-installed').innerHTML = isInstalled ? '✅ YES' : '❌ NO';
+            
+            // Service worker status
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    const swStatus = registrations.length > 0 ? `✅ ${registrations.length} active` : '❌ None';
+                    document.getElementById('sw-status').innerHTML = swStatus;
+                });
+            } else {
+                document.getElementById('sw-status').innerHTML = '❌ Not supported';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkManifest();
+            checkPWAStatus();
+        });
+    </script>
+</body>
+</html> 
