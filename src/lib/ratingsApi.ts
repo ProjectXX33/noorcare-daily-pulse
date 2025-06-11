@@ -95,25 +95,93 @@ export const deleteEmployeeRating = async (ratingId: string) => {
 
 // Task Rating Functions
 export const rateTask = async (taskId: string, rating: number, comment?: string) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  try {
+    console.log('⭐ Starting task rating submission:', {
+      taskId,
+      rating,
+      comment: comment?.substring(0, 50) + (comment && comment.length > 50 ? '...' : ''),
+      hasComment: !!comment
+    });
 
-  const { data, error } = await supabase
-    .from('task_ratings')
-    .insert({
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      console.error('❌ Authentication error:', authError);
+      throw new Error('Authentication failed: ' + authError.message);
+    }
+    
+    if (!user) {
+      console.error('❌ No authenticated user found');
+      throw new Error('Not authenticated');
+    }
+
+    console.log('👤 Authenticated user:', { id: user.id, email: user.email });
+
+    // Validate inputs
+    if (!taskId || typeof taskId !== 'string') {
+      console.error('❌ Invalid taskId:', taskId);
+      throw new Error('Invalid task ID');
+    }
+
+    if (!rating || rating < 1 || rating > 5) {
+      console.error('❌ Invalid rating:', rating);
+      throw new Error('Rating must be between 1 and 5');
+    }
+
+    const insertData = {
       task_id: taskId,
       rating: rating,
       comment: comment || null,
       rated_by: user.id
-    })
-    .select(`
-      *,
-      rated_by_user:users!task_ratings_rated_by_fkey(name)
-    `)
-    .single();
+    };
 
-  if (error) throw error;
-  return mapTaskRatingFromRecord(data);
+    console.log('📤 Inserting rating data:', insertData);
+
+    const { data, error } = await supabase
+      .from('task_ratings')
+      .insert(insertData)
+      .select(`
+        *,
+        rated_by_user:users!task_ratings_rated_by_fkey(name)
+      `)
+      .single();
+
+    if (error) {
+      console.error('❌ Supabase error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // Provide more specific error messages based on error type
+      if (error.code === '23503') {
+        throw new Error('Invalid task ID or user ID - foreign key constraint failed');
+      } else if (error.code === '23505') {
+        throw new Error('You have already rated this task');
+      } else if (error.message.includes('violates')) {
+        throw new Error('Database constraint violation: ' + error.message);
+      } else {
+        throw new Error('Failed to submit rating: ' + error.message);
+      }
+    }
+
+    if (!data) {
+      console.error('❌ No data returned from insert operation');
+      throw new Error('No data returned from rating submission');
+    }
+
+    console.log('✅ Rating submitted successfully:', {
+      id: data.id,
+      taskId: data.task_id,
+      rating: data.rating,
+      ratedBy: data.rated_by_user?.name
+    });
+
+    return mapTaskRatingFromRecord(data);
+  } catch (error) {
+    console.error('❌ Complete error in rateTask:', error);
+    throw error;
+  }
 };
 
 export const updateTaskRating = async (ratingId: string, rating: number, comment?: string) => {

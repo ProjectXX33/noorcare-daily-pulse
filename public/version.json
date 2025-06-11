@@ -1,13 +1,16 @@
 {
-  "version": "1.4.4",
-  "buildTime": "2025-06-10T20:50:50.734Z",
-  "buildTimestamp": "1749588650735",
-  "buildDate": "6/10/2025",
+  "version": "1.5.0",
+  "buildTime": "2025-06-11T00:54:52.876Z",
+  "buildTimestamp": "1749603292876",
+  "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Moved Performance Dashboard to individual page under Employee Management",
-    "Changed 'Fix Overtime' to 'Fix All' with comprehensive data recalculation"
+    "Complete Events system overhaul - now accessible to ALL employees",
+    "Enhanced mobile calendar with proper left/right navigation arrows",
+    "Dual view system: Calendar and Cards views with search and filtering",
+    "Improved permission system: all users can view, Admins/Media Buyers can edit",
+    "Fixed all TypeScript and ESLint errors for better code quality"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

@@ -28,6 +28,8 @@ export const fetchTasks = async (): Promise<Task[]> => {
       description: task.description,
       status: task.status,
       progressPercentage: task.progress_percentage,
+      priority: task.priority || 'medium',
+      projectType: task.project_type || 'other',
       assignedTo: task.assigned_to.id,
       assignedToName: task.assigned_to.name,
       assignedToPosition: task.assigned_to.position,
@@ -68,13 +70,15 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       throw error;
     }
     
-    // Map the data to match our Task interface
+        // Map the data to match our Task interface
     const tasks: Task[] = data.map(task => ({
       id: task.id,
       title: task.title,
       description: task.description,
       status: task.status,
       progressPercentage: task.progress_percentage,
+      priority: task.priority || 'medium',
+      projectType: task.project_type || 'other',
       assignedTo: task.assigned_to.id,
       assignedToName: task.assigned_to.name,
       assignedToPosition: task.assigned_to.position,
@@ -85,7 +89,7 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       updatedAt: new Date(task.updated_at),
       comments: task.comments || [] // Ensure comments are included
     }));
-    
+
     console.log('User tasks fetched:', tasks);
     return tasks;
   } catch (error) {
@@ -106,6 +110,8 @@ export const createTask = async (
     status: string;
     progressPercentage?: number;
     createdBy: string;
+    priority?: string;
+    projectType?: string;
   }
 ): Promise<Task> => {
   try {
@@ -123,6 +129,8 @@ export const createTask = async (
         status: status,
         created_by: task.createdBy,
         progress_percentage: task.progressPercentage || 0,
+        priority: task.priority || 'medium',
+        project_type: task.projectType || 'other',
       }])
       .select(`
         *,
@@ -154,6 +162,8 @@ export const createTask = async (
       description: data.description,
       status: data.status,
       progressPercentage: data.progress_percentage,
+      priority: data.priority || 'medium',
+      projectType: data.project_type || 'other',
       assignedTo: data.assigned_to.id,
       assignedToName: data.assigned_to.name,
       assignedToPosition: data.assigned_to.position,
@@ -181,6 +191,8 @@ export const updateTask = async (
     status?: string;
     assignedTo?: string;
     progressPercentage?: number;
+    priority?: string;
+    projectType?: string;
   },
   currentUserId: string
 ): Promise<Task> => {
@@ -191,6 +203,8 @@ export const updateTask = async (
     const dbUpdates: any = {};
     if (updates.title) dbUpdates.title = updates.title;
     if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.priority) dbUpdates.priority = updates.priority;
+    if (updates.projectType) dbUpdates.project_type = updates.projectType;
     
     // Always set status based on progress percentage
     if (updates.progressPercentage !== undefined) {
@@ -211,6 +225,9 @@ export const updateTask = async (
       .select('*')
       .eq('id', taskId)
       .single();
+    
+    // Add explicit updated_at timestamp
+    dbUpdates.updated_at = new Date().toISOString();
     
     // Update the task
     const { data, error } = await supabase
@@ -363,6 +380,15 @@ export const addTaskComment = async (
       throw fetchError;
     }
     
+    console.log('📝 Task data for notification:', {
+      taskId,
+      commentUserId: userId,
+      taskCreatedBy: taskData.created_by,
+      taskAssignedTo: taskData.assigned_to,
+      creatorPosition: taskData.creator?.position,
+      assigneePosition: taskData.assignee?.position
+    });
+    
     // Create new comment
     const newComment = {
       id: uuidv4(),
@@ -388,20 +414,45 @@ export const addTaskComment = async (
       throw updateError;
     }
 
-    // Enhanced notification logic for different roles
-    if (taskData.assigned_to && taskData.created_by) {
+    // Enhanced notification logic for different roles including admin comments
+    if (taskData.assigned_to) {
+      // Get the commenter's role information
+      const { data: commenterData, error: commenterError } = await supabase
+        .from('users')
+        .select('role, position')
+        .eq('id', userId)
+        .single();
+      
+      if (commenterError) {
+        console.error('Error fetching commenter data:', commenterError);
+      }
+      
+      const commenterRole = commenterData?.role;
+      const commenterPosition = commenterData?.position;
       const creatorPosition = taskData.creator?.position;
       const assigneePosition = taskData.assignee?.position;
       
-      if (userId === taskData.created_by) {
-        // Task creator (Admin/Media Buyer) commented, notify assigned employee
-        let notificationTitle = 'New Comment on Task';
-        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+      console.log('🔔 Comment notification data:', {
+        commenterId: userId,
+        commenterRole,
+        commenterPosition,
+        taskCreatedBy: taskData.created_by,
+        taskAssignedTo: taskData.assigned_to,
+        creatorPosition,
+        assigneePosition
+      });
+      
+      // Case 1: Admin commented on any task - notify the assigned employee
+      if (commenterRole === 'admin' && userId !== taskData.assigned_to) {
+        console.log('🔔 Admin commented, notifying assigned employee');
+        const notificationTitle = 'Admin Comment on Your Task';
+        const notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
         
-        if (creatorPosition === 'Media Buyer') {
-          notificationTitle = 'Media Buyer Comment';
-          notificationMessage = `Media Buyer commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        }
+        console.log('📤 Sending admin comment notification to assignee:', {
+          title: notificationTitle,
+          recipientId: taskData.assigned_to,
+          message: notificationMessage.substring(0, 100) + '...'
+        });
         
         await createNotification({
           user_id: taskData.assigned_to,
@@ -411,8 +462,43 @@ export const addTaskComment = async (
           related_id: taskId,
           created_by: userId
         });
-      } else if (userId === taskData.assigned_to) {
-        // Assigned employee commented, notify task creator
+        
+        console.log('✅ Admin comment notification sent to assignee successfully');
+      }
+      // Case 2: Task creator (Admin/Media Buyer) commented, notify assigned employee
+      else if (userId === taskData.created_by && userId !== taskData.assigned_to) {
+        console.log('🔔 Creator commented, notifying assignee');
+        let notificationTitle = 'New Comment on Task';
+        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        
+        if (creatorPosition === 'Media Buyer') {
+          notificationTitle = 'Media Buyer Comment';
+          notificationMessage = `Media Buyer commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        } else if (commenterRole === 'admin') {
+          notificationTitle = 'Admin Comment on Your Task';
+          notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        }
+        
+        console.log('📤 Sending notification to assignee:', {
+          title: notificationTitle,
+          recipientId: taskData.assigned_to,
+          message: notificationMessage.substring(0, 100) + '...'
+        });
+        
+        await createNotification({
+          user_id: taskData.assigned_to,
+          title: notificationTitle,
+          message: notificationMessage,
+          related_to: 'task',
+          related_id: taskId,
+          created_by: userId
+        });
+        
+        console.log('✅ Notification sent to assignee successfully');
+      }
+      // Case 3: Assigned employee commented, notify task creator (and admin if different)
+      else if (userId === taskData.assigned_to && taskData.created_by) {
+        console.log('🔔 Assignee commented, notifying creator');
         let notificationTitle = 'New Comment on Task';
         let notificationMessage = `${userName} commented on your assigned task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
         
@@ -422,6 +508,12 @@ export const addTaskComment = async (
           notificationMessage = `Designer ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
         }
         
+        console.log('📤 Sending notification to creator:', {
+          title: notificationTitle,
+          recipientId: taskData.created_by,
+          message: notificationMessage.substring(0, 100) + '...'
+        });
+        
         await createNotification({
           user_id: taskData.created_by,
           title: notificationTitle,
@@ -430,9 +522,48 @@ export const addTaskComment = async (
           related_id: taskId,
           created_by: userId
         });
+        
+        console.log('✅ Notification sent to creator successfully');
       }
+      // Case 4: Someone else (e.g., another admin, other employee) commented - notify assigned employee
+      else if (userId !== taskData.assigned_to && userId !== taskData.created_by) {
+        console.log('🔔 Other user commented, notifying assigned employee');
+        let notificationTitle = 'New Comment on Your Task';
+        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        
+        // Special titles based on commenter role
+        if (commenterRole === 'admin') {
+          notificationTitle = 'Admin Comment on Your Task';
+          notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        } else if (commenterPosition === 'Media Buyer') {
+          notificationTitle = 'Media Buyer Comment';
+          notificationMessage = `Media Buyer ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        }
+        
+        console.log('📤 Sending notification to assigned employee:', {
+          title: notificationTitle,
+          recipientId: taskData.assigned_to,
+          message: notificationMessage.substring(0, 100) + '...'
+        });
+        
+        await createNotification({
+          user_id: taskData.assigned_to,
+          title: notificationTitle,
+          message: notificationMessage,
+          related_to: 'task',
+          related_id: taskId,
+          created_by: userId
+        });
+        
+        console.log('✅ Notification sent to assigned employee successfully');
+      } else {
+        console.log('ℹ️ No additional notification needed (commenting on own task)');
+      }
+    } else {
+      console.log('⚠️ Missing task assignee data - no notification sent');
     }
     
+    console.log('✅ Comment added successfully');
     return true;
   } catch (error) {
     console.error('Error adding comment to task:', error);

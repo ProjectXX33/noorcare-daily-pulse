@@ -31,7 +31,9 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
     description: '',
     assignedTo: '',
     status: 'On Hold' as 'On Hold' | 'In Progress' | 'Complete',
-    progressPercentage: 0
+    progressPercentage: 0,
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+    projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other'
   });
   const [newNotification, setNewNotification] = useState({
     title: '',
@@ -154,6 +156,8 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
         assignedTo: newTask.assignedTo,
         status: newTask.status,
         progressPercentage: newTask.progressPercentage,
+        priority: newTask.priority,
+        projectType: newTask.projectType,
         createdBy: user.id
       });
 
@@ -168,7 +172,9 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
         description: '',
         assignedTo: '',
         status: 'On Hold',
-        progressPercentage: 0
+        progressPercentage: 0,
+        priority: 'medium',
+        projectType: 'other'
       });
       
       toast.success(t.taskCreated);
@@ -368,6 +374,25 @@ const TasksAdminPanel = ({ language }: TasksAdminPanelProps) => {
                   <SelectItem value="On Hold">{t.onHold}</SelectItem>
                   <SelectItem value="In Progress">{t.inProgress}</SelectItem>
                   <SelectItem value="Complete">{t.complete}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="task-priority" className="text-right">
+                Priority
+              </Label>
+              <Select
+                value={newTask.priority}
+                onValueChange={(value) => setNewTask({...newTask, priority: value as 'low' | 'medium' | 'high' | 'urgent'})}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">🟢 Low Priority</SelectItem>
+                  <SelectItem value="medium">🟡 Medium Priority</SelectItem>
+                  <SelectItem value="high">🟠 High Priority</SelectItem>
+                  <SelectItem value="urgent">🔴 Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

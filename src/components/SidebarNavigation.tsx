@@ -11,7 +11,6 @@ import {
   User, 
   LogOut,
   Settings,
-  Menu,
   Calendar,
   Clock,
   LayoutDashboard,
@@ -62,11 +61,9 @@ import VersionDisplay from '@/components/VersionDisplay';
 
 interface SidebarNavigationProps {
   children?: React.ReactNode;
-  isOpen: boolean;
-  onClose: () => void;
 }
 
-export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigationProps) => {
+const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -198,7 +195,9 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
     customerServiceOnly?: boolean;
     shiftsAccess?: boolean;
     mediaBuyerOnly?: boolean;
+    designerOnly?: boolean;
     excludeMediaBuyer?: boolean;
+    excludeDesigner?: boolean;
     hasCounter?: boolean;
   }
 
@@ -226,8 +225,9 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       label: 'Task Management',
       color: 'orange',
       items: [
-        { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange' },
+        { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
         { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true, color: 'amber' },
+        { name: 'Design Studio', path: '/designer-dashboard', icon: PenTool, designerOnly: true, color: 'purple' },
         { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, color: 'yellow' },
       ] as NavItem[]
     },
@@ -252,7 +252,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       label: 'Communication',
       color: 'pink',
       items: [
-        { name: t('events') as string, path: '/events', icon: Calendar, excludeMediaBuyer: true, color: 'pink' },
+        { name: t('events') as string, path: '/events', icon: Calendar, color: 'pink' },
         { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true, color: 'violet' },
       ] as NavItem[]
     },
@@ -382,18 +382,18 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
       if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
+      if (item.designerOnly && user?.position !== 'Designer') return false;
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
+      if (item.excludeDesigner && user?.position === 'Designer') return false;
       return true;
     })
   })).filter(group => group.items.length > 0); // Only show groups that have items
 
   return (
-    <SidebarProvider open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
+    <SidebarProvider>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
-          className={`sidebar-glass sticky top-0 h-screen transition-all duration-300 ${
-            isOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0 z-40`}
+          className="sidebar-glass"
           side={language === 'ar' ? 'right' : 'left'}
         >
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
@@ -487,9 +487,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
         <div className="flex flex-col flex-1">
           <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 shadow-sm">
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'}`}>
-              <SidebarTrigger className="md:hidden">
-                <Menu className="h-5 w-5" />
-              </SidebarTrigger>
+              <SidebarTrigger />
               <WorkShiftTimer />
             </div>
             <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
@@ -538,7 +536,7 @@ export const SidebarNavigation = ({ children, isOpen, onClose }: SidebarNavigati
               </DropdownMenu>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">{children}</main>
+          <main className="flex-1 overflow-auto">{children}</main>
         </div>
       </div>
       

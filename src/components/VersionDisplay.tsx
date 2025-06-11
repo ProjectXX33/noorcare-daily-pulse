@@ -105,19 +105,19 @@ const VersionDisplay: React.FC<VersionDisplayProps> = ({ variant = 'sidebar' }) 
       <div
         className="h-7 px-2 text-xs font-mono bg-gray-100 flex items-center gap-1 rounded cursor-default"
         title="Version information"
-      >
-        {getStatusIcon()}
-        <span>v{currentVersion}</span>
-      </div>
+          >
+            {getStatusIcon()}
+            <span>v{currentVersion}</span>
+          </div>
     );
   }
 
   // Sidebar variant (default)
   return (
     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition-all duration-200 cursor-default ${getStatusColor()}`}>
-      {getStatusIcon()}
-      <span className="font-mono text-xs">v{currentVersion}</span>
-    </div>
+          {getStatusIcon()}
+          <span className="font-mono text-xs">v{currentVersion}</span>
+        </div>
   );
 };
 

@@ -66,14 +66,23 @@ CREATE POLICY task_ratings_select ON task_ratings FOR SELECT USING (
 );
 
 CREATE POLICY task_ratings_insert ON task_ratings FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (
+        SELECT 1 FROM tasks t 
+        WHERE t.id = task_id AND (
+            t.assigned_to = auth.uid() OR 
+            t.created_by = auth.uid() OR
+            EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
+        )
+    )
 );
 
 CREATE POLICY task_ratings_update ON task_ratings FOR UPDATE USING (
+    rated_by = auth.uid() OR
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
 );
 
 CREATE POLICY task_ratings_delete ON task_ratings FOR DELETE USING (
+    rated_by = auth.uid() OR
     EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
 );
 

@@ -30,6 +30,7 @@ import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
 import MediaBuyerTasksPage from "./pages/MediaBuyerTasksPage";
+import DesignerDashboard from "./pages/DesignerDashboard";
 import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
@@ -126,16 +127,14 @@ const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Route component that excludes Media Buyers (for Events page)
-const NonMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
+
+
+// Designer route component for designer-only access
+const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (user.position === 'Media Buyer') {
-    return <Navigate to="/media-buyer-tasks" replace />;
+  if (!user || user.position !== 'Designer') {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
   }
   
   return <>{children}</>;
@@ -143,7 +142,6 @@ const NonMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
 
 // This component is outside the BrowserRouter but inside the other providers
 const AppWithAuth = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [showOpeningAnimation, setShowOpeningAnimation] = useState(true);
 
   useEffect(() => {
@@ -180,7 +178,7 @@ const AppWithAuth = () => {
                     path="/dashboard" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <Dashboard />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -190,7 +188,7 @@ const AppWithAuth = () => {
                     path="/employee-dashboard" 
                     element={
                       <EmployeeRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <EmployeeDashboard />
                         </SidebarNavigation>
                       </EmployeeRoute>
@@ -200,7 +198,7 @@ const AppWithAuth = () => {
                     path="/check-in" 
                     element={
                       <PrivateRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <CheckInPage />
                         </SidebarNavigation>
                       </PrivateRoute>
@@ -210,7 +208,7 @@ const AppWithAuth = () => {
                     path="/shifts" 
                     element={
                       <PrivateRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <ShiftsPage />
                         </SidebarNavigation>
                       </PrivateRoute>
@@ -220,7 +218,7 @@ const AppWithAuth = () => {
                     path="/report" 
                     element={
                       <PrivateRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <ReportPage />
                         </SidebarNavigation>
                       </PrivateRoute>
@@ -230,7 +228,7 @@ const AppWithAuth = () => {
                     path="/employees" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminEmployeesPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -240,7 +238,7 @@ const AppWithAuth = () => {
                     path="/reports" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminReportsPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -250,7 +248,7 @@ const AppWithAuth = () => {
                     path="/tasks" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminTasksPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -260,7 +258,7 @@ const AppWithAuth = () => {
                     path="/admin-ratings" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminRatingsPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -270,7 +268,7 @@ const AppWithAuth = () => {
                     path="/employee-tasks" 
                     element={
                       <EmployeeRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <EmployeeTasksPage />
                         </SidebarNavigation>
                       </EmployeeRoute>
@@ -280,7 +278,7 @@ const AppWithAuth = () => {
                     path="/my-ratings" 
                     element={
                       <EmployeeRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <EmployeeRatingsPage />
                         </SidebarNavigation>
                       </EmployeeRoute>
@@ -290,7 +288,7 @@ const AppWithAuth = () => {
                     path="/settings" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <SettingsPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -299,18 +297,18 @@ const AppWithAuth = () => {
                   <Route 
                     path="/events" 
                     element={
-                      <NonMediaBuyerRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                      <PrivateRoute>
+                        <SidebarNavigation>
                           <EventsPage />
                         </SidebarNavigation>
-                      </NonMediaBuyerRoute>
+                      </PrivateRoute>
                     } 
                   />
                   <Route 
                     path="/media-buyer-tasks" 
                     element={
                       <MediaBuyerRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <MediaBuyerTasksPage />
                         </SidebarNavigation>
                       </MediaBuyerRoute>
@@ -320,7 +318,7 @@ const AppWithAuth = () => {
                     path="/admin-shift-management" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminShiftManagement />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -330,7 +328,7 @@ const AppWithAuth = () => {
                     path="/performance-dashboard" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminPerformancePage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -340,7 +338,7 @@ const AppWithAuth = () => {
                     path="/workspace" 
                     element={
                       <PrivateRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <WorkspacePage />
                         </SidebarNavigation>
                       </PrivateRoute>
@@ -350,7 +348,7 @@ const AppWithAuth = () => {
                     path="/analytics" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminAnalyticsPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -360,7 +358,7 @@ const AppWithAuth = () => {
                     path="/admin-bug-reports" 
                     element={
                       <AdminRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <AdminBugReportsPage />
                         </SidebarNavigation>
                       </AdminRoute>
@@ -370,7 +368,7 @@ const AppWithAuth = () => {
                     path="/create-order" 
                     element={
                       <CustomerServiceRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <CreateOrderPage />
                         </SidebarNavigation>
                       </CustomerServiceRoute>
@@ -380,13 +378,22 @@ const AppWithAuth = () => {
                     path="/loyal-customers" 
                     element={
                       <CustomerServiceRoute>
-                        <SidebarNavigation isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)}>
+                        <SidebarNavigation>
                           <LoyalCustomersPage />
                         </SidebarNavigation>
                       </CustomerServiceRoute>
                     } 
                   />
-
+                  <Route 
+                    path="/designer-dashboard" 
+                    element={
+                      <DesignerRoute>
+                        <SidebarNavigation>
+                          <DesignerDashboard />
+                        </SidebarNavigation>
+                      </DesignerRoute>
+                    } 
+                  />
                   <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
                 </Routes>
                 <AppUpdateManager />

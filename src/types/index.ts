@@ -65,6 +65,8 @@ export interface Task {
   createdAt: Date;
   updatedAt: Date;
   progressPercentage: number;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  projectType?: 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other';
   comments?: TaskComment[];
   latestRating?: TaskRating;
   averageRating?: number;
@@ -218,6 +220,8 @@ export type TaskRecord = {
   assigned_to: string;
   status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
   progress_percentage: number;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  project_type: 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other';
   created_at: string;
   updated_at: string;
   created_by: string;
