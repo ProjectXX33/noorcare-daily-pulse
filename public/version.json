@@ -1,21 +1,12 @@
 {
-  "version": "1.6.0",
-  "buildTime": "2025-06-11T17:52:24.648Z",
-  "buildTimestamp": "1749664344649",
-  "buildDate": "6/11/2025",
+  "version": "1.6.1",
+  "buildTime": "2025-06-11T23:12:28.511Z",
+  "buildTimestamp": "1749683548511",
+  "buildDate": "6/12/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "✨ FULLY AUTOMATIC REFRESH: Zero user interaction required!",
-    "Page now auto-refreshes after updates without asking user permission",
-    "Complete hands-off experience - updates happen invisibly in background",
-    "Perfect Netflix-style seamless updates with 3-second refresh delay",
-    "Ultimate user experience: Update → Brief notification → Auto-refresh → Done!",
-    "Enhanced Media Buyer Tasks Page",
-    "Enhanced Admin Tasks Page",
-    "Enhanced Task Details Page",
-    "Enhanced Task Comments Page",
-    "Enhanced Task Creation Page"
+    "Bug Fixed"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

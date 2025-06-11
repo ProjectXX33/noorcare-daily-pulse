@@ -1367,8 +1367,8 @@ const AdminTasksPage = () => {
               </Select>
             </div>
             
-            {/* Project Type - Show for Designers or when can create Creative Brief */}
-            {(isSelectedEmployeeDesigner() || canCreateCreativeBrief()) && (
+            {/* Project Type - Show only for Designers */}
+            {isSelectedEmployeeDesigner() && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="task-project-type" className="text-right">
                   Project Type
@@ -1394,8 +1394,8 @@ const AdminTasksPage = () => {
               </div>
             )}
 
-            {/* Designer-specific fields - Enhanced UI - Available for Admins, Media Buyers when assigning to Designers */}
-            {(isSelectedEmployeeDesigner() || canCreateCreativeBrief()) && (
+            {/* Designer-specific fields - Enhanced UI - Only show when Designer is selected */}
+            {isSelectedEmployeeDesigner() && (
               <div className="mt-6 border-t pt-6">
                 <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-2">
