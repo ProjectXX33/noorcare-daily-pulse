@@ -1,16 +1,16 @@
 {
-  "version": "1.5.4",
+  "version": "1.5.5",
   "buildTime": "2025-06-11T00:54:52.876Z",
   "buildTimestamp": "1749603292876",
   "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🚀 SEAMLESS AUTO-UPDATES: No more annoying update prompts!",
-    "Updates now happen automatically in background without user interaction",
-    "Fixed stuck/hanging update process for smoother experience",
-    "Eliminated repetitive update dialogs and confirmation prompts",
-    "Enhanced user experience with invisible, lightning-fast updates"
+    "✨ FULLY AUTOMATIC REFRESH: Zero user interaction required!",
+    "Page now auto-refreshes after updates without asking user permission",
+    "Complete hands-off experience - updates happen invisibly in background",
+    "Perfect Netflix-style seamless updates with 3-second refresh delay",
+    "Ultimate user experience: Update → Brief notification → Auto-refresh → Done!"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

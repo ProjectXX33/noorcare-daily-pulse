@@ -157,12 +157,18 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
         serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
       }
       
-      // Show subtle notification
+      // Show brief update notification
       toast.success('App updated successfully! 🎉', {
-        duration: 3000,
+        duration: 2000,
       });
       
-      console.log('[UpdateManager] Auto-update completed');
+      console.log('[UpdateManager] Auto-update completed, refreshing in 3 seconds...');
+      
+      // Auto-refresh after short delay for smooth experience
+      setTimeout(() => {
+        console.log('[UpdateManager] Auto-refreshing page...');
+        window.location.reload();
+      }, 3000); // 3 second delay to let user see the success message
       
     } catch (error) {
       console.error('[UpdateManager] Auto-update failed:', error);
@@ -428,16 +434,11 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
       
       console.log('[UpdateManager] Update completed successfully for version:', updateInfo.version);
       
-      // Optional: Gentle refresh after delay (user can continue working)
+      // Auto-refresh for immediate effect (this function should rarely be used now)
       setTimeout(() => {
-        toast.info('App updated! Refresh page when convenient.', {
-          duration: 5000,
-          action: {
-            label: 'Refresh Now',
-            onClick: () => window.location.reload()
-          }
-        });
-      }, 2000);
+        console.log('[UpdateManager] Auto-refreshing page after manual update...');
+        window.location.reload();
+      }, 3000);
       
     } catch (error) {
       console.error('[UpdateManager] Error during update:', error);
