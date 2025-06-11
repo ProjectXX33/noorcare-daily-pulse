@@ -156,7 +156,15 @@
         // Calculate work hours
         const totalWorkMs = checkOutTime - checkInTime;
         const totalWorkHours = totalWorkMs / (1000 * 60 * 60);
-        const expectedHours = shift.duration_hours || 8;
+        // Use correct expected hours based on shift type
+        let expectedHours = 8; // Default
+        if (shift.name && shift.name.toLowerCase().includes('day')) {
+          expectedHours = 7; // Day shift is 7 hours
+        } else if (shift.name && shift.name.toLowerCase().includes('night')) {
+          expectedHours = 8; // Night shift is 8 hours
+        } else {
+          expectedHours = shift.duration_hours || 8;
+        }
         const regularHours = Math.min(totalWorkHours, expectedHours);
         const overtimeHours = Math.max(0, totalWorkHours - expectedHours);
         

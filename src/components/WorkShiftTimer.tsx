@@ -95,9 +95,32 @@ const WorkShiftTimer: React.FC = () => {
     const updateTimer = () => {
       const checkInTime = new Date(activeCheckIn.timestamp);
       const now = new Date();
-      const eightHoursInMs = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-      const endTime = new Date(checkInTime.getTime() + eightHoursInMs);
+      
+      // Determine shift hours based on check-in time
+      // Day shift: 9 AM - 4 PM (7 hours), Night shift: 4 PM - 12 AM (8 hours)
+      const checkInHour = checkInTime.getHours();
+      let workHours = 8; // Default to 8 hours
+      
+      if (checkInHour >= 9 && checkInHour < 16) {
+        // Day shift (9 AM - 4 PM) = 7 hours
+        workHours = 7;
+      } else if (checkInHour >= 16 || checkInHour < 1) {
+        // Night shift (4 PM - 1 AM) = 8 hours
+        workHours = 8;
+      }
+      
+      const workHoursInMs = workHours * 60 * 60 * 1000;
+      const endTime = new Date(checkInTime.getTime() + workHoursInMs);
       const remaining = endTime.getTime() - now.getTime();
+      
+      console.log('WorkShiftTimer - Timer calculation:', {
+        checkInTime: checkInTime.toISOString(),
+        checkInHour,
+        workHours,
+        endTime: endTime.toISOString(),
+        remaining: remaining,
+        remainingFormatted: Math.abs(remaining) / (1000 * 60 * 60)
+      });
       
       setTimeRemaining(remaining); // Can be negative for overtime
     };
@@ -170,7 +193,7 @@ const WorkShiftTimer: React.FC = () => {
     return 'Remaining';
   };
 
-  // Show "Work Done!" when 8 hours are completed (but still checked in)
+  // Show "Work Done!" when shift hours are completed (but still checked in)
   if (timeRemaining <= 0) {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-blue-100 text-blue-700 border-blue-200">

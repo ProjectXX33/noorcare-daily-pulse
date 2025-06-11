@@ -195,6 +195,48 @@ export interface WooCommerceCoupon {
   }>;
 }
 
+export interface WooCommerceCustomer {
+  id: number;
+  date_created: string;
+  date_modified: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  username: string;
+  billing: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+    email: string;
+    phone: string;
+  };
+  shipping: {
+    first_name: string;
+    last_name: string;
+    company: string;
+    address_1: string;
+    address_2: string;
+    city: string;
+    state: string;
+    postcode: string;
+    country: string;
+  };
+  is_paying_customer: boolean;
+  avatar_url: string;
+  meta_data: Array<{
+    id: number;
+    key: string;
+    value: string;
+  }>;
+}
+
 export interface WooCommerceOrder {
   id: number;
   parent_id: number;
@@ -437,6 +479,196 @@ class WooCommerceAPI {
       return null;
     }
   }
+
+  async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+    try {
+      console.log('🔍 Testing WooCommerce API connection...');
+      console.log('📍 URL:', this.config.url);
+      console.log('🔑 Consumer Key:', this.config.consumerKey ? `${this.config.consumerKey.substring(0, 10)}...` : 'NOT SET');
+      console.log('🔐 Consumer Secret:', this.config.consumerSecret ? `${this.config.consumerSecret.substring(0, 10)}...` : 'NOT SET');
+
+      // Test products endpoint since you confirmed it works
+      const testUrl = this.getApiUrl('products');
+      console.log('🌐 Testing products API endpoint:', testUrl);
+
+      const response = await fetch(`${testUrl}?per_page=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error Response:', errorText);
+        
+        if (response.status === 401) {
+          return {
+            success: false,
+            message: 'Authentication failed - check your API keys',
+            details: { status: response.status, error: errorText }
+          };
+        } else if (response.status === 404) {
+          return {
+            success: false,
+            message: 'WooCommerce API endpoint not found - check if WooCommerce REST API is enabled',
+            details: { status: response.status, error: errorText }
+          };
+        } else {
+          return {
+            success: false,
+            message: `API request failed: ${response.statusText}`,
+            details: { status: response.status, error: errorText }
+          };
+        }
+      }
+
+      const data = await response.json();
+      console.log('✅ API Response:', data);
+
+      return {
+        success: true,
+        message: 'WooCommerce API connection successful',
+        details: data
+      };
+    } catch (error) {
+      console.error('💥 Connection test failed:', error);
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return {
+          success: false,
+          message: 'Network error - unable to reach WooCommerce site',
+          details: { error: error.message }
+        };
+      }
+      
+      return {
+        success: false,
+        message: `Connection test failed: ${error.message}`,
+        details: { error: error.message }
+      };
+    }
+  }
+
+  async fetchCustomers(params?: {
+    per_page?: number;
+    page?: number;
+    search?: string;
+    email?: string;
+    orderby?: string;
+    order?: string;
+    role?: string;
+  }): Promise<WooCommerceCustomer[]> {
+    try {
+      console.log('🔍 Fetching customers with params:', params);
+      
+      const searchParams = new URLSearchParams();
+      
+      if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+      if (params?.page) searchParams.append('page', params.page.toString());
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.email) searchParams.append('email', params.email);
+      if (params?.orderby) searchParams.append('orderby', params.orderby);
+      if (params?.order) searchParams.append('order', params.order);
+      if (params?.role) searchParams.append('role', params.role);
+
+      const url = `${this.getApiUrl('customers')}?${searchParams.toString()}`;
+      console.log('🌐 Request URL:', url);
+      
+      const startTime = Date.now();
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+      const responseTime = Date.now() - startTime;
+      
+      console.log(`⏱️ API Response time: ${responseTime}ms`);
+      console.log('📊 Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error Response:', errorText);
+        throw new Error(`Failed to fetch customers: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const customers: WooCommerceCustomer[] = await response.json();
+      console.log(`✅ Successfully fetched ${customers.length} customers`);
+      return customers;
+    } catch (error) {
+      console.error('💥 Error fetching customers:', error);
+      throw error;
+    }
+  }
+
+  async getCustomer(customerId: number): Promise<WooCommerceCustomer> {
+    try {
+      const url = this.getApiUrl(`customers/${customerId}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch customer: ${response.statusText}`);
+      }
+
+      const customer: WooCommerceCustomer = await response.json();
+      return customer;
+    } catch (error) {
+      console.error('Error fetching customer:', error);
+      throw error;
+    }
+  }
+
+  async fetchOrdersForCustomer(customerId: number, params?: {
+    per_page?: number;
+    page?: number;
+    status?: string;
+    orderby?: string;
+    order?: string;
+  }): Promise<WooCommerceOrder[]> {
+    try {
+      const searchParams = new URLSearchParams();
+      searchParams.append('customer', customerId.toString());
+      
+      if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+      if (params?.page) searchParams.append('page', params.page.toString());
+      if (params?.status) searchParams.append('status', params.status);
+      if (params?.orderby) searchParams.append('orderby', params.orderby);
+      if (params?.order) searchParams.append('order', params.order);
+
+      const url = `${this.getApiUrl('orders')}?${searchParams.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch customer orders: ${response.statusText}`);
+      }
+
+      const orders: WooCommerceOrder[] = await response.json();
+      return orders;
+    } catch (error) {
+      console.error('Error fetching customer orders:', error);
+      throw error;
+    }
+  }
 }
 
 // Create singleton instance
@@ -455,6 +687,65 @@ export const isWooCommerceConfigured = (): boolean => {
     WOOCOMMERCE_CONFIG.consumerSecret !== 'your_consumer_secret'
   );
 };
+
+// Debug function to test WooCommerce API from browser console
+export const testWooCommerceAPI = async () => {
+  console.log('🔧 WooCommerce API Diagnostic Tool');
+  console.log('=====================================');
+  
+  // Configuration check
+  console.log('1. 📋 Configuration Check:');
+  console.log('   URL:', WOOCOMMERCE_CONFIG.url);
+  console.log('   Consumer Key:', WOOCOMMERCE_CONFIG.consumerKey ? `${WOOCOMMERCE_CONFIG.consumerKey.substring(0, 15)}...` : '❌ NOT SET');
+  console.log('   Consumer Secret:', WOOCOMMERCE_CONFIG.consumerSecret ? `${WOOCOMMERCE_CONFIG.consumerSecret.substring(0, 15)}...` : '❌ NOT SET');
+  console.log('   Is Configured:', isWooCommerceConfigured());
+  
+  if (!isWooCommerceConfigured()) {
+    console.log('❌ WooCommerce is not properly configured. Check your environment variables.');
+    return;
+  }
+  
+  // Test connection
+  console.log('\n2. 🔍 Testing API Connection:');
+  try {
+    const connectionResult = await wooCommerceAPI.testConnection();
+    if (connectionResult.success) {
+      console.log('✅ Connection successful:', connectionResult.message);
+      console.log('   API Details:', connectionResult.details);
+    } else {
+      console.log('❌ Connection failed:', connectionResult.message);
+      console.log('   Error details:', connectionResult.details);
+      return;
+    }
+  } catch (error) {
+    console.log('💥 Connection test error:', error.message);
+    return;
+  }
+  
+  // Test customer fetch
+  console.log('\n3. 👥 Testing Customer Fetch:');
+  try {
+    const customers = await wooCommerceAPI.fetchCustomers({ per_page: 5 });
+    console.log(`✅ Successfully fetched ${customers.length} customers (limited to 5 for test)`);
+    if (customers.length > 0) {
+      console.log('   Sample customer:', {
+        id: customers[0].id,
+        email: customers[0].email,
+        name: `${customers[0].first_name} ${customers[0].last_name}`,
+        date_created: customers[0].date_created
+      });
+    }
+  } catch (error) {
+    console.log('❌ Customer fetch failed:', error.message);
+    return;
+  }
+  
+  console.log('\n🎉 All tests passed! Your WooCommerce API is working properly.');
+  console.log('💡 You can now use the Loyal Customers feature.');
+};
+
+// Make it available globally for debugging
+(window as any).testWooCommerceAPI = testWooCommerceAPI;
 
 // Mock data for development/testing
 export const mockProducts: WooCommerceProduct[] = [

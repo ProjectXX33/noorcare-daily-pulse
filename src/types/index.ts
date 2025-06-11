@@ -70,6 +70,15 @@ export interface Task {
   comments?: TaskComment[];
   latestRating?: TaskRating;
   averageRating?: number;
+  // New fields for designer tasks
+  tacticalPlan?: string;
+  timeEstimate?: string;
+  aim?: string;
+  idea?: string;
+  copy?: string;
+  visualFeeding?: string;
+  attachmentFile?: string;
+  notes?: string;
 }
 
 export type TaskComment = {
@@ -226,6 +235,15 @@ export type TaskRecord = {
   updated_at: string;
   created_by: string;
   comments: TaskComment[];
+  // New fields for designer tasks
+  tactical_plan?: string;
+  time_estimate?: string;
+  aim?: string;
+  idea?: string;
+  copy?: string;
+  visual_feeding?: string;
+  attachment_file?: string;
+  notes?: string;
 }
 
 export type WorkTimeConfigRecord = {

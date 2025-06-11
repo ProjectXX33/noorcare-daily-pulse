@@ -139,33 +139,19 @@ function calculateWorkHours(checkInTime, checkOutTime, shift) {
   const totalMinutes = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60);
   const totalHours = totalMinutes / 60;
   
-  // Parse shift times
-  const [shiftStartHour, shiftStartMin] = shift.start_time.split(':').map(Number);
-  const [shiftEndHour, shiftEndMin] = shift.end_time.split(':').map(Number);
-  
-  // Create shift start and end times for the work date
-  const shiftStart = new Date(checkInTime);
-  shiftStart.setHours(shiftStartHour, shiftStartMin, 0, 0);
-  
-  const shiftEnd = new Date(checkInTime);
-  shiftEnd.setHours(shiftEndHour, shiftEndMin, 0, 0);
-  
-  // Handle shifts that cross midnight
-  if (shiftEndHour === 0 || shiftEndHour < shiftStartHour) {
-    shiftEnd.setDate(shiftEnd.getDate() + 1);
+  // Determine standard work hours based on shift type
+  let standardWorkHours = 8; // Default to 8 hours
+  if (shift.name && shift.name.toLowerCase().includes('day')) {
+    standardWorkHours = 7; // Day shift is 7 hours
+  } else if (shift.name && shift.name.toLowerCase().includes('night')) {
+    standardWorkHours = 8; // Night shift is 8 hours
   }
   
-  // Calculate regular hours: time worked within shift boundaries
-  const actualWorkStart = checkInTime > shiftStart ? checkInTime : shiftStart;
-  const actualWorkEnd = checkOutTime < shiftEnd ? checkOutTime : shiftEnd;
+  // Calculate regular hours based on standard hours for the shift
+  const regularHours = Math.min(totalHours, standardWorkHours);
   
-  let regularHours = 0;
-  if (actualWorkEnd > actualWorkStart) {
-    regularHours = (actualWorkEnd.getTime() - actualWorkStart.getTime()) / (1000 * 60 * 60);
-  }
-  
-  // Calculate overtime hours: total hours - regular hours
-  const overtimeHours = Math.max(0, totalHours - regularHours);
+  // Calculate overtime hours: total hours - standard hours for this shift
+  const overtimeHours = Math.max(0, totalHours - standardWorkHours);
   
   return {
     regularHours: Math.round(regularHours * 100) / 100,

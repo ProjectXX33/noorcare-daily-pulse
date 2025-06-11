@@ -357,8 +357,14 @@ export async function recordCheckOutPerformance(
         // Calculate check-in delay
         delayMinutes = calculateDelay(shiftInfo.start_time, new Date(checkInData.timestamp));
         
-        // Calculate work duration performance
+        // Calculate work duration performance - different hours for different shifts
+        if (shiftInfo.name && shiftInfo.name.toLowerCase().includes('day')) {
+          expectedHours = 7; // Day shift is 7 hours
+        } else if (shiftInfo.name && shiftInfo.name.toLowerCase().includes('night')) {
+          expectedHours = 8; // Night shift is 8 hours
+        } else {
         expectedHours = shiftInfo.duration_hours || 8; // Default 8 hours
+        }
         actualHours = regularHours + overtimeHours;
         
         // Use comprehensive performance calculation

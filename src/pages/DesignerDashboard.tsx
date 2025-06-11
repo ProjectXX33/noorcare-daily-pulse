@@ -35,6 +35,7 @@ import {
 import { toast } from "sonner";
 import { fetchUserTasks, updateTaskProgress } from '@/lib/tasksApi';
 import { getTaskAverageRating } from '@/lib/ratingsApi';
+import { getFileUrl, isImageFile } from '@/lib/fileUpload';
 import TaskComments from '@/components/TaskComments';
 import StarRating from '@/components/StarRating';
 
@@ -62,6 +63,15 @@ interface DesignTask {
   clientName?: string;
   deadline?: Date;
   designStyle?: string;
+  // New designer-specific fields from admin
+  tacticalPlan?: string;
+  timeEstimate?: string;
+  aim?: string;
+  idea?: string;
+  copy?: string;
+  visualFeeding?: string;
+  attachmentFile?: string;
+  notes?: string;
 }
 
 const DesignerDashboard = () => {
@@ -76,6 +86,8 @@ const DesignerDashboard = () => {
   const [filterProject, setFilterProject] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   // Load tasks when component mounts
   useEffect(() => {
@@ -264,6 +276,11 @@ const DesignerDashboard = () => {
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
+  };
+
+  const handleImageClick = (imagePath: string) => {
+    setSelectedImage(imagePath);
+    setIsImageModalOpen(true);
   };
 
   const handleUpdateProgress = async (taskId: string, newProgress: number) => {
@@ -504,9 +521,15 @@ const DesignerDashboard = () => {
                           {task.priority?.toUpperCase()}
                         </Badge>
                       </div>
-                      <CardTitle className="text-sm sm:text-base lg:text-lg font-semibold line-clamp-2 break-words overflow-wrap-anywhere">
+                      <CardTitle className="text-sm sm:text-base lg:text-lg font-semibold line-clamp-2 break-words overflow-wrap-anywhere mb-1">
                         {task.title}
                       </CardTitle>
+                      
+                      {/* Move description to header to remove gap */}
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-3 break-words overflow-wrap-anywhere mb-2">
+                        {task.description}
+                      </p>
+                      
                       {task.clientName && (
                         <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                           <User className="w-3 h-3 flex-shrink-0" />
@@ -515,9 +538,66 @@ const DesignerDashboard = () => {
                       )}
                     </CardHeader>
                     <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
-                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 sm:line-clamp-3 break-words overflow-wrap-anywhere">
-                        {task.description}
-                      </p>
+                      
+                      {/* Visual Feeding Preview - Show on card if available */}
+                      {task.visualFeeding && isImageFile(task.visualFeeding) && (
+                        <div className="mt-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-pink-600">🖼️</span>
+                            <span className="text-xs font-medium text-pink-600">Visual Reference</span>
+                          </div>
+                          <div className="relative group cursor-pointer" onClick={(e) => {
+                            e.stopPropagation(); // Prevent opening task dialog
+                            handleImageClick(getFileUrl(task.visualFeeding));
+                          }}>
+                            <img 
+                              src={getFileUrl(task.visualFeeding)} 
+                              alt="Visual Reference Preview" 
+                              className="w-full h-20 sm:h-24 object-cover rounded border-2 border-pink-200 transition-all duration-200 group-hover:border-pink-400 group-hover:shadow-lg"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            {/* Overlay to indicate it's clickable */}
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <div className="bg-white bg-opacity-90 rounded-full p-1.5">
+                                  <Eye className="w-3 h-3 text-gray-700" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Designer Brief Summary */}
+                      {(task.tacticalPlan || task.timeEstimate || task.aim) && (
+                        <div className="mt-3 p-2 sm:p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                          <div className="flex items-center gap-1 mb-2">
+                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">📋 Creative Brief</span>
+                          </div>
+                          <div className="space-y-1 text-xs">
+                            {task.timeEstimate && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-orange-600">⏱️</span>
+                                <span className="font-medium text-slate-700 dark:text-slate-300">Time: {task.timeEstimate}</span>
+                              </div>
+                            )}
+                            {task.aim && (
+                              <div className="flex items-start gap-1">
+                                <span className="text-green-600 mt-0.5">🎯</span>
+                                <span className="font-medium text-slate-700 dark:text-slate-300 line-clamp-1">{task.aim}</span>
+                              </div>
+                            )}
+                            {task.tacticalPlan && (
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600 mt-0.5">📋</span>
+                                <span className="text-slate-600 dark:text-slate-400 line-clamp-1">{task.tacticalPlan}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -550,14 +630,61 @@ const DesignerDashboard = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3 flex-shrink-0" />
-                        <span className="truncate">Updated {new Date(task.updatedAt).toLocaleDateString()}</span>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">Updated {new Date(task.updatedAt).toLocaleDateString()}</span>
+                          </div>
+                          {task.createdByName && (
+                            <span className="text-purple-600 dark:text-purple-400 font-medium">
+                              👤 From: {task.createdByName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {/* File indicators */}
+                          <div className="flex items-center gap-1">
+                            {task.visualFeeding && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                                🖼️
+                              </span>
+                            )}
+                            {task.attachmentFile && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                                📎
+                              </span>
+                            )}
+                            {task.comments && task.comments.length > 0 && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                💬 {task.comments.length}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </>
                 ) : (
                   <div className="flex-1 flex items-center gap-4 p-4">
+                    {/* Visual Preview in List Mode */}
+                    {task.visualFeeding && isImageFile(task.visualFeeding) && (
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={getFileUrl(task.visualFeeding)} 
+                          alt="Visual Reference" 
+                          className="w-12 h-12 object-cover rounded border-2 border-pink-200 cursor-pointer hover:border-pink-400 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleImageClick(getFileUrl(task.visualFeeding));
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    
                     <div className="flex items-center gap-2">
                       {getProjectTypeIcon(task.projectType)}
                       <Badge variant="outline" className={`text-xs ${getProjectTypeColor(task.projectType)}`}>
@@ -565,12 +692,29 @@ const DesignerDashboard = () => {
                       </Badge>
                     </div>
                     
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{task.title}</h3>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{task.title}</h3>
                       <p className="text-sm text-muted-foreground line-clamp-1">{task.description}</p>
+                      {task.createdByName && (
+                        <p className="text-xs text-purple-600 dark:text-purple-400">From: {task.createdByName}</p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4">
+                      {/* File indicators in list mode */}
+                      <div className="flex items-center gap-1">
+                        {task.attachmentFile && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                            📎
+                          </span>
+                        )}
+                        {task.comments && task.comments.length > 0 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            💬 {task.comments.length}
+                          </span>
+                        )}
+                      </div>
+                      
                       <Badge variant="outline" className={`text-xs ${getStatusColor(task.status)}`}>
                         {task.status}
                       </Badge>
@@ -758,6 +902,159 @@ const DesignerDashboard = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Designer Brief Section - Show if any designer fields exist */}
+                    {(selectedTask.tacticalPlan || selectedTask.timeEstimate || selectedTask.aim || 
+                      selectedTask.idea || selectedTask.copy || selectedTask.visualFeeding || 
+                      selectedTask.attachmentFile || selectedTask.notes) && (
+                      <div className="border-t pt-6 mt-6">
+                        <div className="mb-4 flex items-center gap-2">
+                          <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">🎨</span>
+                          </div>
+                          <Label className="text-base font-bold text-slate-900 dark:text-slate-100">Creative Brief</Label>
+                          <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                            Designer Details
+                          </span>
+                        </div>
+                        
+                        <div className="grid gap-4">
+                          {selectedTask.tacticalPlan && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span className="text-purple-600">📋</span> Tactical Plan
+                              </Label>
+                              <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
+                                  {selectedTask.tacticalPlan}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {(selectedTask.timeEstimate || selectedTask.aim) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {selectedTask.timeEstimate && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <span className="text-blue-600">⏱️</span> Time Estimate
+                                  </Label>
+                                  <div className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.timeEstimate}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {selectedTask.aim && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <span className="text-green-600">🎯</span> Aim/Goal
+                                  </Label>
+                                  <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg border border-green-200 dark:border-green-700">
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.aim}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {selectedTask.idea && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span className="text-yellow-600">💡</span> Creative Idea
+                              </Label>
+                              <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl border border-yellow-200 dark:border-yellow-700">
+                                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
+                                  {selectedTask.idea}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedTask.copy && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span className="text-indigo-600">📝</span> Copy Text
+                              </Label>
+                              <div className="p-4 bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-xl border border-indigo-200 dark:border-indigo-700">
+                                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
+                                  {selectedTask.copy}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {(selectedTask.visualFeeding || selectedTask.attachmentFile) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {selectedTask.visualFeeding && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <span className="text-pink-600">🖼️</span> Visual Feeding
+                                  </Label>
+                                  <div className="p-3 bg-gradient-to-r from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-lg border border-pink-200 dark:border-pink-700">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-pink-600">📷</span>
+                                      <span className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.visualFeeding}</span>
+                                    </div>
+                                                                         {/* Image Preview - if it's an image file */}
+                                     {selectedTask.visualFeeding && isImageFile(selectedTask.visualFeeding) && (
+                                       <div className="mt-2">
+                                                                                    <div className="relative group cursor-pointer" onClick={() => handleImageClick(getFileUrl(selectedTask.visualFeeding))}>
+                                             <img 
+                                               src={getFileUrl(selectedTask.visualFeeding)} 
+                                               alt="Visual Reference" 
+                                             className="max-w-full h-auto max-h-32 rounded border transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
+                                             onError={(e) => {
+                                               e.currentTarget.style.display = 'none';
+                                             }}
+                                           />
+                                           {/* Overlay to indicate it's clickable */}
+                                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
+                                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                               <div className="bg-white bg-opacity-90 rounded-full p-2">
+                                                 <Eye className="w-4 h-4 text-gray-700" />
+                                               </div>
+                                             </div>
+                                           </div>
+                                         </div>
+                                         <p className="text-xs text-slate-500 mt-1 text-center">Click to view full size</p>
+                                       </div>
+                                     )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {selectedTask.attachmentFile && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                    <span className="text-orange-600">📎</span> Additional Files
+                                  </Label>
+                                  <div className="p-3 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg border border-orange-200 dark:border-orange-700">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-orange-600">📄</span>
+                                      <span className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.attachmentFile}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {selectedTask.notes && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span className="text-gray-600">💬</span> Additional Notes
+                              </Label>
+                              <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/20 dark:to-gray-800/20 rounded-xl border border-gray-200 dark:border-gray-700">
+                                <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words">
+                                  {selectedTask.notes}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 
@@ -855,6 +1152,33 @@ const DesignerDashboard = () => {
               </Tabs>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Modal */}
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none">
+          <div className="relative flex items-center justify-center">
+            {selectedImage && (
+              <img 
+                                  src={selectedImage} 
+                alt="Visual Reference - Full Size" 
+                className="max-w-full max-h-[90vh] object-contain rounded"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+            {/* Close button */}
+            <button
+              onClick={() => setIsImageModalOpen(false)}
+              className="absolute top-4 right-4 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-2 transition-all duration-200"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

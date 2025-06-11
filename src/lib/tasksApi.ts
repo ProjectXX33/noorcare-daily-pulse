@@ -38,7 +38,16 @@ export const fetchTasks = async (): Promise<Task[]> => {
       createdByPosition: task.created_by.position,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at),
-      comments: task.comments || [] // Ensure comments are included
+      comments: task.comments || [], // Ensure comments are included
+      // Add new designer fields
+      tacticalPlan: task.tactical_plan,
+      timeEstimate: task.time_estimate,
+      aim: task.aim,
+      idea: task.idea,
+      copy: task.copy,
+      visualFeeding: task.visual_feeding,
+      attachmentFile: task.attachment_file,
+      notes: task.notes
     }));
     
     console.log('Tasks fetched:', tasks);
@@ -87,7 +96,16 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       createdByPosition: task.created_by.position,
       createdAt: new Date(task.created_at),
       updatedAt: new Date(task.updated_at),
-      comments: task.comments || [] // Ensure comments are included
+      comments: task.comments || [], // Ensure comments are included
+      // Add new designer fields
+      tacticalPlan: task.tactical_plan,
+      timeEstimate: task.time_estimate,
+      aim: task.aim,
+      idea: task.idea,
+      copy: task.copy,
+      visualFeeding: task.visual_feeding,
+      attachmentFile: task.attachment_file,
+      notes: task.notes
     }));
 
     console.log('User tasks fetched:', tasks);
@@ -112,6 +130,15 @@ export const createTask = async (
     createdBy: string;
     priority?: string;
     projectType?: string;
+    // New designer fields
+    tacticalPlan?: string;
+    timeEstimate?: string;
+    aim?: string;
+    idea?: string;
+    copy?: string;
+    visualFeeding?: string;
+    attachmentFile?: string;
+    notes?: string;
   }
 ): Promise<Task> => {
   try {
@@ -131,6 +158,15 @@ export const createTask = async (
         progress_percentage: task.progressPercentage || 0,
         priority: task.priority || 'medium',
         project_type: task.projectType || 'other',
+        // Add new designer fields
+        tactical_plan: task.tacticalPlan,
+        time_estimate: task.timeEstimate,
+        aim: task.aim,
+        idea: task.idea,
+        copy: task.copy,
+        visual_feeding: task.visualFeeding,
+        attachment_file: task.attachmentFile,
+        notes: task.notes,
       }])
       .select(`
         *,
@@ -171,7 +207,16 @@ export const createTask = async (
       createdByName: data.created_by.name,
       createdByPosition: data.created_by.position,
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
+      updatedAt: new Date(data.updated_at),
+      // Add new designer fields
+      tacticalPlan: data.tactical_plan,
+      timeEstimate: data.time_estimate,
+      aim: data.aim,
+      idea: data.idea,
+      copy: data.copy,
+      visualFeeding: data.visual_feeding,
+      attachmentFile: data.attachment_file,
+      notes: data.notes
     };
     
     console.log('Task created:', newTask);
@@ -193,6 +238,15 @@ export const updateTask = async (
     progressPercentage?: number;
     priority?: string;
     projectType?: string;
+    // New designer fields
+    tacticalPlan?: string;
+    timeEstimate?: string;
+    aim?: string;
+    idea?: string;
+    copy?: string;
+    visualFeeding?: string;
+    attachmentFile?: string;
+    notes?: string;
   },
   currentUserId: string
 ): Promise<Task> => {
@@ -205,6 +259,15 @@ export const updateTask = async (
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     if (updates.priority) dbUpdates.priority = updates.priority;
     if (updates.projectType) dbUpdates.project_type = updates.projectType;
+    // Add new designer fields
+    if (updates.tacticalPlan !== undefined) dbUpdates.tactical_plan = updates.tacticalPlan;
+    if (updates.timeEstimate !== undefined) dbUpdates.time_estimate = updates.timeEstimate;
+    if (updates.aim !== undefined) dbUpdates.aim = updates.aim;
+    if (updates.idea !== undefined) dbUpdates.idea = updates.idea;
+    if (updates.copy !== undefined) dbUpdates.copy = updates.copy;
+    if (updates.visualFeeding !== undefined) dbUpdates.visual_feeding = updates.visualFeeding;
+    if (updates.attachmentFile !== undefined) dbUpdates.attachment_file = updates.attachmentFile;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     
     // Always set status based on progress percentage
     if (updates.progressPercentage !== undefined) {
@@ -302,6 +365,8 @@ export const updateTask = async (
       description: data.description,
       status: data.status,
       progressPercentage: data.progress_percentage,
+      priority: data.priority || 'medium',
+      projectType: data.project_type || 'other',
       assignedTo: data.assigned_to.id,
       assignedToName: data.assigned_to.name,
       assignedToPosition: data.assigned_to.position,
@@ -309,7 +374,16 @@ export const updateTask = async (
       createdByName: data.created_by.name,
       createdByPosition: data.created_by.position,
       createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at)
+      updatedAt: new Date(data.updated_at),
+      // Add new designer fields
+      tacticalPlan: data.tactical_plan,
+      timeEstimate: data.time_estimate,
+      aim: data.aim,
+      idea: data.idea,
+      copy: data.copy,
+      visualFeeding: data.visual_feeding,
+      attachmentFile: data.attachment_file,
+      notes: data.notes
     };
     
     console.log('Task updated:', updatedTask);

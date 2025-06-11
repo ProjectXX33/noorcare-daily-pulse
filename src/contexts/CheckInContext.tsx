@@ -1078,9 +1078,25 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Helper function to calculate regular and overtime hours
   const calculateRegularAndOvertimeHours = (totalHours: number, shift: Shift) => {
-    const standardWorkHours = 8; // 8-hour standard work day
+    // Different standard work hours based on shift type
+    let standardWorkHours = 8; // Default to 8 hours
+    
+    // Day shift is 7 hours (9 AM - 4 PM), Night shift is 8 hours (4 PM - 12 AM)
+    if (shift.name.toLowerCase().includes('day')) {
+      standardWorkHours = 7; // Day shift is 7 hours
+    } else if (shift.name.toLowerCase().includes('night')) {
+      standardWorkHours = 8; // Night shift is 8 hours
+    }
+    
     const regularHours = Math.min(totalHours, standardWorkHours);
     const overtimeHours = Math.max(0, totalHours - standardWorkHours);
+    
+    console.log(`📊 Hours calculation for ${shift.name}:`, {
+      totalHours: totalHours.toFixed(2),
+      standardWorkHours,
+      regularHours: regularHours.toFixed(2),
+      overtimeHours: overtimeHours.toFixed(2)
+    });
     
     return { regularHours, overtimeHours };
   };

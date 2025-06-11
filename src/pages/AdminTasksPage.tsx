@@ -39,7 +39,8 @@ import {
   fetchTasks, 
   createTask, 
   sendNotification, 
-  updateTask 
+  updateTask,
+  deleteTask 
 } from '@/lib/tasksApi';
 import { getTaskAverageRating, getLatestTaskRating } from '@/lib/ratingsApi';
 import { fetchEmployees } from '@/lib/employeesApi';
@@ -49,7 +50,8 @@ import TaskComments from '@/components/TaskComments';
 import RateTaskModal from '@/components/RateTaskModal';
 import StarRating from '@/components/StarRating';
 import { supabase } from '@/lib/supabase';
-import { Star, MoreVertical, Palette, Smartphone, Globe, Award, FileText, Zap, FolderOpen, Plus, Users, TrendingUp, Clock, Calendar, Filter, Edit, Eye } from 'lucide-react';
+import { uploadFile, getFileUrl, isImageFile } from '@/lib/fileUpload';
+import { Star, MoreVertical, Palette, Smartphone, Globe, Award, FileText, Zap, FolderOpen, Plus, Users, TrendingUp, Clock, Calendar, Filter, Edit, Eye, Trash2 } from 'lucide-react';
 
 // Enhanced Task interface with creator information
 interface EnhancedTask extends Task {
@@ -80,7 +82,16 @@ const AdminTasksPage = () => {
     status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
     progressPercentage: 0,
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-    projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other'
+    projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other',
+    // New fields for designer tasks
+    tacticalPlan: '',
+    timeEstimate: '',
+    aim: '',
+    idea: '',
+    copy: '',
+    visualFeeding: '',
+    attachmentFile: '',
+    notes: ''
   });
   
   const [editingTask, setEditingTask] = useState({
@@ -91,7 +102,16 @@ const AdminTasksPage = () => {
     status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
     progressPercentage: 0,
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-    projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other'
+    projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other',
+    // New fields for designer tasks
+    tacticalPlan: '',
+    timeEstimate: '',
+    aim: '',
+    idea: '',
+    copy: '',
+    visualFeeding: '',
+    attachmentFile: '',
+    notes: ''
   });
   
   const [notification, setNotification] = useState({
@@ -107,6 +127,12 @@ const AdminTasksPage = () => {
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<EnhancedTask | null>(null);
   const [isTaskDetailsDialogOpen, setIsTaskDetailsDialogOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isUploadingVisualFeeding, setIsUploadingVisualFeeding] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isUploadingEditVisualFeeding, setIsUploadingEditVisualFeeding] = useState(false);
+  const [isUploadingEditAttachment, setIsUploadingEditAttachment] = useState(false);
   
   // Translation object for multilingual support
   const translations = {
@@ -289,6 +315,22 @@ const AdminTasksPage = () => {
       return;
     }
 
+    // Additional validation for Designer tasks - Creative Brief fields required
+    const assignedUser = employees.find(emp => emp.id === newTask.assignedTo);
+    if (assignedUser?.position === 'Designer') {
+      const missingFields = [];
+      
+      if (!newTask.tacticalPlan.trim()) missingFields.push('Tactical Plan');
+      if (!newTask.aim.trim()) missingFields.push('Aim/Goal');
+      if (!newTask.idea.trim()) missingFields.push('Creative Idea');
+      if (!newTask.copy.trim()) missingFields.push('Copy Text');
+      
+      if (missingFields.length > 0) {
+        toast.error(`Creative Brief required for Designer tasks. Missing: ${missingFields.join(', ')}`);
+        return;
+      }
+    }
+
     // Automatically set status based on progress
     let status = newTask.status;
     if (newTask.progressPercentage === 0) {
@@ -304,7 +346,16 @@ const AdminTasksPage = () => {
         status,
         createdBy: user.id,
         priority: newTask.priority,
-        projectType: newTask.projectType
+        projectType: newTask.projectType,
+        // Include designer fields
+        tacticalPlan: newTask.tacticalPlan,
+        timeEstimate: newTask.timeEstimate,
+        aim: newTask.aim,
+        idea: newTask.idea,
+        copy: newTask.copy,
+        visualFeeding: newTask.visualFeeding,
+        attachmentFile: newTask.attachmentFile,
+        notes: newTask.notes
       });
       
       setTasks([createdTask, ...tasks]);
@@ -319,7 +370,15 @@ const AdminTasksPage = () => {
         status: 'Not Started',
         progressPercentage: 0,
         priority: 'medium',
-        projectType: 'other'
+        projectType: 'other',
+        tacticalPlan: '',
+        timeEstimate: '',
+        aim: '',
+        idea: '',
+        copy: '',
+        visualFeeding: '',
+        attachmentFile: '',
+        notes: ''
       });
       toast.success(t.taskAdded);
     } catch (error) {
@@ -336,6 +395,22 @@ const AdminTasksPage = () => {
     if (!editingTask.title || !editingTask.description || !editingTask.assignedTo) {
       toast.error(t.fillAllFields);
       return;
+    }
+
+    // Additional validation for Designer tasks - Creative Brief fields required
+    const assignedUser = employees.find(emp => emp.id === editingTask.assignedTo);
+    if (assignedUser?.position === 'Designer') {
+      const missingFields = [];
+      
+      if (!editingTask.tacticalPlan.trim()) missingFields.push('Tactical Plan');
+      if (!editingTask.aim.trim()) missingFields.push('Aim/Goal');
+      if (!editingTask.idea.trim()) missingFields.push('Creative Idea');
+      if (!editingTask.copy.trim()) missingFields.push('Copy Text');
+      
+      if (missingFields.length > 0) {
+        toast.error(`Creative Brief required for Designer tasks. Missing: ${missingFields.join(', ')}`);
+        return;
+      }
     }
 
     // Automatically set status based on progress
@@ -357,7 +432,16 @@ const AdminTasksPage = () => {
           status: finalStatus,
           progressPercentage: editingTask.progressPercentage,
           priority: editingTask.priority,
-          projectType: editingTask.projectType
+          projectType: editingTask.projectType,
+          // Include designer fields
+          tacticalPlan: editingTask.tacticalPlan,
+          timeEstimate: editingTask.timeEstimate,
+          aim: editingTask.aim,
+          idea: editingTask.idea,
+          copy: editingTask.copy,
+          visualFeeding: editingTask.visualFeeding,
+          attachmentFile: editingTask.attachmentFile,
+          notes: editingTask.notes
         },
         user.id
       );
@@ -414,6 +498,83 @@ const AdminTasksPage = () => {
     }
   };
 
+  const handleImageClick = (imagePath: string) => {
+    setSelectedImage(imagePath);
+    setIsImageModalOpen(true);
+  };
+
+  const handleVisualFeedingUpload = async (file: File) => {
+    setIsUploadingVisualFeeding(true);
+    try {
+      const result = await uploadFile(file, 'visual-feeding');
+      if (result.success && result.fileName) {
+        setNewTask({...newTask, visualFeeding: result.fileName});
+        toast.success('Visual feeding uploaded successfully!');
+      } else {
+        toast.error(`Upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload visual feeding');
+    } finally {
+      setIsUploadingVisualFeeding(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (file: File) => {
+    setIsUploadingAttachment(true);
+    try {
+      const result = await uploadFile(file, 'attachments');
+      if (result.success && result.fileName) {
+        setNewTask({...newTask, attachmentFile: result.fileName});
+        toast.success('Attachment uploaded successfully!');
+      } else {
+        toast.error(`Upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload attachment');
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
+  const handleEditVisualFeedingUpload = async (file: File) => {
+    setIsUploadingEditVisualFeeding(true);
+    try {
+      const result = await uploadFile(file, 'visual-feeding');
+      if (result.success && result.fileName) {
+        setEditingTask({...editingTask, visualFeeding: result.fileName});
+        toast.success('Visual feeding uploaded successfully!');
+      } else {
+        toast.error(`Upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload visual feeding');
+    } finally {
+      setIsUploadingEditVisualFeeding(false);
+    }
+  };
+
+  const handleEditAttachmentUpload = async (file: File) => {
+    setIsUploadingEditAttachment(true);
+    try {
+      const result = await uploadFile(file, 'attachments');
+      if (result.success && result.fileName) {
+        setEditingTask({...editingTask, attachmentFile: result.fileName});
+        toast.success('Attachment uploaded successfully!');
+      } else {
+        toast.error(`Upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload attachment');
+    } finally {
+      setIsUploadingEditAttachment(false);
+    }
+  };
+
   const openEditTaskDialog = (task: EnhancedTask) => {
     setEditingTask({
       id: task.id,
@@ -423,7 +584,15 @@ const AdminTasksPage = () => {
       status: task.status as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
       progressPercentage: task.progressPercentage,
       priority: task.priority || 'medium',
-      projectType: task.projectType || 'other'
+      projectType: task.projectType || 'other',
+      tacticalPlan: task.tacticalPlan || '',
+      timeEstimate: task.timeEstimate || '',
+      aim: task.aim || '',
+      idea: task.idea || '',
+      copy: task.copy || '',
+      visualFeeding: task.visualFeeding || '',
+      attachmentFile: task.attachmentFile || '',
+      notes: task.notes || ''
     });
     setSelectedTask(task);
     setCurrentTaskTab("details");
@@ -442,6 +611,19 @@ const AdminTasksPage = () => {
 
   const handleTaskRatingSubmitted = () => {
     loadData(); // Refresh task data to show updated ratings
+  };
+
+  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+    if (window.confirm(`Are you sure you want to delete the task "${taskTitle}"? This action cannot be undone.`)) {
+      try {
+        await deleteTask(taskId);
+        toast.success('Task deleted successfully!');
+        loadData(); // Refresh the task list
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        toast.error('Failed to delete task');
+      }
+    }
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -470,10 +652,42 @@ const AdminTasksPage = () => {
     return selectedEmployee?.position === 'Designer';
   };
 
+  // Check if current user can create Creative Briefs (Admins and Media Buyers)
+  const canCreateCreativeBrief = () => {
+    return user?.role === 'admin' || user?.position === 'Media Buyer';
+  };
+
   // Helper function to check if editing task is for a Designer
   const isEditingTaskForDesigner = () => {
     const selectedEmployee = employees.find(emp => emp.id === editingTask.assignedTo);
     return selectedEmployee?.position === 'Designer';
+  };
+
+  // Helper to check if designer task has meaningful content
+  const getDesignerTaskCompleteness = (task: typeof newTask) => {
+    if (!isSelectedEmployeeDesigner()) return { completed: 0, total: 0, fields: [] };
+    
+    const fields = [
+      { name: 'Tactical Plan', value: task.tacticalPlan, required: true },
+      { name: 'Time Estimate', value: task.timeEstimate, required: true },
+      { name: 'Aim/Goal', value: task.aim, required: true },
+      { name: 'Creative Idea', value: task.idea, required: false },
+      { name: 'Copy Text', value: task.copy, required: false },
+      { name: 'Visual Feeding (Image)', value: task.visualFeeding, required: false },
+      { name: 'Notes', value: task.notes, required: false },
+    ];
+    
+    const completed = fields.filter(field => field.value && field.value.trim().length > 0).length;
+    const requiredCompleted = fields.filter(field => field.required && field.value && field.value.trim().length > 0).length;
+    const totalRequired = fields.filter(field => field.required).length;
+    
+    return { 
+      completed, 
+      total: fields.length, 
+      requiredCompleted,
+      totalRequired,
+      fields: fields.filter(field => field.required && (!field.value || field.value.trim().length === 0)).map(f => f.name)
+    };
   };
 
   // Helper functions for priority and project type display
@@ -904,6 +1118,13 @@ const AdminTasksPage = () => {
                                     <Star className="mr-2 h-4 w-4" />
                                     {t.rateTask}
                                   </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteTask(task.id, task.title)} 
+                                  className="hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Task
+                                </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -979,22 +1200,38 @@ const AdminTasksPage = () => {
                           <Progress value={task.progressPercentage} className="h-2.5 flex-1 bg-slate-200 dark:bg-slate-700" />
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 min-w-[35px]">{task.progressPercentage}%</span>
                         </div>
-                        {/* Rating moved below progress for mobile */}
-                        {task.averageRating && task.averageRating > 0 ? (
+                        {/* Rating and File Indicators */}
+                        <div className="flex items-center justify-between">
+                          {task.averageRating && task.averageRating > 0 ? (
                             <div className="flex items-center gap-2">
-                            <StarRating 
-                              rating={task.averageRating} 
-                              readonly 
-                              size="sm" 
-                              spacing="tight"
-                            />
-                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                              ({task.averageRating.toFixed(1)})
-                            </span>
+                              <StarRating 
+                                rating={task.averageRating} 
+                                readonly 
+                                size="sm" 
+                                spacing="tight"
+                              />
+                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                ({task.averageRating.toFixed(1)})
+                              </span>
                             </div>
-                        ) : (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">{t.noRating}</span>
-                        )}
+                          ) : (
+                            <span className="text-xs text-slate-500 dark:text-slate-400">{t.noRating}</span>
+                          )}
+                          
+                          {/* File indicators for mobile cards */}
+                          <div className="flex items-center gap-1">
+                            {task.visualFeeding && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300">
+                                🖼️
+                              </span>
+                            )}
+                            {task.attachmentFile && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                                📎
+                              </span>
+                            )}
+                          </div>
+                        </div>
                         <div className="flex justify-between text-xs text-gray-500 pt-1">
                           <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                           <span>Updated: {new Date(task.updatedAt).toLocaleDateString()}</span>
@@ -1036,7 +1273,7 @@ const AdminTasksPage = () => {
 
         {/* Add Task Dialog */}
         <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-          <DialogContent className="w-[95vw] max-w-[525px] p-2 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogContent className="w-[95vw] max-w-[90vw] sm:max-w-[700px] lg:max-w-[900px] max-h-[90vh] overflow-y-auto p-4 sm:p-6" dir={language === 'ar' ? 'rtl' : 'ltr'}>
             <DialogHeader>
               <DialogTitle>{t.newTask}</DialogTitle>
               <DialogDescription>
@@ -1130,8 +1367,8 @@ const AdminTasksPage = () => {
               </Select>
             </div>
             
-            {/* Project Type - Only show for Designers */}
-            {isSelectedEmployeeDesigner() && (
+            {/* Project Type - Show for Designers or when can create Creative Brief */}
+            {(isSelectedEmployeeDesigner() || canCreateCreativeBrief()) && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="task-project-type" className="text-right">
                   Project Type
@@ -1156,6 +1393,218 @@ const AdminTasksPage = () => {
                 </Select>
               </div>
             )}
+
+            {/* Designer-specific fields - Enhanced UI - Available for Admins, Media Buyers when assigning to Designers */}
+            {(isSelectedEmployeeDesigner() || canCreateCreativeBrief()) && (
+              <div className="mt-6 border-t pt-6">
+                <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">🎨</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Designer Task Details</h3>
+                    <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                      Creative Brief
+                    </span>
+                  </div>
+                  
+                  {/* Completion Indicator */}
+                  {(() => {
+                    const completeness = getDesignerTaskCompleteness(newTask);
+                    return (
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <span className="text-gray-600">{completeness.completed}/{completeness.total} fields filled</span>
+                        </div>
+                        {completeness.requiredCompleted < completeness.totalRequired && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            <span className="text-red-600">{completeness.totalRequired - completeness.requiredCompleted} required missing</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                <div className="space-y-4">
+                  {/* Tactical Plan */}
+                  <div className="space-y-2">
+                    <Label htmlFor="task-tactical-plan" className="text-sm font-medium flex items-center gap-2">
+                      <span className="text-purple-600">📋</span> Tactical Plan
+                      <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                    </Label>
+                    <Textarea
+                      id="task-tactical-plan"
+                      value={newTask.tacticalPlan}
+                      onChange={(e) => setNewTask({...newTask, tacticalPlan: e.target.value})}
+                      className="min-h-[80px] resize-none border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                      rows={3}
+                      placeholder="• What's the design strategy?&#10;• Key elements to focus on&#10;• Target audience considerations..."
+                    />
+                  </div>
+
+                  {/* Time Estimate & Aim - Side by Side on Desktop */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-time-estimate" className="text-sm font-medium flex items-center gap-2">
+                        <span className="text-blue-600">⏱️</span> Time Estimate
+                      </Label>
+                      <Input
+                        id="task-time-estimate"
+                        value={newTask.timeEstimate}
+                        onChange={(e) => setNewTask({...newTask, timeEstimate: e.target.value})}
+                        className="border-blue-200 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="e.g., 2 hours, 1 day, 3 days..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="task-aim" className="text-sm font-medium flex items-center gap-2">
+                        <span className="text-green-600">🎯</span> Aim/Goal
+                        <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                      </Label>
+                      <Input
+                        id="task-aim"
+                        value={newTask.aim}
+                        onChange={(e) => setNewTask({...newTask, aim: e.target.value})}
+                        className="border-green-200 focus:border-green-500 focus:ring-green-500"
+                        placeholder="What's the main objective?"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Creative Idea */}
+                  <div className="space-y-2">
+                    <Label htmlFor="task-idea" className="text-sm font-medium flex items-center gap-2">
+                      <span className="text-yellow-600">💡</span> Creative Idea
+                      <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                    </Label>
+                    <Textarea
+                      id="task-idea"
+                      value={newTask.idea}
+                      onChange={(e) => setNewTask({...newTask, idea: e.target.value})}
+                      className="min-h-[80px] resize-none border-yellow-200 focus:border-yellow-500 focus:ring-yellow-500"
+                      rows={3}
+                      placeholder="• What's the creative concept?&#10;• Visual style and mood&#10;• Key design elements..."
+                    />
+                  </div>
+
+                  {/* Copy Text */}
+                  <div className="space-y-2">
+                    <Label htmlFor="task-copy" className="text-sm font-medium flex items-center gap-2">
+                      <span className="text-indigo-600">📝</span> Copy Text
+                      <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                    </Label>
+                    <Textarea
+                      id="task-copy"
+                      value={newTask.copy}
+                      onChange={(e) => setNewTask({...newTask, copy: e.target.value})}
+                      className="min-h-[80px] resize-none border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500"
+                      rows={3}
+                      placeholder="• Headlines and taglines&#10;• Body text content&#10;• Call-to-action text..."
+                    />
+                  </div>
+
+                  {/* Visual Feeding (Image) & Attachment - Side by Side */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-visual-feeding" className="text-sm font-medium flex items-center gap-2">
+                        <span className="text-pink-600">🖼️</span> Visual Feeding
+                        <span className="text-xs text-gray-500">(Optional Image)</span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="task-visual-feeding"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleVisualFeedingUpload(file);
+                            }
+                          }}
+                          className="w-full border-pink-200 focus:border-pink-500 focus:ring-pink-500 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 file:cursor-pointer overflow-hidden"
+                          accept="image/*"
+                          disabled={isUploadingVisualFeeding}
+                        />
+                        {isUploadingVisualFeeding && (
+                          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center rounded">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-pink-600"></div>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {isUploadingVisualFeeding ? 'Uploading...' : 'Upload reference images, mood boards, style guides'}
+                        </p>
+                        {newTask.visualFeeding && (
+                          <div className="mt-2 p-2 bg-pink-50 rounded border border-pink-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-pink-600">✓</span>
+                              <span className="text-xs text-pink-800">Uploaded: {newTask.visualFeeding.split('/').pop()}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="task-attachment-file" className="text-sm font-medium flex items-center gap-2">
+                        <span className="text-orange-600">📎</span> Additional Files
+                        <span className="text-xs text-gray-500">(Optional)</span>
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="task-attachment-file"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleAttachmentUpload(file);
+                            }
+                          }}
+                          className="w-full border-orange-200 focus:border-orange-500 focus:ring-orange-500 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 file:cursor-pointer overflow-hidden"
+                          accept=".pdf,.doc,.docx,.txt,.ai,.psd,.sketch,.fig,.zip"
+                          disabled={isUploadingAttachment}
+                        />
+                        {isUploadingAttachment && (
+                          <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center rounded">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          {isUploadingAttachment ? 'Uploading...' : 'Briefs, specs, assets (.pdf, .ai, .psd, etc.)'}
+                        </p>
+                        {newTask.attachmentFile && (
+                          <div className="mt-2 p-2 bg-orange-50 rounded border border-orange-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-orange-600">✓</span>
+                              <span className="text-xs text-orange-800">Uploaded: {newTask.attachmentFile.split('/').pop()}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="task-notes" className="text-sm font-medium flex items-center gap-2">
+                      <span className="text-gray-600">💬</span> Additional Notes
+                      <span className="text-xs text-gray-500">(Optional Instructions)</span>
+                    </Label>
+                    <Textarea
+                      id="task-notes"
+                      value={newTask.notes}
+                      onChange={(e) => setNewTask({...newTask, notes: e.target.value})}
+                      className="min-h-[60px] resize-none border-gray-200 focus:border-gray-500 focus:ring-gray-500"
+                      rows={2}
+                      placeholder="Any additional instructions, preferences, or important notes for the designer..."
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="task-progress" className="text-right">
                   {t.progress}
@@ -1199,14 +1648,32 @@ const AdminTasksPage = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <Tabs value={currentTaskTab} onValueChange={setCurrentTaskTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-10 sm:h-auto">
-              <TabsTrigger value="details" className="text-sm sm:text-base">{t.details}</TabsTrigger>
-              <TabsTrigger value="comments" className="text-sm sm:text-base">{t.comments}</TabsTrigger>
-              </TabsList>
+            <div className="p-4 border rounded-xl bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-900/50 shadow-sm">
+              <Tabs value={currentTaskTab} onValueChange={setCurrentTaskTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-14 sm:h-14 mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-1.5 shadow-lg backdrop-blur-sm gap-2">
+                  <TabsTrigger 
+                    value="details" 
+                    className="relative text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-auto bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-300 ease-in-out transform data-[state=active]:scale-[1.02] hover:scale-[1.01]"
+                  >
+                    <span className="flex items-center gap-2">
+                      📊 {t.details}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="comments" 
+                    className="relative flex items-center justify-center gap-2 text-xs sm:text-sm font-medium min-h-[44px] sm:min-h-auto bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-300 ease-in-out transform data-[state=active]:scale-[1.02] hover:scale-[1.01]"
+                  >
+                    💬 <span className="hidden sm:inline">{t.comments}</span><span className="sm:hidden">Chat</span>
+                    {selectedTask && selectedTask.comments && selectedTask.comments.length > 0 && (
+                      <span className="absolute -top-1 -right-1 sm:relative sm:top-0 sm:right-0 sm:ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full font-bold shadow-lg animate-pulse min-w-[18px] h-[18px] flex items-center justify-center">
+                        {selectedTask.comments.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
               
-            <TabsContent value="details" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
-              <div className="grid gap-3 sm:gap-4">
+                <TabsContent value="details" className="space-y-6 bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg backdrop-blur-sm">
+                  <div className="grid gap-6">
                   <div className="space-y-2">
                   <Label htmlFor="edit-task-title" className="text-sm sm:text-base font-medium">{t.title}</Label>
                     <Input
@@ -1313,6 +1780,187 @@ const AdminTasksPage = () => {
                     </Select>
                   </div>
                 )}
+
+                {/* Designer-specific fields - Enhanced Edit UI */}
+                {isEditingTaskForDesigner() && (
+                  <div className="mt-4 pt-4 border-t border-purple-200">
+                    <div className="mb-4 flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">🎨</span>
+                      </div>
+                      <h4 className="text-base font-semibold text-gray-800 dark:text-gray-200">Designer Details</h4>
+                      <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                        Edit Brief
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      {/* Tactical Plan */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-task-tactical-plan" className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-purple-600">📋</span> Tactical Plan
+                          <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                        </Label>
+                        <Textarea
+                          id="edit-task-tactical-plan"
+                          value={editingTask.tacticalPlan}
+                          onChange={(e) => setEditingTask({...editingTask, tacticalPlan: e.target.value})}
+                          className="min-h-[80px] text-sm resize-none border-purple-200 focus:border-purple-500 focus:ring-purple-500"
+                          rows={3}
+                          placeholder="• Design strategy & approach&#10;• Key focus elements&#10;• Target audience considerations..."
+                        />
+                      </div>
+
+                      {/* Time & Aim - Mobile stacked, Desktop side-by-side */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-task-time-estimate" className="text-sm font-medium flex items-center gap-2">
+                            <span className="text-blue-600">⏱️</span> Time Estimate
+                          </Label>
+                          <Input
+                            id="edit-task-time-estimate"
+                            value={editingTask.timeEstimate}
+                            onChange={(e) => setEditingTask({...editingTask, timeEstimate: e.target.value})}
+                            className="min-h-[44px] text-sm border-blue-200 focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="e.g., 2 hours, 1 day..."
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-task-aim" className="text-sm font-medium flex items-center gap-2">
+                            <span className="text-green-600">🎯</span> Aim/Goal
+                            <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                          </Label>
+                          <Input
+                            id="edit-task-aim"
+                            value={editingTask.aim}
+                            onChange={(e) => setEditingTask({...editingTask, aim: e.target.value})}
+                            className="min-h-[44px] text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
+                            placeholder="Main objective..."
+                          />
+                        </div>
+                      </div>
+
+                      {/* Creative Idea */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-task-idea" className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-yellow-600">💡</span> Creative Idea
+                          <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                        </Label>
+                        <Textarea
+                          id="edit-task-idea"
+                          value={editingTask.idea}
+                          onChange={(e) => setEditingTask({...editingTask, idea: e.target.value})}
+                          className="min-h-[80px] text-sm resize-none border-yellow-200 focus:border-yellow-500 focus:ring-yellow-500"
+                          rows={3}
+                          placeholder="• Creative concept & vision&#10;• Visual style & mood&#10;• Key design elements..."
+                        />
+                      </div>
+
+                      {/* Copy Text */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-task-copy" className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-indigo-600">📝</span> Copy Text
+                          <span className="text-xs text-red-600 font-semibold">*Required for Designers</span>
+                        </Label>
+                        <Textarea
+                          id="edit-task-copy"
+                          value={editingTask.copy}
+                          onChange={(e) => setEditingTask({...editingTask, copy: e.target.value})}
+                          className="min-h-[80px] text-sm resize-none border-indigo-200 focus:border-indigo-500 focus:ring-indigo-500"
+                          rows={3}
+                          placeholder="• Headlines & taglines&#10;• Body text content&#10;• Call-to-action text..."
+                        />
+                      </div>
+
+                                             {/* Visual Feeding (Image Upload) */}
+                       <div className="space-y-2">
+                                                    <Label htmlFor="edit-task-visual-feeding" className="text-sm font-medium flex items-center gap-2">
+                             <span className="text-pink-600">🖼️</span> Visual Feeding
+                             <span className="text-xs text-gray-500">(Optional Image)</span>
+                           </Label>
+                           <div className="space-y-2">
+                             <Input
+                               id="edit-task-visual-feeding"
+                               type="file"
+                                                         onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleEditVisualFeedingUpload(file);
+                            }
+                          }}
+                          disabled={isUploadingEditVisualFeeding}
+                               className="w-full min-h-[44px] text-sm border-pink-200 focus:border-pink-500 focus:ring-pink-500 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 file:cursor-pointer overflow-hidden"
+                               accept="image/*"
+                             />
+                           {isUploadingEditVisualFeeding && (
+                             <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-md">
+                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600"></div>
+                               <span className="text-xs text-pink-800">Uploading...</span>
+                             </div>
+                           )}
+                           {editingTask.visualFeeding && !isUploadingEditVisualFeeding && (
+                             <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-md">
+                               <span className="text-pink-600">🖼️</span>
+                               <span className="text-xs text-pink-800">Current: {editingTask.visualFeeding.split('/').pop()}</span>
+                             </div>
+                           )}
+                           <p className="text-xs text-gray-500">Upload reference images, mood boards, style guides</p>
+                         </div>
+                       </div>
+
+                      {/* Attachment File */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-task-attachment-file" className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-orange-600">📎</span> Attachment File
+                          <span className="text-xs text-gray-500">(Optional)</span>
+                        </Label>
+                        <div className="space-y-2">
+                          <Input
+                            id="edit-task-attachment-file"
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleEditAttachmentUpload(file);
+                              }
+                            }}
+                            disabled={isUploadingEditAttachment}
+                                                         className="w-full min-h-[44px] text-sm border-orange-200 focus:border-orange-500 focus:ring-orange-500 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 file:cursor-pointer overflow-hidden"
+                            accept="image/*,.pdf,.doc,.docx,.txt,.ai,.psd,.sketch,.fig"
+                          />
+                          {isUploadingEditAttachment && (
+                            <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                              <span className="text-xs text-orange-800">Uploading...</span>
+                            </div>
+                          )}
+                          {editingTask.attachmentFile && !isUploadingEditAttachment && (
+                            <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-md">
+                              <span className="text-orange-600">📄</span>
+                              <span className="text-xs text-orange-800">Current: {editingTask.attachmentFile.split('/').pop()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-task-notes" className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-gray-600">💬</span> Additional Notes
+                        </Label>
+                        <Textarea
+                          id="edit-task-notes"
+                          value={editingTask.notes}
+                          onChange={(e) => setEditingTask({...editingTask, notes: e.target.value})}
+                          className="min-h-[60px] text-sm resize-none border-gray-200 focus:border-gray-500 focus:ring-gray-500"
+                          rows={2}
+                          placeholder="Additional instructions, preferences, or important notes..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <Label htmlFor="edit-task-progress" className="text-sm sm:text-base font-medium">{t.progress}</Label>
@@ -1333,27 +1981,30 @@ const AdminTasksPage = () => {
                 </div>
               </TabsContent>
               
-            <TabsContent value="comments" className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
-                {user && selectedTask && (
-                  <TaskComments
-                    taskId={selectedTask.id}
-                    user={user}
-                    comments={selectedTask.comments || []}
-                    onCommentAdded={(newComments) => {
-                      // Update the task comments in the local state
-                      setTasks(tasks.map(task => 
-                        task.id === selectedTask.id 
-                          ? {...task, comments: newComments} 
-                          : task
-                      ));
-                      // Also update the selected task
-                      setSelectedTask({...selectedTask, comments: newComments});
-                    }}
-                    language={language}
-                  />
-                )}
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="comments" className="space-y-6 bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg backdrop-blur-sm">
+                  <div className="min-h-[200px]">
+                    {user && selectedTask && (
+                      <TaskComments
+                        taskId={selectedTask.id}
+                        user={user}
+                        comments={selectedTask.comments || []}
+                        onCommentAdded={(newComments) => {
+                          // Update the task comments in the local state
+                          setTasks(tasks.map(task => 
+                            task.id === selectedTask.id 
+                              ? {...task, comments: newComments} 
+                              : task
+                          ));
+                          // Also update the selected task
+                          setSelectedTask({...selectedTask, comments: newComments});
+                        }}
+                        language={language}
+                      />
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
             
           <DialogFooter className={`pt-4 sm:pt-6 gap-2 sm:gap-3 ${language === 'ar' ? 'flex-row-reverse' : 'flex-col sm:flex-row'}`}>
             <Button 
@@ -1476,7 +2127,9 @@ const AdminTasksPage = () => {
           {selectedTaskForDetails && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Task Details - {selectedTaskForDetails.title}</DialogTitle>
+                <DialogTitle className="text-xl font-bold break-words line-clamp-2 overflow-wrap-anywhere">
+                  Task Details - {selectedTaskForDetails.title}
+                </DialogTitle>
                 <DialogDescription>
                   Complete task information and admin controls
                 </DialogDescription>
@@ -1601,6 +2254,127 @@ const AdminTasksPage = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Designer Task Details */}
+                {selectedTaskForDetails.assignedToPosition === 'Designer' && (
+                  selectedTaskForDetails.tacticalPlan || 
+                  selectedTaskForDetails.timeEstimate || 
+                  selectedTaskForDetails.aim || 
+                  selectedTaskForDetails.idea || 
+                  selectedTaskForDetails.copy || 
+                  selectedTaskForDetails.visualFeeding || 
+                  selectedTaskForDetails.attachmentFile || 
+                  selectedTaskForDetails.notes
+                ) && (
+                  <div className="border-t pt-4">
+                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">Designer Task Information</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedTaskForDetails.tacticalPlan && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tactical Plan</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {selectedTaskForDetails.tacticalPlan}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.timeEstimate && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Time Estimate</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
+                            {selectedTaskForDetails.timeEstimate}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.aim && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Aim/Goal</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {selectedTaskForDetails.aim}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.idea && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Creative Idea</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {selectedTaskForDetails.idea}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.copy && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Copy Text</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {selectedTaskForDetails.copy}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.visualFeeding && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                            <span>🖼️</span> Visual Feeding (Reference Image)
+                          </Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-pink-600">📷</span>
+                              <span className="text-sm">{selectedTaskForDetails.visualFeeding}</span>
+                            </div>
+                                                        {/* Image Preview - if it's an image file */}
+                             {selectedTaskForDetails.visualFeeding && isImageFile(selectedTaskForDetails.visualFeeding) && (
+                               <div className="mt-2">
+                                 <div className="relative group cursor-pointer" onClick={() => handleImageClick(getFileUrl(selectedTaskForDetails.visualFeeding))}>
+                                   <img 
+                                     src={getFileUrl(selectedTaskForDetails.visualFeeding)} 
+                                     alt="Visual Reference" 
+                                     className="max-w-full h-auto max-h-48 rounded border shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
+                                     onError={(e) => {
+                                       e.currentTarget.style.display = 'none';
+                                     }}
+                                   />
+                                   {/* Overlay to indicate it's clickable */}
+                                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
+                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                       <div className="bg-white bg-opacity-90 rounded-full p-2">
+                                         <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                         </svg>
+                                       </div>
+                                     </div>
+                                   </div>
+                                 </div>
+                                 <p className="text-xs text-slate-500 mt-1 text-center">Click to view full size</p>
+                               </div>
+                             )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.attachmentFile && (
+                        <div>
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Attachment File</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
+                            📎 {selectedTaskForDetails.attachmentFile}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedTaskForDetails.notes && (
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Notes</Label>
+                          <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border max-h-32 overflow-y-auto whitespace-pre-wrap">
+                            {selectedTaskForDetails.notes}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Comments Section */}
                 <div className="border-t pt-4">
@@ -1655,6 +2429,33 @@ const AdminTasksPage = () => {
           task={taskToRate}
           onRatingSubmitted={handleTaskRatingSubmitted}
         />
+
+        {/* Image Modal */}
+        <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none">
+            <div className="relative flex items-center justify-center">
+              {selectedImage && (
+                <img 
+                  src={selectedImage} 
+                  alt="Visual Reference - Full Size" 
+                  className="max-w-full max-h-[90vh] object-contain rounded"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              {/* Close button */}
+              <button
+                onClick={() => setIsImageModalOpen(false)}
+                className="absolute top-4 right-4 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-2 transition-all duration-200"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 };

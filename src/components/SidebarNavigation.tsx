@@ -226,7 +226,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'orange',
       items: [
         { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
-        { name: 'Media Buyer Tasks', path: '/media-buyer-tasks', icon: CheckSquare, mediaBuyerOnly: true, color: 'amber' },
+        { name: 'Media Buyer Dashboard', path: '/media-buyer-tasks', icon: TrendingUp, mediaBuyerOnly: true, color: 'amber' },
         { name: 'Design Studio', path: '/designer-dashboard', icon:  Brush, designerOnly: true, color: 'purple' },
         { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, color: 'yellow' },
       ] as NavItem[]

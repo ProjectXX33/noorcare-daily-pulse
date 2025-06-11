@@ -26,6 +26,7 @@ import { CheckInProvider } from "./contexts/CheckInContext";
 import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { WorkspaceMessageProvider } from "./contexts/WorkspaceMessageContext";
+import { LoyalCustomersProvider } from "./contexts/LoyalCustomersContext";
 import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
@@ -46,6 +47,8 @@ import AppUpdateManager from "./components/AppUpdateManager";
 import UpdateTrigger from "./components/UpdateTrigger";
 import PWAVersionChecker from "./components/PWAVersionChecker";
 import FloatingChatbot from "./components/FloatingChatbot";
+import BackgroundProcessIndicator from "./components/BackgroundProcessIndicator";
+import CustomerLoader from "./components/MobileCustomerLoader";
 
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
@@ -165,6 +168,7 @@ const AppWithAuth = () => {
         <AuthProvider>
           <WorkspaceMessageProvider>
             <CheckInProvider>
+              <LoyalCustomersProvider>
               <LanguageProvider>
                 <AnimatePresence>
                   {showOpeningAnimation && <OpeningAnimation />}
@@ -401,11 +405,14 @@ const AppWithAuth = () => {
                 <PWAVersionChecker />
                 <PWAUpdateInstructions />
                 <FloatingChatbot />
+                <BackgroundProcessIndicator />
+                <CustomerLoader />
 
                 <PWAInstallPrompt />
                 <Toaster />
                 <Sonner />
               </LanguageProvider>
+                </LoyalCustomersProvider>
             </CheckInProvider>
           </WorkspaceMessageProvider>
         </AuthProvider>

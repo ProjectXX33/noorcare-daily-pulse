@@ -172,6 +172,14 @@ export function calculateWorkHours(
   const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
   const totalHours = totalMinutes / 60;
   
+  // Determine standard work hours based on shift type
+  let standardWorkHours = 8; // Default to 8 hours
+  if (shift.name.toLowerCase().includes('day')) {
+    standardWorkHours = 7; // Day shift is 7 hours
+  } else if (shift.name.toLowerCase().includes('night')) {
+    standardWorkHours = 8; // Night shift is 8 hours
+  }
+  
   // Parse shift times (assume they're in HH:MM format)
   const [shiftStartHour, shiftStartMin] = shift.startTime.split(':').map(Number);
   const [shiftEndHour, shiftEndMin] = shift.endTime.split(':').map(Number);
@@ -192,26 +200,21 @@ export function calculateWorkHours(
     checkInTime: checkInTime.toISOString(),
     checkOutTime: checkOutTime.toISOString(),
     shiftName: shift.name,
+    standardWorkHours,
     shiftStart: shiftStart.toISOString(),
     shiftEnd: shiftEnd.toISOString(),
     totalHours: totalHours.toFixed(2)
   });
   
-  // Calculate regular hours: time worked within the shift boundaries
-  const actualWorkStart = checkInTime > shiftStart ? checkInTime : shiftStart;
-  const actualWorkEnd = checkOutTime < shiftEnd ? checkOutTime : shiftEnd;
+  // Calculate regular hours based on standard hours for the shift, not shift boundaries
+  const regularHours = Math.min(totalHours, standardWorkHours);
   
-  let regularHours = 0;
-  if (actualWorkEnd > actualWorkStart) {
-    regularHours = differenceInMinutes(actualWorkEnd, actualWorkStart) / 60;
-  }
-  
-  // Calculate overtime hours: total hours - regular hours
-  const overtimeHours = Math.max(0, totalHours - regularHours);
+  // Calculate overtime hours: total hours - standard hours for this shift
+  const overtimeHours = Math.max(0, totalHours - standardWorkHours);
   
   console.log('📊 Work hours calculated:', {
-    actualWorkStart: actualWorkStart.toISOString(),
-    actualWorkEnd: actualWorkEnd.toISOString(),
+    totalHours: totalHours.toFixed(2),
+    standardWorkHours,
     regularHours: regularHours.toFixed(2),
     overtimeHours: overtimeHours.toFixed(2),
     totalCalculated: (regularHours + overtimeHours).toFixed(2)

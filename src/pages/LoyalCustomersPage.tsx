@@ -1,477 +1,512 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Download, Crown, Star, Award, Medal, Gem, Users, ShoppingCart, Calendar, MapPin, Phone, Mail, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { 
-  Crown, 
-  Star, 
-  TrendingUp, 
-  ShoppingBag, 
-  Users, 
-  Search,
-  Trophy,
-  Medal,
-  Award,
-  DollarSign,
-  Calendar,
-  Phone,
-  Mail,
-  MapPin,
-  Filter,
-  Download,
-  Loader2
-} from 'lucide-react';
-import wooCommerceAPI, { isWooCommerceConfigured } from '@/lib/woocommerceApi';
+import * as XLSX from 'xlsx';
+import { useLoyalCustomers } from '@/contexts/LoyalCustomersContext';
 
-interface LoyalCustomer {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  total_spent: number;
-  orders_count: number;
-  avg_order_value: number;
-  first_order_date: string;
-  last_order_date: string;
-  loyalty_tier: 'Diamond' | 'Platinum' | 'Gold' | 'Silver' | 'Bronze';
-  avatar?: string;
-}
-
-const LoyalCustomersPage: React.FC = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  
-  // Strict access control - redirect if not Customer Service
-  useEffect(() => {
-    if (!user) {
-      navigate('/login', { replace: true });
-      return;
-    }
-    
-    if (user.position !== 'Customer Service') {
-      console.warn('Access denied: User is not Customer Service');
-      navigate(user.role === 'admin' ? '/dashboard' : '/employee-dashboard', { replace: true });
-      return;
-    }
-  }, [user, navigate]);
-
-  // Don't render page content if user is not Customer Service
-  if (!user || user.position !== 'Customer Service') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking permissions...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const [customers, setCustomers] = useState<LoyalCustomer[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<LoyalCustomer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'spending' | 'orders' | 'avg_order'>('spending');
-
-  // Determine loyalty tier based on spending and orders
-  const determineLoyaltyTier = (totalSpent: number, ordersCount: number): LoyalCustomer['loyalty_tier'] => {
-    if (totalSpent >= 5000 && ordersCount >= 20) return 'Diamond';
-    if (totalSpent >= 3000 && ordersCount >= 15) return 'Platinum';
-    if (totalSpent >= 1500 && ordersCount >= 10) return 'Gold';
-    if (totalSpent >= 500 && ordersCount >= 5) return 'Silver';
-    return 'Bronze';
-  };
-
-  // Get tier color and icon
-  const getTierInfo = (tier: LoyalCustomer['loyalty_tier']) => {
-    switch (tier) {
-      case 'Diamond': return { color: 'text-blue-600 bg-blue-50 border-blue-200', icon: Crown };
-      case 'Platinum': return { color: 'text-gray-600 bg-gray-50 border-gray-200', icon: Trophy };
-      case 'Gold': return { color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: Medal };
-      case 'Silver': return { color: 'text-slate-600 bg-slate-50 border-slate-200', icon: Award };
-      case 'Bronze': return { color: 'text-orange-600 bg-orange-50 border-orange-200', icon: Star };
-    }
-  };
-
-  // Saudi Riyal SVG Component
-  const SaudiRiyalIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+// Saudi Riyal SVG Icon Component
+const RiyalIcon = ({ className }: { className?: string }) => (
     <svg 
       className={className}
       xmlns="http://www.w3.org/2000/svg" 
       viewBox="0 0 1124.14 1256.39" 
-      width="20" 
-      height="22" 
+    width="14" 
+    height="15.432" 
       style={{ display: 'inline-block', verticalAlign: '-0.125em' }}
     >
-      <path 
-        fill="currentColor" 
-        d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"
-      />
-      <path 
-        fill="currentColor" 
-        d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"
-      />
+    <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+    <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
     </svg>
   );
 
-  // Fetch customer data
-  useEffect(() => {
-    const fetchCustomerData = async () => {
-      setLoading(true);
-      try {
-        if (isWooCommerceConfigured()) {
-          // For now, we'll generate mock data since WooCommerce customer API requires additional setup
-          // In production, you would fetch real customer data from WooCommerce
-          console.log('Generating loyalty customer analytics...');
-          generateMockCustomers();
-        } else {
-          console.log('Using mock customer data...');
-          generateMockCustomers();
-        }
-      } catch (error) {
-        console.error('Error fetching customer data:', error);
-        toast.error('Failed to load customer data');
-        generateMockCustomers();
-      } finally {
-        setLoading(false);
-      }
-    };
+const LoyalCustomersPage = () => {
+  const { 
+    customers, 
+    loading, 
+    error, 
+    progress, 
+    stage, 
+    details, 
+    startFetching,
+    clearData 
+  } = useLoyalCustomers();
 
-    fetchCustomerData();
+  // Debug logging to understand the issue
+  React.useEffect(() => {
+    console.log('🔍 LoyalCustomersPage mounted with state:', {
+      loading,
+      customersCount: customers.length,
+      progress,
+      stage
+    });
   }, []);
 
-  // Generate mock customer data for demonstration
-  const generateMockCustomers = () => {
-    const mockCustomers: LoyalCustomer[] = Array.from({ length: 50 }, (_, index) => {
-      const totalSpent = Math.random() * 8000 + 200; // 200-8200 SAR
-      const ordersCount = Math.floor(Math.random() * 25) + 1; // 1-25 orders
-      const avgOrderValue = totalSpent / ordersCount;
-      
-      const firstNames = ['Ahmed', 'Mohammed', 'Abdullah', 'Omar', 'Khalid', 'Faisal', 'Nasser', 'Salem', 'Fahad', 'Turki'];
-      const lastNames = ['Al-Rashid', 'Al-Otaibi', 'Al-Ghamdi', 'Al-Harbi', 'Al-Malki', 'Al-Zahrani', 'Al-Dosari', 'Al-Shehri', 'Al-Qahtani', 'Al-Mutairi'];
-      
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      
-      return {
-        id: index + 1,
-        name: `${firstName} ${lastName}`,
-        email: `${firstName.toLowerCase()}.${lastName.toLowerCase().replace('al-', '')}@email.com`,
-        phone: `+966 5${Math.floor(Math.random() * 90000000) + 10000000}`,
-        address: `Riyadh, Saudi Arabia`,
-        total_spent: Math.round(totalSpent),
-        orders_count: ordersCount,
-        avg_order_value: Math.round(avgOrderValue),
-        first_order_date: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        last_order_date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        loyalty_tier: determineLoyaltyTier(totalSpent, ordersCount)
-      };
+  React.useEffect(() => {
+    console.log('🔍 State changed:', {
+      loading,
+      customersCount: customers.length,
+      progress,
+      stage
     });
+  }, [loading, customers.length, progress, stage]);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTier, setSelectedTier] = useState<string>('all');
+      
+  const tiers = [
+    { value: 'all', label: 'All Tiers', icon: Users, color: 'text-gray-600' },
+    { value: 'Diamond', label: 'Diamond', icon: Gem, color: 'text-blue-600' },
+    { value: 'Platinum', label: 'Platinum', icon: Crown, color: 'text-purple-600' },
+    { value: 'Gold', label: 'Gold', icon: Award, color: 'text-yellow-600' },
+    { value: 'Silver', label: 'Silver', icon: Medal, color: 'text-gray-500' },
+    { value: 'Bronze', label: 'Bronze', icon: Star, color: 'text-orange-600' }
+  ];
 
-    // Sort by total spent (highest first)
-    const sortedCustomers = mockCustomers.sort((a, b) => b.total_spent - a.total_spent);
-    setCustomers(sortedCustomers);
-    setFilteredCustomers(sortedCustomers);
+  const tierColors = {
+    Diamond: 'bg-gradient-to-r from-blue-100 to-blue-50 border-blue-200 text-blue-800',
+    Platinum: 'bg-gradient-to-r from-purple-100 to-purple-50 border-purple-200 text-purple-800',
+    Gold: 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-yellow-200 text-yellow-800',
+    Silver: 'bg-gradient-to-r from-gray-100 to-gray-50 border-gray-200 text-gray-800',
+    Bronze: 'bg-gradient-to-r from-orange-100 to-orange-50 border-orange-200 text-orange-800'
   };
 
-  // Filter and sort customers
-  useEffect(() => {
-    let filtered = customers.filter(customer =>
+  const getTierIcon = (tier: string) => {
+    switch (tier) {
+      case 'Diamond': return Gem;
+      case 'Platinum': return Crown;
+      case 'Gold': return Award;
+      case 'Silver': return Medal;
+      case 'Bronze': return Star;
+      default: return Star;
+    }
+  };
+
+  const filteredCustomers = customers.filter(customer => {
+    const matchesSearch = 
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone?.includes(searchTerm)
-    );
+      customer.phone?.includes(searchTerm) ||
+      customer.id.toString().includes(searchTerm);
+    
+    const matchesTier = selectedTier === 'all' || customer.loyalty_tier === selectedTier;
+    
+    return matchesSearch && matchesTier;
+  });
 
-    // Sort customers
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'spending': return b.total_spent - a.total_spent;
-        case 'orders': return b.orders_count - a.orders_count;
-        case 'avg_order': return b.avg_order_value - a.avg_order_value;
-        default: return b.total_spent - a.total_spent;
+  const exportToExcel = () => {
+    try {
+      if (filteredCustomers.length === 0) {
+        toast.error('No customers to export');
+        return;
       }
-    });
 
-    setFilteredCustomers(filtered);
-  }, [customers, searchTerm, sortBy]);
+      const exportData = filteredCustomers.map((customer, index) => ({
+        'Rank': index + 1,
+        'Customer Name': customer.name,
+        'Email': customer.email,
+        'Phone': customer.phone || 'N/A',
+        'Address': customer.address || 'N/A',
+        'Total Spent (SAR)': customer.total_spent,
+        'Orders Count': customer.orders_count,
+        'Average Order Value (SAR)': customer.avg_order_value,
+        'Loyalty Tier': customer.loyalty_tier,
+        'First Order Date': customer.first_order_date,
+        'Last Order Date': customer.last_order_date,
+        'Customer ID': customer.id
+      }));
 
-  // Calculate summary stats
-  const totalCustomers = customers.length;
-  const totalRevenue = customers.reduce((sum, customer) => sum + customer.total_spent, 0);
-  const totalOrders = customers.reduce((sum, customer) => sum + customer.orders_count, 0);
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Top 100 Loyal Customers');
 
-  // Get tier distribution
-  const tierDistribution = customers.reduce((acc, customer) => {
+      const fileName = `top_100_loyal_customers_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      toast.success(`Successfully exported ${exportData.length} customers to Excel!`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export data to Excel');
+    }
+  };
+
+  const getTierStats = () => {
+    const stats = customers.reduce((acc, customer) => {
     acc[customer.loyalty_tier] = (acc[customer.loyalty_tier] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  if (loading) {
+    return stats;
+  };
+
+  const tierStats = getTierStats();
+  const totalSpent = customers.reduce((sum, customer) => sum + customer.total_spent, 0);
+  const totalOrders = customers.reduce((sum, customer) => sum + customer.orders_count, 0);
+
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-amber-600 mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading loyal customers...</p>
+      <div className="p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md mx-auto"
+        >
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+                <Users className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-red-800 mb-2">Unable to Load Customers</h3>
+              <p className="text-red-600 mb-4">{error}</p>
+              <div className="space-y-2">
+                <Button onClick={startFetching} variant="outline" className="w-full">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Try Again
+                </Button>
+                <Button onClick={clearData} variant="ghost" className="w-full">
+                  Clear Data
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (loading && customers.length === 0) {
+    return (
+      <div className="p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-2xl mx-auto"
+        >
+          <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+                <Crown className="w-10 h-10 text-amber-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-amber-800 mb-2">
+                Discovering Top 100 Loyal Customers
+              </h3>
+              <p className="text-amber-700 mb-6">
+                {stage || 'Preparing to analyze latest customer data...'}
+              </p>
+              
+              {progress > 0 && (
+                <div className="mb-4 p-3 bg-amber-100 rounded-lg border border-amber-200">
+                  <p className="text-sm text-amber-700">
+                    <strong>⚡ Background Processing Active:</strong> This process started earlier and is continuing from where it left off.
+                  </p>
+                </div>
+              )}
+              
+              <div className="w-full bg-amber-200 rounded-full h-3 mb-4 overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between text-sm text-amber-700 mb-4">
+                <span>Progress</span>
+                <span className="font-semibold">{Math.round(progress)}%</span>
+              </div>
+              
+              <p className="text-amber-600 text-sm">
+                {details || 'Processing latest 5000 customers for comprehensive results...'}
+              </p>
+              
+              <div className="mt-6 p-4 bg-amber-100 rounded-lg border border-amber-200">
+                <p className="text-xs text-amber-700">
+                  <strong>Background Processing:</strong> You can navigate to other pages - this will continue running in the background!
+                </p>
+                <p className="text-xs text-amber-600 mt-2 md:hidden">
+                  📱 On mobile: Look for the floating progress circle on the right side of your screen when you navigate away.
+                </p>
         </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-yellow-50 p-2 sm:p-4 md:p-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="mb-4 md:mb-6">
-        <div className="flex items-center gap-2 sm:gap-3 mb-2">
-          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
-            <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <Crown className="text-amber-500" />
+            Top 100 Loyal Customers
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Ranked by total spending from latest 5000 customers • Real WooCommerce data
+          </p>
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent truncate">
-              Top Loyal Customers
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Track and analyze your most valuable customers</p>
+        
+        <div className="flex gap-2">
+          {loading && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 rounded-lg">
+              <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-amber-700">Updating...</span>
           </div>
+          )}
+          <Button 
+            onClick={startFetching} 
+            variant="outline" 
+            size="sm"
+            disabled={loading}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {loading ? 'Processing...' : 'Refresh Data'}
+          </Button>
+          <Button 
+            onClick={exportToExcel} 
+            className="bg-green-600 hover:bg-green-700"
+            disabled={filteredCustomers.length === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 md:mb-6">
-        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+      {/* Summary Stats */}
+      {customers.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-amber-600">Total Customers</p>
+                  <p className="text-2xl font-bold text-amber-800">{customers.length}</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Customers</p>
-                <p className="text-lg sm:text-2xl font-bold text-amber-600">{totalCustomers}</p>
-              </div>
+                <Users className="h-8 w-8 text-amber-500" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <SaudiRiyalIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-green-600">Total Revenue</p>
+                  <p className="text-2xl font-bold text-green-800">{totalSpent.toLocaleString()} SAR</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Revenue</p>
-                <p className="text-lg sm:text-2xl font-bold text-blue-600">{totalRevenue.toLocaleString()} SAR</p>
-              </div>
+                <RiyalIcon className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-600">Total Orders</p>
+                  <p className="text-2xl font-bold text-blue-800">{totalOrders.toLocaleString()}</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Orders</p>
-                <p className="text-lg sm:text-2xl font-bold text-purple-600">{totalOrders}</p>
-              </div>
+                <ShoppingCart className="h-8 w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-purple-600">Avg per Customer</p>
+                  <p className="text-2xl font-bold text-purple-800">
+                    {customers.length > 0 ? Math.round(totalSpent / customers.length).toLocaleString() : 0} SAR
+                  </p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">Avg Order Value</p>
-                <p className="text-lg sm:text-2xl font-bold text-orange-600">{Math.round(avgOrderValue)} SAR</p>
-              </div>
+                <Award className="h-8 w-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
-      </div>
+        </motion.div>
+      )}
 
-      {/* Filters and Search */}
-      <Card className="mb-4 md:mb-6">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col gap-3 sm:gap-4">
+      {/* Filters and Tier Stats */}
+      {customers.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-col lg:flex-row gap-4"
+        >
+          <Card className="flex-1">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, email, or phone..."
+                    placeholder="Search by name, email, phone, or ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 text-sm sm:text-base"
+                    className="w-full"
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  {tiers.map((tier) => {
+                    const TierIcon = tier.icon;
+                    const count = tier.value === 'all' ? customers.length : tierStats[tier.value] || 0;
+                    return (
               <Button
-                variant={sortBy === 'spending' ? 'default' : 'outline'}
-                onClick={() => setSortBy('spending')}
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
+                        key={tier.value}
+                        variant={selectedTier === tier.value ? "default" : "outline"}
                 size="sm"
+                        onClick={() => setSelectedTier(tier.value)}
+                        className={`${selectedTier === tier.value ? '' : tier.color}`}
               >
-                <SaudiRiyalIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">By Spending</span>
-                <span className="sm:hidden">Spending</span>
+                        <TierIcon className="w-4 h-4 mr-1" />
+                        {tier.label} ({count})
               </Button>
-              <Button
-                variant={sortBy === 'orders' ? 'default' : 'outline'}
-                onClick={() => setSortBy('orders')}
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
-                size="sm"
-              >
-                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">By Orders</span>
-                <span className="sm:hidden">Orders</span>
-              </Button>
-              <Button
-                variant={sortBy === 'avg_order' ? 'default' : 'outline'}
-                onClick={() => setSortBy('avg_order')}
-                className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2"
-                size="sm"
-              >
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">By AOV</span>
-                <span className="sm:hidden">AOV</span>
-              </Button>
+                    );
+                  })}
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Loyalty Tier Distribution */}
-      <Card className="mb-4 md:mb-6">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="text-lg sm:text-xl">Loyalty Tier Distribution</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Customer distribution across loyalty tiers</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
-            {['Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze'].map((tier) => {
-              const tierInfo = getTierInfo(tier as LoyalCustomer['loyalty_tier']);
-              const TierIcon = tierInfo.icon;
-              const count = tierDistribution[tier] || 0;
-              
-              return (
-                <div key={tier} className={`p-2 sm:p-4 rounded-lg border ${tierInfo.color} text-center`}>
-                  <TierIcon className="h-4 w-4 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
-                  <p className="font-semibold text-xs sm:text-sm">{tier}</p>
-                  <p className="text-lg sm:text-2xl font-bold">{count}</p>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+        </motion.div>
+      )}
 
       {/* Customer List */}
+      {customers.length > 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="grid gap-4"
+        >
+          {filteredCustomers.length === 0 ? (
       <Card>
-        <CardHeader className="pb-3 sm:pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">Top Loyal Customers</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Showing {filteredCustomers.length} customers sorted by {sortBy}
-              </CardDescription>
-            </div>
-            <Button variant="outline" className="flex items-center gap-2 self-start sm:self-auto" size="sm">
-              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="text-xs sm:text-sm">Export</span>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="space-y-3 sm:space-y-4">
-            {filteredCustomers.slice(0, 50).map((customer, index) => {
-              const tierInfo = getTierInfo(customer.loyalty_tier);
-              const TierIcon = tierInfo.icon;
+              <CardContent className="p-8 text-center">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">No customers found</h3>
+                <p className="text-gray-500">Try adjusting your search criteria or tier filter.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredCustomers.map((customer, index) => {
+              const TierIcon = getTierIcon(customer.loyalty_tier);
+              const tierColorClass = tierColors[customer.loyalty_tier];
+              const rank = customers.findIndex(c => c.id === customer.id) + 1;
               
               return (
-                <div key={customer.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors gap-3 sm:gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                      <span className={`text-sm sm:text-lg font-bold w-6 sm:w-8 text-center ${
-                        index === 0 ? 'text-amber-600' : 
-                        index === 1 ? 'text-gray-600' : 
-                        index === 2 ? 'text-orange-600' : 'text-muted-foreground'
-                      }`}>
-                        #{index + 1}
-                      </span>
-                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
-                        <AvatarFallback className="bg-gradient-to-br from-amber-100 to-yellow-100 text-amber-600 font-semibold text-xs sm:text-sm">
-                          {customer.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
+                <motion.div
+                  key={customer.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <Card className={`hover:shadow-lg transition-all duration-200 ${tierColorClass} border-2`}>
+                    <CardContent className="p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-lg font-bold shadow-sm">
+                              #{rank}
+                            </div>
+                            <Badge className={`mt-2 ${tierColorClass} border-0`}>
+                              <TierIcon className="w-3 h-3 mr-1" />
+                              {customer.loyalty_tier}
+                            </Badge>
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                        <h3 className="font-semibold text-sm sm:text-base truncate">{customer.name}</h3>
-                        <Badge variant="secondary" className={`${tierInfo.color} flex items-center gap-1 self-start`}>
-                          <TierIcon className="h-2 w-2 sm:h-3 sm:w-3" />
-                          <span className="text-xs">{customer.loyalty_tier}</span>
-                        </Badge>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-1">{customer.name}</h3>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Mail className="w-4 h-4" />
+                                <span className="break-all">{customer.email}</span>
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1 truncate">
-                          <Mail className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate">{customer.email}</span>
-                        </span>
                         {customer.phone && (
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 flex-shrink-0" />
-                            {customer.phone}
-                          </span>
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-4 h-4" />
+                                  <span>{customer.phone}</span>
+                                </div>
+                              )}
+                              {customer.address && (
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-4 h-4" />
+                                  <span>{customer.address}</span>
+                                </div>
                         )}
                       </div>
                     </div>
                   </div>
                   
-                                      <div className="grid grid-cols-3 gap-4 sm:gap-8 text-center border-t sm:border-t-0 pt-3 sm:pt-0 flex-shrink-0">
-                     <div>
-                       <p className="text-xs sm:text-sm text-muted-foreground">Total Spent</p>
-                       <p className="font-semibold text-sm sm:text-base flex items-center justify-center gap-1">
-                         <SaudiRiyalIcon className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
-                         <span className="truncate">{customer.total_spent.toLocaleString()}</span>
-                       </p>
+                        <div className="flex flex-col lg:flex-row gap-4">
+                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                            <div className="bg-white bg-opacity-50 rounded-lg p-3">
+                              <p className="text-lg font-bold text-gray-900">{customer.total_spent.toLocaleString()}</p>
+                              <p className="text-xs text-gray-600">SAR Spent</p>
+                            </div>
+                            <div className="bg-white bg-opacity-50 rounded-lg p-3">
+                              <p className="text-lg font-bold text-gray-900">{customer.orders_count}</p>
+                              <p className="text-xs text-gray-600">Orders</p>
+                            </div>
+                            <div className="bg-white bg-opacity-50 rounded-lg p-3">
+                              <p className="text-lg font-bold text-gray-900">{customer.avg_order_value.toLocaleString()}</p>
+                              <p className="text-xs text-gray-600">Avg SAR</p>
+                            </div>
+                            <div className="bg-white bg-opacity-50 rounded-lg p-3">
+                              <div className="flex items-center gap-1 justify-center">
+                                <Calendar className="w-3 h-3" />
+                                <p className="text-xs text-gray-600">Since</p>
                      </div>
-                     <div>
-                       <p className="text-xs sm:text-sm text-muted-foreground">Orders</p>
-                       <p className="font-semibold text-sm sm:text-base">{customer.orders_count}</p>
+                              <p className="text-sm font-semibold text-gray-900">{customer.first_order_date}</p>
                      </div>
-                     <div>
-                       <p className="text-xs sm:text-sm text-muted-foreground">Avg Order</p>
-                       <p className="font-semibold text-sm sm:text-base flex items-center justify-center gap-1">
-                         <SaudiRiyalIcon className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
-                         <span className="truncate">{customer.avg_order_value}</span>
-                       </p>
                      </div>
                   </div>
                 </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               );
-            })}
-          </div>
+            })
+          )}
+        </motion.div>
+      ) : !loading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-12"
+        >
+          <Card>
+            <CardContent className="p-8">
+              <Crown className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">Ready to Load Top 100 Customer Data</h3>
+              <p className="text-gray-600 mb-6">
+                Click below to analyze latest 5000 customers from WooCommerce to find your top 100 loyal customers.
+              </p>
+              <Button onClick={startFetching} className="bg-amber-500 hover:bg-amber-600 text-white">
+                <Users className="w-4 h-4 mr-2" />
+                Load Top 100 Customer Data
+              </Button>
         </CardContent>
       </Card>
+        </motion.div>
+      )}
     </div>
   );
 };

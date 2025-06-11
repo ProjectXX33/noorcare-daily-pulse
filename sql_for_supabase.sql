@@ -216,6 +216,7 @@ CREATE TABLE IF NOT EXISTS shifts (
 );
 
 -- Insert default shifts for Customer Service
+-- Day Shift: 9 AM - 4 PM (7 hours), Night Shift: 4 PM - 12 AM (8 hours)
 INSERT INTO shifts (name, start_time, end_time, position)
 VALUES 
     ('Day Shift', '09:00:00', '16:00:00', 'Customer Service'),
