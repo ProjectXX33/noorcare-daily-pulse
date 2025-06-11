@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '1.5.1'; // Update this version when deploying new changes
+const APP_VERSION = '1.5.2'; // Update this version when deploying new changes
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
@@ -86,12 +86,28 @@ async function clearStorageData() {
 // Notify all clients about the update
 async function notifyClientsOfUpdate() {
   try {
+    // Fetch version info with release notes
+    let versionInfo = null;
+    try {
+      const response = await fetch(`/version.json?t=${Date.now()}`);
+      if (response.ok) {
+        versionInfo = await response.json();
+      }
+    } catch (error) {
+      console.warn('[SW] Could not fetch version info:', error);
+    }
+
     const clients = await self.clients.matchAll();
     clients.forEach(client => {
       client.postMessage({
         type: 'APP_UPDATED',
         version: APP_VERSION,
-        message: 'App has been updated! Refresh to get the latest version.'
+        message: 'App has been updated! Refresh to get the latest version.',
+        releaseNotes: versionInfo?.releaseNotes || [
+          'Fixed critical Service Worker errors causing app startup issues',
+          'Improved PWA reliability with proper service worker lifecycle management',
+          'Enhanced app update system with better conflict resolution'
+        ]
       });
     });
     

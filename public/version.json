@@ -1,16 +1,16 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "buildTime": "2025-06-11T00:54:52.876Z",
   "buildTimestamp": "1749603292876",
   "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Fixed critical Service Worker errors causing app startup issues",
-    "Resolved 'InvalidStateError: Only the active worker can claim clients' error",
-    "Improved PWA reliability with proper service worker lifecycle management",
-    "Enhanced app update system with better conflict resolution",
-    "Updated Design Studio icon from pen to brush for better visual representation"
+    "Fixed update notifications to show proper release notes instead of generic messages",
+    "Service Worker now fetches and displays detailed changelog from version.json",
+    "Enhanced update experience with comprehensive information for users",
+    "Improved version tracking and notification system reliability",
+    "Better fallback messages when version info cannot be fetched"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
