@@ -121,13 +121,8 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
     switch (data.type) {
       case 'APP_UPDATED':
         console.log('[UpdateManager] App update detected:', data);
-        setUpdateInfo({
-          available: true,
-          version: data.version,
-          message: data.message || 'App has been updated!',
-          releaseNotes: data.releaseNotes || ['App has been updated with latest improvements']
-        });
-        setShowUpdatePrompt(true);
+        // Auto-update in background without showing prompts
+        handleAutoUpdate(data);
         break;
         
       case 'CLEAR_STORAGE':
@@ -141,6 +136,36 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
           window.location.href = data.url;
         }
         break;
+    }
+  };
+
+  const handleAutoUpdate = async (updateData: any) => {
+    try {
+      console.log('[UpdateManager] Starting auto-update:', updateData);
+      
+      // Clear storage while preserving auth data
+      clearAppStorage(['theme', 'language', 'chatSoundEnabled', 'preferredLanguage']);
+      
+      // Mark version as updated
+      if (updateData.version) {
+        localStorage.setItem('app-version', updateData.version);
+        localStorage.setItem('last-update-check', Date.now().toString());
+      }
+      
+      // Skip waiting for new service worker
+      if (serviceWorkerRegistration?.waiting) {
+        serviceWorkerRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      
+      // Show subtle notification
+      toast.success('App updated successfully! 🎉', {
+        duration: 3000,
+      });
+      
+      console.log('[UpdateManager] Auto-update completed');
+      
+    } catch (error) {
+      console.error('[UpdateManager] Auto-update failed:', error);
     }
   };
 
@@ -281,83 +306,30 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
 
   const checkServerVersion = async () => {
     try {
-      // Check multiple sources for version detection
+      // Simplified version check - only for tracking, no prompts
       const buildTime = document.querySelector('meta[name="build-time"]')?.getAttribute('content');
-      const currentBuildTime = localStorage.getItem('app-build-time');
       const appVersion = localStorage.getItem('app-version');
       const lastUpdateCheck = localStorage.getItem('last-update-check');
       
-      // Fetch latest version info
+      // Fetch latest version info for tracking
       const versionInfo = await fetchVersionInfo();
       
-      console.log('[UpdateManager] Version check:', {
+      console.log('[UpdateManager] Background version check:', {
         buildTime,
-        currentBuildTime,
         appVersion,
         lastUpdateCheck,
         serverVersion: versionInfo?.version
       });
 
-      const updateVersion = versionInfo?.version || 'Latest';
-
-      // If build time changed or no previous version stored
-      if (buildTime && buildTime !== 'BUILD_TIME_PLACEHOLDER' && buildTime !== currentBuildTime) {
-        console.log('[UpdateManager] Build time changed, triggering update');
-        if (shouldShowUpdatePopup(updateVersion)) {
-          setUpdateInfo({
-            available: true,
-            version: updateVersion,
-            message: 'A new version is available! Please refresh to get the latest updates.',
-            releaseNotes: versionInfo?.releaseNotes || ['Bug fixes and performance improvements']
-          });
-          setShowUpdatePrompt(true);
-          localStorage.setItem('last-popup-time', Date.now().toString());
-        }
-        return;
-      }
-
-      // Only show welcome popup for first-time users
-      if (!appVersion && !lastUpdateCheck) {
-        console.log('[UpdateManager] First time user, showing welcome');
-        if (shouldShowUpdatePopup(updateVersion)) {
-          setUpdateInfo({
-            available: true,
-            version: updateVersion,
-            message: 'Welcome! Please refresh to ensure you have the latest version.',
-            releaseNotes: versionInfo?.releaseNotes || ['Welcome to the latest version!']
-          });
-          setShowUpdatePrompt(true);
-          localStorage.setItem('last-popup-time', Date.now().toString());
-        }
-        return;
-      }
-
-      // Only show periodic checks if version actually changed
-      const timeSinceLastCheck = Date.now() - parseInt(lastUpdateCheck || '0');
-      const twoHours = 2 * 60 * 60 * 1000; // Increased to 2 hours to reduce spam
-      
-      if (timeSinceLastCheck > twoHours && versionInfo && appVersion !== versionInfo.version) {
-        console.log('[UpdateManager] Version changed, showing update');
-        if (shouldShowUpdatePopup(updateVersion)) {
-          setUpdateInfo({
-            available: true,
-            version: updateVersion,
-            message: 'A new version is available with the latest features!',
-            releaseNotes: versionInfo?.releaseNotes || ['Latest features and improvements']
-          });
-          setShowUpdatePrompt(true);
-          localStorage.setItem('last-popup-time', Date.now().toString());
-        }
-        return;
-      }
-      
-      // Store current build time if we have it
+      // Only update tracking data, no prompts
       if (buildTime && buildTime !== 'BUILD_TIME_PLACEHOLDER') {
         localStorage.setItem('app-build-time', buildTime);
       }
 
-      // Update last check time
       localStorage.setItem('last-update-check', Date.now().toString());
+      
+      // Let service worker handle all update prompts/logic
+      console.log('[UpdateManager] Server version check completed (passive mode)');
       
     } catch (error) {
       console.error('[UpdateManager] Error checking server version:', error);

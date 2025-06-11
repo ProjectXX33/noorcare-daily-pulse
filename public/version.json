@@ -1,16 +1,16 @@
 {
-  "version": "1.5.3",
+  "version": "1.5.4",
   "buildTime": "2025-06-11T00:54:52.876Z",
   "buildTimestamp": "1749603292876",
   "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🔐 CRITICAL FIX: Users no longer get logged out after updates!",
-    "Enhanced authentication data preservation during app updates",
-    "Auto-detection and protection of Supabase auth tokens and session data",
-    "Improved storage clearing logic to maintain user login state",
-    "Better session management preserving user preferences and auth state"
+    "🚀 SEAMLESS AUTO-UPDATES: No more annoying update prompts!",
+    "Updates now happen automatically in background without user interaction",
+    "Fixed stuck/hanging update process for smoother experience",
+    "Eliminated repetitive update dialogs and confirmation prompts",
+    "Enhanced user experience with invisible, lightning-fast updates"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
