@@ -98,5 +98,5 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "1.5.0"
+  "version": "1.5.1"
 }

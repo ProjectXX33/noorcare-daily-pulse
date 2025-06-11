@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '1.5.0'; // Update this version when deploying new changes
+const APP_VERSION = '1.5.1'; // Update this version when deploying new changes
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
@@ -31,9 +31,8 @@ self.addEventListener('install', event => {
         console.log('[SW] Caching app assets');
         return cache.addAll(urlsToCache);
       }),
-      // Store version info
-      self.clients.claim(),
-      self.skipWaiting() // Force activation of new SW
+      // Force activation of new SW
+      self.skipWaiting()
     ])
   );
 });

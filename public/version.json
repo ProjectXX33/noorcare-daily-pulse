@@ -1,16 +1,16 @@
 {
-  "version": "1.5.0",
+  "version": "1.5.1",
   "buildTime": "2025-06-11T00:54:52.876Z",
   "buildTimestamp": "1749603292876",
   "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Complete Events system overhaul - now accessible to ALL employees",
-    "Enhanced mobile calendar with proper left/right navigation arrows",
-    "Dual view system: Calendar and Cards views with search and filtering",
-    "Improved permission system: all users can view, Admins/Media Buyers can edit",
-    "Fixed all TypeScript and ESLint errors for better code quality"
+    "Fixed critical Service Worker errors causing app startup issues",
+    "Resolved 'InvalidStateError: Only the active worker can claim clients' error",
+    "Improved PWA reliability with proper service worker lifecycle management",
+    "Enhanced app update system with better conflict resolution",
+    "Updated Design Studio icon from pen to brush for better visual representation"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
