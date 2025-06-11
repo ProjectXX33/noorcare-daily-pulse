@@ -149,20 +149,38 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
       // Get all localStorage keys
       const allKeys = Object.keys(localStorage);
       
+      // Auto-detect and preserve authentication keys (like CacheManager does)
+      const authKeys = allKeys.filter(key => 
+        key.includes('sb-') ||           // Supabase auth tokens
+        key.includes('supabase') ||      // Any Supabase data
+        key.includes('auth') ||          // Auth-related keys
+        key.includes('session') ||       // Session data
+        key.includes('user') ||          // User data
+        key.includes('token')            // Token data
+      );
+      
+      // Combine explicit preserve keys with auto-detected auth keys
+      const allPreserveKeys = [...preserveKeys, ...authKeys];
+      
+      console.log('[UpdateManager] Preserving keys:', allPreserveKeys);
+      
       // Clear all except preserved keys
       allKeys.forEach(key => {
-        if (!preserveKeys.includes(key)) {
+        if (!allPreserveKeys.includes(key)) {
           localStorage.removeItem(key);
         }
       });
       
-      // Clear sessionStorage completely
-      sessionStorage.clear();
+      // Don't clear sessionStorage completely - it might contain auth data
+      // Instead, clear only non-auth session data
+      const sessionKeys = Object.keys(sessionStorage);
+      sessionKeys.forEach(key => {
+        if (!key.includes('sb-') && !key.includes('supabase') && !key.includes('auth')) {
+          sessionStorage.removeItem(key);
+        }
+      });
       
-      // Clear any cached data from context/state
-      if (window.location.pathname !== '/login') {
-        console.log('[UpdateManager] Storage cleared, refreshing app state');
-      }
+      console.log('[UpdateManager] Storage cleared while preserving authentication data');
       
     } catch (error) {
       console.error('[UpdateManager] Error clearing storage:', error);

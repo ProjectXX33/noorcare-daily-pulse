@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '1.5.2'; // Update this version when deploying new changes
+const APP_VERSION = '1.5.3'; // Update this version when deploying new changes
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
@@ -67,13 +67,20 @@ self.addEventListener('activate', event => {
 // Clear storage data for fresh app state
 async function clearStorageData() {
   try {
-    // Clear all localStorage data related to the app (except user preferences)
+    // Clear all localStorage data related to the app (except user preferences and auth data)
     const clients = await self.clients.matchAll();
     clients.forEach(client => {
       client.postMessage({
         type: 'CLEAR_STORAGE',
         version: APP_VERSION,
-        preserveKeys: ['theme', 'language', 'chatSoundEnabled'] // Keep user preferences
+        preserveKeys: [
+          'theme', 
+          'language', 
+          'chatSoundEnabled',
+          'preferredLanguage',
+          'notificationPreferences',
+          'chatPreferences'
+        ] // Keep user preferences and let AppUpdateManager handle auth preservation
       });
     });
     

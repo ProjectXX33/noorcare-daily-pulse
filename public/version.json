@@ -1,16 +1,16 @@
 {
-  "version": "1.5.2",
+  "version": "1.5.3",
   "buildTime": "2025-06-11T00:54:52.876Z",
   "buildTimestamp": "1749603292876",
   "buildDate": "6/11/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Fixed update notifications to show proper release notes instead of generic messages",
-    "Service Worker now fetches and displays detailed changelog from version.json",
-    "Enhanced update experience with comprehensive information for users",
-    "Improved version tracking and notification system reliability",
-    "Better fallback messages when version info cannot be fetched"
+    "🔐 CRITICAL FIX: Users no longer get logged out after updates!",
+    "Enhanced authentication data preservation during app updates",
+    "Auto-detection and protection of Supabase auth tokens and session data",
+    "Improved storage clearing logic to maintain user login state",
+    "Better session management preserving user preferences and auth state"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
