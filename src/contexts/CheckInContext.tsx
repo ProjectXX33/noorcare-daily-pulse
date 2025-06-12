@@ -764,13 +764,22 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.log('📋 Available shifts for tracking:', shifts.length);
         
         // IMPORTANT: Pass userId to get assigned shift instead of guessing by time
-        const detectedShift = await determineShift(existingCheckIn.timestamp, shifts, userId);
-        console.log('🎯 Detected shift for checkout:', detectedShift ? detectedShift.name : 'None');
+        let detectedShift;
+        try {
+          detectedShift = await determineShift(existingCheckIn.timestamp, shifts, userId);
+          console.log('🎯 Detected shift for checkout:', detectedShift ? detectedShift.name : 'None');
+        } catch (shiftLookupError) {
+          console.warn('⚠️ Shift lookup failed during checkout:', shiftLookupError);
+          // Fallback: try to determine shift by time without assignment lookup
+          const { determineShiftByTime } = await import('@/lib/shiftsApi');
+          detectedShift = determineShiftByTime(existingCheckIn.timestamp, shifts);
+          console.log('🎯 Fallback shift detection:', detectedShift ? detectedShift.name : 'None');
+        }
         
         if (detectedShift) {
           // Calculate hours using flexible overtime rules
           const hoursWorked = calculateHours(existingCheckIn.timestamp, checkOutTime);
-          const { regularHours, overtimeHours } = calculateRegularAndOvertimeHours(existingCheckIn.timestamp, checkOutTime, detectedShift);
+          const { regularHours, overtimeHours } = await calculateRegularAndOvertimeHours(existingCheckIn.timestamp, checkOutTime, detectedShift);
           
           console.log('⏱️ Hours calculation:', {
             hoursWorked: hoursWorked.toFixed(2),
@@ -1268,9 +1277,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Helper function to calculate regular and overtime hours with flexible rules
-  const calculateRegularAndOvertimeHours = (checkInTime: Date, checkOutTime: Date, shift: Shift) => {
+  const calculateRegularAndOvertimeHours = async (checkInTime: Date, checkOutTime: Date, shift: Shift) => {
     // Use the new flexible calculateWorkHours function from shiftsApi
-    const { calculateWorkHours } = require('@/lib/shiftsApi');
+    const { calculateWorkHours } = await import('@/lib/shiftsApi');
     const result = calculateWorkHours(checkInTime, checkOutTime, shift);
     
     console.log(`📊 Flexible hours calculation for ${shift.name}:`, {

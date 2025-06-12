@@ -736,7 +736,6 @@ const ShiftsPage = () => {
                       <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 p-6 rounded-2xl border border-blue-200 dark:border-blue-800 max-w-sm mx-auto">
                         <div className="text-3xl mb-3">💡</div>
                         <p className="text-sm text-blue-700 dark:text-blue-300 font-semibold mb-2">No shift data for this month yet</p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">Data will appear after Customer Service employees check in/out.</p>
                         </div>
                       ) : startOfMonth(selectedDate) > startOfMonth(new Date()) ? (
                       <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 p-6 rounded-2xl border border-amber-200 dark:border-amber-800 max-w-sm mx-auto">
@@ -846,7 +845,6 @@ const ShiftsPage = () => {
                               <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-200 dark:border-blue-800 max-w-md mx-auto">
                                 <div className="text-2xl mb-2">💡</div>
                                 <p className="text-xs text-blue-700 dark:text-blue-300 font-semibold mb-1">No shift data for this month yet</p>
-                                <p className="text-xs text-blue-600 dark:text-blue-400">Data will appear after Customer Service employees check in/out.</p>
                               </div>
                             ) : startOfMonth(selectedDate) > startOfMonth(new Date()) ? (
                               <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-xl border border-amber-200 dark:border-amber-800 max-w-md mx-auto">
