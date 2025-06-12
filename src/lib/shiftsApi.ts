@@ -172,8 +172,9 @@ export function calculateWorkHours(
   const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
   const totalHours = totalMinutes / 60;
   
-  // Determine standard work hours based on shift type
-  let standardWorkHours = 8; // Default to 8 hours
+  // Updated standard work hours based on new shift requirements:
+  // Day shift: 7 hours, Night shift: 8 hours
+  let standardWorkHours = 8; // Default to 8 hours for night shift
   if (shift.name.toLowerCase().includes('day')) {
     standardWorkHours = 7; // Day shift is 7 hours
   } else if (shift.name.toLowerCase().includes('night')) {
@@ -196,11 +197,11 @@ export function calculateWorkHours(
     shiftEnd.setDate(shiftEnd.getDate() + 1); // Next day
   }
   
-  console.log('📊 Calculating work hours:', {
+  console.log('📊 Updated hours calculation:', {
     checkInTime: checkInTime.toISOString(),
     checkOutTime: checkOutTime.toISOString(),
     shiftName: shift.name,
-    standardWorkHours,
+    standardWorkHours: `${standardWorkHours} hours (${shift.name.toLowerCase().includes('day') ? 'Day Shift' : 'Night Shift'})`,
     shiftStart: shiftStart.toISOString(),
     shiftEnd: shiftEnd.toISOString(),
     totalHours: totalHours.toFixed(2)

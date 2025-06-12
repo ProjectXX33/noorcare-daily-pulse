@@ -36,6 +36,18 @@
           "sizes": "192x192"
         }
       ]
+    },
+    {
+      "name": "Shifts",
+      "short_name": "Shifts",
+      "description": "View shifts (Day: 7h, Night: 8h)",
+      "url": "/shifts",
+      "icons": [
+        {
+          "src": "/NQ-ICON.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
   "lang": "en",
@@ -89,7 +101,9 @@
   "features": [
     "Cross Platform",
     "Fast",
-    "Simple"
+    "Simple",
+    "Works Offline",
+    "Mobile Data Optimized"
   ],
   "prefer_related_applications": false,
   "related_applications": [],
@@ -98,5 +112,14 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "1.6.1"
+  "version": "1.6.2",
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+noorhub",
+      "url": "/?action=%s"
+    }
+  ]
 }

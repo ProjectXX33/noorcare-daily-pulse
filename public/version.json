@@ -1,12 +1,18 @@
 {
-  "version": "1.6.1",
-  "buildTime": "2025-06-11T23:12:28.511Z",
-  "buildTimestamp": "1749683548511",
+  "version": "1.6.2",
+  "buildTime": "2025-06-12T11:06:37.529Z",
+  "buildTimestamp": "1749726397530",
   "buildDate": "6/12/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Bug Fixed"
+    "🔧 Fixed PWA authentication persistence on mobile data",
+    "📱 Enhanced mobile data connectivity with 8-second timeout",
+    "🚀 Improved offline functionality and caching",
+    "⏰ Updated shift hours: Day shift 7h, Night shift 8h",
+    "📊 Analytics now track only check-in enabled positions",
+    "🔄 Better service worker cache management",
+    "📡 Enhanced background sync for slow connections"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

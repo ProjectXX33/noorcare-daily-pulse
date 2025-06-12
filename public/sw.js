@@ -1,24 +1,45 @@
 // App version and cache configuration
-const APP_VERSION = '1.6.1'; // Update this version when deploying new changes
+const APP_VERSION = '1.6.2'; // Updated for mobile data improvements
 const CACHE_NAME = `noorhub-v${APP_VERSION}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
-// Static assets to cache
+// Enhanced static assets to cache for better mobile data support
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
   '/NQ-ICON.png',
   '/manifest.json',
-  '/notification-sound.mp3'
+  '/notification-sound.mp3',
+  // Add essential pages for offline use
+  '/dashboard',
+  '/check-in',
+  '/shifts',
+  '/tasks'
 ];
 
-// Dynamic cache patterns
+// Dynamic cache patterns with mobile data optimization
 const cachePatterns = [
   /\.(?:js|css|html|png|jpg|jpeg|svg|gif|ico|woff|woff2)$/,
   /^https:\/\/fonts\.googleapis\.com/,
-  /^https:\/\/fonts\.gstatic\.com/
+  /^https:\/\/fonts\.gstatic\.com/,
+  // Cache essential API responses for offline functionality
+  /^.*\/api\/shifts.*/,
+  /^.*\/api\/users.*/
 ];
+
+// Network timeout for mobile data connections
+const NETWORK_TIMEOUT = 8000; // 8 seconds for slower mobile connections
+
+// Enhanced fetch with mobile data optimization
+function fetchWithTimeout(request, timeout = NETWORK_TIMEOUT) {
+  return Promise.race([
+    fetch(request),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Network timeout')), timeout)
+    )
+  ]);
+}
 
 // Install service worker and clear old caches
 self.addEventListener('install', event => {
@@ -124,7 +145,7 @@ async function notifyClientsOfUpdate() {
   }
 }
 
-// Enhanced fetch strategy with cache management
+// Enhanced fetch strategy with mobile data optimization
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
@@ -134,41 +155,63 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Handle API requests differently (always fetch fresh)
+  // Handle API requests with mobile data optimization
   if (url.pathname.includes('/api/') || url.search.includes('supabase')) {
     event.respondWith(
-      fetch(request).catch(() => {
-        // Return offline response for API calls
-        return new Response(JSON.stringify({ 
-          error: 'Offline', 
-          message: 'You are currently offline' 
-        }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+      // Try cache first for API requests on slow connections
+      caches.match(request).then(cachedResponse => {
+        const fetchPromise = fetchWithTimeout(request, NETWORK_TIMEOUT)
+          .then(response => {
+            // Cache successful API responses for offline use
+            if (response.ok && (url.pathname.includes('/shifts') || url.pathname.includes('/users'))) {
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(request, response.clone());
+              });
+            }
+            return response;
+          })
+          .catch(() => {
+            // Return cached response if network fails
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Return offline response for API calls
+            return new Response(JSON.stringify({ 
+              error: 'Offline', 
+              message: 'You are currently offline. Using cached data if available.' 
+            }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
+
+        // Return cached response immediately if available, then update cache in background
+        return cachedResponse || fetchPromise;
       })
     );
     return;
   }
   
-  // Handle app assets with cache-first strategy
+  // Handle app assets with cache-first strategy optimized for mobile
   event.respondWith(
     caches.match(request).then(cachedResponse => {
-      // Return cached version if available
+      // Return cached version if available (faster for mobile data)
       if (cachedResponse) {
-        // Fetch fresh version in background for next time
-        fetch(request).then(response => {
+        // Fetch fresh version in background for next time (with timeout)
+        fetchWithTimeout(request, NETWORK_TIMEOUT).then(response => {
           if (response.ok && shouldCache(request)) {
             caches.open(CACHE_NAME).then(cache => {
               cache.put(request, response.clone());
             });
           }
-        }).catch(() => {});
+        }).catch(() => {
+          console.log('[SW] Background update failed for:', request.url);
+        });
         
         return cachedResponse;
       }
       
-      // Fetch from network
-      return fetch(request).then(response => {
+      // Fetch from network with timeout for mobile data
+      return fetchWithTimeout(request, NETWORK_TIMEOUT).then(response => {
         // Cache successful responses
         if (response.ok && shouldCache(request)) {
           const responseToCache = response.clone();
@@ -181,7 +224,10 @@ self.addEventListener('fetch', event => {
       }).catch(() => {
         // Return offline page for navigation requests
         if (request.mode === 'navigate') {
-          return caches.match('/') || new Response('Offline');
+          return caches.match('/') || new Response(
+            '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>You are offline</h1><p>Please check your internet connection and try again.</p></body></html>',
+            { headers: { 'Content-Type': 'text/html' } }
+          );
         }
         throw new Error('Network unavailable');
       });

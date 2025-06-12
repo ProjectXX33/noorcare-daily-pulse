@@ -96,10 +96,11 @@ const WorkShiftTimer: React.FC = () => {
       const checkInTime = new Date(activeCheckIn.timestamp);
       const now = new Date();
       
-      // Determine shift hours based on check-in time
-      // Day shift: 9 AM - 4 PM (7 hours), Night shift: 4 PM - 12 AM (8 hours)
+      // Updated shift hours based on new requirements:
+      // Day shift: 7 hours (9 AM - 4 PM)
+      // Night shift: 8 hours (4 PM - 12 AM)
       const checkInHour = checkInTime.getHours();
-      let workHours = 8; // Default to 8 hours
+      let workHours = 8; // Default to 8 hours for night shift
       
       if (checkInHour >= 9 && checkInHour < 16) {
         // Day shift (9 AM - 4 PM) = 7 hours
@@ -113,10 +114,10 @@ const WorkShiftTimer: React.FC = () => {
       const endTime = new Date(checkInTime.getTime() + workHoursInMs);
       const remaining = endTime.getTime() - now.getTime();
       
-      console.log('WorkShiftTimer - Timer calculation:', {
+      console.log('WorkShiftTimer - Updated timer calculation:', {
         checkInTime: checkInTime.toISOString(),
         checkInHour,
-        workHours,
+        workHours: `${workHours} hours (${checkInHour >= 9 && checkInHour < 16 ? 'Day Shift' : 'Night Shift'})`,
         endTime: endTime.toISOString(),
         remaining: remaining,
         remainingFormatted: Math.abs(remaining) / (1000 * 60 * 60)

@@ -15,7 +15,10 @@ const CheckInPage = () => {
     isLoading, 
     getUserCheckIns, 
     hasCheckedInToday,
-    hasCheckedOutToday
+    hasCheckedOutToday,
+    refreshCheckIns,
+    currentCheckIn,
+    isCheckedIn: contextIsCheckedIn
   } = useCheckIn();
   
   const [isDayOff, setIsDayOff] = useState(false);
@@ -64,21 +67,6 @@ const CheckInPage = () => {
   const isCheckedIn = hasCheckedInToday(user.id);
   const isCheckedOut = hasCheckedOutToday(user.id);
   
-  // Determine current status based on check-in AND check-out status
-  let currentStatus;
-  if (isCheckedIn && !isCheckedOut) {
-    currentStatus = 'checked-in';
-  } else if (isCheckedIn && isCheckedOut) {
-    currentStatus = 'workday-complete';
-  } else {
-    currentStatus = 'not-checked-in';
-  }
-  
-  // Function to format time from date
-  const formatTime = (date: string | Date) => {
-    return format(new Date(date), 'h:mm a');
-  };
-  
   // Get today's date
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -89,6 +77,68 @@ const CheckInPage = () => {
     checkInDate.setHours(0, 0, 0, 0);
     return checkInDate.getTime() === today.getTime();
   });
+  
+  // Enhanced debugging for check-in state
+  console.log('🔍 CheckInPage State Debug:', {
+    userName: user.name,
+    userId: user.id,
+    isCheckedIn,
+    isCheckedOut,
+    contextIsCheckedIn,
+    currentCheckIn: currentCheckIn ? {
+      id: currentCheckIn.id,
+      timestamp: currentCheckIn.timestamp,
+      hasCheckOut: !!(currentCheckIn.checkOutTime || currentCheckIn.checkoutTime)
+    } : null,
+    userCheckIns: userCheckIns.length,
+    todayCheckIns: todayCheckIns.length,
+    todayCheckInsWithCheckout: todayCheckIns.filter(ci => ci.checkOutTime || ci.checkoutTime).length
+  });
+  
+  // Use context state for more reliable checking
+  const actualIsCheckedIn = contextIsCheckedIn || isCheckedIn;
+  
+  // Enhanced status determination - handle manual checkout
+  const hasAnyCheckoutToday = todayCheckIns.some(ci => ci.checkOutTime || ci.checkoutTime);
+  const hasActiveCheckIn = actualIsCheckedIn && !isCheckedOut;
+  
+  // Determine current status based on check-in AND check-out status
+  let currentStatus;
+  if (hasActiveCheckIn) {
+    currentStatus = 'checked-in';
+  } else if ((actualIsCheckedIn || todayCheckIns.length > 0) && (isCheckedOut || hasAnyCheckoutToday)) {
+    currentStatus = 'workday-complete';
+  } else {
+    currentStatus = 'not-checked-in';
+  }
+  
+  console.log('📊 Status Determination:', {
+    actualIsCheckedIn,
+    isCheckedOut,
+    hasAnyCheckoutToday,
+    hasActiveCheckIn,
+    currentStatus,
+    finalDecision: currentStatus
+  });
+  
+  // Function to format time from date
+  const formatTime = (date: string | Date) => {
+    return format(new Date(date), 'h:mm a');
+  };
+  
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered by user');
+    setLoading(true);
+    try {
+      await refreshCheckIns();
+      console.log('✅ Manual refresh completed');
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   if (isLoading || loading) {
     return (
@@ -112,6 +162,18 @@ const CheckInPage = () => {
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
                 Record your daily attendance and working hours for {user.position === 'Designer' ? 'Designer shifts' : 'Customer Service shifts'}.
               </p>
+            </div>
+            <div className="flex justify-end sm:justify-start shrink-0">
+              <button
+                onClick={handleManualRefresh}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                <ArrowRightLeft className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="text-sm">
+                  {loading ? 'Refreshing...' : 'Refresh Status'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -152,14 +214,19 @@ const CheckInPage = () => {
                   
                   {todayCheckIns.length > 0 && (
                     <div className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                      {todayCheckIns.map((checkIn, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                      {todayCheckIns
+                        .filter((checkIn, index, array) => {
+                          // Remove duplicates by checking if this is the first occurrence of this ID
+                          return array.findIndex(item => item.id === checkIn.id) === index;
+                        })
+                        .map((checkIn) => (
+                        <div key={`status-${checkIn.id}`} className="flex items-center gap-2">
                           <span className="font-medium">
-                            {checkIn.checkOutTime ? 'Checked out:' : 'Checked in:'}
+                            {(checkIn.checkOutTime || checkIn.checkoutTime) ? 'Checked out:' : 'Checked in:'}
                           </span>
                           <span>
-                            {checkIn.checkOutTime 
-                              ? formatTime(checkIn.checkOutTime) 
+                            {(checkIn.checkOutTime || checkIn.checkoutTime)
+                              ? formatTime(checkIn.checkOutTime || checkIn.checkoutTime) 
                               : formatTime(checkIn.timestamp)}
                           </span>
                         </div>
@@ -184,9 +251,9 @@ const CheckInPage = () => {
                   {/* Check-in/Check-out Buttons */}
                   {!isDayOff && (
                     <>
-                      {!isCheckedIn && <CheckInButton />}
-                      {isCheckedIn && !isCheckedOut && <CheckOutButton />}
-                      {isCheckedIn && isCheckedOut && (
+                      {currentStatus === 'not-checked-in' && <CheckInButton />}
+                      {currentStatus === 'checked-in' && <CheckOutButton />}
+                      {currentStatus === 'workday-complete' && (
                         <div className="text-center p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
                           <div className="text-green-600 font-medium text-sm sm:text-base">
                             ✅ Workday Complete
@@ -194,6 +261,11 @@ const CheckInPage = () => {
                           <div className="text-green-500 text-xs sm:text-sm">
                             Thank you for your work today!
                           </div>
+                          {hasAnyCheckoutToday && !actualIsCheckedIn && (
+                            <div className="text-green-400 text-xs mt-1">
+                              You were checked out automatically
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -221,22 +293,27 @@ const CheckInPage = () => {
                     <p className="text-xs sm:text-sm text-muted-foreground">No check-ins recorded yet today</p>
                   ) : (
                     <div className="space-y-2">
-                      {todayCheckIns.map((checkIn, index) => (
-                        <div key={index} className="p-2 sm:p-3 bg-muted rounded-lg">
+                      {todayCheckIns
+                        .filter((checkIn, index, array) => {
+                          // Remove duplicates by checking if this is the first occurrence of this ID
+                          return array.findIndex(item => item.id === checkIn.id) === index;
+                        })
+                        .map((checkIn) => (
+                        <div key={`today-session-${checkIn.id}`} className="p-2 sm:p-3 bg-muted rounded-lg">
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2">
                             <div className="text-xs sm:text-sm">
                               <span className="font-medium">Check-in:</span> {formatTime(checkIn.timestamp)}
                             </div>
-                            {checkIn.checkOutTime && (
+                            {(checkIn.checkOutTime || checkIn.checkoutTime) && (
                               <div className="text-xs sm:text-sm">
-                                <span className="font-medium">Check-out:</span> {formatTime(checkIn.checkOutTime)}
+                                <span className="font-medium">Check-out:</span> {formatTime(checkIn.checkOutTime || checkIn.checkoutTime)}
                               </div>
                             )}
                           </div>
-                          {checkIn.checkOutTime && (
+                          {(checkIn.checkOutTime || checkIn.checkoutTime) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               Duration: {Math.round(
-                                (new Date(checkIn.checkOutTime).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60)
+                                (new Date(checkIn.checkOutTime || checkIn.checkoutTime!).getTime() - new Date(checkIn.timestamp).getTime()) / (1000 * 60 * 60)
                               )} hours
                             </div>
                           )}
@@ -272,7 +349,9 @@ const CheckInPage = () => {
           <Card className="p-3 sm:p-4">
             <div className="text-center">
               <div className="text-lg sm:text-2xl font-bold text-green-600">
-                {todayCheckIns.length}
+                {todayCheckIns.filter((checkIn, index, array) => 
+                  array.findIndex(item => item.id === checkIn.id) === index
+                ).length}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
                 Today's Check-ins
@@ -283,7 +362,8 @@ const CheckInPage = () => {
           <Card className="p-3 sm:p-4">
             <div className="text-center">
               <div className="text-lg sm:text-2xl font-bold text-blue-600">
-                {isCheckedIn ? (isCheckedOut ? '✓' : '⏱️') : '⏸️'}
+                {currentStatus === 'workday-complete' ? '✓' : 
+                 currentStatus === 'checked-in' ? '⏱️' : '⏸️'}
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
                 Current Status
@@ -304,17 +384,46 @@ const CheckInPage = () => {
         </div>
 
         {/* Recent check-ins history */}
-        <Card>
-          <CardHeader className="pb-3 sm:pb-4">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CheckInHistory checkIns={userCheckIns.slice(0, 10)} title="" />
-          </CardContent>
-        </Card>
+        <CheckInHistory checkIns={userCheckIns.slice(0, 10)} title="Recent Check-ins" />
+        
+        {/* Debug Info Panel (only show if there are issues) */}
+        {(actualIsCheckedIn && isCheckedOut) || (!actualIsCheckedIn && todayCheckIns.length > 0) ? (
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm text-yellow-800">
+                <AlertCircle className="h-4 w-4" />
+                Debug Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <strong>Current Status:</strong> {currentStatus}
+                </div>
+                <div>
+                  <strong>Context Check-in:</strong> {contextIsCheckedIn ? 'Yes' : 'No'}
+                </div>
+                <div>
+                  <strong>Has Checked In Today:</strong> {isCheckedIn ? 'Yes' : 'No'}
+                </div>
+                <div>
+                  <strong>Has Checked Out Today:</strong> {isCheckedOut ? 'Yes' : 'No'}
+                </div>
+                <div>
+                  <strong>Today's Check-ins:</strong> {todayCheckIns.length}
+                </div>
+                <div>
+                  <strong>Active Check-in ID:</strong> {currentCheckIn?.id || 'None'}
+                </div>
+              </div>
+              <div className="text-center mt-4">
+                <p className="text-yellow-700">
+                  If you cannot check out, click "Refresh Status" above or contact support.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

@@ -181,9 +181,11 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Subscribe to realtime check-in updates
+  // Subscribe to realtime check-in updates with enhanced debugging
   useEffect(() => {
     if (!user) return;
+
+    console.log('🔄 Setting up real-time check-in subscription for user:', user.name);
 
     const subscription = supabase
       .channel('check-ins-realtime')
@@ -194,32 +196,151 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           table: 'check_ins'
         }, 
         (payload) => {
-          console.log('Check-in update received:', payload);
-          // Refresh check-ins when any change occurs
+          console.log('🔔 Real-time check-in update received:', payload);
+          
+          // Check if this is a checkout event for the current user
+          if (payload.eventType === 'UPDATE' && 
+              payload.new && 
+              payload.new.user_id === user.id && 
+              payload.new.checkout_time && 
+              !payload.old.checkout_time) {
+            
+            console.log('🏁 Manual checkout detected for current user!', {
+              userId: user.id,
+              userName: user.name,
+              checkoutTime: payload.new.checkout_time,
+              wasManualCheckout: true
+            });
+            
+            // Show immediate notification for manual checkout
+            toast.success('✅ You have been checked out. Workday complete!', {
+              duration: 5000,
+              style: {
+                background: '#10B981',
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }
+            });
+          }
+          
+          // Refresh check-ins immediately when any change occurs
           refreshCheckIns();
         }
       )
       .subscribe();
 
     return () => {
+      console.log('🔌 Unsubscribing from check-in updates');
       subscription.unsubscribe();
     };
   }, [user]);
 
+  // Enhanced user state tracking with real-time updates
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+
+    const updateUserState = () => {
+      const userCheckIns = checkIns.filter(ci => ci.userId === user.id);
+      
+      // Use work day boundaries for better accuracy
+      let todayCheckIns = [];
+      
+      if (workDayBoundaries) {
+        todayCheckIns = userCheckIns.filter(ci => {
+          const checkInTime = new Date(ci.timestamp);
+          return checkInTime >= workDayBoundaries.workDayStart && 
+                 checkInTime < workDayBoundaries.workDayEnd;
+        });
+      } else {
+        // Fallback to regular day check
+        const today = new Date().toDateString();
+        todayCheckIns = userCheckIns.filter(ci => 
+          new Date(ci.timestamp).toDateString() === today
+        );
+      }
+
+      // Find active check-in (not checked out yet)
+      const activeCheckIn = todayCheckIns.find(ci => !ci.checkOutTime && !ci.checkoutTime);
+      
+      // Check if user has been manually checked out
+      const manuallyCheckedOut = todayCheckIns.some(ci => 
+        (ci.checkOutTime || ci.checkoutTime) && 
+        !activeCheckIn
+      );
+      
+      const hasActiveCheckIn = !!activeCheckIn;
+      
+      console.log('👤 User state update:', {
+        userName: user.name,
+        userId: user.id,
+        totalCheckIns: userCheckIns.length,
+        todayCheckIns: todayCheckIns.length,
+        activeCheckIn: activeCheckIn ? {
+          id: activeCheckIn.id,
+          timestamp: activeCheckIn.timestamp,
+          hasCheckOut: !!(activeCheckIn.checkOutTime || activeCheckIn.checkoutTime)
+        } : null,
+        hasActiveCheckIn,
+        manuallyCheckedOut,
+        workDayBoundaries
+      });
+
+      setIsCheckedIn(hasActiveCheckIn);
+      setCurrentCheckIn(activeCheckIn || null);
+
+      // Calculate today's hours
+      let totalHours = 0;
+      todayCheckIns.forEach(ci => {
+        const checkOutTime = ci.checkOutTime || ci.checkoutTime;
+        if (checkOutTime) {
+          const checkInTime = new Date(ci.timestamp);
+          const checkOut = new Date(checkOutTime);
+          const hours = (checkOut.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+          totalHours += hours;
+        }
+      });
+      setTodaysHours(totalHours);
+    };
+
+    updateUserState();
+  }, [checkIns, user, workDayBoundaries]);
+
+  // Auto-refresh every 30 seconds to ensure real-time accuracy
+  useEffect(() => {
+    if (!user) return;
+
+    const autoRefresh = setInterval(() => {
+      console.log('🔄 Auto-refreshing check-ins for real-time accuracy');
+      refreshCheckIns();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(autoRefresh);
+  }, [user]);
+
+  // Enhanced fetch function with better error handling and debugging
   const fetchCheckIns = async () => {
+    console.log('📡 Fetching check-ins...');
+    
     try {
       const { data: checkInsData, error: checkInsError } = await supabase
         .from('check_ins')
         .select('*, users:user_id(name, department, position)')
         .order('timestamp', { ascending: false });
         
-      if (checkInsError) throw checkInsError;
+      if (checkInsError) {
+        console.error('❌ Error fetching check-ins:', checkInsError);
+        throw checkInsError;
+      }
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, name, department, position');
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('❌ Error fetching users:', usersError);
+        throw usersError;
+      }
       
       // Create a map of user details for quick lookup
       const usersMap = usersData.reduce((acc: Record<string, any>, user) => {
@@ -234,40 +355,38 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userId: item.user_id,
           timestamp: new Date(item.timestamp),
           checkoutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
-          checkOutTime: item.checkout_time ? new Date(item.checkout_time) : null, // Match types/index.ts which expects Date | null
+          checkOutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
           userName: userInfo.name || 'Unknown User',
           department: userInfo.department || 'Unknown',
           position: userInfo.position || 'Unknown',
         };
       });
       
-      setCheckIns(formattedCheckIns);
-
-      // Check if current user is checked in (for employees) - same logic as refreshCheckIns
-      if (user && user.role !== 'admin') {
-        const userCheckIns = formattedCheckIns.filter(ci => ci.userId === user.id);
-        const today = new Date().toDateString();
-        const todayCheckIns = userCheckIns.filter(ci => 
-          new Date(ci.timestamp).toDateString() === today
-        );
-        const activeCheckIn = todayCheckIns.find(ci => !ci.checkOutTime);
-        setIsCheckedIn(!!activeCheckIn);
-        setCurrentCheckIn(activeCheckIn || null);
-
-        // Calculate today's hours
-        let totalHours = 0;
-        todayCheckIns.forEach(ci => {
-          if (ci.checkOutTime) {
-            const checkInTime = new Date(ci.timestamp);
-            const checkOutTime = new Date(ci.checkOutTime);
-            const hours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-            totalHours += hours;
-          }
-        });
-        setTodaysHours(totalHours);
-      }
+      console.log('✅ Check-ins fetched successfully:', {
+        total: formattedCheckIns.length,
+        recent: formattedCheckIns.slice(0, 3).map(ci => ({
+          id: ci.id,
+          user: ci.userName,
+          timestamp: ci.timestamp,
+          hasCheckOut: !!(ci.checkOutTime || ci.checkoutTime)
+        }))
+      });
+      
+      // Deduplicate check-ins by ID to prevent UI issues
+      const uniqueCheckIns = formattedCheckIns.filter((checkIn, index, array) => 
+        array.findIndex(item => item.id === checkIn.id) === index
+      );
+      
+      console.log('🔍 Deduplication result:', {
+        original: formattedCheckIns.length,
+        deduplicated: uniqueCheckIns.length,
+        duplicatesRemoved: formattedCheckIns.length - uniqueCheckIns.length
+      });
+      
+      setCheckIns(uniqueCheckIns);
     } catch (error) {
-      console.error('Error fetching check-ins:', error);
+      console.error('❌ Error in fetchCheckIns:', error);
+      toast.error('Failed to load check-in data. Please refresh the page.');
     }
   };
   
@@ -849,19 +968,37 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      return checkIns.some(checkIn => {
+      const result = checkIns.some(checkIn => {
         const checkInDate = new Date(checkIn.timestamp);
         checkInDate.setHours(0, 0, 0, 0);
         return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
       });
+      
+      console.log('📅 hasCheckedInToday (fallback):', { userId, result, today: today.toISOString() });
+      return result;
     }
 
-    return checkIns.some(checkIn => {
+    const result = checkIns.some(checkIn => {
       const checkInTime = new Date(checkIn.timestamp);
-      return checkIn.userId === userId && 
+      const isInRange = checkIn.userId === userId && 
              checkInTime >= workDayBoundaries.workDayStart && 
              checkInTime < workDayBoundaries.workDayEnd;
+      
+      if (checkIn.userId === userId) {
+        console.log('🔍 Checking check-in:', {
+          checkInId: checkIn.id,
+          timestamp: checkInTime.toISOString(),
+          workDayStart: workDayBoundaries.workDayStart.toISOString(),
+          workDayEnd: workDayBoundaries.workDayEnd.toISOString(),
+          isInRange
+        });
+      }
+      
+      return isInRange;
     });
+    
+    console.log('📅 hasCheckedInToday:', { userId, result, workDayBoundaries });
+    return result;
   };
   
   const hasCheckedOutToday = (userId: string): boolean => {
@@ -876,7 +1013,17 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return checkIn.userId === userId && checkInDate.getTime() === today.getTime();
       });
       
-      return todayCheckIn ? !!todayCheckIn.checkoutTime : false;
+      const result = todayCheckIn ? !!(todayCheckIn.checkoutTime || todayCheckIn.checkOutTime) : false;
+      console.log('📅 hasCheckedOutToday (fallback):', { 
+        userId, 
+        result, 
+        todayCheckIn: todayCheckIn ? {
+          id: todayCheckIn.id,
+          checkoutTime: todayCheckIn.checkoutTime,
+          checkOutTime: todayCheckIn.checkOutTime
+        } : null 
+      });
+      return result;
     }
 
     const todayCheckIn = checkIns.find(checkIn => {
@@ -886,7 +1033,19 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
              checkInTime < workDayBoundaries.workDayEnd;
     });
     
-    return todayCheckIn ? !!todayCheckIn.checkoutTime : false;
+    const result = todayCheckIn ? !!(todayCheckIn.checkoutTime || todayCheckIn.checkOutTime) : false;
+    console.log('📅 hasCheckedOutToday:', { 
+      userId, 
+      result, 
+      todayCheckIn: todayCheckIn ? {
+        id: todayCheckIn.id,
+        timestamp: todayCheckIn.timestamp,
+        checkoutTime: todayCheckIn.checkoutTime,
+        checkOutTime: todayCheckIn.checkOutTime
+      } : null,
+      workDayBoundaries 
+    });
+    return result;
   };
   
   const getUserLatestCheckIn = (userId: string): CheckIn | null => {
@@ -947,20 +1106,28 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const refreshCheckIns = async () => {
     if (!user) return;
 
+    console.log('🔄 Refreshing check-ins for user:', user.name);
+
     try {
-      // Use the same logic as fetchCheckIns but with potential date filtering
+      // Use the same logic as fetchCheckIns but with enhanced debugging
       const { data: checkInsData, error: checkInsError } = await supabase
         .from('check_ins')
         .select('*, users:user_id(name, department, position)')
         .order('timestamp', { ascending: false });
         
-      if (checkInsError) throw checkInsError;
+      if (checkInsError) {
+        console.error('❌ Error refreshing check-ins:', checkInsError);
+        throw checkInsError;
+      }
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('id, name, department, position');
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('❌ Error fetching users during refresh:', usersError);
+        throw usersError;
+      }
       
       // Create a map of user details for quick lookup
       const usersMap = usersData.reduce((acc: Record<string, any>, user) => {
@@ -975,40 +1142,42 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userId: item.user_id,
           timestamp: new Date(item.timestamp),
           checkoutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
-          checkOutTime: item.checkout_time ? new Date(item.checkout_time) : null, // Match types/index.ts which expects Date | null
+          checkOutTime: item.checkout_time ? new Date(item.checkout_time) : undefined,
           userName: userInfo.name || 'Unknown User',
           department: userInfo.department || 'Unknown',
           position: userInfo.position || 'Unknown',
         };
       });
       
-      setCheckIns(formattedCheckIns);
+      console.log('✅ Check-ins refreshed successfully:', {
+        total: formattedCheckIns.length,
+        userCheckIns: formattedCheckIns.filter(ci => ci.userId === user.id).length,
+        currentUserRecent: formattedCheckIns
+          .filter(ci => ci.userId === user.id)
+          .slice(0, 2)
+          .map(ci => ({
+            id: ci.id,
+            timestamp: ci.timestamp,
+            hasCheckOut: !!(ci.checkOutTime || ci.checkoutTime)
+          }))
+      });
+      
+      // Deduplicate check-ins by ID to prevent UI issues
+      const uniqueCheckIns = formattedCheckIns.filter((checkIn, index, array) => 
+        array.findIndex(item => item.id === checkIn.id) === index
+      );
+      
+      console.log('🔍 Deduplication result:', {
+        original: formattedCheckIns.length,
+        deduplicated: uniqueCheckIns.length,
+        duplicatesRemoved: formattedCheckIns.length - uniqueCheckIns.length
+      });
+      
+      setCheckIns(uniqueCheckIns);
 
-      // Check if current user is checked in (for employees)
-      if (user.role !== 'admin') {
-        const userCheckIns = formattedCheckIns.filter(ci => ci.userId === user.id);
-        const today = new Date().toDateString();
-        const todayCheckIns = userCheckIns.filter(ci => 
-          new Date(ci.timestamp).toDateString() === today
-        );
-        const activeCheckIn = todayCheckIns.find(ci => !ci.checkOutTime);
-        setIsCheckedIn(!!activeCheckIn);
-        setCurrentCheckIn(activeCheckIn || null);
-
-        // Calculate today's hours
-        let totalHours = 0;
-        todayCheckIns.forEach(ci => {
-          if (ci.checkOutTime) {
-            const checkInTime = new Date(ci.timestamp);
-            const checkOutTime = new Date(ci.checkOutTime);
-            const hours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-            totalHours += hours;
-          }
-        });
-        setTodaysHours(totalHours);
-      }
     } catch (error) {
-      console.error('Error refreshing check-ins:', error);
+      console.error('❌ Error refreshing check-ins:', error);
+      toast.error('Failed to refresh check-in data');
     }
   };
   
@@ -1078,8 +1247,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Helper function to calculate regular and overtime hours
   const calculateRegularAndOvertimeHours = (totalHours: number, shift: Shift) => {
-    // Different standard work hours based on shift type
-    let standardWorkHours = 8; // Default to 8 hours
+    // Updated standard work hours based on new shift requirements:
+    // Day shift: 7 hours, Night shift: 8 hours
+    let standardWorkHours = 8; // Default to 8 hours for night shift
     
     // Day shift is 7 hours (9 AM - 4 PM), Night shift is 8 hours (4 PM - 12 AM)
     if (shift.name.toLowerCase().includes('day')) {
@@ -1091,9 +1261,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const regularHours = Math.min(totalHours, standardWorkHours);
     const overtimeHours = Math.max(0, totalHours - standardWorkHours);
     
-    console.log(`📊 Hours calculation for ${shift.name}:`, {
+    console.log(`📊 Updated hours calculation for ${shift.name}:`, {
       totalHours: totalHours.toFixed(2),
-      standardWorkHours,
+      standardWorkHours: `${standardWorkHours} hours (${shift.name.toLowerCase().includes('day') ? 'Day Shift' : 'Night Shift'})`,
       regularHours: regularHours.toFixed(2),
       overtimeHours: overtimeHours.toFixed(2)
     });

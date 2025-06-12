@@ -89,29 +89,38 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         startDate = startOfMonth(now);
     }
 
-    // Filter data by date range and department - EXCLUDE ADMIN USERS
+    // Filter data by date range and department - EXCLUDE ADMIN USERS AND POSITIONS WITHOUT CHECK-IN
     const nonAdminUsers = users.filter(user => user.role !== 'admin');
+    
+    // Only include positions that have check-in functionality
+    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer'];
+    const checkInEnabledUsers = nonAdminUsers.filter(user => 
+      CHECK_IN_POSITIONS.includes(user.position)
+    );
+    
     const filteredUsers = selectedDepartment === 'all' 
-      ? nonAdminUsers 
-      : nonAdminUsers.filter(user => user.department === selectedDepartment);
+      ? checkInEnabledUsers 
+      : checkInEnabledUsers.filter(user => user.department === selectedDepartment);
 
+    // Only include check-ins from users who have check-in functionality
     const filteredCheckIns = checkIns.filter(checkIn => {
       const checkInDate = new Date(checkIn.timestamp);
       const userInDept = selectedDepartment === 'all' || 
         filteredUsers.some(user => user.id === checkIn.userId);
-      const isNonAdminUser = filteredUsers.some(user => user.id === checkIn.userId);
-      return checkInDate >= startDate && checkInDate <= endDate && userInDept && isNonAdminUser;
+      const isCheckInEnabledUser = filteredUsers.some(user => user.id === checkIn.userId);
+      return checkInDate >= startDate && checkInDate <= endDate && userInDept && isCheckInEnabledUser;
     });
 
+    // Only include reports from check-in enabled users (if needed for analytics)
     const filteredReports = workReports.filter(report => {
       const reportDate = new Date(report.date);
       const userInDept = selectedDepartment === 'all' || 
         filteredUsers.some(user => user.id === report.userId);
-      const isNonAdminUser = filteredUsers.some(user => user.id === report.userId);
-      return reportDate >= startDate && reportDate <= endDate && userInDept && isNonAdminUser;
+      const isCheckInEnabledUser = filteredUsers.some(user => user.id === report.userId);
+      return reportDate >= startDate && reportDate <= endDate && userInDept && isCheckInEnabledUser;
     });
 
-    // Daily attendance data
+    // Daily attendance data - only for check-in enabled positions
     const dailyAttendance = [];
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dayCheckIns = filteredCheckIns.filter(checkIn => 
@@ -124,8 +133,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       });
     }
 
-    // Department distribution - EXCLUDE ADMIN USERS
-    const departmentStats = nonAdminUsers.reduce((acc, user) => {
+    // Department distribution - ONLY CHECK-IN ENABLED USERS
+    const departmentStats = checkInEnabledUsers.reduce((acc, user) => {
       acc[user.department] = (acc[user.department] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -133,11 +142,11 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const departmentData = Object.entries(departmentStats).map(([dept, count]) => ({
       name: dept,
       value: count,
-      percentage: ((count / nonAdminUsers.length) * 100).toFixed(1)
+      percentage: ((count / checkInEnabledUsers.length) * 100).toFixed(1)
     }));
 
-    // Position distribution - EXCLUDE ADMIN USERS
-    const positionStats = nonAdminUsers.reduce((acc, user) => {
+    // Position distribution - ONLY CHECK-IN ENABLED POSITIONS
+    const positionStats = checkInEnabledUsers.reduce((acc, user) => {
       acc[user.position] = (acc[user.position] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -147,7 +156,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       value: count
     }));
 
-    // Weekly performance trends
+    // Weekly performance trends - only for check-in enabled users
     const weeklyData = [];
     for (let week = 0; week < 4; week++) {
       const weekStart = subDays(endDate, (3 - week) * 7);
@@ -174,7 +183,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       });
     }
 
-    // Calculate work hours and overtime - Group by date and aggregate
+    // Calculate work hours and overtime - Group by date and aggregate (only check-in enabled users)
     const workHoursMap = new Map<string, { regularHours: number; overtimeHours: number; totalHours: number; sessions: number }>();
     
     filteredCheckIns
@@ -187,8 +196,20 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         
         // Ensure we have positive hours
         if (hoursWorked > 0) {
-          const regularHours = Math.min(hoursWorked, 8);
-          const overtimeHours = Math.max(hoursWorked - 8, 0);
+          // Determine shift type based on check-in hour to calculate correct regular/overtime hours
+          const checkInHour = checkInTime.getHours();
+          let standardHours = 8; // Default to night shift hours
+          
+          if (checkInHour >= 9 && checkInHour < 16) {
+            // Day shift: 7 hours
+            standardHours = 7;
+          } else if (checkInHour >= 16 || checkInHour < 1) {
+            // Night shift: 8 hours  
+            standardHours = 8;
+          }
+          
+          const regularHours = Math.min(hoursWorked, standardHours);
+          const overtimeHours = Math.max(hoursWorked - standardHours, 0);
           
           const existing = workHoursMap.get(dateKey) || { regularHours: 0, overtimeHours: 0, totalHours: 0, sessions: 0 };
           workHoursMap.set(dateKey, {
@@ -241,7 +262,12 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   const getDepartments = () => {
     const nonAdminUsers = users.filter(user => user.role !== 'admin');
-    const departments = [...new Set(nonAdminUsers.map(user => user.department))];
+    // Only include positions that have check-in functionality
+    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer'];
+    const checkInEnabledUsers = nonAdminUsers.filter(user => 
+      CHECK_IN_POSITIONS.includes(user.position)
+    );
+    const departments = [...new Set(checkInEnabledUsers.map(user => user.department))];
     return departments;
   };
 
@@ -260,6 +286,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Last updated: {lastUpdated.toLocaleTimeString()} • Auto-refreshing every 30s
+          </p>
+          <p className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400 mt-2 p-2 rounded-lg border border-blue-200 dark:border-blue-800">
+            📊 Analytics track check-in enabled positions only: Customer Service & Designers
           </p>
         </div>
         

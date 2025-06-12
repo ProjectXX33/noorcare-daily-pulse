@@ -363,7 +363,7 @@ export async function recordCheckOutPerformance(
         } else if (shiftInfo.name && shiftInfo.name.toLowerCase().includes('night')) {
           expectedHours = 8; // Night shift is 8 hours
         } else {
-        expectedHours = shiftInfo.duration_hours || 8; // Default 8 hours
+          expectedHours = shiftInfo.duration_hours || 8; // Default 8 hours
         }
         actualHours = regularHours + overtimeHours;
         

@@ -126,7 +126,7 @@
         const totalWorkMs = checkOutTime - checkInTime;
         const totalWorkHours = totalWorkMs / (1000 * 60 * 60);
         // Use correct expected hours based on shift type
-        let expectedHours = 8; // Default
+        let expectedHours = 8; // Default to night shift
         if (shift.name && shift.name.toLowerCase().includes('day')) {
           expectedHours = 7; // Day shift is 7 hours
         } else if (shift.name && shift.name.toLowerCase().includes('night')) {
