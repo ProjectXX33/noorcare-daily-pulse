@@ -6,7 +6,7 @@ import { TrendingUp } from 'lucide-react';
 
 const AdminPerformancePage = () => {
   const { user } = useAuth();
-  const [currentMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [currentMonth] = useState('2025-06');
 
   if (!user || user.role !== 'admin') {
     return null;

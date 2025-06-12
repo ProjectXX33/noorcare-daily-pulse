@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   TrendingUp,
   RefreshCw,
-  Loader2
+  Loader2,
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { recalculateOvertimeHours } from '@/utils/recalculateOvertime';
@@ -344,7 +346,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       // Get all performance records for recalculation
       const { data: performanceRecords, error: fetchError } = await supabase
         .from('admin_performance_dashboard')
-        .select('*');
+        .select('*')
+        .eq('month_year', currentMonth);
 
       if (fetchError) throw fetchError;
 
@@ -421,6 +424,206 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     } catch (error) {
       console.error('Error recalculating performance metrics:', error);
       return { success: false, error: error.message };
+    }
+  };
+
+  // Re-record all records from scratch with current month data
+  const rerecordAllRecords = async () => {
+    if (!confirm(`This will clear and re-record ALL performance data for ${currentMonth} from check-in/out records. This cannot be undone! Continue?`)) return;
+
+    setIsRecalculating(true);
+    toast.info('🔄 Re-recording all performance data from scratch...');
+
+    try {
+      // Step 1: Clear existing records for this month
+      const { error: deleteError } = await supabase
+        .from('admin_performance_dashboard')
+        .delete()
+        .eq('month_year', currentMonth);
+
+      if (deleteError) throw deleteError;
+
+      // Step 2: Get all check-ins for the current month
+      const monthStart = `${currentMonth}-01`;
+      const nextMonth = currentMonth.split('-');
+      const nextMonthDate = new Date(parseInt(nextMonth[0]), parseInt(nextMonth[1]), 1);
+      const monthEnd = nextMonthDate.toISOString().split('T')[0];
+
+      const { data: checkIns, error: checkInError } = await supabase
+        .from('check_ins')
+        .select(`
+          *,
+          users:user_id(name, position)
+        `)
+        .gte('timestamp', monthStart)
+        .lt('timestamp', monthEnd)
+        .not('checkout_time', 'is', null);
+
+      if (checkInError) throw checkInError;
+
+      // Step 3: Get shift assignments for the month
+      const { data: shiftAssignments, error: shiftError } = await supabase
+        .from('shift_assignments')
+        .select(`
+          *,
+          shifts:assigned_shift_id(name, start_time, end_time)
+        `)
+        .gte('work_date', monthStart)
+        .lt('work_date', monthEnd);
+
+      if (shiftError) throw shiftError;
+
+      // Step 4: Process data by employee
+      const employeeData: Record<string, {
+        name: string;
+        position: string;
+        workingDays: Set<string>;
+        totalDelayMinutes: number;
+        totalOvertimeHours: number;
+        sessions: any[];
+      }> = {};
+      
+      for (const checkIn of checkIns) {
+        const userId = checkIn.user_id;
+        const userName = checkIn.users?.name || 'Unknown';
+        const userPosition = checkIn.users?.position;
+        
+        // Only process Customer Service and Designer
+        if (!['Customer Service', 'Designer'].includes(userPosition)) continue;
+
+        if (!employeeData[userId]) {
+          employeeData[userId] = {
+            name: userName,
+            position: userPosition,
+            workingDays: new Set(),
+            totalDelayMinutes: 0,
+            totalOvertimeHours: 0,
+            sessions: []
+          };
+        }
+
+        const workDate = checkIn.timestamp.split('T')[0];
+        employeeData[userId].workingDays.add(workDate);
+
+        // Find shift assignment for this date
+        const shiftAssignment = shiftAssignments.find(sa => 
+          sa.employee_id === userId && sa.work_date === workDate
+        );
+
+        if (shiftAssignment && !shiftAssignment.is_day_off) {
+          const shift = shiftAssignment.shifts;
+          const checkInTime = new Date(checkIn.timestamp);
+          const checkOutTime = new Date(checkIn.checkout_time);
+          
+          // Calculate delay
+          const scheduledStartTime = shift.start_time;
+          const [schedHour, schedMin] = scheduledStartTime.split(':').map(Number);
+          const scheduledStart = new Date(checkInTime);
+          scheduledStart.setHours(schedHour, schedMin, 0, 0);
+          
+          const delayMs = checkInTime.getTime() - scheduledStart.getTime();
+          const delayMinutes = Math.max(0, delayMs / (1000 * 60));
+          employeeData[userId].totalDelayMinutes += delayMinutes;
+          
+          // Calculate overtime using new flexible rules
+          const totalHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+          const checkInHour = checkInTime.getHours();
+          
+          let standardHours = 8;
+          if (shift.name.toLowerCase().includes('day')) {
+            standardHours = 7;
+          }
+          
+          let overtimeHours = 0;
+          if (shift.name.toLowerCase().includes('day')) {
+            // Day shift: Before 9AM or after 4PM = overtime
+            if (checkInHour < 9) {
+              const earlyStart = new Date(checkInTime);
+              earlyStart.setHours(9, 0, 0, 0);
+              if (checkInTime < earlyStart) {
+                overtimeHours += (earlyStart.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+              }
+            }
+            if (checkOutTime.getHours() >= 16) {
+              const regularEnd = new Date(checkOutTime);
+              regularEnd.setHours(16, 0, 0, 0);
+              if (checkOutTime > regularEnd) {
+                overtimeHours += (checkOutTime.getTime() - regularEnd.getTime()) / (1000 * 60 * 60);
+              }
+            }
+          } else {
+            // Night shift: Standard calculation with midnight overtime
+            const regularHours = Math.min(totalHours, standardHours);
+            overtimeHours = Math.max(0, totalHours - standardHours);
+          }
+          
+          employeeData[userId].totalOvertimeHours += overtimeHours;
+        }
+      }
+
+      // Step 5: Create new performance records
+      let created = 0;
+      for (const [userId, data] of Object.entries(employeeData)) {
+        const delayMinutes = data.totalDelayMinutes;
+        const workingDays = data.workingDays.size;
+        
+        const performanceScore = delayMinutes <= 0 ? 100.0 : 
+          delayMinutes >= 500 ? 0.0 : 
+          Math.max(0, 100.0 - (delayMinutes / 5.0));
+          
+        let punctuality = 100.0;
+        if (delayMinutes >= 60) {
+          punctuality = 0.0;
+        } else if (delayMinutes > 30) {
+          punctuality = Math.max(0, 50 - (delayMinutes * 2));
+        } else if (delayMinutes > 0) {
+          punctuality = Math.max(0, 90 - (delayMinutes * 3));
+        }
+        
+        let status = 'Good';
+        if (performanceScore >= 95 && punctuality >= 95) {
+          status = 'Excellent';
+        } else if (performanceScore >= 85 && punctuality >= 80) {
+          status = 'Good';
+        } else if (performanceScore >= 70 && punctuality >= 60) {
+          status = 'Needs Improvement';
+        } else {
+          status = 'Poor';
+        }
+
+        const recordData = {
+          employee_id: userId,
+          employee_name: data.name,
+          month_year: currentMonth,
+          total_working_days: workingDays,
+          total_delay_minutes: Math.round(delayMinutes),
+          total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100,
+          total_overtime_hours: Math.round(data.totalOvertimeHours * 100) / 100,
+          average_performance_score: Math.round(performanceScore * 100) / 100,
+          punctuality_percentage: Math.round(punctuality * 100) / 100,
+          performance_status: status,
+          worked_dates: Array.from(data.workingDays),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('admin_performance_dashboard')
+          .insert(recordData);
+
+        if (!insertError) created++;
+      }
+
+      toast.success(`✅ Re-recorded ${created} performance records for ${currentMonth}!`);
+      await loadData();
+      
+      return { success: true, recordsCreated: created };
+    } catch (error) {
+      console.error('Error re-recording data:', error);
+      toast.error(`Failed to re-record: ${error.message}`);
+      return { success: false, error: error.message };
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -528,13 +731,25 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               </Sheet>
 
               <Button 
-                onClick={startAddingNew} 
+                onClick={rerecordAllRecords} 
+                variant="outline" 
                 size="sm"
+                disabled={isRecalculating}
+                className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none bg-orange-50 hover:bg-orange-100"
+              >
+                {isRecalculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                <span className="ml-1 hidden sm:inline">Re-record All</span>
+              </Button>
+
+              <Button 
+                onClick={startAddingNew} 
+                variant="default" 
+                size="sm"
+                disabled={isAddingNew}
                 className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
               >
-                <Plus className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Add Record</span>
-                <span className="sm:hidden">Add</span>
+                <Plus className="h-4 w-4" />
+                <span className="ml-1 hidden sm:inline">Add Record</span>
               </Button>
             </div>
           </CardTitle>
