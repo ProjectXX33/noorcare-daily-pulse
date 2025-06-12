@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Flame, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Clock, Flame, CheckCircle, AlertTriangle, Play, Timer, ArrowDown } from 'lucide-react';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -64,7 +64,8 @@ const WorkShiftTimer: React.FC = () => {
         // Get shift assignment if we have an active check-in
         let assignment = null;
         if (active) {
-          const today = new Date().toISOString().split('T')[0];
+          // Use work day boundaries to get correct work date
+          const workDate = workDayBoundaries.workDayStart.toISOString().split('T')[0];
           const { data: assignmentData } = await supabase
             .from('shift_assignments')
             .select(`
@@ -72,7 +73,7 @@ const WorkShiftTimer: React.FC = () => {
               shifts:assigned_shift_id(name, start_time, end_time)
             `)
             .eq('employee_id', user.id)
-            .eq('work_date', today)
+            .eq('work_date', workDate)
             .single();
           
           assignment = assignmentData;
@@ -98,7 +99,7 @@ const WorkShiftTimer: React.FC = () => {
     findActiveCheckIn();
   }, [user, checkIns]);
 
-  // Timer logic - runs every second when there's an active check-in
+  // Enhanced timer logic - runs every second for real-time updates
   useEffect(() => {
     if (!activeCheckIn) {
       setTimeWorked(0);
@@ -121,10 +122,11 @@ const WorkShiftTimer: React.FC = () => {
         return;
       }
       
-      // Calculate total time worked
+      // Calculate total time worked in seconds for more precision
       const timeWorkedMs = now.getTime() - checkInTime.getTime();
-      const timeWorkedMinutes = Math.floor(timeWorkedMs / (1000 * 60));
-      setTimeWorked(timeWorkedMinutes);
+      const timeWorkedSeconds = Math.floor(timeWorkedMs / 1000);
+      const timeWorkedMinutes = Math.floor(timeWorkedSeconds / 60);
+      setTimeWorked(timeWorkedSeconds);
       
       // Determine shift type and standard work hours
       const checkInHour = checkInTime.getHours();
@@ -147,33 +149,23 @@ const WorkShiftTimer: React.FC = () => {
         }
       }
       
-      const standardWorkMinutes = standardWorkHours * 60;
+      const standardWorkSeconds = standardWorkHours * 60 * 60;
       
       // Check if in overtime
-      if (timeWorkedMinutes > standardWorkMinutes) {
+      if (timeWorkedSeconds > standardWorkSeconds) {
         setIsOvertime(true);
-        setOvertimeMinutes(timeWorkedMinutes - standardWorkMinutes);
+        setOvertimeMinutes(Math.floor((timeWorkedSeconds - standardWorkSeconds) / 60));
       } else {
         setIsOvertime(false);
         setOvertimeMinutes(0);
       }
-      
-      console.log('WorkShiftTimer - Timer update:', {
-        checkInTime: checkInTime.toISOString(),
-        now: now.toISOString(),
-        timeWorkedMinutes,
-        standardWorkMinutes,
-        shiftType,
-        isOvertime: timeWorkedMinutes > standardWorkMinutes,
-        overtimeMinutes: Math.max(0, timeWorkedMinutes - standardWorkMinutes)
-      });
     };
 
     // Update immediately
     updateTimer();
 
-    // Update every minute (60 seconds)
-    const interval = setInterval(updateTimer, 60000);
+    // Update every second for real-time experience
+    const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
   }, [activeCheckIn, shiftInfo]);
@@ -194,11 +186,27 @@ const WorkShiftTimer: React.FC = () => {
     }
   };
 
-  // Format time display
-  const formatTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  // Enhanced time formatting with seconds
+  const formatTime = (totalSeconds: number): string => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Format countdown time (hours:minutes:seconds)
+  const formatCountdown = (totalSeconds: number): string => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Format time without seconds for remaining time
+  const formatTimeMinutes = (totalSeconds: number): string => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
   };
 
   // Show debug info for any user during testing
@@ -219,8 +227,8 @@ const WorkShiftTimer: React.FC = () => {
     
     if (hasCheckedOut && !activeCheckIn) {
       return (
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium bg-green-100 text-green-700 border-green-200 shadow-sm">
-          <CheckCircle className="h-4 w-4" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-300 shadow-sm">
+          <CheckCircle className="h-4 w-4 text-green-600" />
           <span>Work Complete! 🎉</span>
         </div>
       );
@@ -228,8 +236,8 @@ const WorkShiftTimer: React.FC = () => {
     
     if (!activeCheckIn || timeWorked === 0) {
       return (
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium bg-gray-100 text-gray-600 border-gray-200">
-          <Clock className="h-4 w-4" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium bg-gradient-to-r from-slate-100 to-gray-100 text-slate-600 border-slate-300 shadow-sm">
+          <Clock className="h-4 w-4 text-slate-500" />
           <span>Not Checked In</span>
         </div>
       );
@@ -238,50 +246,74 @@ const WorkShiftTimer: React.FC = () => {
     return null; // Don't show for non-employees
   }
 
-  // Timer display for active work session
+  // Enhanced timer display for active work session
   if (isOvertime) {
-    // Overtime mode - enhanced design with fire animation
+    // Overtime mode - no flashing, solid design
     return (
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-bold bg-gradient-to-r from-red-100 to-orange-100 text-red-700 border-red-300 shadow-lg animate-pulse">
-        <div className="relative">
-          <Flame className="h-5 w-5 text-red-600 animate-bounce" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-orange-400 rounded-full animate-ping"></div>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-          <span className="font-mono text-lg tracking-wider">
-            {formatTime(overtimeMinutes)}
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-red-50 to-orange-50 text-red-700 border-red-400 shadow-md">
+        <Flame className="h-4 w-4 text-red-600" />
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm tracking-wide text-red-800">
+            +{formatTimeMinutes(overtimeMinutes * 60)}
           </span>
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-extrabold">🔥 OVERTIME</span>
-            <AlertTriangle className="h-3 w-3 animate-pulse" />
-          </div>
+          <span className="hidden sm:inline text-xs font-extrabold text-red-600">OVERTIME</span>
+          {/* Full timer on desktop */}
+          <span className="hidden sm:inline text-xs opacity-75 ml-1">
+            ({formatTime(timeWorked)} total)
+          </span>
         </div>
       </div>
     );
   }
 
-  // Regular work time mode
-  const standardWorkMinutes = (shiftInfo?.name?.toLowerCase().includes('day') ? 7 : 8) * 60;
-  const remainingMinutes = standardWorkMinutes - timeWorked;
+  // Regular work time mode with countdown
+  const standardWorkSeconds = (shiftInfo?.name?.toLowerCase().includes('day') ? 7 : 8) * 60 * 60;
+  const remainingSeconds = Math.max(0, standardWorkSeconds - timeWorked);
+  const progressPercentage = Math.min(100, (timeWorked / standardWorkSeconds) * 100);
   
-  // Color coding based on remaining time
-  let colorClass = 'bg-green-100 text-green-700 border-green-200';
-  if (remainingMinutes <= 30) { // Last 30 minutes
-    colorClass = 'bg-orange-100 text-orange-700 border-orange-300';
-  } else if (remainingMinutes <= 60) { // Last hour
-    colorClass = 'bg-yellow-100 text-yellow-700 border-yellow-300';
+  // Dynamic color coding based on remaining time
+  let colorClass = 'from-emerald-50 to-green-50 text-emerald-700 border-emerald-300';
+  let iconColor = 'text-emerald-600';
+  let progressColor = 'bg-emerald-500';
+  let progressBgColor = 'bg-emerald-100/50';
+  
+  if (remainingSeconds <= 30 * 60) { // Last 30 minutes
+    colorClass = 'from-orange-50 to-amber-50 text-orange-700 border-orange-400';
+    iconColor = 'text-orange-600';
+    progressColor = 'bg-orange-500';
+    progressBgColor = 'bg-orange-100/50';
+  } else if (remainingSeconds <= 60 * 60) { // Last hour
+    colorClass = 'from-yellow-50 to-amber-50 text-yellow-700 border-yellow-400';
+    iconColor = 'text-yellow-600';
+    progressColor = 'bg-yellow-500';
+    progressBgColor = 'bg-yellow-100/50';
   }
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-500 ${colorClass} shadow-sm`}>
-      <Clock className="h-4 w-4" />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-        <span className="font-mono font-bold text-base">
-          {formatTime(timeWorked)}
-        </span>
-        <span className="text-xs opacity-75">
-          worked ({formatTime(remainingMinutes)} left)
-        </span>
+    <div className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-gradient-to-r ${colorClass} shadow-sm overflow-hidden`}>
+      {/* Compact progress bar with matching colors */}
+      <div className={`absolute bottom-0 left-0 h-0.5 ${progressBgColor} w-full`}>
+        <div 
+          className={`h-full ${progressColor} transition-all duration-1000 ease-out`}
+          style={{ width: `${progressPercentage}%` }}
+        ></div>
+      </div>
+      
+      <Timer className={`h-4 w-4 ${iconColor}`} />
+      
+      <div className="flex items-center gap-2">
+        {/* Countdown Timer */}
+        <div className="flex items-center gap-1">
+          <ArrowDown className="h-3 w-3 opacity-60" />
+          <span className="font-mono text-sm tracking-wide font-bold">
+            {formatCountdown(remainingSeconds)}
+          </span>
+        </div>
+        
+        {/* Worked Time (smaller) - Hidden on mobile */}
+        <div className="hidden sm:block text-xs opacity-75">
+          ({formatTime(timeWorked)} worked)
+        </div>
       </div>
     </div>
   );

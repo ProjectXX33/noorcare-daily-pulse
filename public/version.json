@@ -1,13 +1,12 @@
 {
-  "version": "1.6.7",
-  "buildTime": "2025-06-12T22:02:29.416Z",
-  "buildTimestamp": "1749765749417",
+  "version": "1.6.8",
+  "buildTime": "2025-06-12T22:53:35.865Z",
+  "buildTimestamp": "1749768815866",
   "buildDate": "6/13/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🔥 Enhanced overtime timer - counts UP with fire emoji and red styling",
-    "Fixed bug where check-in/out was not working good for Customer Service and Designer employees"
+    "🔥 Enhanced Work Timer and overtime timer - counts UP with fire emoji and red styling"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
