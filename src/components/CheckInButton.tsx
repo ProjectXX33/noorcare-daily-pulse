@@ -76,14 +76,20 @@ const CheckInButton = () => {
         const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
 
         if (!canCheckIn) {
-          let message = '';
-          if (shift.name.toLowerCase().includes('day')) {
-            message = 'Your Day Shift starts at 9:00 AM';
-          } else if (shift.name.toLowerCase().includes('night')) {
-            message = 'Your Night Shift starts at 4:00 PM';
-          } else {
-            message = `Your shift starts at ${shift.start_time}`;
-          }
+          // Format the start time to 12-hour format
+          const formatTime = (timeString: string) => {
+            const [hours, minutes] = timeString.split(':').map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes);
+            return date.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit', 
+              hour12: true 
+            });
+          };
+
+          const formattedStartTime = formatTime(shift.start_time);
+          const message = `Your ${shift.name} starts at ${formattedStartTime}`;
 
           setShiftValidation({
             canCheckIn: false,

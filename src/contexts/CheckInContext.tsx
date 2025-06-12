@@ -529,14 +529,20 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
 
             if (!canCheckIn) {
-              let message = '';
-              if (shift.name.toLowerCase().includes('day')) {
-                message = 'Your Day Shift starts at 9:00 AM. You can check in 30 minutes before.';
-              } else if (shift.name.toLowerCase().includes('night')) {
-                message = 'Your Night Shift starts at 4:00 PM. You can check in 30 minutes before.';
-              } else {
-                message = `Your shift starts at ${shift.start_time}. You can check in 30 minutes before.`;
-              }
+              // Format the start time to 12-hour format
+              const formatTime = (timeString: string) => {
+                const [hours, minutes] = timeString.split(':').map(Number);
+                const date = new Date();
+                date.setHours(hours, minutes);
+                return date.toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
+                  minute: '2-digit', 
+                  hour12: true 
+                });
+              };
+
+              const formattedStartTime = formatTime(shift.start_time);
+              const message = `Your ${shift.name} starts at ${formattedStartTime}. You can check in 30 minutes before.`;
 
               toast.warning(message, {
                 duration: 6000,
