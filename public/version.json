@@ -1,18 +1,13 @@
 {
-  "version": "1.6.5",
-  "buildTime": "2025-06-12T14:27:23.496Z",
-  "buildTimestamp": "1749738443497",
-  "buildDate": "6/12/2025",
+  "version": "1.6.6",
+  "buildTime": "2025-06-12T21:14:57.173Z",
+  "buildTimestamp": "1749762897174",
+  "buildDate": "6/13/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
     "🔥 Enhanced overtime timer - counts UP with fire emoji and red styling",
-    "⚡ Real-time performance recording on check-in/out",
-    "🕘 Flexible work schedule - 9AM start, 4AM reset, check-in anytime",
-    "💰 Advanced overtime rules - early start/late work compensation",
-    "🧹 Clean interface - removed debug information for employees",
-    "📊 Intelligent overtime calculation based on actual work periods",
-    "🎯 Live performance updates and instant dashboard sync"
+    "Fixed bug where check-in/out was not working good for Customer Service and Designer employees"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

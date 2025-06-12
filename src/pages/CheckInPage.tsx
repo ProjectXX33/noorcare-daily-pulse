@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import CheckInButton from '@/components/CheckInButton';
 import CheckOutButton from '@/components/CheckOutButton';
 import CheckInHistory from '@/components/CheckInHistory';
+import WorkShiftTimer from '@/components/WorkShiftTimer';
+import AutoCheckoutService from '@/components/AutoCheckoutService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ArrowRightLeft, Clock, Loader2, AlertCircle, CheckCircle, LogIn, LogOut } from 'lucide-react';
@@ -125,6 +127,8 @@ const CheckInPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Background service for auto-checkout at 4AM */}
+      <AutoCheckoutService />
       {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
       <div className="border-b border-border/50 bg-background/98 w-full">
         <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
@@ -183,6 +187,11 @@ const CheckInPage = () => {
                           : 'Not Checked In'}
                     </span>
                   </p>
+                  
+                  {/* Work Timer */}
+                  <div className="mb-3">
+                    <WorkShiftTimer />
+                  </div>
                   
                   {todayCheckIns.length > 0 && (
                     <div className="text-xs sm:text-sm text-muted-foreground space-y-1">

@@ -79,7 +79,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [employees, setEmployees] = useState<Array<{id: string, name: string, position?: string}>>([]);
-  const [isRecalculating, setIsRecalculating] = useState(false);
+
 
   useEffect(() => {
     loadData();
@@ -295,50 +295,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const calculatedPunctuality = calcPunctuality(delayMinutes);
   const calculatedStatus = calcStatus(calculatedScore, calculatedPunctuality);
 
-  const handleFixAll = async () => {
-    if (!confirm('This will recalculate and update all performance metrics for all existing records. This includes overtime hours, working days, performance scores, and punctuality. Are you sure?')) {
-      return;
-    }
 
-    setIsRecalculating(true);
-    toast.info('🔄 Starting comprehensive fix for all performance data...');
-
-    try {
-      // Step 1: Recalculate overtime hours in monthly_shifts
-      toast.info('📊 Step 1: Fixing overtime calculations...');
-      const overtimeResult = await recalculateOvertimeHours();
-      
-      // Step 2: Recalculate performance dashboard metrics
-      toast.info('📈 Step 2: Updating performance metrics...');
-      const performanceResult = await recalculatePerformanceMetrics();
-      
-      let totalUpdated = 0;
-      const messages = [];
-      
-      if (overtimeResult.success) {
-        totalUpdated += overtimeResult.recordsUpdated;
-        messages.push(`${overtimeResult.recordsUpdated} overtime records`);
-      }
-      
-      if (performanceResult.success) {
-        totalUpdated += performanceResult.recordsUpdated;
-        messages.push(`${performanceResult.recordsUpdated} performance records`);
-      }
-      
-      if (totalUpdated > 0) {
-        toast.success(`✅ Successfully fixed ${totalUpdated} records! Updated: ${messages.join(', ')}`);
-        // Reload the performance data to show updated values
-        await loadData();
-      } else {
-        toast.success('✅ All records are already up to date!');
-      }
-    } catch (error) {
-      console.error('Error during Fix All operation:', error);
-      toast.error(`❌ Error: ${error.message}`);
-    } finally {
-      setIsRecalculating(false);
-    }
-  };
 
   // New function to recalculate performance metrics
   const recalculatePerformanceMetrics = async () => {
@@ -431,7 +388,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const rerecordAllRecords = async () => {
     if (!confirm(`This will clear and re-record ALL performance data for ${currentMonth} from check-in/out records. This cannot be undone! Continue?`)) return;
 
-    setIsRecalculating(true);
+
     toast.info('🔄 Re-recording all performance data from scratch...');
 
     try {
@@ -623,7 +580,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       toast.error(`Failed to re-record: ${error.message}`);
       return { success: false, error: error.message };
     } finally {
-      setIsRecalculating(false);
+      // Clean up
     }
   };
 
@@ -687,57 +644,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                 <span className="ml-1 hidden sm:inline">Refresh</span>
               </Button>
 
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    disabled={isRecalculating}
-                    className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
-                    title="Fix and recalculate all performance metrics including overtime hours, working days, and performance scores"
-                  >
-                    {isRecalculating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : '🛠️'} 
-                    <span className="ml-1 hidden sm:inline">{isRecalculating ? 'Fixing All...' : 'Fix All'}</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="h-[35vh]">
-                  <SheetHeader>
-                    <SheetTitle>Fix All Performance Data</SheetTitle>
-                  </SheetHeader>
-                  <div className="py-4 space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      This will comprehensively fix and recalculate all performance metrics including:
-                    </p>
-                    <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
-                      <li>Overtime hours using corrected formulas</li>
-                      <li>Performance scores based on delay minutes</li>
-                      <li>Punctuality percentages</li>
-                      <li>Working days calculations</li>
-                      <li>Performance status categories</li>
-                    </ul>
-                    <Button 
-                      onClick={handleFixAll}
-                      disabled={isRecalculating}
-                      className="w-full min-h-[44px]"
-                    >
-                      {isRecalculating ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        '🛠️'
-                      )} {isRecalculating ? 'Fixing All Data...' : 'Fix All Performance Data'}
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-
               <Button 
                 onClick={rerecordAllRecords} 
                 variant="outline" 
                 size="sm"
-                disabled={isRecalculating}
+                disabled={isLoading}
                 className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none bg-orange-50 hover:bg-orange-100"
               >
-                {isRecalculating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                 <span className="ml-1 hidden sm:inline">Re-record All</span>
               </Button>
 

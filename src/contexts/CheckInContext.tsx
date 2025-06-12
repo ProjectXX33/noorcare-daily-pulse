@@ -499,7 +499,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
       
-      // For Customer Service and Designer employees, check if today is a day off BEFORE check-in
+      // For Customer Service and Designer employees, check shift timing and day off BEFORE check-in
       if (userData.position === 'Customer Service' || userData.position === 'Designer') {
         try {
           const { checkIfDayOff } = await import('@/lib/performanceApi');
@@ -511,6 +511,38 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               duration: 5000,
             });
             return;
+          }
+
+          // Check shift timing validation
+          if (dayOffStatus.assignedShift) {
+            const shift = dayOffStatus.assignedShift;
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTotalMinutes = currentHour * 60 + currentMinute;
+
+            const [shiftHour, shiftMinute] = shift.start_time.split(':').map(Number);
+            const shiftTotalMinutes = shiftHour * 60 + shiftMinute;
+
+            // Allow check-in 30 minutes before shift start
+            const allowEarlyMinutes = 30;
+            const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+
+            if (!canCheckIn) {
+              let message = '';
+              if (shift.name.toLowerCase().includes('day')) {
+                message = 'Your Day Shift starts at 9:00 AM. You can check in 30 minutes before.';
+              } else if (shift.name.toLowerCase().includes('night')) {
+                message = 'Your Night Shift starts at 4:00 PM. You can check in 30 minutes before.';
+              } else {
+                message = `Your shift starts at ${shift.start_time}. You can check in 30 minutes before.`;
+              }
+
+              toast.warning(message, {
+                duration: 6000,
+              });
+              return;
+            }
           }
         } catch (dayOffError) {
           console.error('Error checking day off status:', dayOffError);
