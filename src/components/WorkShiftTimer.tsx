@@ -96,34 +96,39 @@ const WorkShiftTimer: React.FC = () => {
       const checkInTime = new Date(activeCheckIn.timestamp);
       const now = new Date();
       
-      // Work day starts at 9AM, but flexible check-in allowed
-      // Standard hours: Day shift: 7 hours, Night shift: 8 hours
-      // Overtime calculated based on actual work periods
+      // Determine shift type and standard work hours
       const checkInHour = checkInTime.getHours();
-      let workHours = 8; // Default to 8 hours for night shift
+      let standardWorkHours = 8; // Default to 8 hours for night shift
       
       if (checkInHour >= 9 && checkInHour < 16) {
         // Day shift (standard 9 AM - 4 PM) = 7 hours
-        workHours = 7;
+        standardWorkHours = 7;
       } else if (checkInHour >= 16 || checkInHour < 9) {
         // Night shift or early morning = 8 hours
-        workHours = 8;
+        standardWorkHours = 8;
       }
       
-      const workHoursInMs = workHours * 60 * 60 * 1000;
-      const endTime = new Date(checkInTime.getTime() + workHoursInMs);
-      const remaining = endTime.getTime() - now.getTime();
+      // Calculate time worked so far
+      const timeWorkedMs = now.getTime() - checkInTime.getTime();
+      const standardWorkMs = standardWorkHours * 60 * 60 * 1000;
       
-      console.log('WorkShiftTimer - Updated timer calculation:', {
+      // Smart timer logic:
+      // 1. Count down standard work hours first
+      // 2. When standard hours complete, count up overtime
+      const remaining = standardWorkMs - timeWorkedMs;
+      
+      console.log('WorkShiftTimer - Smart timer calculation:', {
         checkInTime: checkInTime.toISOString(),
+        now: now.toISOString(),
         checkInHour,
-        workHours: `${workHours} hours (${checkInHour >= 9 && checkInHour < 16 ? 'Day Shift' : 'Night Shift'})`,
-        endTime: endTime.toISOString(),
+        standardWorkHours: `${standardWorkHours} hours (${checkInHour >= 9 && checkInHour < 16 ? 'Day Shift' : 'Night Shift'})`,
+        timeWorkedHours: (timeWorkedMs / (1000 * 60 * 60)).toFixed(2),
         remaining: remaining,
-        remainingFormatted: Math.abs(remaining) / (1000 * 60 * 60)
+        isOvertime: remaining <= 0,
+        overtimeMinutes: remaining <= 0 ? Math.abs(remaining) / (1000 * 60) : 0
       });
       
-      setTimeRemaining(remaining); // Can be negative for overtime
+      setTimeRemaining(remaining); // Negative when in overtime
     };
 
     // Update immediately
@@ -178,8 +183,7 @@ const WorkShiftTimer: React.FC = () => {
     const minutes = Math.floor((absMs % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((absMs % (1000 * 60)) / 1000);
     
-    const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    return ms < 0 ? `${timeStr}` : timeStr; // Show overtime time counting up
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getTimerColor = (): string => {
@@ -189,24 +193,36 @@ const WorkShiftTimer: React.FC = () => {
     return 'text-green-600 bg-green-100 border-green-200';
   };
 
-  const getStatusText = (): string => {
-    if (timeRemaining <= 0) return '🔥 Overtime';
-    return 'Remaining';
+  const getStatusText = (): JSX.Element => {
+    if (timeRemaining <= 0) {
+      return (
+        <>
+          <span className="sm:hidden">🔥</span>
+          <span className="hidden sm:inline">🔥 Overtime</span>
+        </>
+      );
+    }
+    return <span>Remaining</span>;
   };
 
-  // Show overtime counter when shift hours are completed (but still checked in)
+  // Smart timer display: Count down standard hours, then count up overtime
   if (timeRemaining <= 0) {
+    // Overtime mode - count UP with red styling and fire emoji
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-red-100 text-red-600 border-red-200">
         <Clock className="h-3 w-3" />
         <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1">
-          <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
-          <span className="text-xs">🔥 Overtime</span>
+          <span className="font-mono font-bold">{formatTime(Math.abs(timeRemaining))}</span>
+          <span className="text-xs">
+            <span className="sm:hidden">🔥</span>
+            <span className="hidden sm:inline">🔥 Overtime</span>
+          </span>
         </div>
       </div>
     );
   }
 
+  // Standard work hours mode - count DOWN with normal styling
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${getTimerColor()}`}>
       <Clock className="h-3 w-3" />
