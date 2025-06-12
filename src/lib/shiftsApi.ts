@@ -32,12 +32,12 @@ export async function fetchWorkTimeConfig(): Promise<WorkTimeConfig | null> {
   }
 }
 
-// Get current work day boundaries based on daily reset time (e.g., 9 AM)
-// For night shift support: if current time is before 9 AM, we're still in "yesterday's" work day
+// Get current work day boundaries for check-in/out reset (4 AM)
+// Work day starts at 9AM but check-in/out resets at 4AM for night shift support
 export async function getCurrentWorkDayBoundaries(): Promise<{ workDayStart: Date; workDayEnd: Date }> {
   try {
     const config = await fetchWorkTimeConfig();
-    const resetTimeStr = config?.dailyResetTime || '09:00:00'; // Default to 9 AM
+    const resetTimeStr = config?.dailyResetTime || '04:00:00'; // Check-in/out reset at 4 AM
     
     const now = new Date();
     const [resetHour, resetMinute] = resetTimeStr.split(':').map(Number);
@@ -162,7 +162,8 @@ export async function fetchMonthlyShifts(
   }
 }
 
-// Calculate hours based on check-in/out times and shift
+// Calculate hours with flexible overtime rules
+// Work day starts at 9AM, but overtime is calculated based on actual work periods
 export function calculateWorkHours(
   checkInTime: Date,
   checkOutTime: Date,
@@ -172,8 +173,7 @@ export function calculateWorkHours(
   const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
   const totalHours = totalMinutes / 60;
   
-  // Updated standard work hours based on new shift requirements:
-  // Day shift: 7 hours, Night shift: 8 hours
+  // Standard work hours: Day shift: 7 hours, Night shift: 8 hours
   let standardWorkHours = 8; // Default to 8 hours for night shift
   if (shift.name.toLowerCase().includes('day')) {
     standardWorkHours = 7; // Day shift is 7 hours
@@ -181,48 +181,87 @@ export function calculateWorkHours(
     standardWorkHours = 8; // Night shift is 8 hours
   }
   
-  // Parse shift times (assume they're in HH:MM format)
-  const [shiftStartHour, shiftStartMin] = shift.startTime.split(':').map(Number);
-  const [shiftEndHour, shiftEndMin] = shift.endTime.split(':').map(Number);
+  // Calculate overtime based on new rules:
+  // Day shift: Before 9AM or after 4PM = overtime
+  // Night shift: Between 12AM-4AM = overtime (if not checked out)
+  let overtimeHours = 0;
+  let regularHours = totalHours;
   
-  // Create shift start and end times for the same date as check-in
-  const shiftStart = new Date(checkInTime);
-  shiftStart.setHours(shiftStartHour, shiftStartMin, 0, 0);
-  
-  const shiftEnd = new Date(checkInTime);
-  shiftEnd.setHours(shiftEndHour, shiftEndMin, 0, 0);
-  
-  // Handle shifts that cross midnight (like Night Shift 16:00-00:00)
-  if (shiftEndHour === 0 || shiftEndHour < shiftStartHour) {
-    shiftEnd.setDate(shiftEnd.getDate() + 1); // Next day
+  if (shift.name.toLowerCase().includes('day')) {
+    // Day shift overtime calculation
+    const checkInHour = checkInTime.getHours();
+    const checkOutHour = checkOutTime.getHours();
+    
+    // Early morning overtime (before 9AM)
+    if (checkInHour < 9) {
+      const earlyStart = new Date(checkInTime);
+      earlyStart.setHours(9, 0, 0, 0);
+      
+      if (checkInTime < earlyStart) {
+        const earlyMinutes = differenceInMinutes(earlyStart, checkInTime);
+        overtimeHours += earlyMinutes / 60;
+      }
+    }
+    
+    // Evening overtime (after 4PM)
+    if (checkOutHour >= 16) {
+      const regularEnd = new Date(checkOutTime);
+      regularEnd.setHours(16, 0, 0, 0);
+      
+      if (checkOutTime > regularEnd) {
+        const lateMinutes = differenceInMinutes(checkOutTime, regularEnd);
+        overtimeHours += lateMinutes / 60;
+      }
+    }
+    
+    // Regular hours = total - overtime, but minimum of standard hours
+    regularHours = Math.min(totalHours - overtimeHours, standardWorkHours);
+    
+  } else if (shift.name.toLowerCase().includes('night')) {
+    // Night shift overtime calculation
+    // Check if work extends between 12AM-4AM
+    const midnightToday = new Date(checkInTime);
+    midnightToday.setHours(24, 0, 0, 0); // Next day midnight
+    
+    const fourAM = new Date(checkInTime);
+    fourAM.setDate(fourAM.getDate() + 1);
+    fourAM.setHours(4, 0, 0, 0); // Next day 4AM
+    
+    // If checkout time is between midnight and 4AM, it's overtime
+    if (checkOutTime >= midnightToday && checkOutTime <= fourAM) {
+      const lateNightMinutes = differenceInMinutes(checkOutTime, midnightToday);
+      overtimeHours = lateNightMinutes / 60;
+      regularHours = totalHours - overtimeHours;
+    } else {
+      // Standard calculation if no late night work
+      regularHours = Math.min(totalHours, standardWorkHours);
+      overtimeHours = Math.max(0, totalHours - standardWorkHours);
+    }
+  } else {
+    // Default calculation for other shifts
+    regularHours = Math.min(totalHours, standardWorkHours);
+    overtimeHours = Math.max(0, totalHours - standardWorkHours);
   }
   
-  console.log('📊 Updated hours calculation:', {
+  // Ensure non-negative values
+  regularHours = Math.max(0, regularHours);
+  overtimeHours = Math.max(0, overtimeHours);
+  
+  console.log('📊 Flexible hours calculation:', {
+    shiftName: shift.name,
     checkInTime: checkInTime.toISOString(),
     checkOutTime: checkOutTime.toISOString(),
-    shiftName: shift.name,
-    standardWorkHours: `${standardWorkHours} hours (${shift.name.toLowerCase().includes('day') ? 'Day Shift' : 'Night Shift'})`,
-    shiftStart: shiftStart.toISOString(),
-    shiftEnd: shiftEnd.toISOString(),
-    totalHours: totalHours.toFixed(2)
-  });
-  
-  // Calculate regular hours based on standard hours for the shift, not shift boundaries
-  const regularHours = Math.min(totalHours, standardWorkHours);
-  
-  // Calculate overtime hours: total hours - standard hours for this shift
-  const overtimeHours = Math.max(0, totalHours - standardWorkHours);
-  
-  console.log('📊 Work hours calculated:', {
     totalHours: totalHours.toFixed(2),
     standardWorkHours,
     regularHours: regularHours.toFixed(2),
     overtimeHours: overtimeHours.toFixed(2),
-    totalCalculated: (regularHours + overtimeHours).toFixed(2)
+    calculationRule: shift.name.toLowerCase().includes('day') 
+      ? 'Day shift: Before 9AM or after 4PM = overtime'
+      : 'Night shift: Between 12AM-4AM = overtime'
   });
   
   return {
-    regularHours: Math.round(regularHours * 100) / 100, // Round to 2 decimal places
+    regularHours: Math.round(regularHours * 100) / 100,
     overtimeHours: Math.round(overtimeHours * 100) / 100
   };
 }

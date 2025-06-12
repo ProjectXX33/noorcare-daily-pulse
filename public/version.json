@@ -1,18 +1,18 @@
 {
-  "version": "1.6.2",
-  "buildTime": "2025-06-12T11:06:37.529Z",
-  "buildTimestamp": "1749726397530",
+  "version": "1.6.5",
+  "buildTime": "2025-06-12T14:11:55.441Z",
+  "buildTimestamp": "1749737515442",
   "buildDate": "6/12/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🔧 Fixed PWA authentication persistence on mobile data",
-    "📱 Enhanced mobile data connectivity with 8-second timeout",
-    "🚀 Improved offline functionality and caching",
-    "⏰ Updated shift hours: Day shift 7h, Night shift 8h",
-    "📊 Analytics now track only check-in enabled positions",
-    "🔄 Better service worker cache management",
-    "📡 Enhanced background sync for slow connections"
+    "🔥 Enhanced overtime timer - counts UP with fire emoji and red styling",
+    "⚡ Real-time performance recording on check-in/out",
+    "🕘 Flexible work schedule - 9AM start, 4AM reset, check-in anytime",
+    "💰 Advanced overtime rules - early start/late work compensation",
+    "🧹 Clean interface - removed debug information for employees",
+    "📊 Intelligent overtime calculation based on actual work periods",
+    "🎯 Live performance updates and instant dashboard sync"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

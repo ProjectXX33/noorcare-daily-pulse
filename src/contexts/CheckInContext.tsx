@@ -649,27 +649,49 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         toast.success('Check-in successful');
       }
       
-      // Add the new check-in to the local state
-      if (data && data[0]) {
-        const newCheckIn: CheckIn = {
-          id: data[0].id,
-          userId: data[0].user_id,
-          timestamp: new Date(data[0].timestamp),
-          checkoutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined,
-          checkOutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined, // Also include checkOutTime to match types/index.ts
-          userName: userData.name,
-          department: userData.department,
-          position: userData.position
-        };
-        
-        setCheckIns(prev => [newCheckIn, ...prev]);
-        
-        // Update check-in status for current user
-        if (userId === user?.id) {
-          setIsCheckedIn(true);
-          setCurrentCheckIn(newCheckIn);
+              // Add the new check-in to the local state
+        if (data && data[0]) {
+          const newCheckIn: CheckIn = {
+            id: data[0].id,
+            userId: data[0].user_id,
+            timestamp: new Date(data[0].timestamp),
+            checkoutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined,
+            checkOutTime: data[0].checkout_time ? new Date(data[0].checkout_time) : undefined, // Also include checkOutTime to match types/index.ts
+            userName: userData.name,
+            department: userData.department,
+            position: userData.position
+          };
+          
+          setCheckIns(prev => [newCheckIn, ...prev]);
+          
+          // Update check-in status for current user
+          if (userId === user?.id) {
+            setIsCheckedIn(true);
+            setCurrentCheckIn(newCheckIn);
+          }
+          
+          // Real-time performance recording for check-in
+          if (userData.position === 'Customer Service' || userData.position === 'Designer') {
+            try {
+              const shifts = await fetchShifts();
+              const detectedShift = await determineShift(new Date(data[0].timestamp), shifts, userId);
+              
+              if (detectedShift) {
+                const { recordCheckInPerformance } = await import('@/lib/performanceApi');
+                await recordCheckInPerformance(
+                  userId,
+                  new Date(data[0].timestamp),
+                  detectedShift.id,
+                  detectedShift.startTime,
+                  new Date(data[0].timestamp)
+                );
+                console.log('✅ Real-time check-in performance recorded');
+              }
+            } catch (performanceError) {
+              console.error('❌ Error in real-time check-in performance recording:', performanceError);
+            }
+          }
         }
-      }
     } catch (error) {
       console.error('Error checking in:', error);
       toast.error('Failed to check in');
@@ -746,9 +768,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.log('🎯 Detected shift for checkout:', detectedShift ? detectedShift.name : 'None');
         
         if (detectedShift) {
-          // Calculate hours
+          // Calculate hours using flexible overtime rules
           const hoursWorked = calculateHours(existingCheckIn.timestamp, checkOutTime);
-          const { regularHours, overtimeHours } = calculateRegularAndOvertimeHours(hoursWorked, detectedShift);
+          const { regularHours, overtimeHours } = calculateRegularAndOvertimeHours(existingCheckIn.timestamp, checkOutTime, detectedShift);
           
           console.log('⏱️ Hours calculation:', {
             hoursWorked: hoursWorked.toFixed(2),
@@ -1245,30 +1267,23 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
   };
 
-  // Helper function to calculate regular and overtime hours
-  const calculateRegularAndOvertimeHours = (totalHours: number, shift: Shift) => {
-    // Updated standard work hours based on new shift requirements:
-    // Day shift: 7 hours, Night shift: 8 hours
-    let standardWorkHours = 8; // Default to 8 hours for night shift
+  // Helper function to calculate regular and overtime hours with flexible rules
+  const calculateRegularAndOvertimeHours = (checkInTime: Date, checkOutTime: Date, shift: Shift) => {
+    // Use the new flexible calculateWorkHours function from shiftsApi
+    const { calculateWorkHours } = require('@/lib/shiftsApi');
+    const result = calculateWorkHours(checkInTime, checkOutTime, shift);
     
-    // Day shift is 7 hours (9 AM - 4 PM), Night shift is 8 hours (4 PM - 12 AM)
-    if (shift.name.toLowerCase().includes('day')) {
-      standardWorkHours = 7; // Day shift is 7 hours
-    } else if (shift.name.toLowerCase().includes('night')) {
-      standardWorkHours = 8; // Night shift is 8 hours
-    }
-    
-    const regularHours = Math.min(totalHours, standardWorkHours);
-    const overtimeHours = Math.max(0, totalHours - standardWorkHours);
-    
-    console.log(`📊 Updated hours calculation for ${shift.name}:`, {
-      totalHours: totalHours.toFixed(2),
-      standardWorkHours: `${standardWorkHours} hours (${shift.name.toLowerCase().includes('day') ? 'Day Shift' : 'Night Shift'})`,
-      regularHours: regularHours.toFixed(2),
-      overtimeHours: overtimeHours.toFixed(2)
+    console.log(`📊 Flexible hours calculation for ${shift.name}:`, {
+      checkInTime: checkInTime.toISOString(),
+      checkOutTime: checkOutTime.toISOString(),
+      regularHours: result.regularHours.toFixed(2),
+      overtimeHours: result.overtimeHours.toFixed(2),
+      rules: shift.name.toLowerCase().includes('day') 
+        ? 'Day shift: Before 9AM or after 4PM = overtime'
+        : 'Night shift: Between 12AM-4AM = overtime'
     });
     
-    return { regularHours, overtimeHours };
+    return result;
   };
 
   // Helper function to update monthly shift checkout

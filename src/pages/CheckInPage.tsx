@@ -78,23 +78,6 @@ const CheckInPage = () => {
     return checkInDate.getTime() === today.getTime();
   });
   
-  // Enhanced debugging for check-in state
-  console.log('🔍 CheckInPage State Debug:', {
-    userName: user.name,
-    userId: user.id,
-    isCheckedIn,
-    isCheckedOut,
-    contextIsCheckedIn,
-    currentCheckIn: currentCheckIn ? {
-      id: currentCheckIn.id,
-      timestamp: currentCheckIn.timestamp,
-      hasCheckOut: !!(currentCheckIn.checkOutTime || currentCheckIn.checkoutTime)
-    } : null,
-    userCheckIns: userCheckIns.length,
-    todayCheckIns: todayCheckIns.length,
-    todayCheckInsWithCheckout: todayCheckIns.filter(ci => ci.checkOutTime || ci.checkoutTime).length
-  });
-  
   // Use context state for more reliable checking
   const actualIsCheckedIn = contextIsCheckedIn || isCheckedIn;
   
@@ -112,15 +95,6 @@ const CheckInPage = () => {
     currentStatus = 'not-checked-in';
   }
   
-  console.log('📊 Status Determination:', {
-    actualIsCheckedIn,
-    isCheckedOut,
-    hasAnyCheckoutToday,
-    hasActiveCheckIn,
-    currentStatus,
-    finalDecision: currentStatus
-  });
-  
   // Function to format time from date
   const formatTime = (date: string | Date) => {
     return format(new Date(date), 'h:mm a');
@@ -128,13 +102,11 @@ const CheckInPage = () => {
   
   // Manual refresh function
   const handleManualRefresh = async () => {
-    console.log('🔄 Manual refresh triggered by user');
     setLoading(true);
     try {
       await refreshCheckIns();
-      console.log('✅ Manual refresh completed');
     } catch (error) {
-      console.error('❌ Manual refresh failed:', error);
+      console.error('Manual refresh failed:', error);
     } finally {
       setLoading(false);
     }
@@ -386,44 +358,7 @@ const CheckInPage = () => {
         {/* Recent check-ins history */}
         <CheckInHistory checkIns={userCheckIns.slice(0, 10)} title="Recent Check-ins" />
         
-        {/* Debug Info Panel (only show if there are issues) */}
-        {(actualIsCheckedIn && isCheckedOut) || (!actualIsCheckedIn && todayCheckIns.length > 0) ? (
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm text-yellow-800">
-                <AlertCircle className="h-4 w-4" />
-                Debug Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs space-y-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <strong>Current Status:</strong> {currentStatus}
-                </div>
-                <div>
-                  <strong>Context Check-in:</strong> {contextIsCheckedIn ? 'Yes' : 'No'}
-                </div>
-                <div>
-                  <strong>Has Checked In Today:</strong> {isCheckedIn ? 'Yes' : 'No'}
-                </div>
-                <div>
-                  <strong>Has Checked Out Today:</strong> {isCheckedOut ? 'Yes' : 'No'}
-                </div>
-                <div>
-                  <strong>Today's Check-ins:</strong> {todayCheckIns.length}
-                </div>
-                <div>
-                  <strong>Active Check-in ID:</strong> {currentCheckIn?.id || 'None'}
-                </div>
-              </div>
-              <div className="text-center mt-4">
-                <p className="text-yellow-700">
-                  If you cannot check out, click "Refresh Status" above or contact support.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+
       </div>
     </div>
   );

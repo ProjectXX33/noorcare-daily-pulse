@@ -1,8 +1,8 @@
-# Night Shift Overtime Handling with 9 AM Reset
+# Night Shift Overtime Handling with 4 AM Reset
 
 ## Overview
 
-The system now uses a **9 AM reset time** instead of midnight (12 AM) to properly handle night shift overtime. This ensures that night shift workers who work beyond midnight have their entire shift counted as one work day.
+The system now uses a **4 AM reset time** instead of midnight (12 AM) to properly handle night shift overtime. This ensures that night shift workers who work beyond midnight have their entire shift counted as one work day.
 
 ## Problem Solved
 
@@ -13,51 +13,51 @@ The system now uses a **9 AM reset time** instead of midnight (12 AM) to properl
 - Check-in counted for June 2nd, check-out counted for June 3rd
 - Overtime calculation was broken
 
-### After (9 AM Reset)
+### After (4 AM Reset)
 - Night shift worker checks in at 4 PM on June 2nd  
 - Works until 3 AM on June 3rd (11 hours total)
 - **Solution**: Both check-in and check-out count as the same work day
-- Work day runs from June 2nd 9 AM to June 3rd 9 AM
+- Work day runs from June 2nd 4 AM to June 3rd 4 AM
 - Overtime properly calculated as 3 hours (11 total - 8 regular = 3 overtime)
 
 ## How It Works
 
 ### Work Day Boundaries
-The system defines a "work day" as the period between two consecutive 9 AM reset times:
+The system defines a "work day" as the period between two consecutive 4 AM reset times:
 
 ```
 Work Day Example:
-├── June 2nd 9:00 AM (Start of work day)
-│   ├── 9:00 AM - 4:00 PM: Day Shift Period
+├── June 2nd 4:00 AM (Start of work day)
+│   ├── 4:00 AM - 4:00 PM: Day Shift Period
 │   ├── 4:00 PM - 12:00 AM: Night Shift Period  
-│   ├── 12:00 AM - 9:00 AM: Night Shift Overtime Period
-└── June 3rd 9:00 AM (End of work day / Start of next work day)
+│   ├── 12:00 AM - 4:00 AM: Night Shift Overtime Period
+└── June 3rd 4:00 AM (End of work day / Start of next work day)
 ```
 
 ### Current Time Logic
-- **Before 9 AM**: You're still in "yesterday's" work day
-- **After 9 AM**: You're in "today's" work day
+- **Before 4 AM**: You're still in "yesterday's" work day
+- **After 4 AM**: You're in "today's" work day
 
 ### Example Scenarios
 
 #### Scenario 1: Night Shift with Overtime
 ```
-✅ Check-in:  June 2nd, 4:00 PM  (Work Day: June 2nd 9AM → June 3rd 9AM)
-✅ Check-out: June 3rd, 3:00 AM  (Same Work Day: June 2nd 9AM → June 3rd 9AM)
+✅ Check-in:  June 2nd, 4:00 PM  (Work Day: June 2nd 4AM → June 3rd 4AM)
+✅ Check-out: June 3rd, 3:00 AM  (Same Work Day: June 2nd 4AM → June 3rd 4AM)
 ✅ Result: 11 hours on same work day (8 regular + 3 overtime)
 ```
 
 #### Scenario 2: Early Morning Check-in (Before Reset)
 ```
-✅ Current Time: June 3rd, 7:00 AM
-✅ Work Day: June 2nd 9AM → June 3rd 9AM (still yesterday's work day)
+✅ Current Time: June 3rd, 2:00 AM
+✅ Work Day: June 2nd 4AM → June 3rd 4AM (still yesterday's work day)
 ✅ If checking in: Would count for June 2nd work day
 ```
 
 #### Scenario 3: Normal Day Shift
 ```
-✅ Check-in:  June 2nd, 9:00 AM  (Work Day: June 2nd 9AM → June 3rd 9AM)
-✅ Check-out: June 2nd, 5:00 PM  (Same Work Day: June 2nd 9AM → June 3rd 9AM)  
+✅ Check-in:  June 2nd, 9:00 AM  (Work Day: June 2nd 4AM → June 3rd 4AM)
+✅ Check-out: June 2nd, 5:00 PM  (Same Work Day: June 2nd 4AM → June 3rd 4AM)  
 ✅ Result: 8 hours on same work day (8 regular + 0 overtime)
 ```
 
@@ -66,12 +66,12 @@ Work Day Example:
 ### Database Configuration
 The reset time is stored in the `work_time_config` table:
 ```sql
-daily_reset_time TIME NOT NULL DEFAULT '09:00:00'
+daily_reset_time TIME NOT NULL DEFAULT '04:00:00'
 ```
 
 ### Functions Updated
-- `hasCheckedInToday()` - Now uses 9 AM work day boundaries
-- `hasCheckedOutToday()` - Now uses 9 AM work day boundaries  
+- `hasCheckedInToday()` - Now uses 4 AM work day boundaries
+- `hasCheckedOutToday()` - Now uses 4 AM work day boundaries  
 - `checkInUser()` - Prevents duplicate check-ins within same work day
 - `checkOutUser()` - Finds check-in within same work day for checkout
 
@@ -106,7 +106,7 @@ The daily reset time can be changed by updating the `work_time_config` table:
 
 ```sql
 UPDATE work_time_config 
-SET daily_reset_time = '09:00:00' 
+SET daily_reset_time = '04:00:00' 
 WHERE name = 'default';
 ```
 
@@ -123,7 +123,7 @@ You can verify the feature is working by:
 
 ## Troubleshooting
 
-### If 9 AM Reset Not Working
+### If 4 AM Reset Not Working
 1. Check `work_time_config` table has correct `daily_reset_time`
 2. Look for error messages in browser console
 3. Verify database connectivity

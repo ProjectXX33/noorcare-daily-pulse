@@ -96,17 +96,17 @@ const WorkShiftTimer: React.FC = () => {
       const checkInTime = new Date(activeCheckIn.timestamp);
       const now = new Date();
       
-      // Updated shift hours based on new requirements:
-      // Day shift: 7 hours (9 AM - 4 PM)
-      // Night shift: 8 hours (4 PM - 12 AM)
+      // Work day starts at 9AM, but flexible check-in allowed
+      // Standard hours: Day shift: 7 hours, Night shift: 8 hours
+      // Overtime calculated based on actual work periods
       const checkInHour = checkInTime.getHours();
       let workHours = 8; // Default to 8 hours for night shift
       
       if (checkInHour >= 9 && checkInHour < 16) {
-        // Day shift (9 AM - 4 PM) = 7 hours
+        // Day shift (standard 9 AM - 4 PM) = 7 hours
         workHours = 7;
-      } else if (checkInHour >= 16 || checkInHour < 1) {
-        // Night shift (4 PM - 1 AM) = 8 hours
+      } else if (checkInHour >= 16 || checkInHour < 9) {
+        // Night shift or early morning = 8 hours
         workHours = 8;
       }
       
@@ -179,29 +179,29 @@ const WorkShiftTimer: React.FC = () => {
     const seconds = Math.floor((absMs % (1000 * 60)) / 1000);
     
     const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    return ms < 0 ? `+${timeStr}` : timeStr; // Show + for overtime
+    return ms < 0 ? `${timeStr}` : timeStr; // Show overtime time counting up
   };
 
   const getTimerColor = (): string => {
-    if (timeRemaining <= 0) return 'text-red-600 bg-red-100 border-red-200';
+    if (timeRemaining <= 0) return 'text-red-600 bg-red-100 border-red-200'; // Overtime - Red
     if (timeRemaining <= 60 * 60 * 1000) return 'text-orange-600 bg-orange-100 border-orange-200'; // Last hour
     if (timeRemaining <= 2 * 60 * 60 * 1000) return 'text-yellow-600 bg-yellow-100 border-yellow-200'; // Last 2 hours
     return 'text-green-600 bg-green-100 border-green-200';
   };
 
   const getStatusText = (): string => {
-    if (timeRemaining <= 0) return 'Overtime';
+    if (timeRemaining <= 0) return '🔥 Overtime';
     return 'Remaining';
   };
 
-  // Show "Work Done!" when shift hours are completed (but still checked in)
+  // Show overtime counter when shift hours are completed (but still checked in)
   if (timeRemaining <= 0) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-blue-100 text-blue-700 border-blue-200">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium bg-red-100 text-red-600 border-red-200">
         <Clock className="h-3 w-3" />
         <div className="flex flex-col sm:flex-row sm:items-center sm:gap-1">
           <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
-          <span className="text-xs">Work Done! (Overtime)</span>
+          <span className="text-xs">🔥 Overtime</span>
         </div>
       </div>
     );
