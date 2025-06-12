@@ -18,104 +18,141 @@ const CheckInButton = () => {
     assignedShift?: { name: string; start_time: string };
   }>({ canCheckIn: true, message: '' });
 
+
   if (!user) return null;
 
   // Check shift assignment and timing validation
-  useEffect(() => {
-    const checkShiftValidation = async () => {
-      if (!user || user.position !== 'Customer Service' && user.position !== 'Designer') {
+  const checkShiftValidation = async () => {
+    if (!user || user.position !== 'Customer Service' && user.position !== 'Designer') {
+      setShiftValidation({ canCheckIn: true, message: '' });
+      return;
+    }
+
+    try {
+      // Get current work day boundaries (4AM reset logic)
+      const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
+      const { workDayStart } = await getCurrentWorkDayBoundaries();
+      
+      // Use work day start date instead of calendar date
+      const workDate = workDayStart.toISOString().split('T')[0];
+      
+      console.log('🔍 CheckInButton - Work day logic:', {
+        currentTime: new Date().toISOString(),
+        workDayStart: workDayStart.toISOString(),
+        workDate,
+        calendarDate: new Date().toISOString().split('T')[0]
+      });
+      
+      // Get shift assignment for the current work day
+      const { data: assignment, error } = await supabase
+        .from('shift_assignments')
+        .select(`
+          *,
+          shifts:assigned_shift_id(name, start_time, end_time)
+        `)
+        .eq('employee_id', user.id)
+        .eq('work_date', workDate)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching shift assignment:', error);
         setShiftValidation({ canCheckIn: true, message: '' });
         return;
       }
 
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Get shift assignment for today
-        const { data: assignment, error } = await supabase
-          .from('shift_assignments')
-          .select(`
-            *,
-            shifts:assigned_shift_id(name, start_time, end_time)
-          `)
-          .eq('employee_id', user.id)
-          .eq('work_date', today)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching shift assignment:', error);
-          setShiftValidation({ canCheckIn: true, message: '' });
-          return;
-        }
-
-        if (!assignment || assignment.is_day_off) {
-          setShiftValidation({ 
-            canCheckIn: false, 
-            message: assignment?.is_day_off ? 'Today is your day off' : 'No shift assigned for today'
-          });
-          return;
-        }
-
-        const shift = assignment.shifts;
-        if (!shift) {
-          setShiftValidation({ canCheckIn: true, message: '' });
-          return;
-        }
-
-        // Check current time vs shift start time
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        const currentTotalMinutes = currentHour * 60 + currentMinute;
-
-        const [shiftHour, shiftMinute] = shift.start_time.split(':').map(Number);
-        const shiftTotalMinutes = shiftHour * 60 + shiftMinute;
-
-        // Determine if employee can check in (allow 30 minutes before shift start)
-        const allowEarlyMinutes = 30;
-        const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
-
-        if (!canCheckIn) {
-          // Format the start time to 12-hour format
-          const formatTime = (timeString: string) => {
-            const [hours, minutes] = timeString.split(':').map(Number);
-            const date = new Date();
-            date.setHours(hours, minutes);
-            return date.toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit', 
-              hour12: true 
-            });
-          };
-
-          const formattedStartTime = formatTime(shift.start_time);
-          const message = `Your ${shift.name} starts at ${formattedStartTime}`;
-
-          setShiftValidation({
-            canCheckIn: false,
-            message,
-            assignedShift: shift
-          });
-        } else {
-          setShiftValidation({
-            canCheckIn: true,
-            message: '',
-            assignedShift: shift
-          });
-        }
-
-      } catch (error) {
-        console.error('Error checking shift validation:', error);
-        setShiftValidation({ canCheckIn: true, message: '' });
+      if (!assignment || assignment.is_day_off) {
+        setShiftValidation({ 
+          canCheckIn: false, 
+          message: assignment?.is_day_off ? 'Today is your day off' : 'No shift assigned for today'
+        });
+        return;
       }
-    };
 
+      const shift = assignment.shifts;
+      if (!shift) {
+        setShiftValidation({ canCheckIn: true, message: '' });
+        return;
+      }
+
+      // Check current time vs shift start time
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTotalMinutes = currentHour * 60 + currentMinute;
+
+      const [shiftHour, shiftMinute] = shift.start_time.split(':').map(Number);
+      const shiftTotalMinutes = shiftHour * 60 + shiftMinute;
+
+      // Determine if employee can check in (allow 30 minutes before shift start)
+      const allowEarlyMinutes = 30;
+      const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+
+      if (!canCheckIn) {
+        // Format the start time to 12-hour format
+        const formatTime = (timeString: string) => {
+          const [hours, minutes] = timeString.split(':').map(Number);
+          const date = new Date();
+          date.setHours(hours, minutes);
+          return date.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+        };
+
+        const formattedStartTime = formatTime(shift.start_time);
+        const message = `Your ${shift.name} starts at ${formattedStartTime}`;
+
+        setShiftValidation({
+          canCheckIn: false,
+          message,
+          assignedShift: shift
+        });
+      } else {
+        setShiftValidation({
+          canCheckIn: true,
+          message: '',
+          assignedShift: shift
+        });
+      }
+
+    } catch (error) {
+      console.error('Error checking shift validation:', error);
+      setShiftValidation({ canCheckIn: true, message: '' });
+    }
+  };
+
+
+
+  useEffect(() => {
     checkShiftValidation();
     
     // Check every minute for real-time updates
     const interval = setInterval(checkShiftValidation, 60000);
     
-    return () => clearInterval(interval);
+    // Real-time subscription for shift assignment changes
+    const subscription = supabase
+      .channel(`shift_assignments_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shift_assignments',
+          filter: `employee_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('CheckInButton: Shift assignment changed, refreshing...', payload);
+          // Re-check shift validation when assignment changes
+          setTimeout(checkShiftValidation, 500); // Small delay to ensure DB is updated
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      clearInterval(interval);
+      subscription.unsubscribe();
+    };
   }, [user]);
 
   const alreadyCheckedIn = hasCheckedInToday(user.id);
@@ -188,6 +225,8 @@ const CheckInButton = () => {
     <div className="flex flex-col items-center">
       <p className="text-xl font-bold mb-1">{currentTime}</p>
       <p className="text-sm text-gray-500 mb-4">{currentDate}</p>
+      
+
       
       <div className="relative">
         <Button
