@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
-import { Check, Clock } from 'lucide-react';
+import { Check, Clock, AlertCircle } from 'lucide-react';
 
 const CheckOutButton = () => {
   const { user } = useAuth();
@@ -74,13 +73,27 @@ const CheckOutButton = () => {
       </div>
       
       {checkedOutToday && (
-        <div className="mt-4 text-sm text-blue-600 animate-fade-in bg-blue-50 p-2 rounded-md border border-blue-100">
-          <p className="flex items-center justify-center gap-1">
-            <Check className="h-4 w-4" />
-            You've completed your workday!
-          </p>
+        <div className="mt-4 space-y-2">
+          <div className="text-sm text-blue-600 animate-fade-in bg-blue-50 p-2 rounded-md border border-blue-100">
+            <p className="flex items-center justify-center gap-1">
+              <Check className="h-4 w-4" />
+              You've completed your workday!
+            </p>
+          </div>
+          
+          {/* Post-checkout overtime info */}
+          <div className="text-xs text-purple-600 bg-purple-50 p-2 rounded-md border border-purple-100">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <AlertCircle className="h-3 w-3" />
+              <span className="font-semibold">Overtime Tracking Active</span>
+            </div>
+            <p className="text-center text-purple-500">
+              Any additional work time will be tracked as overtime
+            </p>
+          </div>
         </div>
       )}
+      
       {!checkedInToday && (
         <div className="mt-4 text-sm text-gray-500 flex items-center gap-1">
           <Clock className="h-4 w-4" />

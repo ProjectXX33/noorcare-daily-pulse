@@ -32,6 +32,38 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// Helper function to format delay in hours and minutes
+const formatDelayHoursAndMinutes = (totalMinutes: number): string => {
+  if (totalMinutes <= 0) return '0min';
+  
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  
+  if (hours === 0) {
+    return `${minutes}min`;
+  } else if (minutes === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${minutes}min`;
+  }
+};
+
+// Helper function to format hours (decimal) to hours and minutes
+const formatHoursAndMinutes = (decimalHours: number): string => {
+  if (decimalHours <= 0) return '0min';
+  
+  const hours = Math.floor(decimalHours);
+  const minutes = Math.round((decimalHours - hours) * 60);
+  
+  if (hours === 0) {
+    return `${minutes}min`;
+  } else if (minutes === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${minutes}min`;
+  }
+};
+
 interface PerformanceRecord {
   id: string;
   employee_id: string;
@@ -52,10 +84,26 @@ interface EditablePerformanceDashboardProps {
 }
 
 // Helper functions for calculation (copied from performanceApi.ts)
-function calcPerformanceScore(delayMinutes: number): number {
-  if (delayMinutes <= 0) return 100.0;
-  if (delayMinutes >= 500) return 0.0;
-  return Math.max(0, 100.0 - (delayMinutes / 5.0));
+function calcPerformanceScore(delayMinutes: number, overtimeHours: number = 0): number {
+  // Base score starts at 100
+  let score = 100.0;
+  
+  // Penalty for delays (negative impact)
+  if (delayMinutes > 0) {
+    // Each minute of delay reduces score by 0.2 points (was 0.2, making it fairer)
+    const delayPenalty = Math.min(50, delayMinutes * 0.2); // Max penalty of 50 points for delays
+    score -= delayPenalty;
+  }
+  
+  // Bonus for overtime (positive impact to balance delays)
+  if (overtimeHours > 0) {
+    // Each hour of overtime adds 2 points (reward dedication)
+    const overtimeBonus = Math.min(25, overtimeHours * 2); // Max bonus of 25 points for overtime
+    score += overtimeBonus;
+  }
+  
+  // Ensure score stays within 0-100 range
+  return Math.max(0, Math.min(100, Math.round(score * 100) / 100));
 }
 function calcPunctuality(delayMinutes: number): number {
   if (delayMinutes >= 60) return 0.0;
@@ -107,6 +155,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     try {
       console.log('Loading performance data for month:', currentMonth);
       
+      // First, auto-calculate performance from monthly shifts
+      await autoCalculatePerformanceFromShifts();
+      
+      // Then load the updated performance data
       const { data, error } = await supabase
         .from('admin_performance_dashboard')
         .select(`
@@ -129,6 +181,115 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       toast.error('Failed to load performance data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Auto-calculate performance metrics from monthly_shifts data
+  const autoCalculatePerformanceFromShifts = async () => {
+    try {
+      console.log('🔄 Auto-calculating performance from monthly shifts...');
+      
+      // Get all monthly shifts for the current month
+      const monthStart = `${currentMonth}-01`;
+      const nextMonth = currentMonth.split('-');
+      const nextMonthDate = new Date(parseInt(nextMonth[0]), parseInt(nextMonth[1]), 1);
+      const monthEnd = nextMonthDate.toISOString().split('T')[0];
+
+      const { data: monthlyShifts, error: shiftsError } = await supabase
+        .from('monthly_shifts')
+        .select(`
+          *,
+          users:user_id(name, position)
+        `)
+        .gte('work_date', monthStart)
+        .lt('work_date', monthEnd)
+        .in('users.position', ['Customer Service', 'Designer']);
+
+      if (shiftsError) throw shiftsError;
+
+      console.log(`📊 Found ${monthlyShifts.length} monthly shift records to process`);
+
+      // Group by employee
+      const employeeData: Record<string, {
+        name: string;
+        position: string;
+        workingDays: Set<string>;
+        totalDelayMinutes: number;
+        totalOvertimeHours: number;
+      }> = {};
+
+      for (const shift of monthlyShifts) {
+        const userId = shift.user_id;
+        const userName = shift.users?.name || 'Unknown';
+        const userPosition = shift.users?.position;
+
+        if (!employeeData[userId]) {
+          employeeData[userId] = {
+            name: userName,
+            position: userPosition,
+            workingDays: new Set(),
+            totalDelayMinutes: 0,
+            totalOvertimeHours: 0,
+          };
+        }
+
+        // Add working day
+        employeeData[userId].workingDays.add(shift.work_date);
+        
+        // Add delay minutes
+        employeeData[userId].totalDelayMinutes += shift.delay_minutes || 0;
+        
+        // Add overtime hours
+        employeeData[userId].totalOvertimeHours += shift.overtime_hours || 0;
+      }
+
+      // Process each employee's data
+      const records = [];
+      for (const [userId, data] of Object.entries(employeeData)) {
+        const delayMinutes = data.totalDelayMinutes;
+        const workingDays = data.workingDays.size;
+        const overtimeHours = data.totalOvertimeHours;
+
+        const performanceScore = calcPerformanceScore(delayMinutes, overtimeHours);
+        const punctuality = calcPunctuality(delayMinutes);
+        const status = calcStatus(performanceScore, punctuality);
+
+        const record = {
+          employee_id: userId,
+          employee_name: data.name,
+          month_year: currentMonth,
+          total_working_days: workingDays,
+          total_delay_minutes: Math.round(delayMinutes),
+          total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100,
+          total_overtime_hours: Math.round(overtimeHours * 100) / 100,
+          average_performance_score: Math.round(performanceScore * 100) / 100,
+          punctuality_percentage: Math.round(punctuality * 100) / 100,
+          performance_status: status,
+        };
+
+        records.push(record);
+        console.log(`✅ Calculated for ${data.name}: ${workingDays} days, ${delayMinutes.toFixed(0)} delay min, ${overtimeHours.toFixed(2)}h overtime`);
+      }
+
+      // Upsert records into admin_performance_dashboard
+      if (records.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('admin_performance_dashboard')
+          .upsert(records, { 
+            onConflict: 'employee_id,month_year',
+            ignoreDuplicates: false 
+          });
+
+        if (upsertError) {
+          console.error('Error upserting performance records:', upsertError);
+        } else {
+          console.log(`✅ Successfully auto-calculated and updated ${records.length} performance records`);
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Error auto-calculating performance:', error);
+      // Don't throw error here, just log it - we still want to load existing data
     }
   };
 
@@ -163,10 +324,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         total_delay_minutes: delayMinutes,
         total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100, // Convert minutes to hours
         total_overtime_hours: overtimeHours,
-        average_performance_score: calcPerformanceScore(delayMinutes),
+        average_performance_score: calcPerformanceScore(delayMinutes, overtimeHours),
         punctuality_percentage: calcPunctuality(delayMinutes),
         performance_status: calcStatus(
-          calcPerformanceScore(delayMinutes),
+          calcPerformanceScore(delayMinutes, overtimeHours),
           calcPunctuality(delayMinutes)
         ),
       };
@@ -284,14 +445,15 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
   const summaryStats = {
     bestPerformers: performanceData.filter(p => p.average_performance_score >= 95).length,
-    totalDelayHours: performanceData.reduce((sum, p) => sum + p.total_delay_hours, 0),
+    totalDelayMinutes: performanceData.reduce((sum, p) => sum + p.total_delay_minutes, 0),
     totalOvertimeHours: performanceData.reduce((sum, p) => sum + p.total_overtime_hours, 0),
   };
 
   // When editing/adding, always calculate these fields
   const delayMinutes = editForm.total_delay_minutes || 0;
+  const overtimeHours = editForm.total_overtime_hours || 0;
   const workingDays = editForm.total_working_days || 1;
-  const calculatedScore = calcPerformanceScore(delayMinutes);
+  const calculatedScore = calcPerformanceScore(delayMinutes, overtimeHours);
   const calculatedPunctuality = calcPunctuality(delayMinutes);
   const calculatedStatus = calcStatus(calculatedScore, calculatedPunctuality);
 
@@ -316,10 +478,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         const delayMinutes = record.total_delay_minutes || 0;
         const workingDays = record.total_working_days || 1;
         
-        // Recalculate performance score
-        const newPerformanceScore = delayMinutes <= 0 ? 100.0 : 
-          delayMinutes >= 500 ? 0.0 : 
-          Math.max(0, 100.0 - (delayMinutes / 5.0));
+        // Recalculate performance score using new logic
+        const overtimeHours = record.total_overtime_hours || 0;
+        const newPerformanceScore = calcPerformanceScore(delayMinutes, overtimeHours);
         
         // Recalculate punctuality percentage
         let newPunctuality = 100.0;
@@ -605,7 +766,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Total Delays</p>
-                <p className="text-lg sm:text-2xl font-bold text-red-600">{summaryStats.totalDelayHours.toFixed(1)}h</p>
+                <p className="text-lg sm:text-2xl font-bold text-red-600">{formatDelayHoursAndMinutes(summaryStats.totalDelayMinutes)}</p>
               </div>
               <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
             </div>
@@ -617,7 +778,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Total Overtime</p>
-                <p className="text-lg sm:text-2xl font-bold text-blue-600">{summaryStats.totalOvertimeHours.toFixed(1)}h</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-600">{formatHoursAndMinutes(summaryStats.totalOvertimeHours)}</p>
               </div>
               <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
             </div>
@@ -795,7 +956,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   </div>
                 ) : (
                   performanceData.map((record) => {
-                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes);
+                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
                     const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
                     const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
                     const isEditing = editingId === record.id;
@@ -937,15 +1098,15 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <span className="text-xs text-muted-foreground">Delay Hours</span>
-                                  <div className={`text-sm font-medium ${record.total_delay_hours > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                    {record.total_delay_hours.toFixed(2)}h
+                                  <span className="text-xs text-muted-foreground">Delay</span>
+                                  <div className={`text-sm font-medium ${record.total_delay_minutes > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                    {formatDelayHoursAndMinutes(record.total_delay_minutes)}
                                   </div>
                                 </div>
                                 <div>
                                   <span className="text-xs text-muted-foreground">Overtime Hours</span>
                                   <div className={`text-sm font-medium ${record.total_overtime_hours > 0 ? 'text-blue-600' : 'text-gray-500'}`}>
-                                    {record.total_overtime_hours}h
+                                    {formatHoursAndMinutes(record.total_overtime_hours)}
                                   </div>
                                 </div>
                               </div>
@@ -992,7 +1153,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       <TableHead>Position</TableHead>
                     <TableHead>Working Days</TableHead>
                     <TableHead>Performance Score</TableHead>
-                    <TableHead>Delay Hours</TableHead>
+                    <TableHead>Delay</TableHead>
                     <TableHead>Overtime Hours</TableHead>
                     <TableHead>Punctuality %</TableHead>
                     <TableHead>Status</TableHead>
@@ -1046,7 +1207,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       </TableCell>
                       <TableCell>
                         <span className="text-red-600 font-medium">
-                          {(editForm.total_delay_minutes ? (editForm.total_delay_minutes / 60).toFixed(2) : '0.00') + 'h'}
+                          {formatDelayHoursAndMinutes(editForm.total_delay_minutes || 0)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -1095,7 +1256,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
                   {/* Existing Records */}
                   {performanceData.map((record) => {
-                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes);
+                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
                     const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
                     const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
                     
@@ -1167,11 +1328,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       <TableCell>
                         {editingId === record.id ? (
                           <span className="text-red-600 font-medium">
-                            {(editForm.total_delay_minutes ? (editForm.total_delay_minutes / 60).toFixed(2) : '0.00') + 'h'}
+                            {formatDelayHoursAndMinutes(editForm.total_delay_minutes || 0)}
                           </span>
                         ) : (
-                          <span className={record.total_delay_hours > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
-                            {record.total_delay_hours.toFixed(2)}h
+                          <span className={record.total_delay_minutes > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                            {formatDelayHoursAndMinutes(record.total_delay_minutes)}
                           </span>
                         )}
                       </TableCell>
@@ -1186,7 +1347,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           />
                         ) : (
                           <span className={record.total_overtime_hours > 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}>
-                            {record.total_overtime_hours}h
+                            {formatHoursAndMinutes(record.total_overtime_hours)}
                           </span>
                         )}
                       </TableCell>

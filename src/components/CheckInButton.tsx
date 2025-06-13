@@ -31,16 +31,29 @@ const CheckInButton = () => {
     try {
       // Get current work day boundaries (4AM reset logic)
       const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
-      const { workDayStart } = await getCurrentWorkDayBoundaries();
+      const { workDayStart, workDayEnd } = await getCurrentWorkDayBoundaries();
       
-      // Use work day start date instead of calendar date
-      const workDate = workDayStart.toISOString().split('T')[0];
+      // Determine the correct work date based on current time
+      const currentTime = new Date();
+      let workDate;
+      
+      if (currentTime >= workDayStart && currentTime < workDayEnd) {
+        // We're within the current work day - use the calendar date
+        // At 4:29 AM on Friday, this should give us Friday's date for Friday's shifts
+        const calendarDate = new Date();
+        workDate = calendarDate.toISOString().split('T')[0];
+      } else {
+        // Fallback to work day start date
+        workDate = workDayStart.toISOString().split('T')[0];
+      }
       
       console.log('🔍 CheckInButton - Work day logic:', {
-        currentTime: new Date().toISOString(),
+        currentTime: currentTime.toISOString(),
         workDayStart: workDayStart.toISOString(),
+        workDayEnd: workDayEnd.toISOString(),
         workDate,
-        calendarDate: new Date().toISOString().split('T')[0]
+        calendarDate: new Date().toISOString().split('T')[0],
+        isWithinWorkDay: currentTime >= workDayStart && currentTime < workDayEnd
       });
       
       // Get shift assignment for the current work day
@@ -83,9 +96,23 @@ const CheckInButton = () => {
       const [shiftHour, shiftMinute] = shift.start_time.split(':').map(Number);
       const shiftTotalMinutes = shiftHour * 60 + shiftMinute;
 
-      // Determine if employee can check in (allow 30 minutes before shift start)
-      const allowEarlyMinutes = 30;
-      const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+      // Determine if employee can check in with specific timing rules
+      let allowEarlyMinutes = 30; // Default 30 minutes early
+      let canCheckIn = false;
+      
+      // Specific timing rules for shifts
+      if (shift.name.toLowerCase().includes('day')) {
+        // Day shift: Can check in from 8:30 AM (30 min before 9:00 AM)
+        const allowedStartTime = 8 * 60 + 30; // 8:30 AM in minutes
+        canCheckIn = currentTotalMinutes >= allowedStartTime;
+      } else if (shift.name.toLowerCase().includes('night')) {
+        // Night shift: Can check in from 3:30 PM (30 min before 4:00 PM)  
+        const allowedStartTime = 15 * 60 + 30; // 3:30 PM in minutes
+        canCheckIn = currentTotalMinutes >= allowedStartTime;
+      } else {
+        // Generic shift: Use 30 minutes before shift start
+        canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+      }
 
       if (!canCheckIn) {
         // Format the start time to 12-hour format
@@ -101,7 +128,15 @@ const CheckInButton = () => {
         };
 
         const formattedStartTime = formatTime(shift.start_time);
-        const message = `Your ${shift.name} starts at ${formattedStartTime}`;
+        let message = `Your ${shift.name} starts at ${formattedStartTime}.`;
+        
+        if (shift.name.toLowerCase().includes('day')) {
+          message += ' Day shift employees can check in from 8:30 AM.';
+        } else if (shift.name.toLowerCase().includes('night')) {
+          message += ' Night shift employees can check in from 3:30 PM.';
+        } else {
+          message += ' You can check in 30 minutes before your shift.';
+        }
 
         setShiftValidation({
           canCheckIn: false,

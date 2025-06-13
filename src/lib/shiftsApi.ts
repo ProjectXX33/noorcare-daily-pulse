@@ -149,6 +149,7 @@ export async function fetchMonthlyShifts(
       checkOutTime: item.check_out_time ? new Date(item.check_out_time) : undefined,
       regularHours: item.regular_hours,
       overtimeHours: item.overtime_hours,
+      delayMinutes: item.delay_minutes || 0,
       createdAt: new Date(item.created_at),
       updatedAt: new Date(item.updated_at),
       userName: item.users?.name,
@@ -278,6 +279,18 @@ export async function createOrUpdateMonthlyShift(
   try {
     let regularHours = 0;
     let overtimeHours = 0;
+    let delayMinutes = 0;
+    
+    // Calculate delay time based on shift start time
+    if (shift) {
+      const [startHour, startMin] = shift.startTime.split(':').map(Number);
+      const scheduledStart = new Date(checkInTime);
+      scheduledStart.setHours(startHour, startMin, 0, 0);
+      
+      // Calculate delay in minutes (only positive delays count)
+      const delayMs = checkInTime.getTime() - scheduledStart.getTime();
+      delayMinutes = Math.max(0, delayMs / (1000 * 60));
+    }
     
     // Calculate hours if we have both check-in and check-out times and shift info
     if (checkOutTime && shift) {
@@ -310,6 +323,7 @@ export async function createOrUpdateMonthlyShift(
           check_out_time: checkOutTime?.toISOString() || null,
           regular_hours: regularHours,
           overtime_hours: overtimeHours,
+          delay_minutes: delayMinutes,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingRecord.id)
@@ -333,7 +347,8 @@ export async function createOrUpdateMonthlyShift(
           check_in_time: checkInTime.toISOString(),
           check_out_time: checkOutTime?.toISOString() || null,
           regular_hours: regularHours,
-          overtime_hours: overtimeHours
+          overtime_hours: overtimeHours,
+          delay_minutes: delayMinutes
         })
         .select(`
           *,
@@ -355,6 +370,7 @@ export async function createOrUpdateMonthlyShift(
       checkOutTime: result.check_out_time ? new Date(result.check_out_time) : undefined,
       regularHours: result.regular_hours,
       overtimeHours: result.overtime_hours,
+      delayMinutes: result.delay_minutes || 0,
       createdAt: new Date(result.created_at),
       updatedAt: new Date(result.updated_at),
       userName: result.users?.name,

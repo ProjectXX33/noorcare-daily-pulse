@@ -122,6 +122,7 @@ export type MonthlyShift = {
   checkOutTime?: Date;
   regularHours: number;
   overtimeHours: number;
+  delayMinutes: number;
   createdAt: Date;
   updatedAt: Date;
   // Populated fields
@@ -276,6 +277,7 @@ export type MonthlyShiftRecord = {
   check_out_time: string | null;
   regular_hours: number;
   overtime_hours: number;
+  delay_minutes: number;
   created_at: string;
   updated_at: string;
 };

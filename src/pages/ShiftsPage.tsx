@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { MonthlyShift, Shift, User } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek } from 'date-fns';
 import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye, RefreshCw } from 'lucide-react';
+import AdminRecalculateButton from '@/components/AdminRecalculateButton';
 import { toast } from 'sonner';
 import CustomerServiceSchedule from '@/components/CustomerServiceSchedule';
 import {
@@ -24,6 +25,45 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from "@/components/ui/label";
+
+// Helper function to format delay in hours and minutes
+const formatDelayHoursAndMinutes = (totalMinutes: number): string => {
+  if (totalMinutes <= 0) return '0min';
+  
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  
+  if (hours === 0) {
+    return `${minutes}min`;
+  } else if (minutes === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${minutes}min`;
+  }
+};
+
+// Helper function to format hours (decimal) to hours and minutes
+const formatHoursAndMinutes = (decimalHours: number): string => {
+  if (decimalHours <= 0) return '0min';
+  
+  const hours = Math.floor(decimalHours);
+  const minutes = Math.round((decimalHours - hours) * 60);
+  
+  if (hours === 0) {
+    return `${minutes}min`;
+  } else if (minutes === 0) {
+    return `${hours}h`;
+  } else {
+    return `${hours}h ${minutes}min`;
+  }
+};
+
+// Calculate Net Hours: Total Hours - Delay Time (for justice calculation)
+const calculateNetHours = (totalHours: number, delayMinutes: number): number => {
+  const delayHours = delayMinutes / 60; // Convert delay minutes to hours
+  const netHours = totalHours - delayHours;
+  return Math.max(0, netHours); // Don't show negative net hours
+};
 
 const ShiftsPage = () => {
   const { user } = useAuth();
@@ -66,9 +106,11 @@ const ShiftsPage = () => {
       shift: "Shift",
       checkIn: "Check In",
       checkOut: "Check Out",
+      delay: "Delay Minutes",
       regularHours: "Regular Hours",
       overtimeHours: "Overtime Hours",
       totalHours: "Total Hours",
+      netHours: "Net Hours",
       dayShift: "Day Shift",
       nightShift: "Night Shift",
       notWorked: "Not Worked",
@@ -97,9 +139,11 @@ const ShiftsPage = () => {
       shift: "المناوبة",
       checkIn: "تسجيل الدخول",
       checkOut: "تسجيل الخروج",
+      delay: "دقائق التأخير",
       regularHours: "الساعات العادية",
       overtimeHours: "ساعات العمل الإضافي",
       totalHours: "إجمالي الساعات",
+      netHours: "الساعات الصافية",
       dayShift: "مناوبة النهار",
       nightShift: "مناوبة الليل",
       notWorked: "لم يعمل",
@@ -238,6 +282,7 @@ const ShiftsPage = () => {
         checkOutTime: item.check_out_time ? new Date(item.check_out_time) : undefined,
         regularHours: item.regular_hours,
         overtimeHours: item.overtime_hours,
+        delayMinutes: item.delay_minutes || 0,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at),
         userName: item.users?.name,
@@ -481,8 +526,7 @@ const ShiftsPage = () => {
                       </div>
                     </div>
                     <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalRegularHours}</p>
-                    <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground">{summary.totalRegular.toFixed(1)}</div>
-                    <p className="text-xs sm:text-sm text-muted-foreground">{t.hours}</p>
+                    <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground">{formatHoursAndMinutes(summary.totalRegular)}</div>
               </div>
             </CardContent>
           </Card>
@@ -501,8 +545,7 @@ const ShiftsPage = () => {
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalOvertimeHours}</p>
-                <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600">{summary.totalOvertime.toFixed(1)}</div>
-                <p className="text-xs sm:text-sm text-muted-foreground">{t.hours}</p>
+                <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600">{formatHoursAndMinutes(summary.totalOvertime)}</div>
               </div>
             </CardContent>
           </Card>
@@ -531,12 +574,14 @@ const ShiftsPage = () => {
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.averageHoursPerDay}</p>
-                <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600">{summary.averagePerDay.toFixed(1)}</div>
-                <p className="text-xs sm:text-sm text-muted-foreground">{t.hours}</p>
+                <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600">{formatHoursAndMinutes(summary.averagePerDay)}</div>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Admin Recalculation Tools */}
+        {user?.role === 'admin' && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
 
         {/* Enhanced mobile filters with better UX - Only show for admin */}
         {user?.role === 'admin' && (
@@ -781,29 +826,45 @@ const ShiftsPage = () => {
                           </div>
                             </div>
                         
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground font-medium block">{t.delay}</span>
+                            <div className={`text-xs font-bold rounded-lg p-2 text-center ${
+                              shift.delayMinutes > 0 
+                                ? 'text-red-600 bg-red-50 dark:bg-red-900/20' 
+                                : 'text-green-600 bg-green-50 dark:bg-green-900/20'
+                            }`}>
+                              {formatDelayHoursAndMinutes(shift.delayMinutes)}
+                            </div>
+                          </div>
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.regularHours}</span>
                             <div className="text-xs font-bold text-foreground bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 text-center">
-                              {shift.regularHours.toFixed(1)}h
+                              {formatHoursAndMinutes(shift.regularHours)}
                             </div>
                           </div>
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.overtimeHours}</span>
                             <div className="text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2 text-center">
-                              {shift.overtimeHours.toFixed(1)}h
+                              {formatHoursAndMinutes(shift.overtimeHours)}
                             </div>
                           </div>
                         </div>
                         
-                        <div className="pt-2 border-t border-border/50">
+                        <div className="pt-2 border-t border-border/50 space-y-2">
                           <div className="flex justify-between items-center bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg p-2">
                             <span className="text-xs text-muted-foreground font-semibold">{t.totalHours}</span>
                             <span className="font-bold text-sm text-primary">
-                              {(shift.regularHours + shift.overtimeHours).toFixed(1)}h
+                              {formatHoursAndMinutes(shift.regularHours + shift.overtimeHours)}
                             </span>
-                            </div>
                           </div>
+                          <div className="flex justify-between items-center bg-gradient-to-r from-purple-100/50 to-purple-50/30 dark:from-purple-900/20 dark:to-purple-800/10 rounded-lg p-2">
+                            <span className="text-xs text-muted-foreground font-semibold">{t.netHours}</span>
+                            <span className="font-bold text-sm text-purple-600">
+                              {formatHoursAndMinutes(calculateNetHours(shift.regularHours + shift.overtimeHours, shift.delayMinutes))}
+                            </span>
+                          </div>
+                        </div>
                         </CardContent>
                       </Card>
                     ))
@@ -822,15 +883,17 @@ const ShiftsPage = () => {
                       <TableHead className="font-semibold text-xs">{t.shift}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.checkIn}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.checkOut}</TableHead>
+                      <TableHead className="font-semibold text-xs">{t.delay}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.regularHours}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.overtimeHours}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.totalHours}</TableHead>
+                      <TableHead className="font-semibold text-xs">{t.netHours}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-12">
+                        <TableCell colSpan={user.role === 'admin' ? 10 : 9} className="text-center py-12">
                           <div className="flex items-center justify-center space-x-3">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                             <span className="text-sm font-medium">{t.loading}</span>
@@ -839,7 +902,7 @@ const ShiftsPage = () => {
                       </TableRow>
                     ) : monthlyShifts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-12">
+                        <TableCell colSpan={user.role === 'admin' ? 10 : 9} className="text-center py-12">
                           <div className="space-y-4">
                             {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
                               <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-200 dark:border-blue-800 max-w-md mx-auto">
@@ -875,12 +938,20 @@ const ShiftsPage = () => {
                           </TableCell>
                           <TableCell className="font-mono text-xs">{formatTime(shift.checkInTime)}</TableCell>
                           <TableCell className="font-mono text-xs">{formatTime(shift.checkOutTime)}</TableCell>
-                          <TableCell className="font-semibold text-xs">{shift.regularHours.toFixed(1)} {t.hours}</TableCell>
+                          <TableCell className={`font-semibold text-xs ${
+                            shift.delayMinutes > 0 ? 'text-red-600' : 'text-green-600'
+                          }`}>
+                            {formatDelayHoursAndMinutes(shift.delayMinutes)}
+                          </TableCell>
+                          <TableCell className="font-semibold text-xs">{formatHoursAndMinutes(shift.regularHours)}</TableCell>
                           <TableCell className="text-orange-600 font-semibold text-xs">
-                            {shift.overtimeHours.toFixed(1)} {t.hours}
+                            {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className="font-bold text-primary text-xs">
-                            {(shift.regularHours + shift.overtimeHours).toFixed(1)} {t.hours}
+                            {formatHoursAndMinutes(shift.regularHours + shift.overtimeHours)}
+                          </TableCell>
+                          <TableCell className="font-bold text-purple-600 text-xs">
+                            {formatHoursAndMinutes(calculateNetHours(shift.regularHours + shift.overtimeHours, shift.delayMinutes))}
                           </TableCell>
                         </TableRow>
                       ))

@@ -58,6 +58,8 @@ interface CheckInContextType {
   todaysHours: number;
   refreshCheckIns: () => Promise<void>;
   refreshWorkReports: () => Promise<void>;
+  workDayBoundaries: { workDayStart: Date; workDayEnd: Date } | null;
+  forceRefreshBoundaries: () => Promise<void>;
 }
 
 const CheckInContext = createContext<CheckInContextType | undefined>(undefined);
@@ -143,8 +145,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     loadWorkDayBoundaries();
     
-    // Refresh boundaries every hour to handle day transitions
-    const interval = setInterval(loadWorkDayBoundaries, 60 * 60 * 1000);
+    // Refresh boundaries more frequently to handle day transitions (every 5 minutes)
+    const interval = setInterval(loadWorkDayBoundaries, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
   }, []);
@@ -524,9 +526,22 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const [shiftHour, shiftMinute] = shift.start_time.split(':').map(Number);
             const shiftTotalMinutes = shiftHour * 60 + shiftMinute;
 
-            // Allow check-in 30 minutes before shift start
-            const allowEarlyMinutes = 30;
-            const canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+            // Specific timing rules for shifts
+            let canCheckIn = false;
+            
+            if (shift.name.toLowerCase().includes('day')) {
+              // Day shift: Can check in from 8:30 AM (30 min before 9:00 AM)
+              const allowedStartTime = 8 * 60 + 30; // 8:30 AM in minutes
+              canCheckIn = currentTotalMinutes >= allowedStartTime;
+            } else if (shift.name.toLowerCase().includes('night')) {
+              // Night shift: Can check in from 3:30 PM (30 min before 4:00 PM)  
+              const allowedStartTime = 15 * 60 + 30; // 3:30 PM in minutes
+              canCheckIn = currentTotalMinutes >= allowedStartTime;
+            } else {
+              // Generic shift: Use 30 minutes before shift start
+              const allowEarlyMinutes = 30;
+              canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+            }
 
             if (!canCheckIn) {
               // Format the start time to 12-hour format
@@ -542,7 +557,15 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               };
 
               const formattedStartTime = formatTime(shift.start_time);
-              const message = `Your ${shift.name} starts at ${formattedStartTime}. You can check in 30 minutes before.`;
+              let message = `Your ${shift.name} starts at ${formattedStartTime}.`;
+              
+              if (shift.name.toLowerCase().includes('day')) {
+                message += ' Day shift employees can check in from 8:30 AM.';
+              } else if (shift.name.toLowerCase().includes('night')) {
+                message += ' Night shift employees can check in from 3:30 PM.';
+              } else {
+                message += ' You can check in 30 minutes before.';
+              }
 
               toast.warning(message, {
                 duration: 6000,
@@ -594,7 +617,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               userId,
               detectedShift.id,
               currentWorkDay.workDayStart, // Use work day start as reference date
-              checkInTime
+              checkInTime,
+              undefined, // checkOutTime
+              detectedShift // Pass shift for delay calculation
             );
             console.log('✅ Monthly shift record created/updated');
 
@@ -1308,6 +1333,18 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await notifyAdmins('check_out', user.id);
   };
 
+  // Function to force refresh work day boundaries
+  const forceRefreshBoundaries = async () => {
+    try {
+      const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
+      const boundaries = await getCurrentWorkDayBoundaries();
+      setWorkDayBoundaries(boundaries);
+      console.log('🔄 Work day boundaries force refreshed:', boundaries);
+    } catch (error) {
+      console.error('Error force refreshing work day boundaries:', error);
+    }
+  };
+
   // Helper function to calculate work hours
   const calculateHours = (checkInTime: Date, checkOutTime: Date): number => {
     const diffMs = checkOutTime.getTime() - checkInTime.getTime();
@@ -1412,6 +1449,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     todaysHours,
     refreshCheckIns,
     refreshWorkReports,
+    workDayBoundaries,
+    forceRefreshBoundaries,
   };
   
   return (

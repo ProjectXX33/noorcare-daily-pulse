@@ -20,7 +20,8 @@ const CheckInPage = () => {
     hasCheckedOutToday,
     refreshCheckIns,
     currentCheckIn,
-    isCheckedIn: contextIsCheckedIn
+    isCheckedIn: contextIsCheckedIn,
+    forceRefreshBoundaries
   } = useCheckIn();
   
   const [isDayOff, setIsDayOff] = useState(false);
@@ -69,15 +70,25 @@ const CheckInPage = () => {
   const isCheckedIn = hasCheckedInToday(user.id);
   const isCheckedOut = hasCheckedOutToday(user.id);
   
-  // Get today's date
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Get today's check-ins based on work day boundaries (resets at 4 AM)
+  const { workDayBoundaries } = useCheckIn();
   
-  // Filter check-ins for today
+  // Filter check-ins for current work day
   const todayCheckIns = userCheckIns.filter(checkIn => {
-    const checkInDate = new Date(checkIn.timestamp);
-    checkInDate.setHours(0, 0, 0, 0);
-    return checkInDate.getTime() === today.getTime();
+    const checkInTime = new Date(checkIn.timestamp);
+    
+    if (workDayBoundaries) {
+      // Use work day boundaries (4 AM reset)
+      return checkInTime >= workDayBoundaries.workDayStart && 
+             checkInTime < workDayBoundaries.workDayEnd;
+    } else {
+      // Fallback to midnight-based logic
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const checkInDate = new Date(checkInTime);
+      checkInDate.setHours(0, 0, 0, 0);
+      return checkInDate.getTime() === today.getTime();
+    }
   });
   
   // Use context state for more reliable checking
@@ -86,6 +97,23 @@ const CheckInPage = () => {
   // Enhanced status determination - handle manual checkout
   const hasAnyCheckoutToday = todayCheckIns.some(ci => ci.checkOutTime || ci.checkoutTime);
   const hasActiveCheckIn = actualIsCheckedIn && !isCheckedOut;
+  
+  // Debug logging for status determination
+  console.log('🔍 CheckInPage Status Debug:', {
+    currentTime: new Date().toISOString(),
+    workDayBoundaries,
+    todayCheckIns: todayCheckIns.length,
+    actualIsCheckedIn,
+    isCheckedOut,
+    hasAnyCheckoutToday,
+    hasActiveCheckIn,
+    todayCheckInsDetails: todayCheckIns.map(ci => ({
+      id: ci.id,
+      timestamp: ci.timestamp,
+      checkOutTime: ci.checkOutTime,
+      checkoutTime: ci.checkoutTime
+    }))
+  });
   
   // Determine current status based on check-in AND check-out status
   let currentStatus;
@@ -106,7 +134,10 @@ const CheckInPage = () => {
   const handleManualRefresh = async () => {
     setLoading(true);
     try {
+      // Force refresh work day boundaries first, then check-ins
+      await forceRefreshBoundaries();
       await refreshCheckIns();
+      console.log('🔄 Manual refresh completed - boundaries and check-ins updated');
     } catch (error) {
       console.error('Manual refresh failed:', error);
     } finally {

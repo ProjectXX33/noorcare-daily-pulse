@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Flame, CheckCircle, AlertTriangle, Play, Timer, ArrowDown } from 'lucide-react';
+import { Clock, Flame, CheckCircle, AlertTriangle, Play, Timer, ArrowDown, AlertCircle } from 'lucide-react';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -13,86 +13,82 @@ const WorkShiftTimer: React.FC = () => {
   const [isOvertime, setIsOvertime] = useState<boolean>(false);
   const [overtimeMinutes, setOvertimeMinutes] = useState<number>(0);
   const [shiftInfo, setShiftInfo] = useState<any>(null);
+  
+  // New states for post-checkout tracking
+  const [postCheckoutTime, setPostCheckoutTime] = useState<number>(0);
+  const [isPostCheckout, setIsPostCheckout] = useState<boolean>(false);
+  const [checkoutTime, setCheckoutTime] = useState<Date | null>(null);
 
   // Find active check-in and get shift information
   useEffect(() => {
-    console.log('WorkShiftTimer - Effect triggered:', {
-      hasUser: !!user,
-      userName: user?.name,
-      userRole: user?.role,
-      checkInsLength: checkIns?.length || 0
-    });
-
-    if (!user || user.role !== 'employee') {
-      console.log('WorkShiftTimer - User not employee or no user');
-      setActiveCheckIn(null);
-      return;
-    }
-
-    if (!checkIns?.length) {
-      console.log('WorkShiftTimer - No check-ins data');
-      setActiveCheckIn(null);
-      return;
-    }
-
-    // Find today's active check-in (not checked out yet) using work day boundaries
     const findActiveCheckIn = async () => {
-      try {
-        // Get work day boundaries
-        const { getCurrentWorkDayBoundaries } = await import('@/lib/shiftsApi');
-        const workDayBoundaries = await getCurrentWorkDayBoundaries();
+      if (!user?.id || !checkIns.length) return;
+      
+      const today = new Date().toDateString();
+      const todayCheckIns = checkIns.filter(ci => 
+        ci.userId === user.id && 
+        new Date(ci.timestamp).toDateString() === today
+      );
+      
+      // Find the most recent check-in for today
+      const latestCheckIn = todayCheckIns.sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )[0];
+      
+      if (latestCheckIn) {
+        // Check if this check-in has been checked out
+        const hasCheckedOut = !!(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime);
         
-        const todayCheckIns = checkIns.filter(ci => {
-          const checkInTime = new Date(ci.timestamp);
-          const isCurrentUser = ci.userId === user.id;
-          const isInWorkDay = checkInTime >= workDayBoundaries.workDayStart && 
-                            checkInTime < workDayBoundaries.workDayEnd;
-          
-          return isCurrentUser && isInWorkDay;
-        });
-        
-        console.log('WorkShiftTimer - Work day check-ins found:', todayCheckIns.length);
-        
-        // Find the check-in without checkout time (still active)
-        const active = todayCheckIns.find(ci => {
-          const hasCheckOut = !!(ci.checkOutTime || ci.checkoutTime);
-          return !hasCheckOut;
-        });
-        
-        setActiveCheckIn(active || null);
-        
-        // Get shift assignment if we have an active check-in
-        let assignment = null;
-        if (active) {
-          // Use work day boundaries to get correct work date
-          const workDate = workDayBoundaries.workDayStart.toISOString().split('T')[0];
-          const { data: assignmentData } = await supabase
-            .from('shift_assignments')
-            .select(`
-              *,
-              shifts:assigned_shift_id(name, start_time, end_time)
-            `)
-            .eq('employee_id', user.id)
-            .eq('work_date', workDate)
-            .single();
-          
-          assignment = assignmentData;
-          setShiftInfo(assignmentData?.shifts || null);
+        if (hasCheckedOut) {
+          // Post-checkout mode: continue tracking time for overtime
+          setIsPostCheckout(true);
+          setCheckoutTime(new Date(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime!));
+          setActiveCheckIn(null); // No active check-in, but we track post-checkout time
         } else {
-          setShiftInfo(null);
+          // Still checked in
+          setIsPostCheckout(false);
+          setPostCheckoutTime(0);
+          setCheckoutTime(null);
+          setActiveCheckIn(latestCheckIn);
         }
         
-        console.log('WorkShiftTimer - Final result:', {
-          user: user.name,
-          activeCheckIn: active ? {
-            id: active.id,
-            timestamp: active.timestamp,
-            hasCheckOut: !!(active.checkOutTime || active.checkoutTime)
-          } : null,
-          shiftInfo: assignment?.shifts?.name || 'No shift'
-        });
-      } catch (error) {
-        console.error('Error finding active check-in:', error);
+        // Get shift information
+        try {
+          const { data: shifts } = await supabase
+            .from('shifts')
+            .select('*');
+          
+          if (shifts && latestCheckIn) {
+            const checkInTime = new Date(latestCheckIn.timestamp);
+            const detectedShift = shifts.find(shift => {
+              const [startHour, startMin] = shift.start_time.split(':').map(Number);
+              const [endHour, endMin] = shift.end_time.split(':').map(Number);
+              
+              const shiftStart = new Date(checkInTime);
+              shiftStart.setHours(startHour, startMin, 0, 0);
+              
+              const shiftEnd = new Date(checkInTime);
+              shiftEnd.setHours(endHour, endMin, 0, 0);
+              
+              if (endHour < startHour) {
+                shiftEnd.setDate(shiftEnd.getDate() + 1);
+              }
+              
+              const tolerance = 2 * 60 * 60 * 1000; // 2 hours tolerance
+              return checkInTime >= new Date(shiftStart.getTime() - tolerance) && 
+                     checkInTime <= new Date(shiftStart.getTime() + tolerance);
+            });
+            
+            setShiftInfo(detectedShift);
+          }
+        } catch (error) {
+          console.error('Error fetching shift info:', error);
+        }
+      } else {
+        setActiveCheckIn(null);
+        setIsPostCheckout(false);
+        setPostCheckoutTime(0);
+        setCheckoutTime(null);
       }
     };
 
@@ -101,63 +97,73 @@ const WorkShiftTimer: React.FC = () => {
 
   // Enhanced timer logic - runs every second for real-time updates
   useEffect(() => {
-    if (!activeCheckIn) {
-      setTimeWorked(0);
-      setIsOvertime(false);
-      setOvertimeMinutes(0);
-      return;
-    }
-
     const updateTimer = () => {
-      const checkInTime = new Date(activeCheckIn.timestamp);
       const now = new Date();
       
       // Check if it's 4AM (auto-checkout time)
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       
-      if (currentHour === 4 && currentMinute === 0) {
+      if (currentHour === 4 && currentMinute === 0 && activeCheckIn) {
         // Auto checkout at 4AM
         handleAutoCheckout();
         return;
       }
       
-      // Calculate total time worked in seconds for more precision
-      const timeWorkedMs = now.getTime() - checkInTime.getTime();
-      const timeWorkedSeconds = Math.floor(timeWorkedMs / 1000);
-      const timeWorkedMinutes = Math.floor(timeWorkedSeconds / 60);
-      setTimeWorked(timeWorkedSeconds);
-      
-      // Determine shift type and standard work hours
-      const checkInHour = checkInTime.getHours();
-      let standardWorkHours = 8; // Default to 8 hours for night shift
-      let shiftType = 'Night Shift';
-      
-      if (shiftInfo) {
-        if (shiftInfo.name.toLowerCase().includes('day')) {
-          standardWorkHours = 7; // Day shift is 7 hours
-          shiftType = 'Day Shift';
-        } else if (shiftInfo.name.toLowerCase().includes('night')) {
-          standardWorkHours = 8; // Night shift is 8 hours
-          shiftType = 'Night Shift';
+      if (isPostCheckout && checkoutTime) {
+        // Post-checkout overtime tracking
+        const postCheckoutMs = now.getTime() - checkoutTime.getTime();
+        const postCheckoutSeconds = Math.floor(postCheckoutMs / 1000);
+        setPostCheckoutTime(postCheckoutSeconds);
+        
+        // All post-checkout time is overtime
+        if (postCheckoutSeconds > 0) {
+          setIsOvertime(true);
+          setOvertimeMinutes(Math.floor(postCheckoutSeconds / 60));
+        }
+        
+      } else if (activeCheckIn) {
+        // Regular check-in tracking
+        const checkInTime = new Date(activeCheckIn.timestamp);
+        
+        // Calculate total time worked in seconds for more precision
+        const timeWorkedMs = now.getTime() - checkInTime.getTime();
+        const timeWorkedSeconds = Math.floor(timeWorkedMs / 1000);
+        setTimeWorked(timeWorkedSeconds);
+        
+        // Determine shift type and standard work hours
+        const checkInHour = checkInTime.getHours();
+        let standardWorkHours = 8; // Default to 8 hours for night shift
+        
+        if (shiftInfo) {
+          if (shiftInfo.name.toLowerCase().includes('day')) {
+            standardWorkHours = 7; // Day shift is 7 hours
+          } else if (shiftInfo.name.toLowerCase().includes('night')) {
+            standardWorkHours = 8; // Night shift is 8 hours
+          }
+        } else {
+          // Fallback logic based on check-in time
+          if (checkInHour >= 9 && checkInHour < 16) {
+            standardWorkHours = 7;
+          }
+        }
+        
+        const standardWorkSeconds = standardWorkHours * 60 * 60;
+        
+        // Check if in overtime
+        if (timeWorkedSeconds > standardWorkSeconds) {
+          setIsOvertime(true);
+          setOvertimeMinutes(Math.floor((timeWorkedSeconds - standardWorkSeconds) / 60));
+        } else {
+          setIsOvertime(false);
+          setOvertimeMinutes(0);
         }
       } else {
-        // Fallback logic based on check-in time
-        if (checkInHour >= 9 && checkInHour < 16) {
-          standardWorkHours = 7;
-          shiftType = 'Day Shift';
-        }
-      }
-      
-      const standardWorkSeconds = standardWorkHours * 60 * 60;
-      
-      // Check if in overtime
-      if (timeWorkedSeconds > standardWorkSeconds) {
-        setIsOvertime(true);
-        setOvertimeMinutes(Math.floor((timeWorkedSeconds - standardWorkSeconds) / 60));
-      } else {
+        // No active session
+        setTimeWorked(0);
         setIsOvertime(false);
         setOvertimeMinutes(0);
+        setPostCheckoutTime(0);
       }
     };
 
@@ -168,7 +174,7 @@ const WorkShiftTimer: React.FC = () => {
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [activeCheckIn, shiftInfo]);
+  }, [activeCheckIn, shiftInfo, isPostCheckout, checkoutTime]);
 
   // Auto checkout function
   const handleAutoCheckout = async () => {
@@ -183,6 +189,64 @@ const WorkShiftTimer: React.FC = () => {
     } catch (error) {
       console.error('Auto-checkout failed:', error);
       toast.error('Failed to auto checkout. Please manually check out.');
+    }
+  };
+
+  // Function to record post-checkout overtime
+  const recordPostCheckoutOvertime = async () => {
+    if (!user || !checkoutTime || postCheckoutTime <= 0) return;
+    
+    try {
+      const overtimeHours = postCheckoutTime / 3600; // Convert seconds to hours
+      const today = new Date().toDateString();
+      const workDate = new Date(today);
+      
+      // First get the current overtime hours
+      const { data: currentRecord, error: fetchError } = await supabase
+        .from('monthly_shifts')
+        .select('overtime_hours')
+        .eq('user_id', user.id)
+        .eq('work_date', workDate.toISOString().split('T')[0])
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching current overtime:', fetchError);
+        toast.error('Failed to fetch current overtime hours');
+        return;
+      }
+
+      const newOvertimeTotal = (currentRecord.overtime_hours || 0) + overtimeHours;
+
+      // Update the monthly shift record with additional overtime
+      const { error: updateError } = await supabase
+        .from('monthly_shifts')
+        .update({
+          overtime_hours: newOvertimeTotal,
+          updated_at: new Date().toISOString(),
+          additional_overtime_recorded: true
+        })
+        .eq('user_id', user.id)
+        .eq('work_date', workDate.toISOString().split('T')[0]);
+
+      if (updateError) {
+        console.error('Error updating overtime:', updateError);
+        toast.error('Failed to record additional overtime');
+        return;
+      }
+
+      // Reset post-checkout tracking
+      setPostCheckoutTime(0);
+      setIsPostCheckout(false);
+      setIsOvertime(false);
+      setOvertimeMinutes(0);
+      
+      toast.success(`✅ Additional ${overtimeHours.toFixed(2)} hours of overtime recorded!`, {
+        duration: 4000,
+      });
+      
+    } catch (error) {
+      console.error('Error recording post-checkout overtime:', error);
+      toast.error('Failed to record additional overtime');
     }
   };
 
@@ -216,6 +280,36 @@ const WorkShiftTimer: React.FC = () => {
 
   // For employees only
   if (user?.role === 'employee') {
+    // Post-checkout overtime tracking mode
+    if (isPostCheckout && postCheckoutTime > 0) {
+      const overtimeHours = postCheckoutTime / 3600;
+      
+      return (
+        <div className="flex flex-col gap-2">
+          {/* Post-checkout overtime display */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 border-purple-400 shadow-md">
+            <AlertCircle className="h-4 w-4 text-purple-600" />
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm tracking-wide text-purple-800">
+                +{formatTimeMinutes(postCheckoutTime)} EXTRA
+              </span>
+              <span className="hidden sm:inline text-xs font-extrabold text-purple-600">OVERTIME</span>
+            </div>
+          </div>
+          
+          {/* Record overtime button */}
+          {postCheckoutTime >= 60 && ( // Show button after 1 minute
+            <button
+              onClick={recordPostCheckoutOvertime}
+              className="px-3 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+            >
+              Record {overtimeHours.toFixed(2)}h Overtime
+            </button>
+          )}
+        </div>
+      );
+    }
+    
     // Check if user has checked out today (show "Work Done!")
     const today = new Date().toDateString();
     const todayCheckIns = checkIns?.filter(ci => 
@@ -225,7 +319,7 @@ const WorkShiftTimer: React.FC = () => {
     
     const hasCheckedOut = todayCheckIns.some(ci => !!(ci.checkOutTime || ci.checkoutTime));
     
-    if (hasCheckedOut && !activeCheckIn) {
+    if (hasCheckedOut && !activeCheckIn && !isPostCheckout) {
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-300 shadow-sm">
           <CheckCircle className="h-4 w-4 text-green-600" />
