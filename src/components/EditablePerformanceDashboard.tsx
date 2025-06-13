@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Loader2,
   Zap,
-  RotateCcw
+  RotateCcw,
+  User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { recalculateOvertimeHours } from '@/utils/recalculateOvertime';
@@ -77,6 +78,13 @@ interface PerformanceRecord {
   average_performance_score: number;
   punctuality_percentage: number;
   performance_status: string;
+  // Enhanced metrics
+  total_logins?: number;
+  app_usage_hours?: number;
+  tasks_completed?: number;
+  tasks_success_rate?: number;
+  check_ins_count?: number;
+  average_daily_hours?: number;
 }
 
 interface EditablePerformanceDashboardProps {
@@ -122,17 +130,34 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   currentMonth = format(new Date(), 'yyyy-MM') 
 }) => {
   const [performanceData, setPerformanceData] = useState<PerformanceRecord[]>([]);
+  const [filteredPerformanceData, setFilteredPerformanceData] = useState<PerformanceRecord[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PerformanceRecord>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [employees, setEmployees] = useState<Array<{id: string, name: string, position?: string}>>([]);
-
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  const [selectedPosition, setSelectedPosition] = useState<string>('all');
 
   useEffect(() => {
     loadData();
     loadEmployees();
   }, [currentMonth]);
+
+  // Filter performance data based on selected filters
+  useEffect(() => {
+    let filtered = [...performanceData];
+    
+    if (selectedEmployee !== 'all') {
+      filtered = filtered.filter(record => record.employee_id === selectedEmployee);
+    }
+    
+    if (selectedPosition !== 'all') {
+      filtered = filtered.filter(record => record.employee_position === selectedPosition);
+    }
+    
+    setFilteredPerformanceData(filtered);
+  }, [performanceData, selectedEmployee, selectedPosition]);
 
   const loadEmployees = async () => {
     try {
@@ -176,6 +201,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         employee_position: item.users?.position
       }));
       setPerformanceData(formattedData);
+      setFilteredPerformanceData(formattedData); // Initialize filtered data
     } catch (error) {
       console.error('Error loading performance data:', error);
       toast.error('Failed to load performance data');
@@ -187,7 +213,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   // Auto-calculate performance metrics from monthly_shifts data
   const autoCalculatePerformanceFromShifts = async () => {
     try {
-      console.log('🔄 Auto-calculating performance from monthly shifts...');
+      console.log('🔄 Auto-calculating comprehensive performance metrics...');
       
       // Get all monthly shifts for the current month
       const monthStart = `${currentMonth}-01`;
@@ -195,6 +221,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       const nextMonthDate = new Date(parseInt(nextMonth[0]), parseInt(nextMonth[1]), 1);
       const monthEnd = nextMonthDate.toISOString().split('T')[0];
 
+      console.log(`📅 Searching for data between ${monthStart} and ${monthEnd}`);
+
+      // Get monthly shifts data
       const { data: monthlyShifts, error: shiftsError } = await supabase
         .from('monthly_shifts')
         .select(`
@@ -207,17 +236,50 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
       if (shiftsError) throw shiftsError;
 
-      console.log(`📊 Found ${monthlyShifts.length} monthly shift records to process`);
+      // Get check-ins data for login frequency and app usage
+      const { data: checkIns, error: checkInsError } = await supabase
+        .from('check_ins')
+        .select(`
+          *,
+          users:user_id(name, position)
+        `)
+        .gte('timestamp', monthStart)
+        .lt('timestamp', monthEnd + 'T23:59:59')
+        .in('users.position', ['Customer Service', 'Designer']);
+
+      if (checkInsError) throw checkInsError;
+
+      // Get tasks data for productivity metrics
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          users:assigned_to(name, position)
+        `)
+        .gte('created_at', monthStart)
+        .lt('created_at', monthEnd + 'T23:59:59')
+        .in('users.position', ['Customer Service', 'Designer']);
+
+      if (tasksError) throw tasksError;
+
+      console.log(`📊 Found ${monthlyShifts.length} shifts, ${checkIns.length} check-ins, ${tasks.length} tasks`);
 
       // Group by employee
       const employeeData: Record<string, {
         name: string;
         position: string;
         workingDays: Set<string>;
+        workingDatesArray: string[];
         totalDelayMinutes: number;
         totalOvertimeHours: number;
+        checkInsCount: number;
+        loginDays: Set<string>;
+        tasksCompleted: number;
+        tasksTotal: number;
+        totalWorkHours: number;
       }> = {};
 
+      // Process monthly shifts
       for (const shift of monthlyShifts) {
         const userId = shift.user_id;
         const userName = shift.users?.name || 'Unknown';
@@ -228,19 +290,51 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             name: userName,
             position: userPosition,
             workingDays: new Set(),
+            workingDatesArray: [],
             totalDelayMinutes: 0,
             totalOvertimeHours: 0,
+            checkInsCount: 0,
+            loginDays: new Set(),
+            tasksCompleted: 0,
+            tasksTotal: 0,
+            totalWorkHours: 0,
           };
         }
 
         // Add working day
-        employeeData[userId].workingDays.add(shift.work_date);
+        const workDate = shift.work_date;
+        employeeData[userId].workingDays.add(workDate);
+        if (!employeeData[userId].workingDatesArray.includes(workDate)) {
+          employeeData[userId].workingDatesArray.push(workDate);
+        }
         
-        // Add delay minutes
+        console.log(`📝 Processing shift for ${userName} on ${workDate}: delay=${shift.delay_minutes || 0}min, overtime=${shift.overtime_hours || 0}h`);
+        
+        // Add delay minutes and overtime hours
         employeeData[userId].totalDelayMinutes += shift.delay_minutes || 0;
-        
-        // Add overtime hours
         employeeData[userId].totalOvertimeHours += shift.overtime_hours || 0;
+        employeeData[userId].totalWorkHours += (shift.regular_hours || 0) + (shift.overtime_hours || 0);
+      }
+
+      // Process check-ins for login frequency
+      for (const checkIn of checkIns) {
+        const userId = checkIn.user_id;
+        if (employeeData[userId]) {
+          employeeData[userId].checkInsCount++;
+          const loginDate = new Date(checkIn.timestamp).toISOString().split('T')[0];
+          employeeData[userId].loginDays.add(loginDate);
+        }
+      }
+
+      // Process tasks for productivity metrics
+      for (const task of tasks) {
+        const userId = task.assigned_to;
+        if (employeeData[userId]) {
+          employeeData[userId].tasksTotal++;
+          if (task.status === 'completed') {
+            employeeData[userId].tasksCompleted++;
+          }
+        }
       }
 
       // Process each employee's data
@@ -249,6 +343,17 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         const delayMinutes = data.totalDelayMinutes;
         const workingDays = data.workingDays.size;
         const overtimeHours = data.totalOvertimeHours;
+        const workingDatesArray = data.workingDatesArray.sort();
+        const totalLogins = data.loginDays.size;
+        const checkInsCount = data.checkInsCount;
+        const tasksCompleted = data.tasksCompleted;
+        const tasksTotal = data.tasksTotal;
+        const tasksSuccessRate = tasksTotal > 0 ? (tasksCompleted / tasksTotal) * 100 : 0;
+        const averageDailyHours = workingDays > 0 ? data.totalWorkHours / workingDays : 0;
+        const appUsageHours = data.totalWorkHours; // Using work hours as app usage proxy
+
+        console.log(`👥 ${data.name}: ${workingDays} unique working days from dates: [${workingDatesArray.join(', ')}]`);
+        console.log(`   📊 Logins: ${totalLogins} days, Check-ins: ${checkInsCount}, Tasks: ${tasksCompleted}/${tasksTotal}`);
 
         const performanceScore = calcPerformanceScore(delayMinutes, overtimeHours);
         const punctuality = calcPunctuality(delayMinutes);
@@ -259,16 +364,24 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           employee_name: data.name,
           month_year: currentMonth,
           total_working_days: workingDays,
+          worked_dates: workingDatesArray, // Store the actual dates worked
           total_delay_minutes: Math.round(delayMinutes),
           total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100,
           total_overtime_hours: Math.round(overtimeHours * 100) / 100,
           average_performance_score: Math.round(performanceScore * 100) / 100,
           punctuality_percentage: Math.round(punctuality * 100) / 100,
           performance_status: status,
+          // Enhanced metrics
+          total_logins: totalLogins,
+          app_usage_hours: Math.round(appUsageHours * 100) / 100,
+          tasks_completed: tasksCompleted,
+          tasks_success_rate: Math.round(tasksSuccessRate * 100) / 100,
+          check_ins_count: checkInsCount,
+          average_daily_hours: Math.round(averageDailyHours * 100) / 100,
         };
 
         records.push(record);
-        console.log(`✅ Calculated for ${data.name}: ${workingDays} days, ${delayMinutes.toFixed(0)} delay min, ${overtimeHours.toFixed(2)}h overtime`);
+        console.log(`✅ Calculated for ${data.name}: ${workingDays} days, ${delayMinutes.toFixed(0)} delay min, ${overtimeHours.toFixed(2)}h overtime, ${tasksCompleted} tasks`);
       }
 
       // Upsert records into admin_performance_dashboard
@@ -282,13 +395,52 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
         if (upsertError) {
           console.error('Error upserting performance records:', upsertError);
+          
+          // If the error is due to missing columns, create records without enhanced metrics
+          if (upsertError.message?.includes('column') || upsertError.code === '42703') {
+            console.log('⚠️ Enhanced columns not available, using basic metrics only...');
+            
+            const basicRecords = records.map(record => ({
+              employee_id: record.employee_id,
+              employee_name: record.employee_name,
+              month_year: record.month_year,
+              total_working_days: record.total_working_days,
+              worked_dates: record.worked_dates,
+              total_delay_minutes: record.total_delay_minutes,
+              total_delay_hours: record.total_delay_hours,
+              total_overtime_hours: record.total_overtime_hours,
+              average_performance_score: record.average_performance_score,
+              punctuality_percentage: record.punctuality_percentage,
+              performance_status: record.performance_status,
+            }));
+
+            const { error: basicUpsertError } = await supabase
+              .from('admin_performance_dashboard')
+              .upsert(basicRecords, { 
+                onConflict: 'employee_id,month_year',
+                ignoreDuplicates: false 
+              });
+
+            if (basicUpsertError) {
+              console.error('Error upserting basic performance records:', basicUpsertError);
+              toast.error('Failed to update performance records');
+            } else {
+              console.log(`✅ Successfully updated ${basicRecords.length} basic performance records`);
+              toast.warning('Performance updated with basic metrics only. Database schema needs enhancement.');
+            }
+          } else {
+            toast.error('Failed to update performance records');
+          }
         } else {
-          console.log(`✅ Successfully auto-calculated and updated ${records.length} performance records`);
+          console.log(`✅ Successfully auto-calculated and updated ${records.length} comprehensive performance records`);
         }
+      } else {
+        console.log('⚠️ No performance records to update');
       }
 
     } catch (error) {
       console.error('❌ Error auto-calculating performance:', error);
+      toast.error('Failed to calculate performance from comprehensive data');
       // Don't throw error here, just log it - we still want to load existing data
     }
   };
@@ -443,11 +595,54 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     return 'text-red-600';
   };
 
-  const summaryStats = {
-    bestPerformers: performanceData.filter(p => p.average_performance_score >= 95).length,
-    totalDelayMinutes: performanceData.reduce((sum, p) => sum + p.total_delay_minutes, 0),
-    totalOvertimeHours: performanceData.reduce((sum, p) => sum + p.total_overtime_hours, 0),
-  };
+  // Calculate summary statistics
+  const summaryStats = performanceData.reduce((acc, record) => {
+    acc.totalEmployees += 1;
+    acc.totalWorkingDays += record.total_working_days;
+    acc.totalDelayMinutes += record.total_delay_minutes;
+    acc.totalOvertimeHours += record.total_overtime_hours;
+    
+    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
+    acc.averagePerformanceScore += realTimeScore;
+    
+    // Count best performers (score >= 95)
+    if (realTimeScore >= 95) {
+      acc.bestPerformers += 1;
+    }
+    
+    return acc;
+  }, {
+    totalEmployees: 0,
+    totalWorkingDays: 0,
+    totalDelayMinutes: 0,
+    totalOvertimeHours: 0,
+    averagePerformanceScore: 0,
+    bestPerformers: 0
+  });
+
+  // Calculate filtered statistics
+  const filteredStats = filteredPerformanceData.reduce((acc, record) => {
+    acc.totalEmployees += 1;
+    acc.totalDelayMinutes += record.total_delay_minutes;
+    acc.totalOvertimeHours += record.total_overtime_hours;
+    
+    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
+    if (realTimeScore >= 95) {
+      acc.bestPerformers += 1;
+    }
+    
+    return acc;
+  }, {
+    totalEmployees: 0,
+    totalDelayMinutes: 0,
+    totalOvertimeHours: 0,
+    bestPerformers: 0
+  });
+
+  // Finalize average calculation
+  if (summaryStats.totalEmployees > 0) {
+    summaryStats.averagePerformanceScore = Math.round((summaryStats.averagePerformanceScore / summaryStats.totalEmployees) * 100) / 100;
+  }
 
   // When editing/adding, always calculate these fields
   const delayMinutes = editForm.total_delay_minutes || 0;
@@ -456,8 +651,6 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const calculatedScore = calcPerformanceScore(delayMinutes, overtimeHours);
   const calculatedPunctuality = calcPunctuality(delayMinutes);
   const calculatedStatus = calcStatus(calculatedScore, calculatedPunctuality);
-
-
 
   // New function to recalculate performance metrics
   const recalculatePerformanceMetrics = async () => {
@@ -548,7 +741,6 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   // Re-record all records from scratch with current month data
   const rerecordAllRecords = async () => {
     if (!confirm(`This will clear and re-record ALL performance data for ${currentMonth} from check-in/out records. This cannot be undone! Continue?`)) return;
-
 
     toast.info('🔄 Re-recording all performance data from scratch...');
 
@@ -745,18 +937,80 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     }
   };
 
+
+
+  // Calculate best employee based on comprehensive performance
+  const calculateBestEmployee = () => {
+    if (filteredPerformanceData.length === 0) return null;
+
+    // Sort employees by performance criteria:
+    // 1. Lowest delay minutes (negative impact)
+    // 2. Highest overtime hours (positive impact)
+    // 3. Highest task completion rate (positive impact)
+    // 4. Highest performance score (overall metric)
+    const bestEmployee = filteredPerformanceData.reduce((best, current) => {
+      const currentScore = calcPerformanceScore(current.total_delay_minutes, current.total_overtime_hours);
+      const bestScore = calcPerformanceScore(best.total_delay_minutes, best.total_overtime_hours);
+      
+      // Comprehensive scoring system
+      const currentComprehensiveScore = 
+        (currentScore * 0.4) + // Performance score weight
+        (Math.max(0, 100 - current.total_delay_minutes) * 0.3) + // Punctuality weight
+        ((current.total_overtime_hours || 0) * 2) + // Overtime bonus
+        ((current.tasks_success_rate || 0) * 0.2) + // Task completion weight
+        ((current.average_daily_hours || 0) * 0.1); // Work dedication weight
+
+      const bestComprehensiveScore = 
+        (bestScore * 0.4) +
+        (Math.max(0, 100 - best.total_delay_minutes) * 0.3) +
+        ((best.total_overtime_hours || 0) * 2) +
+        ((best.tasks_success_rate || 0) * 0.2) +
+        ((best.average_daily_hours || 0) * 0.1);
+
+      return currentComprehensiveScore > bestComprehensiveScore ? current : best;
+    });
+
+    return bestEmployee;
+  };
+
+  const bestEmployee = calculateBestEmployee();
+
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Mobile-optimized Summary Cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
+      {/* Summary Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        {/* Best Employee Card */}
+        <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Best Performers</p>
-                <p className="text-lg sm:text-2xl font-bold">{summaryStats.bestPerformers}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium">
+                  🏆 Best Employee
+                </p>
+                {bestEmployee ? (
+                  <>
+                    <p className="text-lg sm:text-xl font-bold text-yellow-700 mb-1">
+                      {bestEmployee.employee_name}
+                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs text-yellow-600">
+                        {formatDelayHoursAndMinutes(bestEmployee.total_delay_minutes)} delay
+                      </p>
+                      <p className="text-xs text-yellow-600">
+                        {formatHoursAndMinutes(bestEmployee.total_overtime_hours)} overtime
+                      </p>
+                      {bestEmployee.tasks_completed !== undefined && (
+                        <p className="text-xs text-yellow-600">
+                          {bestEmployee.tasks_completed} tasks completed
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No data</p>
+                )}
               </div>
-              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500" />
+              <Award className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-500" />
             </div>
           </CardContent>
         </Card>
@@ -765,8 +1019,38 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Total Delays</p>
-                <p className="text-lg sm:text-2xl font-bold text-red-600">{formatDelayHoursAndMinutes(summaryStats.totalDelayMinutes)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Best Performers
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-green-600">
+                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.bestPerformers : summaryStats.bestPerformers}
+                  {(selectedEmployee !== 'all' || selectedPosition !== 'all') && (
+                    <span className="text-sm text-muted-foreground ml-1">
+                      / {summaryStats.bestPerformers}
+                    </span>
+                  )}
+                </p>
+                {(selectedEmployee !== 'all' || selectedPosition !== 'all') && (
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredPerformanceData.length} of {performanceData.length} employees
+                  </p>
+                )}
+              </div>
+              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Total Delay
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-red-600">
+                  {formatDelayHoursAndMinutes(selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.totalDelayMinutes : summaryStats.totalDelayMinutes)}
+                </p>
               </div>
               <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
             </div>
@@ -777,8 +1061,12 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">Total Overtime</p>
-                <p className="text-lg sm:text-2xl font-bold text-blue-600">{formatHoursAndMinutes(summaryStats.totalOvertimeHours)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Total Overtime
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-600">
+                  {formatHoursAndMinutes(selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.totalOvertimeHours : summaryStats.totalOvertimeHours)}
+                </p>
               </div>
               <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
             </div>
@@ -828,6 +1116,60 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               </Button>
             </div>
           </CardTitle>
+          
+          {/* Filters Section */}
+          <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t">
+            <div className="flex-1 sm:max-w-xs">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Filter by Employee</label>
+              <Select
+                value={selectedEmployee}
+                onValueChange={setSelectedEmployee}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="All Employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex-1 sm:max-w-xs">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Filter by Position</label>
+              <Select
+                value={selectedPosition}
+                onValueChange={setSelectedPosition}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="All Positions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Positions</SelectItem>
+                  <SelectItem value="Customer Service">Customer Service</SelectItem>
+                  <SelectItem value="Designer">Designer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-end">
+              <Button 
+                onClick={() => {
+                  setSelectedEmployee('all');
+                  setSelectedPosition('all');
+                }}
+                variant="outline" 
+                size="sm"
+                className="h-10 px-3"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {/* Mobile cards view - Fixed mobile viewing */}
@@ -949,13 +1291,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     </div>
                     <span className="text-sm text-muted-foreground">Loading...</span>
                   </div>
-                ) : performanceData.length === 0 && !isAddingNew ? (
+                ) : filteredPerformanceData.length === 0 && !isAddingNew ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">No performance data available.</p>
                     <p className="text-xs text-muted-foreground mt-1">Click "Add Record" to create new entries.</p>
                   </div>
                 ) : (
-                  performanceData.map((record) => {
+                  filteredPerformanceData.map((record) => {
                     const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
                     const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
                     const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
@@ -1014,19 +1356,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                                   </Button>
                                 </>
                               ) : (
-                                <>
-                                  <Button onClick={() => startEditing(record)} size="sm" variant="outline" className="min-h-[44px] sm:min-h-auto">
+                                <div className="flex gap-2">
+                                  <Button onClick={() => startEditing(record)} size="sm" variant="outline">
                                     <Edit3 className="h-4 w-4" />
                                   </Button>
-                                  <Button 
-                                    onClick={() => deleteRecord(record.id)} 
-                                    size="sm" 
-                                    variant="outline"
-                                    className="text-red-600 hover:text-red-700 min-h-[44px] sm:min-h-auto"
-                                  >
+                                  <Button onClick={() => deleteRecord(record.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700">
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
-                                </>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1111,6 +1448,51 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                                 </div>
                               </div>
 
+                              {/* Enhanced Metrics Section */}
+                              <div className="pt-2 border-t space-y-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Tasks Completed</span>
+                                    <div className="text-sm font-medium text-purple-600">
+                                      {record.tasks_completed || 0}
+                                      {record.tasks_success_rate !== undefined && (
+                                        <span className="text-xs text-muted-foreground ml-1">
+                                          ({record.tasks_success_rate.toFixed(0)}%)
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Login Days</span>
+                                    <div className="text-sm font-medium text-indigo-600">
+                                      {record.total_logins || 0}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">App Usage</span>
+                                    <div className="text-sm font-medium text-green-600">
+                                      {formatHoursAndMinutes(record.app_usage_hours || 0)}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-muted-foreground">Avg Daily Hours</span>
+                                    <div className="text-sm font-medium text-teal-600">
+                                      {formatHoursAndMinutes(record.average_daily_hours || 0)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <span className="text-xs text-muted-foreground">Check-ins Count</span>
+                                  <div className="text-sm font-medium text-orange-600">
+                                    {record.check_ins_count || 0}
+                                  </div>
+                                </div>
+                              </div>
+
                               <div className="flex items-center justify-between pt-2 border-t">
                                 <div>
                                   <span className="text-xs text-muted-foreground">Punctuality</span>
@@ -1149,13 +1531,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               <Table>
                 <TableHeader>
                   <TableRow>
-                      <TableHead className="sticky left-0 bg-background z-10">Employee</TableHead>
-                      <TableHead>Position</TableHead>
-                    <TableHead>Working Days</TableHead>
-                    <TableHead>Performance Score</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Days</TableHead>
                     <TableHead>Delay</TableHead>
-                    <TableHead>Overtime Hours</TableHead>
-                    <TableHead>Punctuality %</TableHead>
+                    <TableHead>Overtime</TableHead>
+                    <TableHead>Tasks</TableHead>
+                    <TableHead>Logins</TableHead>
+                    <TableHead>App Usage</TableHead>
+                    <TableHead>Performance</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -1255,171 +1638,92 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   )}
 
                   {/* Existing Records */}
-                  {performanceData.map((record) => {
+                  {filteredPerformanceData.map((record) => {
                     const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
                     const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
                     const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
                     
                     return (
                     <TableRow key={record.id}>
-                          <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                        {editingId === record.id ? (
-                          <Select
-                            value={editForm.employee_id}
-                            onValueChange={(value) => {
-                              const employee = employees.find(e => e.id === value);
-                              setEditForm({
-                                ...editForm,
-                                employee_id: value,
-                                    employee_name: employee?.name || '',
-                                    employee_position: employee?.position || ''
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {employees.map((emp) => (
-                                <SelectItem key={emp.id} value={emp.id}>
-                                      {emp.name} ({emp.position})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          record.employee_name
-                        )}
-                      </TableCell>
-                          <TableCell>
-                            {editingId === record.id ? (
-                              <span className="text-sm text-gray-600">
-                                {editForm.employee_position || record.employee_position}
-                              </span>
-                            ) : (
+                          <TableCell className="sticky left-0 bg-background z-10">
+                            <div>
+                              <div className="font-medium">{record.employee_name}</div>
                               <Badge variant={record.employee_position === 'Designer' ? 'secondary' : 'default'} className="text-xs">
                                 {record.employee_position || 'Unknown'}
                               </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <Input
-                            type="number"
-                            value={editForm.total_working_days || ''}
-                            onChange={(e) => setEditForm({...editForm, total_working_days: Number(e.target.value)})}
-                            className="w-20"
-                          />
-                        ) : (
-                          record.total_working_days
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <span className={`font-bold ${getPerformanceColor(calculatedScore)}`}>
-                            {calculatedScore.toFixed(1)}%
-                          </span>
-                        ) : (
-                          <span className={`font-bold ${getPerformanceColor(realTimeScore)}`}>
-                            {realTimeScore.toFixed(1)}%
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <span className="text-red-600 font-medium">
-                            {formatDelayHoursAndMinutes(editForm.total_delay_minutes || 0)}
-                          </span>
-                        ) : (
-                          <span className={record.total_delay_minutes > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
-                            {formatDelayHoursAndMinutes(record.total_delay_minutes)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editForm.total_overtime_hours || ''}
-                            onChange={(e) => setEditForm({...editForm, total_overtime_hours: Number(e.target.value)})}
-                            className="w-20"
-                          />
-                        ) : (
-                          <span className={record.total_overtime_hours > 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}>
-                            {formatHoursAndMinutes(record.total_overtime_hours)}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <Input
-                            type="number"
-                            value={editForm.total_delay_minutes || ''}
-                            onChange={(e) => setEditForm({...editForm, total_delay_minutes: Number(e.target.value)})}
-                            className="w-20"
-                            placeholder="Minutes"
-                          />
-                        ) : (
-                          <span className={getPerformanceColor(realTimePunctuality)}>
-                            {realTimePunctuality.toFixed(1)}%
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <Badge className={
-                            calculatedStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                            calculatedStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                            calculatedStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }>
-                            {calculatedStatus}
-                          </Badge>
-                        ) : (
-                          <Badge className={
-                            realTimeStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                            realTimeStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                            realTimeStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }>
-                            {realTimeStatus}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingId === record.id ? (
-                          <div className="flex gap-1">
-                            <Button onClick={saveRecord} size="sm" variant="outline">
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button onClick={cancelEditing} size="sm" variant="outline">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-1">
-                            <Button onClick={() => startEditing(record)} size="sm" variant="outline">
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              onClick={() => deleteRecord(record.id)} 
-                              size="sm" 
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                            </div>
+                          </TableCell>
+                          <TableCell>{record.total_working_days}</TableCell>
+                          <TableCell>
+                            <span className={record.total_delay_minutes > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                              {formatDelayHoursAndMinutes(record.total_delay_minutes)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={record.total_overtime_hours > 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}>
+                              {formatHoursAndMinutes(record.total_overtime_hours)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-purple-600 font-medium">
+                              {record.tasks_completed || 0}
+                              {record.tasks_success_rate !== undefined && (
+                                <div className="text-xs text-muted-foreground">
+                                  {record.tasks_success_rate.toFixed(0)}% success
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-indigo-600 font-medium">
+                              {record.total_logins || 0} days
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-green-600 font-medium">
+                              {formatHoursAndMinutes(record.app_usage_hours || 0)}
+                              {record.average_daily_hours !== undefined && (
+                                <div className="text-xs text-muted-foreground">
+                                  {formatHoursAndMinutes(record.average_daily_hours)} avg/day
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className={`font-bold ${getPerformanceColor(realTimeScore)}`}>
+                              {realTimeScore.toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {realTimePunctuality.toFixed(0)}% punctual
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={
+                              realTimeStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
+                              realTimeStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
+                              realTimeStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }>
+                              {realTimeStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button onClick={() => startEditing(record)} size="sm" variant="outline">
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                              <Button onClick={() => deleteRecord(record.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
 
-              {performanceData.length === 0 && !isAddingNew && (
+              {filteredPerformanceData.length === 0 && !isAddingNew && (
                 <div className="text-center py-8 text-gray-500">
                   No performance data available. Click "Add Record" to create new entries.
                 </div>

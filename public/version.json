@@ -1,18 +1,13 @@
 {
-  "version": "1.7.0",
-  "buildTime": "2025-06-13T01:30:25.831Z",
-  "buildTimestamp": "1749778225833",
+  "version": "1.7.1",
+  "buildTime": "2025-06-13T18:06:51.194Z",
+  "buildTimestamp": "1749838011194",
   "buildDate": "6/13/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
     "⚖️ Justice Performance System - Fair scoring that balances delays with overtime work",
-    "🔄 Fully Automatic Calculations - Performance and shift data auto-update from real records",
-    "📊 Net Hours Column - Shows effective work time after subtracting delays",
-    "💰 Overtime Bonus System - Rewards dedication with performance score bonuses",
-    "🎯 Smart Performance Formula - Delay penalties balanced by overtime rewards",
-    "🏆 Fair Employee Evaluation - Justice for hardworking employees with overtime",
-    "🔥 Enhanced Work Timer and overtime timer - counts UP with fire emoji and red styling"
+    "Enhanced Performance Dashboard - Comprehensive performance tracking with multi-factor scoring"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
