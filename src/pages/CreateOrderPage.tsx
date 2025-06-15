@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
   ShoppingCart, 
@@ -23,7 +24,10 @@ import {
   Truck,
   X,
   FileText,
-  CheckCircle
+  CheckCircle,
+  Eye,
+  Star,
+  Info
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +42,18 @@ interface Product {
   sale_price?: string;
   sku?: string;
   categories?: Array<{ name: string }>;
+  description?: string;
+  short_description?: string;
+  images?: Array<{
+    id: number;
+    src: string;
+    name: string;
+    alt: string;
+  }>;
+  average_rating?: string;
+  rating_count?: number;
+  total_sales?: number;
+  featured?: boolean;
 }
 
 interface OrderItem {
@@ -104,6 +120,8 @@ const CreateOrderPage: React.FC = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<CouponInfo | null>(null);
   const [customerNote, setCustomerNote] = useState('');
   const [includeShipping, setIncludeShipping] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
     first_name: '',
     last_name: '',
@@ -144,7 +162,14 @@ const CreateOrderPage: React.FC = () => {
             sale_price: product.sale_price,
             stock_status: product.stock_status,
             sku: product.sku,
-            categories: product.categories.map(cat => ({ name: cat.name }))
+            categories: product.categories.map(cat => ({ name: cat.name })),
+            description: product.description,
+            short_description: product.short_description,
+            images: product.images,
+            average_rating: product.average_rating,
+            rating_count: product.rating_count,
+            total_sales: product.total_sales,
+            featured: product.featured
           }));
           
           setProducts(convertedProducts);
@@ -278,7 +303,14 @@ const CreateOrderPage: React.FC = () => {
           sale_price: product.sale_price,
           stock_status: product.stock_status,
           sku: product.sku,
-          categories: product.categories.map(cat => ({ name: cat.name }))
+          categories: product.categories.map(cat => ({ name: cat.name })),
+          description: product.description,
+          short_description: product.short_description,
+          images: product.images,
+          average_rating: product.average_rating,
+          rating_count: product.rating_count,
+          total_sales: product.total_sales,
+          featured: product.featured
         }));
         
         setProducts(convertedProducts);
@@ -366,7 +398,14 @@ const CreateOrderPage: React.FC = () => {
               sale_price: product.sale_price,
               stock_status: product.stock_status,
               sku: product.sku,
-              categories: product.categories.map(cat => ({ name: cat.name }))
+              categories: product.categories.map(cat => ({ name: cat.name })),
+              description: product.description,
+              short_description: product.short_description,
+              images: product.images,
+              average_rating: product.average_rating,
+              rating_count: product.rating_count,
+              total_sales: product.total_sales,
+              featured: product.featured
             }));
             setProducts(convertedProducts);
           });
@@ -382,6 +421,11 @@ const CreateOrderPage: React.FC = () => {
       ...prev,
       [field]: value
     }));
+  };
+
+  const viewProductDetails = (product: Product) => {
+    setSelectedProduct(product);
+    setIsProductDetailsOpen(true);
   };
 
   const addProductToOrder = (product: Product) => {
@@ -903,8 +947,7 @@ const CreateOrderPage: React.FC = () => {
                     {products.map((product) => (
                     <div
                       key={product.id}
-                      className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => addProductToOrder(product)}
+                      className="border rounded-lg p-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-semibold text-sm">{product.name}</h4>
@@ -946,10 +989,16 @@ const CreateOrderPage: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <Button size="sm" variant="outline">
-                          <Plus className="h-3 w-3 mr-1" />
-                          Add
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => viewProductDetails(product)}>
+                            <Eye className="h-3 w-3 sm:mr-1" />
+                            <span className="hidden sm:inline">View Details</span>
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => addProductToOrder(product)}>
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add
+                          </Button>
+                        </div>
                       </div>
                     </div>
                                         ))}
@@ -969,8 +1018,7 @@ const CreateOrderPage: React.FC = () => {
                         {products.map((product) => (
                           <div
                             key={product.id}
-                            className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => addProductToOrder(product)}
+                            className="border rounded-lg p-4 hover:shadow-md transition-shadow"
                           >
                             <div className="flex justify-between items-start mb-2">
                               <h4 className="font-semibold text-sm">{product.name}</h4>
@@ -1012,10 +1060,16 @@ const CreateOrderPage: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              <Button size="sm" variant="outline">
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="outline" onClick={() => viewProductDetails(product)}>
+                                  <Eye className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">View Details</span>
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => addProductToOrder(product)}>
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1227,6 +1281,209 @@ const CreateOrderPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Product Details Modal */}
+      <Dialog open={isProductDetailsOpen} onOpenChange={setIsProductDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span>Product Details</span>
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Detailed information about this product
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedProduct && (
+            <div className="space-y-4 sm:space-y-6">
+              {/* Product Header */}
+              <div className="flex items-start gap-3 sm:gap-4">
+                {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                  <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border">
+                    <img
+                      src={selectedProduct.images[0].src}
+                      alt={selectedProduct.images[0].alt || selectedProduct.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                    <div className="w-full h-full bg-muted flex items-center justify-center hidden">
+                      <Package className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-lg bg-muted flex items-center justify-center border">
+                    <Package className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                  </div>
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2 leading-tight">{selectedProduct.name}</h3>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge variant={selectedProduct.stock_status === 'instock' ? 'default' : 'destructive'} className="text-xs">
+                      {selectedProduct.stock_status === 'instock' ? 'In Stock' : 'Out of Stock'}
+                    </Badge>
+                    {selectedProduct.featured && (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
+                        <Star className="h-3 w-3 mr-1" />
+                        Featured
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {selectedProduct.sku && (
+                    <p className="text-xs sm:text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Price Section */}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Pricing
+                </h4>
+                <div className="flex items-center gap-4">
+                  {selectedProduct.sale_price ? (
+                    <>
+                      <div className="text-2xl font-bold text-emerald-600 flex items-center gap-1">
+                        <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="24" height="26" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                          <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                          <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                        </svg>
+                        {selectedProduct.sale_price}
+                        <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-800">On Sale</Badge>
+                      </div>
+                      <div className="text-lg line-through text-muted-foreground flex items-center gap-1">
+                        <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="18" height="20" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                          <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                          <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                        </svg>
+                        {selectedProduct.regular_price}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-2xl font-bold flex items-center gap-1">
+                      <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="24" height="26" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                        <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                        <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                      </svg>
+                      {selectedProduct.price}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Product Description */}
+              {selectedProduct.description && (
+                <div className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                  <h4 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-800 border-b border-slate-200 pb-2">
+                    <Info className="h-5 w-5 text-blue-600" />
+                    Product Description
+                  </h4>
+                  <div 
+                    className={`prose prose-slate max-w-none text-slate-700 leading-7 text-base ${
+                      /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) 
+                        ? 'text-right' 
+                        : 'text-left'
+                    }`}
+                    style={{
+                      lineHeight: '1.75',
+                      fontSize: '16px',
+                      fontFamily: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description)
+                        ? '"Noto Sans Arabic", "Cairo", "Amiri", "Scheherazade New", system-ui, -apple-system, sans-serif'
+                        : 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      direction: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'rtl' : 'ltr'
+                    }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: selectedProduct.description
+                        .replace(/<p>/gi, `<p class="mb-4 text-slate-700 ${/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'text-right' : 'text-left'}">`)
+                        .replace(/<h[1-6]([^>]*)>/gi, `<h$1 class="font-bold text-slate-800 mt-6 mb-3 ${/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'text-right' : 'text-left'}">`)
+                        .replace(/<ul>/gi, `<ul class="list-disc mb-4 space-y-2 text-slate-700 ${/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'list-inside text-right' : 'list-inside text-left'}">`)
+                        .replace(/<ol>/gi, `<ol class="list-decimal mb-4 space-y-2 text-slate-700 ${/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'list-inside text-right' : 'list-inside text-left'}">`)
+                        .replace(/<li>/gi, `<li class="text-slate-700 ${/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(selectedProduct.description) ? 'text-right' : 'text-left'}">`)
+                        .replace(/<strong>/gi, '<strong class="font-semibold text-slate-800">')
+                        .replace(/<b>/gi, '<b class="font-semibold text-slate-800">')
+                        .replace(/<em>/gi, '<em class="italic text-slate-600">')
+                        .replace(/<i>/gi, '<i class="italic text-slate-600">')
+                        .replace(/<a([^>]*)>/gi, '<a$1 class="text-blue-600 hover:text-blue-800 underline">')
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Product Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {selectedProduct.average_rating && (
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                      <span className="font-semibold">{selectedProduct.average_rating}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Rating</p>
+                  </div>
+                )}
+                
+                {selectedProduct.rating_count && (
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="font-semibold mb-1">{selectedProduct.rating_count}</div>
+                    <p className="text-xs text-muted-foreground">Reviews</p>
+                  </div>
+                )}
+                
+                {selectedProduct.total_sales && (
+                  <div className="text-center p-3 bg-muted/50 rounded-lg">
+                    <div className="font-semibold mb-1">{selectedProduct.total_sales}</div>
+                    <p className="text-xs text-muted-foreground">Sales</p>
+                  </div>
+                )}
+                
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <div className="font-semibold mb-1">ID: {selectedProduct.id}</div>
+                  <p className="text-xs text-muted-foreground">Product ID</p>
+                </div>
+              </div>
+
+              {/* Categories */}
+              {selectedProduct.categories && selectedProduct.categories.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Categories</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProduct.categories.map((category, index) => (
+                      <Badge key={index} variant="outline">
+                        {category.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button 
+                  onClick={() => {
+                    addProductToOrder(selectedProduct);
+                    setIsProductDetailsOpen(false);
+                  }}
+                  className="flex-1"
+                  disabled={selectedProduct.stock_status !== 'instock'}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Order
+                </Button>
+                <Button variant="outline" onClick={() => setIsProductDetailsOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
