@@ -1,13 +1,14 @@
 {
-  "version": "1.7.1",
-  "buildTime": "2025-06-13T18:06:51.194Z",
-  "buildTimestamp": "1749838011194",
-  "buildDate": "6/13/2025",
+  "version": "1.7.3",
+  "buildTime": "2025-06-15T18:47:45.627Z",
+  "buildTimestamp": "1750013265627",
+  "buildDate": "6/15/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "⚖️ Justice Performance System - Fair scoring that balances delays with overtime work",
-    "Enhanced Performance Dashboard - Comprehensive performance tracking with multi-factor scoring"
+    "Hot Fix: Fixed overtime tracking issue",
+    "Add New Shift Timer",
+    "Add New Copy Writing Page"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false
