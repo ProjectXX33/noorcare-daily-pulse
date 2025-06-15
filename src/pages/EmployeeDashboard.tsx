@@ -106,6 +106,12 @@ const EmployeeDashboard = () => {
 
   if (!user) return null;
 
+  // Redirect Copy Writing users to their dedicated dashboard
+  if (user.position === 'Copy Writing') {
+    navigate('/copy-writing-dashboard', { replace: true });
+    return null;
+  }
+
   const userCheckIns = getUserCheckIns(user.id) as unknown as CheckIn[];
   const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
   const checkedInToday = hasCheckedInToday(user.id);

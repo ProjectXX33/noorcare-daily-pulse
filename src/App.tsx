@@ -27,6 +27,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { WorkspaceMessageProvider } from "./contexts/WorkspaceMessageContext";
 import { LoyalCustomersProvider } from "./contexts/LoyalCustomersContext";
+import { CopyWritingProductsProvider } from "./contexts/CopyWritingProductsContext";
 import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
@@ -40,6 +41,8 @@ import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
 import LoyalCustomersPage from "./pages/LoyalCustomersPage";
+import CopyWritingDashboard from "./pages/CopyWritingDashboard";
+import CopyWritingProductsPage from "./pages/CopyWritingProductsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import NotificationHandler from "./components/NotificationHandler";
 import NotificationBanner from "./components/NotificationBanner";
@@ -49,6 +52,7 @@ import PWAVersionChecker from "./components/PWAVersionChecker";
 import FloatingChatbot from "./components/FloatingChatbot";
 import BackgroundProcessIndicator from "./components/BackgroundProcessIndicator";
 import CustomerLoader from "./components/MobileCustomerLoader";
+import CopyWritingLoader from "./components/MobileCopyWritingLoader";
 
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
@@ -108,6 +112,22 @@ const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Employee Dashboard route - redirects Copy Writing users to their dashboard
+const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  // Redirect Copy Writing users to their dedicated dashboard
+  if (user && user.position === 'Copy Writing') {
+    return <Navigate to="/copy-writing-dashboard" replace />;
+  }
+  
+  return (
+    <PrivateRoute allowedRoles={['employee']}>
+      {children}
+    </PrivateRoute>
+  );
+};
+
 // Customer Service route component
 const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
@@ -143,6 +163,17 @@ const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Copy Writing route component for copy writing-only access
+const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user || user.position !== 'Copy Writing') {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 // This component is outside the BrowserRouter but inside the other providers
 const AppWithAuth = () => {
   const [showOpeningAnimation, setShowOpeningAnimation] = useState(true);
@@ -169,6 +200,7 @@ const AppWithAuth = () => {
           <WorkspaceMessageProvider>
             <CheckInProvider>
               <LoyalCustomersProvider>
+                <CopyWritingProductsProvider>
               <LanguageProvider>
                 <AnimatePresence>
                   {showOpeningAnimation && <OpeningAnimation />}
@@ -191,11 +223,21 @@ const AppWithAuth = () => {
                   <Route 
                     path="/employee-dashboard" 
                     element={
-                      <EmployeeRoute>
+                      <EmployeeDashboardRoute>
                         <SidebarNavigation>
                           <EmployeeDashboard />
                         </SidebarNavigation>
-                      </EmployeeRoute>
+                      </EmployeeDashboardRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/copy-writing-dashboard" 
+                    element={
+                      <CopyWritingRoute>
+                        <SidebarNavigation>
+                          <CopyWritingDashboard />
+                        </SidebarNavigation>
+                      </CopyWritingRoute>
                     } 
                   />
                   <Route 
@@ -398,6 +440,26 @@ const AppWithAuth = () => {
                       </DesignerRoute>
                     } 
                   />
+                  <Route 
+                    path="/copy-writing-dashboard" 
+                    element={
+                      <CopyWritingRoute>
+                        <SidebarNavigation>
+                          <CopyWritingDashboard />
+                        </SidebarNavigation>
+                      </CopyWritingRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/copy-writing-products" 
+                    element={
+                      <CopyWritingRoute>
+                        <SidebarNavigation>
+                          <CopyWritingProductsPage />
+                        </SidebarNavigation>
+                      </CopyWritingRoute>
+                    } 
+                  />
                   <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
                 </Routes>
                 <AppUpdateManager />
@@ -407,11 +469,13 @@ const AppWithAuth = () => {
                 <FloatingChatbot />
                 <BackgroundProcessIndicator />
                 <CustomerLoader />
+                <CopyWritingLoader />
 
                 <PWAInstallPrompt />
                 <Toaster />
                 <Sonner />
               </LanguageProvider>
+                </CopyWritingProductsProvider>
                 </LoyalCustomersProvider>
             </CheckInProvider>
           </WorkspaceMessageProvider>

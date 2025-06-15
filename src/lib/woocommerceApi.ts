@@ -16,6 +16,12 @@ const WOOCOMMERCE_CONFIG: WooCommerceConfig = {
   version: 'wc/v3'
 };
 
+// WordPress credentials for media uploads (from your Python code)
+const WP_CREDENTIALS = {
+  username: import.meta.env.VITE_WP_USERNAME || 'ProjectX',
+  password: import.meta.env.VITE_WP_PASSWORD || 'tTx0 3O6f MiCs EKsB nzJq cQBn'
+};
+
 export interface WooCommerceProduct {
   id: number;
   name: string;
@@ -337,13 +343,19 @@ class WooCommerceAPI {
 
       const url = `${this.getApiUrl('products')}?${searchParams.toString()}`;
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch products: ${response.statusText}`);
@@ -669,6 +681,213 @@ class WooCommerceAPI {
       throw error;
     }
   }
+
+  async fetchCategories(params?: {
+    per_page?: number;
+    page?: number;
+    search?: string;
+    orderby?: string;
+    order?: string;
+    hide_empty?: boolean;
+  }): Promise<Array<{
+    id: number;
+    name: string;
+    slug: string;
+    parent: number;
+    description: string;
+    display: string;
+    image: {
+      id: number;
+      src: string;
+      name: string;
+      alt: string;
+    } | null;
+    menu_order: number;
+    count: number;
+  }>> {
+    try {
+      const searchParams = new URLSearchParams();
+      
+      if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+      if (params?.page) searchParams.append('page', params.page.toString());
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.orderby) searchParams.append('orderby', params.orderby);
+      if (params?.order) searchParams.append('order', params.order);
+      if (params?.hide_empty !== undefined) searchParams.append('hide_empty', params.hide_empty.toString());
+
+      const url = `${this.getApiUrl('products/categories')}?${searchParams.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch categories: ${response.statusText}`);
+      }
+
+      const categories = await response.json();
+      return categories;
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      throw error;
+    }
+  }
+
+  async uploadProductImage(productId: number, imageFile: File): Promise<{
+    id: number;
+    src: string;
+    name: string;
+    alt: string;
+  }> {
+    try {
+      console.log(`📷 Using WordPress Application Password auth - Product ${productId}...`);
+      console.log(`📋 File details: ${imageFile.name}, size: ${imageFile.size} bytes, type: ${imageFile.type}`);
+
+      // Step 1: Upload image to WordPress media library using Application Password
+      console.log('🔄 Step 1: Uploading to WordPress media library...');
+      
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      formData.append('title', imageFile.name.replace(/\.[^/.]+$/, ''));
+      formData.append('alt_text', imageFile.name.replace(/\.[^/.]+$/, ''));
+
+      const mediaUrl = `${this.config.url}/wp-json/wp/v2/media`;
+      console.log('🔗 Media upload URL:', mediaUrl);
+
+      // Use WordPress Application Password authentication (username:application_password)
+      const wpAuth = btoa(`${WP_CREDENTIALS.username}:${WP_CREDENTIALS.password}`);
+      console.log('🔑 Using WordPress authentication:');
+      console.log(`   Username: ${WP_CREDENTIALS.username}`);
+      console.log(`   Password: ${WP_CREDENTIALS.password.substring(0, 4)}...${WP_CREDENTIALS.password.substring(-4)} (Application Password)`);
+      console.log('   Auth header:', `Basic ${wpAuth.substring(0, 20)}...`);
+
+      const mediaResponse = await fetch(mediaUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${wpAuth}`,
+        },
+        body: formData,
+      });
+
+      if (!mediaResponse.ok) {
+        const errorText = await mediaResponse.text();
+        console.error('❌ WordPress media upload failed:', errorText);
+        console.error('💡 This usually means:');
+        console.error('   1. WordPress Application Password is invalid');
+        console.error('   2. User "ProjectX" doesn\'t have media upload permissions');
+        console.error('   3. WordPress REST API is disabled');
+        
+        // Try using WooCommerce API to create media instead
+        console.log('🔄 Trying WooCommerce media creation as fallback...');
+        
+        try {
+          const wooMediaResponse = await fetch(this.getApiUrl('media'), {
+            method: 'POST',
+            headers: {
+              'Authorization': this.getAuthHeader(), // WooCommerce auth
+            },
+            body: formData,
+          });
+
+          if (wooMediaResponse.ok) {
+            const wooMediaResult = await wooMediaResponse.json();
+            console.log('✅ WooCommerce media upload succeeded:', wooMediaResult);
+            
+            const imageData = {
+              id: wooMediaResult.id,
+              src: wooMediaResult.source_url || wooMediaResult.url,
+              name: wooMediaResult.title || imageFile.name,
+              alt: wooMediaResult.alt || imageFile.name.replace(/\.[^/.]+$/, '')
+            };
+
+            console.log('🎉 Image upload completed via WooCommerce API:', imageData);
+            return imageData;
+          }
+        } catch (wooError) {
+          console.error('⚠️ WooCommerce media API also failed:', wooError);
+        }
+
+        throw new Error(`All media upload methods failed. Primary error: ${mediaResponse.status} - ${errorText}`)
+      }
+
+      const mediaResult = await mediaResponse.json();
+      console.log('✅ WordPress media uploaded successfully:', mediaResult);
+
+      // Step 2: Add the media image to the product using WooCommerce API
+      console.log('🔄 Step 2: Adding image to product via WooCommerce API...');
+      
+      const imageData = {
+        id: mediaResult.id,
+        src: mediaResult.source_url || mediaResult.guid?.rendered,
+        name: mediaResult.title?.rendered || imageFile.name,
+        alt: mediaResult.alt_text || imageFile.name.replace(/\.[^/.]+$/, '')
+      };
+
+      // Update product with the new image using WooCommerce auth
+      const updateResponse = await fetch(this.getApiUrl(`products/${productId}`), {
+        method: 'PUT',
+        headers: {
+          'Authorization': this.getAuthHeader(), // WooCommerce auth
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          images: [imageData] // Add as first image
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const updateError = await updateResponse.text();
+        console.error('⚠️ Failed to add image to product:', updateError);
+        // Return the image data anyway since media upload succeeded
+      } else {
+        console.log('✅ Product updated with new image');
+      }
+
+      console.log('🎉 Image upload completed:', imageData);
+      return imageData;
+      
+    } catch (error) {
+      console.error('💥 Error uploading product image:', error);
+      throw error;
+    }
+  }
+
+  // Note: Custom endpoints removed - using direct WooCommerce API and meta data instead
+
+  async deleteProduct(productId: number): Promise<boolean> {
+    try {
+      console.log(`🗑️ WooCommerceAPI: Deleting product ${productId}...`);
+      
+      const response = await fetch(`${this.getApiUrl(`products/${productId}`)}?force=true`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log(`🗑️ WooCommerceAPI: Delete response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ WooCommerce delete failed:', errorText);
+        throw new Error(`Delete failed: ${response.status} ${response.statusText}\n${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ WooCommerceAPI: Product deleted successfully:', result);
+      return true;
+
+    } catch (error) {
+      console.error('💥 WooCommerceAPI: Delete failed:', error);
+      throw error;
+    }
+  }
+
 }
 
 // Create singleton instance

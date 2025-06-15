@@ -25,7 +25,9 @@ import {
   ShoppingCart,
   Wrench,
   Crown,
-  TrendingUp
+  TrendingUp,
+  Edit3,
+  Package
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -198,6 +200,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     designerOnly?: boolean;
     excludeMediaBuyer?: boolean;
     excludeDesigner?: boolean;
+    excludeCopyWriting?: boolean;
+    copyWritingOnly?: boolean;
     hasCounter?: boolean;
   }
 
@@ -207,7 +211,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Overview',
       color: 'blue',
       items: [
-        { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home, color: 'blue' },
+        { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home, color: 'blue', excludeCopyWriting: true },
+        { name: 'Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
         { name: 'Analytics', path: '/analytics', icon: BarChart3, adminOnly: true, color: 'purple' },
       ] as NavItem[]
     },
@@ -262,6 +267,13 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       items: [
         { name: 'Create Order', path: '/create-order', icon: ShoppingCart, customerServiceOnly: true, color: 'emerald' },
         { name: 'Loyal Customers', path: '/loyal-customers', icon: Crown, customerServiceOnly: true, color: 'amber' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Copy Writing Tools',
+      color: 'blue',
+      items: [
+        { name: 'Products', path: '/copy-writing-products', icon: Package, copyWritingOnly: true, color: 'indigo' },
       ] as NavItem[]
     }
   ];
@@ -383,8 +395,10 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.designerOnly && user?.position !== 'Designer') return false;
+      if (item.copyWritingOnly && user?.position !== 'Copy Writing') return false;
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
       if (item.excludeDesigner && user?.position === 'Designer') return false;
+      if (item.excludeCopyWriting && user?.position === 'Copy Writing') return false;
       return true;
     })
   })).filter(group => group.items.length > 0); // Only show groups that have items
