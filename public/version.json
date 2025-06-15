@@ -1,12 +1,19 @@
 {
-  "version": "1.7.4",
-  "buildTime": "2025-06-15T18:47:45.627Z",
-  "buildTimestamp": "1750013265627",
-  "buildDate": "6/15/2025",
+  "version": "1.8.0",
+  "buildTime": "2025-06-15T22:57:52.381Z",
+  "buildTimestamp": "1750028272382",
+  "buildDate": "6/16/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Enhanced Customer Service"
+    "🔥 Complete overtime tracking system overhaul",
+    "⏰ Fixed shift-based overtime calculations",
+    "🎯 Accurate day/night shift detection",
+    "🚀 Real-time overtime counter with fire icon",
+    "⚡ Enhanced work day boundary management (4AM reset)",
+    "🔧 Auto-checkout system at 4AM",
+    "📱 Mobile-optimized overtime display",
+    "🐛 Fixed 9+ hour overtime calculation bug"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

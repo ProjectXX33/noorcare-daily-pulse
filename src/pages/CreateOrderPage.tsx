@@ -995,9 +995,9 @@ const CreateOrderPage: React.FC = () => {
                             <span className="hidden sm:inline">View Details</span>
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => addProductToOrder(product)}>
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add
+                        </Button>
                         </div>
                       </div>
                     </div>
@@ -1066,9 +1066,9 @@ const CreateOrderPage: React.FC = () => {
                                   <span className="hidden sm:inline">View Details</span>
                                 </Button>
                                 <Button size="sm" variant="outline" onClick={() => addProductToOrder(product)}>
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Add
-                                </Button>
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add
+                              </Button>
                               </div>
                             </div>
                           </div>

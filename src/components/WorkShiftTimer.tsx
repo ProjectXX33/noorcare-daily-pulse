@@ -19,25 +19,47 @@ const WorkShiftTimer: React.FC = () => {
   const [isPostCheckout, setIsPostCheckout] = useState<boolean>(false);
   const [checkoutTime, setCheckoutTime] = useState<Date | null>(null);
 
-  // Find active check-in and get shift information
+  // Find active check-in using work day boundaries (4AM to 4AM)
   useEffect(() => {
     const findActiveCheckIn = async () => {
       if (!user?.id || !checkIns.length) return;
       
-      const today = new Date().toDateString();
-      const todayCheckIns = checkIns.filter(ci => 
-        ci.userId === user.id && 
-        new Date(ci.timestamp).toDateString() === today
-      );
+      // Calculate current work day boundaries (4AM to 4AM)
+      const now = new Date();
+      const currentHour = now.getHours();
       
-      // Find the most recent check-in for today
-      const latestCheckIn = todayCheckIns.sort((a, b) => 
+      // Work day starts at 4AM and ends at 4AM next day
+      const workDayStart = new Date(now);
+      if (currentHour >= 4) {
+        // After 4AM today - work day started today at 4AM
+        workDayStart.setHours(4, 0, 0, 0);
+      } else {
+        // Before 4AM today - work day started yesterday at 4AM
+        workDayStart.setDate(workDayStart.getDate() - 1);
+        workDayStart.setHours(4, 0, 0, 0);
+      }
+      
+      const workDayEnd = new Date(workDayStart);
+      workDayEnd.setDate(workDayEnd.getDate() + 1);
+      
+             // Find check-ins within current work day
+       const workDayCheckIns = checkIns.filter(ci => {
+         const checkInTime = new Date(ci.timestamp);
+         return ci.userId === user.id && 
+                checkInTime >= workDayStart && 
+                checkInTime < workDayEnd;
+       });
+      
+      // Find the most recent check-in for current work day
+      const latestCheckIn = workDayCheckIns.sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )[0];
       
       if (latestCheckIn) {
         // Check if this check-in has been checked out
         const hasCheckedOut = !!(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime);
+        
+        
         
         if (hasCheckedOut) {
           // User has checked out - stop all tracking
@@ -121,29 +143,64 @@ const WorkShiftTimer: React.FC = () => {
         const timeWorkedSeconds = Math.floor(timeWorkedMs / 1000);
         setTimeWorked(timeWorkedSeconds);
         
-        // Determine shift type and standard work hours
+        // Determine shift type based on database assignment (shiftInfo) or fallback to check-in time
         const checkInHour = checkInTime.getHours();
-        let standardWorkHours = 8; // Default to 8 hours for night shift
+        let shiftType = 'night'; // Default to night shift
         
-        if (shiftInfo) {
+        // Use database shift assignment if available
+        if (shiftInfo && shiftInfo.name) {
           if (shiftInfo.name.toLowerCase().includes('day')) {
-            standardWorkHours = 7; // Day shift is 7 hours
+            shiftType = 'day';
           } else if (shiftInfo.name.toLowerCase().includes('night')) {
-            standardWorkHours = 8; // Night shift is 8 hours
+            shiftType = 'night';
           }
+          console.log('🔍 Using database shift assignment:', shiftInfo.name, '→', shiftType);
         } else {
-          // Fallback logic based on check-in time
-          if (checkInHour >= 9 && checkInHour < 16) {
-            standardWorkHours = 7;
+          // Fallback to check-in time based detection
+          // Day shift: 8:30AM to 4PM (check-in window: 8:30AM+, shift: 9AM-4PM)
+          // Night shift: 3:30PM to 12AM (check-in window: 3:30PM+, shift: 4PM-12AM)
+          if (checkInHour >= 8 && checkInHour < 16) {
+            shiftType = 'day';
+          } else {
+            shiftType = 'night';
+          }
+          console.log('⚠️ Using fallback check-in time detection:', checkInHour, '→', shiftType);
+        }
+        
+        // Calculate shift end time based on shift type
+        let shiftEndTime;
+        
+        if (shiftType === 'day') {
+          // Day shift: 9AM to 4PM - ends at 4PM same day
+          shiftEndTime = new Date(checkInTime);
+          shiftEndTime.setHours(16, 0, 0, 0); // 4PM
+        } else {
+          // Night shift: 4PM to 12AM (midnight)
+          shiftEndTime = new Date(checkInTime);
+          
+          if (checkInHour >= 15) {
+            // Checked in during afternoon/evening (3:30PM+)
+            // Shift ends at midnight (start of next day)
+            shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+            shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+          } else if (checkInHour < 4) {
+            // Checked in during early morning (12AM-3:59AM) - overtime period
+            // Shift already ended at midnight, so they're in overtime
+            shiftEndTime.setHours(0, 0, 0, 0); // Midnight of current day
+          } else {
+            // Checked in during morning (4AM-2:59PM) but classified as night shift
+            // This is unusual, default to next midnight
+            shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+            shiftEndTime.setHours(0, 0, 0, 0);
           }
         }
         
-        const standardWorkSeconds = standardWorkHours * 60 * 60;
-        
-        // Check if in overtime
-        if (timeWorkedSeconds > standardWorkSeconds) {
+        // Check if in overtime (current time is after shift end time)
+        if (now > shiftEndTime) {
           setIsOvertime(true);
-          setOvertimeMinutes(Math.floor((timeWorkedSeconds - standardWorkSeconds) / 60));
+          const overtimeMs = now.getTime() - shiftEndTime.getTime();
+          const overtimeMinutesCalc = Math.floor(overtimeMs / (1000 * 60));
+          setOvertimeMinutes(overtimeMinutesCalc);
         } else {
           setIsOvertime(false);
           setOvertimeMinutes(0);
@@ -268,14 +325,34 @@ const WorkShiftTimer: React.FC = () => {
     return null;
   }
 
+
+
   // For employees only
   if (user?.role === 'employee') {
-    // Check if user has checked out today (show "Work Done!")
-    const today = new Date().toDateString();
-    const todayCheckIns = checkIns?.filter(ci => 
-      ci.userId === user.id && 
-      new Date(ci.timestamp).toDateString() === today
-    ) || [];
+    // Check if user has checked out today (show "Work Done!") using work day boundaries
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Work day starts at 4AM and ends at 4AM next day
+    const workDayStart = new Date(now);
+    if (currentHour >= 4) {
+      // After 4AM today - work day started today at 4AM
+      workDayStart.setHours(4, 0, 0, 0);
+    } else {
+      // Before 4AM today - work day started yesterday at 4AM
+      workDayStart.setDate(workDayStart.getDate() - 1);
+      workDayStart.setHours(4, 0, 0, 0);
+    }
+    
+    const workDayEnd = new Date(workDayStart);
+    workDayEnd.setDate(workDayEnd.getDate() + 1);
+    
+    const todayCheckIns = checkIns?.filter(ci => {
+      const checkInTime = new Date(ci.timestamp);
+      return ci.userId === user.id && 
+             checkInTime >= workDayStart && 
+             checkInTime < workDayEnd;
+    }) || [];
     
     const hasCheckedOut = todayCheckIns.some(ci => !!(ci.checkOutTime || ci.checkoutTime));
     
@@ -320,10 +397,56 @@ const WorkShiftTimer: React.FC = () => {
     );
   }
 
-  // Regular work time mode with countdown
-  const standardWorkSeconds = (shiftInfo?.name?.toLowerCase().includes('day') ? 7 : 8) * 60 * 60;
-  const remainingSeconds = Math.max(0, standardWorkSeconds - timeWorked);
-  const progressPercentage = Math.min(100, (timeWorked / standardWorkSeconds) * 100);
+  // Regular work time mode with countdown to shift end
+  const checkInTime = new Date(activeCheckIn.timestamp);
+  const checkInHour = checkInTime.getHours();
+  
+  // Use the same shift end time calculation logic as in overtime calculation
+  let shiftEndTime;
+  let shiftType = 'day'; // Default
+  
+  // Use database shift assignment if available
+  if (shiftInfo && shiftInfo.name) {
+    if (shiftInfo.name.toLowerCase().includes('day')) {
+      shiftType = 'day';
+    } else if (shiftInfo.name.toLowerCase().includes('night')) {
+      shiftType = 'night';
+    }
+  } else {
+    // Fallback to check-in time based detection
+    shiftType = (checkInHour >= 8 && checkInHour < 16) ? 'day' : 'night';
+  }
+  
+  if (shiftType === 'day') {
+    // Day shift: 9AM to 4PM - ends at 4PM same day
+    shiftEndTime = new Date(checkInTime);
+    shiftEndTime.setHours(16, 0, 0, 0); // 4PM
+  } else {
+    // Night shift: 4PM to 12AM (midnight)
+    shiftEndTime = new Date(checkInTime);
+    
+    if (checkInHour >= 15) {
+      // Checked in during afternoon/evening (3:30PM+)
+      // Shift ends at midnight (start of next day)
+      shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+      shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+    } else if (checkInHour < 4) {
+      // Checked in during early morning (12AM-3:59AM) - overtime period
+      shiftEndTime.setHours(0, 0, 0, 0); // Midnight of current day
+    } else {
+      // Checked in during morning but classified as night shift
+      shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+      shiftEndTime.setHours(0, 0, 0, 0);
+    }
+  }
+  
+  const now = new Date();
+  const remainingMs = Math.max(0, shiftEndTime.getTime() - now.getTime());
+  const remainingSeconds = Math.floor(remainingMs / 1000);
+  
+  const totalShiftMs = shiftEndTime.getTime() - checkInTime.getTime();
+  const elapsedMs = now.getTime() - checkInTime.getTime();
+  const progressPercentage = Math.min(100, (elapsedMs / totalShiftMs) * 100);
   
   // Dynamic color coding based on remaining time
   let colorClass = 'from-emerald-50 to-green-50 text-emerald-700 border-emerald-300';
