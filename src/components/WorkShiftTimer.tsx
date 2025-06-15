@@ -75,8 +75,55 @@ const WorkShiftTimer: React.FC = () => {
           setActiveCheckIn(latestCheckIn);
         }
         
-        // Get shift information
+                // Get user's assigned shift information with multiple lookup strategies
         try {
+          // Strategy 1: Get TODAY's shift assignment from shift_assignments table
+          const today = new Date().toISOString().split('T')[0];
+          const { data: todayAssignment } = await supabase
+            .from('shift_assignments')
+            .select('assigned_shift_id, is_day_off, shifts:assigned_shift_id(*)')
+            .eq('employee_id', user.id)
+            .eq('work_date', today)
+            .single();
+          
+          if (todayAssignment && !todayAssignment.is_day_off && todayAssignment.shifts) {
+            setShiftInfo(todayAssignment.shifts);
+            return;
+          }
+          
+          if (todayAssignment && todayAssignment.is_day_off) {
+            setShiftInfo(null);
+            return;
+          }
+          
+          // Strategy 2: Fallback to monthly_shifts table
+          const { data: monthlyShift } = await supabase
+            .from('monthly_shifts')
+            .select('shift_id, shifts:shift_id(*)')
+            .eq('user_id', user.id)
+            .eq('work_date', today)
+            .single();
+          
+          if (monthlyShift && monthlyShift.shifts) {
+            setShiftInfo(monthlyShift.shifts);
+            return;
+          }
+          
+          // Strategy 3: Get the most recent shift assignment from shift_assignments
+          const { data: recentAssignment } = await supabase
+            .from('shift_assignments')
+            .select('assigned_shift_id, is_day_off, shifts:assigned_shift_id(*)')
+            .eq('employee_id', user.id)
+            .not('is_day_off', 'eq', true)
+            .order('work_date', { ascending: false })
+            .limit(1);
+          
+          if (recentAssignment && recentAssignment.length > 0 && recentAssignment[0].shifts) {
+            setShiftInfo(recentAssignment[0].shifts);
+            return;
+          }
+          
+          // Strategy 4: Fallback to check-in time detection
           const { data: shifts } = await supabase
             .from('shifts')
             .select('*');
@@ -118,6 +165,51 @@ const WorkShiftTimer: React.FC = () => {
     findActiveCheckIn();
   }, [user, checkIns]);
 
+  // Subscribe to real-time changes in shift_assignments to detect shift assignment changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const subscription = supabase
+      .channel('shift_assignments_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'shift_assignments',
+          filter: `employee_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          // Trigger a re-fetch of shift info when assignments change
+          setTimeout(() => {
+            setShiftInfo(null);
+            window.location.reload();
+          }, 500);
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'monthly_shifts',
+          filter: `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          // Also listen to monthly_shifts as fallback
+          setTimeout(() => {
+            setShiftInfo(null);
+            window.location.reload();
+          }, 500);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id]);
+
+
+
   // Enhanced timer logic - runs every second for real-time updates
   useEffect(() => {
     const updateTimer = () => {
@@ -148,13 +240,20 @@ const WorkShiftTimer: React.FC = () => {
         let shiftType = 'night'; // Default to night shift
         
         // Use database shift assignment if available
+        console.log('🔍 Shift Info Debug:', {
+          shiftInfo: shiftInfo,
+          shiftInfoName: shiftInfo?.name,
+          hasShiftInfo: !!shiftInfo,
+          activeCheckInId: activeCheckIn?.id
+        });
+        
         if (shiftInfo && shiftInfo.name) {
           if (shiftInfo.name.toLowerCase().includes('day')) {
             shiftType = 'day';
           } else if (shiftInfo.name.toLowerCase().includes('night')) {
             shiftType = 'night';
           }
-          console.log('🔍 Using database shift assignment:', shiftInfo.name, '→', shiftType);
+          console.log('✅ Using database shift assignment:', shiftInfo.name, '→', shiftType);
         } else {
           // Fallback to check-in time based detection
           // Day shift: 8:30AM to 4PM (check-in window: 8:30AM+, shift: 9AM-4PM)
@@ -227,7 +326,6 @@ const WorkShiftTimer: React.FC = () => {
   const handleAutoCheckout = async () => {
     if (!user || !activeCheckIn) return;
     
-    console.log('🔄 Auto-checkout triggered at 4AM');
     try {
       await checkOutUser(user.id);
       toast.success('⏰ Auto checked-out at 4AM (work day reset)', {

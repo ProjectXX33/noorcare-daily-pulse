@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Label } from "@/components/ui/label";
 
 // Helper function to format delay in hours and minutes
@@ -93,6 +93,7 @@ const ShiftsPage = () => {
   
   const [showWeeklyAssignment, setShowWeeklyAssignment] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [updatingShifts, setUpdatingShifts] = useState<Set<string>>(new Set());
 
   const translations = {
     en: {
@@ -126,7 +127,11 @@ const ShiftsPage = () => {
       viewDetails: "View Details",
       todaysSchedule: "Today's Schedule",
       refresh: "Refresh",
-      refreshing: "Refreshing..."
+      refreshing: "Refreshing...",
+      changeShift: "Change Shift",
+      noShift: "No Shift",
+      shiftUpdated: "Shift updated successfully",
+      shiftUpdateFailed: "Failed to update shift"
     },
     ar: {
       shifts: "مناوباتي",
@@ -159,7 +164,11 @@ const ShiftsPage = () => {
       viewDetails: "عرض التفاصيل",
       todaysSchedule: "جدول اليوم",
       refresh: "تحديث",
-      refreshing: "جاري التحديث..."
+      refreshing: "جاري التحديث...",
+      changeShift: "تغيير الوردية",
+      noShift: "بدون وردية",
+      shiftUpdated: "تم تحديث الوردية بنجاح",
+      shiftUpdateFailed: "فشل في تحديث الوردية"
     }
   };
 
@@ -410,6 +419,73 @@ const ShiftsPage = () => {
     }
   }, [loadShifts, loadCustomerServiceEmployees, loadMonthlyShifts]);
 
+  // Handle shift change for admin
+  const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
+    if (user?.role !== 'admin') return;
+
+    const updateKey = `${userId}-${format(workDate, 'yyyy-MM-dd')}`;
+    
+    try {
+      // Add to updating set
+      setUpdatingShifts(prev => new Set(prev).add(updateKey));
+      
+      const workDateStr = format(workDate, 'yyyy-MM-dd');
+      const isDayOff = newShiftId === 'none';
+      const shiftId = isDayOff ? null : newShiftId;
+
+      // Update shift assignment in shift_assignments table
+      const { error: assignmentError } = await supabase
+        .from('shift_assignments')
+        .upsert({
+          employee_id: userId,
+          work_date: workDateStr,
+          assigned_shift_id: shiftId,
+          is_day_off: isDayOff,
+          assigned_by: user.id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'employee_id,work_date'
+        });
+
+      if (assignmentError) throw assignmentError;
+
+      // Update monthly shift record if it exists
+      const { error: monthlyError } = await supabase
+        .from('monthly_shifts')
+        .update({
+          shift_id: shiftId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('work_date', workDateStr);
+
+      // Don't throw error if monthly shift doesn't exist yet
+      if (monthlyError && monthlyError.code !== 'PGRST116') {
+        console.warn('Monthly shift update error:', monthlyError);
+      }
+
+      // Find the shift name for the toast message
+      const selectedShift = shifts.find(s => s.id === newShiftId);
+      const shiftName = isDayOff ? t.noShift : selectedShift?.name || 'Unknown Shift';
+      
+      toast.success(`${t.shiftUpdated}: ${shiftName} - ${format(workDate, 'MMM dd, yyyy')}`);
+      
+      // Refresh the data to show the changes
+      await loadMonthlyShifts(false);
+      
+    } catch (error) {
+      console.error('Error updating shift:', error);
+      toast.error(t.shiftUpdateFailed);
+    } finally {
+      // Remove from updating set
+      setUpdatingShifts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(updateKey);
+        return newSet;
+      });
+    }
+  }, [user, shifts, loadMonthlyShifts]);
+
   const saveWeeklyAssignment = async (employeeId: string, weekStart: string, shiftType: 'day' | 'night') => {
     try {
       const { error } = await supabase
@@ -480,7 +556,8 @@ const ShiftsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
       <div className="border-b border-border/50 bg-background/98 w-full">
         <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
@@ -762,7 +839,14 @@ const ShiftsPage = () => {
         {/* Enhanced Monthly Shifts with optimized mobile performance */}
         <Card className="border border-border/50 shadow-sm w-full">
           <CardHeader className="pb-3 px-3 sm:px-4">
-            <CardTitle className="text-base sm:text-lg font-bold truncate">{t.monthlyShifts}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base sm:text-lg font-bold truncate">{t.monthlyShifts}</CardTitle>
+              {user?.role === 'admin' && (
+                <Badge variant="secondary" className="text-xs">
+                  Admin: Click shifts to edit
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0 w-full overflow-hidden">
             {/* Optimized mobile cards view */}
@@ -806,9 +890,56 @@ const ShiftsPage = () => {
                               <p className="text-xs text-muted-foreground mt-1 truncate">{shift.userName}</p>
                               )}
                           </div>
-                          <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
-                            {shift.shiftName || t.notWorked}
-                          </Badge>
+                          {user.role === 'admin' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="relative">
+                                  <Select
+                                    value={shift.shiftId || 'none'}
+                                    onValueChange={(value) => handleShiftChange(shift.userId, shift.workDate, value)}
+                                    disabled={updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`)}
+                                  >
+                                    <SelectTrigger className="w-24 h-6 text-xs">
+                                      <SelectValue>
+                                        <div className="flex items-center gap-1">
+                                          {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
+                                            <div className="animate-spin rounded-full h-2 w-2 border border-gray-300 border-t-transparent"></div>
+                                          )}
+                                          <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-1 py-0.5 rounded-full font-semibold whitespace-nowrap`}>
+                                            {shift.shiftName || t.notWorked}
+                                          </Badge>
+                                        </div>
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">
+                                        <span className="text-gray-500 text-xs">{t.noShift}</span>
+                                      </SelectItem>
+                                      {shifts.map((shiftOption) => (
+                                        <SelectItem key={shiftOption.id} value={shiftOption.id}>
+                                          <div className="flex flex-col gap-1">
+                                            <Badge className={getShiftBadgeColor(shiftOption.name)}>
+                                              {shiftOption.name}
+                                            </Badge>
+                                            <span className="text-xs text-gray-500">
+                                              {shiftOption.startTime} - {shiftOption.endTime}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{t.changeShift}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
+                              {shift.shiftName || t.notWorked}
+                            </Badge>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2">
@@ -932,9 +1063,56 @@ const ShiftsPage = () => {
                           </TableCell>
                           {user.role === 'admin' && <TableCell className="font-medium text-xs">{shift.userName}</TableCell>}
                           <TableCell>
-                            <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                              {shift.shiftName || t.notWorked}
-                            </Badge>
+                            {user.role === 'admin' ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="relative">
+                                    <Select
+                                      value={shift.shiftId || 'none'}
+                                      onValueChange={(value) => handleShiftChange(shift.userId, shift.workDate, value)}
+                                      disabled={updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`)}
+                                    >
+                                      <SelectTrigger className="w-32 h-8 text-xs">
+                                        <SelectValue>
+                                          <div className="flex items-center gap-1">
+                                            {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
+                                              <div className="animate-spin rounded-full h-3 w-3 border border-gray-300 border-t-transparent"></div>
+                                            )}
+                                            <Badge className={getShiftBadgeColor(shift.shiftName)}>
+                                              {shift.shiftName || t.notWorked}
+                                            </Badge>
+                                          </div>
+                                        </SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">
+                                          <span className="text-gray-500">{t.noShift}</span>
+                                        </SelectItem>
+                                        {shifts.map((shiftOption) => (
+                                          <SelectItem key={shiftOption.id} value={shiftOption.id}>
+                                            <div className="flex items-center gap-2">
+                                              <Badge className={getShiftBadgeColor(shiftOption.name)}>
+                                                {shiftOption.name}
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">
+                                                ({shiftOption.startTime} - {shiftOption.endTime})
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{t.changeShift}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Badge className={getShiftBadgeColor(shift.shiftName)}>
+                                {shift.shiftName || t.notWorked}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-xs">{formatTime(shift.checkInTime)}</TableCell>
                           <TableCell className="font-mono text-xs">{formatTime(shift.checkOutTime)}</TableCell>
@@ -964,6 +1142,7 @@ const ShiftsPage = () => {
         </Card>
       </div>
     </div>
+    </TooltipProvider>
   );
 };
 

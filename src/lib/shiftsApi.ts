@@ -248,18 +248,7 @@ export function calculateWorkHours(
   regularHours = Math.max(0, regularHours);
   overtimeHours = Math.max(0, overtimeHours);
   
-  console.log('📊 Flexible hours calculation:', {
-    shiftName: shift.name,
-    checkInTime: checkInTime.toISOString(),
-    checkOutTime: checkOutTime.toISOString(),
-    totalHours: totalHours.toFixed(2),
-    standardWorkHours,
-    regularHours: regularHours.toFixed(2),
-    overtimeHours: overtimeHours.toFixed(2),
-    calculationRule: shift.name.toLowerCase().includes('day') 
-      ? 'Day shift: Before 9AM or after 4PM = overtime'
-      : 'Night shift: Between 12AM-4AM = overtime'
-  });
+
   
   return {
     regularHours: Math.round(regularHours * 100) / 100,
