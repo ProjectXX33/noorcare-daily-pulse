@@ -40,10 +40,11 @@ const WorkShiftTimer: React.FC = () => {
         const hasCheckedOut = !!(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime);
         
         if (hasCheckedOut) {
-          // Post-checkout mode: continue tracking time for overtime
-          setIsPostCheckout(true);
-          setCheckoutTime(new Date(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime!));
-          setActiveCheckIn(null); // No active check-in, but we track post-checkout time
+          // User has checked out - stop all tracking
+          setIsPostCheckout(false);
+          setPostCheckoutTime(0);
+          setCheckoutTime(null);
+          setActiveCheckIn(null);
         } else {
           // Still checked in
           setIsPostCheckout(false);
@@ -110,19 +111,8 @@ const WorkShiftTimer: React.FC = () => {
         return;
       }
       
-      if (isPostCheckout && checkoutTime) {
-        // Post-checkout overtime tracking
-        const postCheckoutMs = now.getTime() - checkoutTime.getTime();
-        const postCheckoutSeconds = Math.floor(postCheckoutMs / 1000);
-        setPostCheckoutTime(postCheckoutSeconds);
-        
-        // All post-checkout time is overtime
-        if (postCheckoutSeconds > 0) {
-          setIsOvertime(true);
-          setOvertimeMinutes(Math.floor(postCheckoutSeconds / 60));
-        }
-        
-      } else if (activeCheckIn) {
+      // Regular timer for active check-ins only
+      if (activeCheckIn) {
         // Regular check-in tracking
         const checkInTime = new Date(activeCheckIn.timestamp);
         
@@ -280,36 +270,6 @@ const WorkShiftTimer: React.FC = () => {
 
   // For employees only
   if (user?.role === 'employee') {
-    // Post-checkout overtime tracking mode
-    if (isPostCheckout && postCheckoutTime > 0) {
-      const overtimeHours = postCheckoutTime / 3600;
-      
-      return (
-        <div className="flex flex-col gap-2">
-          {/* Post-checkout overtime display */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 border-purple-400 shadow-md">
-            <AlertCircle className="h-4 w-4 text-purple-600" />
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm tracking-wide text-purple-800">
-                +{formatTimeMinutes(postCheckoutTime)} EXTRA
-              </span>
-              <span className="hidden sm:inline text-xs font-extrabold text-purple-600">OVERTIME</span>
-            </div>
-          </div>
-          
-          {/* Record overtime button */}
-          {postCheckoutTime >= 60 && ( // Show button after 1 minute
-            <button
-              onClick={recordPostCheckoutOvertime}
-              className="px-3 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
-            >
-              Record {overtimeHours.toFixed(2)}h Overtime
-            </button>
-          )}
-        </div>
-      );
-    }
-    
     // Check if user has checked out today (show "Work Done!")
     const today = new Date().toDateString();
     const todayCheckIns = checkIns?.filter(ci => 
@@ -319,7 +279,7 @@ const WorkShiftTimer: React.FC = () => {
     
     const hasCheckedOut = todayCheckIns.some(ci => !!(ci.checkOutTime || ci.checkoutTime));
     
-    if (hasCheckedOut && !activeCheckIn && !isPostCheckout) {
+    if (hasCheckedOut && !activeCheckIn) {
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-300 shadow-sm">
           <CheckCircle className="h-4 w-4 text-green-600" />

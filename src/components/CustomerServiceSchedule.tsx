@@ -41,9 +41,9 @@ const CustomerServiceSchedule = () => {
   const loadSchedule = async () => {
     setIsLoading(true);
     try {
-      // Get assignments for the next 5 days
+      // Get assignments for the next 7 days
       const startDate = new Date();
-      const endDate = addDays(startDate, 4); // Changed from 13 to 4 (5 days total: 0-4)
+      const endDate = addDays(startDate, 6); // Next 7 days (0-6)
       
       const { data, error } = await supabase
         .from('shift_assignments')
@@ -158,7 +158,7 @@ const CustomerServiceSchedule = () => {
           <CardHeader className="pb-2 px-3 sm:px-4">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-base truncate">
               <Clock className="w-4 h-4 shrink-0" />
-              <span className="truncate">Next 5 Days</span>
+              <span className="truncate">Next 7 Days</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
