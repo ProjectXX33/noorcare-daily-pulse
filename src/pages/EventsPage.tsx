@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { Calendar, Plus, Edit, Trash2, Clock, User, AlertCircle, Eye, Grid, CalendarDays, MapPin, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,8 +17,9 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 // API functions
-import { eventService, Event } from '@/services/eventService';
+import { eventService, Event, EventQA } from '@/services/eventService';
 import { playNotificationSound } from '@/lib/notifications';
+import EventQAComponent from '@/components/EventQAComponent';
 
 const EventsPage = () => {
   const { user } = useAuth();
@@ -106,7 +109,7 @@ const EventsPage = () => {
 
   const loadEvents = async () => {
     try {
-      const eventsData = await eventService.getEvents();
+      const eventsData = await eventService.getEvents(true); // Include Q&A
       setEvents(eventsData);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -266,6 +269,19 @@ const EventsPage = () => {
       end: ''
     });
     setSelectedEvent(null);
+  };
+
+  // Handle Q&A updates
+  const handleQAUpdate = (updatedQA: EventQA[]) => {
+    if (selectedEvent) {
+      const updatedEvent = { ...selectedEvent, qa: updatedQA };
+      setSelectedEvent(updatedEvent);
+      
+      // Update the event in the main events list
+      setEvents(prev => prev.map(event => 
+        event.id === selectedEvent.id ? updatedEvent : event
+      ));
+    }
   };
 
   // Prevent any form changes for non-privileged users
@@ -1035,7 +1051,7 @@ const EventsPage = () => {
 
       {/* Add/Edit Event Dialog */}
       <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-[90vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-3 sm:p-6">
+        <DialogContent className="w-[95vw] max-w-[95vw] sm:max-w-[600px] lg:max-w-[700px] max-h-[95vh] overflow-y-auto p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               {isViewOnly ? (
@@ -1115,6 +1131,19 @@ const EventsPage = () => {
                   You can view this event but cannot make changes. Only Admins and Media Buyers can edit events.
                 </p>
               </div>
+
+              {/* Q&A Section for View-Only */}
+              {selectedEvent && (
+                <div className="border-t pt-6">
+                  <EventQAComponent
+                    eventId={selectedEvent.id}
+                    eventTitle={selectedEvent.title}
+                    qa={selectedEvent.qa || []}
+                    onQAUpdate={handleQAUpdate}
+                    isViewOnly={isViewOnly}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             /* Edit Form for Admins and Media Buyers Only */
@@ -1281,15 +1310,28 @@ const EventsPage = () => {
                   />
                 </div>
               </div>
+
+              {/* Q&A Section for Edit Mode */}
+              {selectedEvent && (
+                <div className="border-t pt-6">
+                  <EventQAComponent
+                    eventId={selectedEvent.id}
+                    eventTitle={selectedEvent.title}
+                    qa={selectedEvent.qa || []}
+                    onQAUpdate={handleQAUpdate}
+                    isViewOnly={false}
+                  />
+                </div>
+              )}
             </form>
           )}
 
-          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-4">
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-3 pt-6 border-t">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsEventDialogOpen(false)}
-              className="min-h-[44px]"
+              className="min-h-[44px] w-full sm:w-auto"
             >
               {isViewOnly ? 'Close' : 'Cancel'}
             </Button>
@@ -1302,17 +1344,17 @@ const EventsPage = () => {
                     variant="destructive"
                     onClick={handleEventDelete}
                     disabled={isLoading}
-                    className="min-h-[44px]"
+                    className="min-h-[44px] w-full sm:w-auto"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    Delete Event
                   </Button>
                 )}
                 
                 <Button
                   type="submit"
                   disabled={isLoading || !canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
-                  className="min-h-[44px]"
+                  className="min-h-[44px] w-full sm:w-auto"
                   onClick={(e) => {
                     if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer') || isViewOnly) {
                       e.preventDefault();

@@ -110,14 +110,14 @@ const ShiftsPage = () => {
       delay: "Delay Minutes",
       regularHours: "Regular Hours",
       overtimeHours: "Overtime Hours",
-      totalHours: "Total Hours",
-      netHours: "Net Hours",
+      delayTime: "Delay to Finish",
       dayShift: "Day Shift",
       nightShift: "Night Shift",
       notWorked: "Not Worked",
       summary: "Summary",
       totalRegularHours: "Total Regular Hours",
       totalOvertimeHours: "Total Overtime Hours",
+      delayToFinish: "Delay to Finish",
       totalWorkingDays: "Total Working Days",
       averageHoursPerDay: "Average Hours/Day",
       noData: "No shift data for selected period",
@@ -147,14 +147,14 @@ const ShiftsPage = () => {
       delay: "دقائق التأخير",
       regularHours: "الساعات العادية",
       overtimeHours: "ساعات العمل الإضافي",
-      totalHours: "إجمالي الساعات",
-      netHours: "الساعات الصافية",
+      delayTime: "وقت التأخير للإنهاء",
       dayShift: "مناوبة النهار",
       nightShift: "مناوبة الليل",
       notWorked: "لم يعمل",
       summary: "الملخص",
       totalRegularHours: "إجمالي الساعات العادية",
-      totalOvertimeHours: "إجمالي ساعات العمل الإضافي",
+              totalOvertimeHours: "إجمالي ساعات العمل الإضافي",
+      delayToFinish: "التأخير للإنهاء",
       totalWorkingDays: "إجمالي أيام العمل",
       averageHoursPerDay: "متوسط الساعات/اليوم",
       noData: "لا توجد بيانات مناوبات للفترة المحددة",
@@ -373,15 +373,36 @@ const ShiftsPage = () => {
   // Memoized calculations for performance
   const summary = useMemo(() => {
     const totalRegular = monthlyShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
-    const totalOvertime = monthlyShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
+    const actualOvertimeHours = monthlyShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
     const workingDays = monthlyShifts.filter(shift => shift.checkInTime).length;
-    const averagePerDay = workingDays > 0 ? (totalRegular + totalOvertime) / workingDays : 0;
+    const averagePerDay = workingDays > 0 ? (totalRegular + actualOvertimeHours) / workingDays : 0;
+    
+    // Calculate total delay in minutes
+    const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
+    // Convert total delay minutes to hours
+    const totalDelayHours = totalDelayMinutes / 60;
+    
+    // Smart calculation based on delay vs overtime comparison
+    let delayToFinish = 0;
+    let totalOvertime = 0;
+    
+    if (totalDelayHours > actualOvertimeHours) {
+      // If Delay > Overtime: Show remaining delay, set overtime to 0
+      delayToFinish = totalDelayHours - actualOvertimeHours;
+      totalOvertime = 0;
+    } else {
+      // If Overtime >= Delay: Show real overtime, set delay to finish as 0 (All Clear)
+      delayToFinish = 0;
+      totalOvertime = actualOvertimeHours - totalDelayHours;
+    }
 
     return {
       totalRegular,
-      totalOvertime,
+      totalOvertime, // Real overtime after subtracting delay
+      actualOvertimeHours, // Keep the actual overtime for internal calculations
       workingDays,
-      averagePerDay
+      averagePerDay,
+      delayToFinish // Remaining delay after subtracting overtime
     };
   }, [monthlyShifts]);
 
@@ -591,7 +612,7 @@ const ShiftsPage = () => {
 
       <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
         {/* Enhanced mobile-responsive summary cards */}
-        <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-4 w-full">
+        <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-5 w-full">
           <Tooltip>
             <TooltipTrigger asChild>
               <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full cursor-help">
@@ -617,12 +638,30 @@ const ShiftsPage = () => {
             <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="text-center space-y-2 sm:space-y-3">
                 <div className="flex justify-center">
-                  <div className="p-2 sm:p-3 rounded-full bg-orange-100 dark:bg-orange-900/30">
-                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-orange-600 dark:text-orange-400" />
+                  <div className={`p-2 sm:p-3 rounded-full ${summary.totalOvertime > 0 ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-gray-100 dark:bg-gray-900/30'}`}>
+                    <TrendingUp className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.totalOvertime > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'}`} />
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalOvertimeHours}</p>
-                <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-orange-600">{formatHoursAndMinutes(summary.totalOvertime)}</div>
+                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
+                  {summary.totalOvertime > 0 ? formatHoursAndMinutes(summary.totalOvertime) : '0h 0min'}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+            <CardContent className="p-3 sm:p-4 md:p-5">
+              <div className="text-center space-y-2 sm:space-y-3">
+                <div className="flex justify-center">
+                  <div className={`p-2 sm:p-3 rounded-full ${summary.delayToFinish > 0 ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                    <Clock className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.delayToFinish > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`} />
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.delayToFinish}</p>
+                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  {summary.delayToFinish > 0 ? formatHoursAndMinutes(summary.delayToFinish) : 'All Clear'}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -982,17 +1021,21 @@ const ShiftsPage = () => {
                           </div>
                         </div>
                         
-                        <div className="pt-2 border-t border-border/50 space-y-2">
-                          <div className="flex justify-between items-center bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg p-2">
-                            <span className="text-xs text-muted-foreground font-semibold">{t.totalHours}</span>
-                            <span className="font-bold text-sm text-primary">
-                              {formatHoursAndMinutes(shift.regularHours + shift.overtimeHours)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center bg-gradient-to-r from-purple-100/50 to-purple-50/30 dark:from-purple-900/20 dark:to-purple-800/10 rounded-lg p-2">
-                            <span className="text-xs text-muted-foreground font-semibold">{t.netHours}</span>
-                            <span className="font-bold text-sm text-purple-600">
-                              {formatHoursAndMinutes(calculateNetHours(shift.regularHours + shift.overtimeHours, shift.delayMinutes))}
+                                                  <div className="pt-2 border-t border-border/50">
+                          <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
+                            <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
+                            <span className={`font-bold text-sm ${
+                              (() => {
+                                const delayHours = shift.delayMinutes / 60;
+                                const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
+                                return delayToFinish > 0 ? 'text-red-600' : 'text-green-600';
+                              })()
+                            }`}>
+                              {(() => {
+                                const delayHours = shift.delayMinutes / 60;
+                                const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
+                                return delayToFinish > 0 ? formatHoursAndMinutes(delayToFinish) : 'All Clear';
+                              })()}
                             </span>
                           </div>
                         </div>
@@ -1017,14 +1060,13 @@ const ShiftsPage = () => {
                       <TableHead className="font-semibold text-xs">{t.delay}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.regularHours}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.overtimeHours}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.totalHours}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.netHours}</TableHead>
+                      <TableHead className="font-semibold text-xs">{t.delayTime}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 10 : 9} className="text-center py-12">
+                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-12">
                           <div className="flex items-center justify-center space-x-3">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                             <span className="text-sm font-medium">{t.loading}</span>
@@ -1033,7 +1075,7 @@ const ShiftsPage = () => {
                       </TableRow>
                     ) : monthlyShifts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 10 : 9} className="text-center py-12">
+                        <TableCell colSpan={user.role === 'admin' ? 8 : 7} className="text-center py-12">
                           <div className="space-y-4">
                             {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
                               <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-200 dark:border-blue-800 max-w-md mx-auto">
@@ -1125,11 +1167,18 @@ const ShiftsPage = () => {
                           <TableCell className="text-orange-600 font-semibold text-xs">
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
-                          <TableCell className="font-bold text-primary text-xs">
-                            {formatHoursAndMinutes(shift.regularHours + shift.overtimeHours)}
-                          </TableCell>
-                          <TableCell className="font-bold text-purple-600 text-xs">
-                            {formatHoursAndMinutes(calculateNetHours(shift.regularHours + shift.overtimeHours, shift.delayMinutes))}
+                          <TableCell className={`font-bold text-xs ${
+                            (() => {
+                              const delayHours = shift.delayMinutes / 60;
+                              const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
+                              return delayToFinish > 0 ? 'text-red-600' : 'text-green-600';
+                            })()
+                          }`}>
+                            {(() => {
+                              const delayHours = shift.delayMinutes / 60;
+                              const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
+                              return delayToFinish > 0 ? formatHoursAndMinutes(delayToFinish) : 'All Clear';
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))

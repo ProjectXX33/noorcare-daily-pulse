@@ -235,10 +235,14 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded border">
           <div className="font-semibold mb-1">What this recalculates:</div>
           <ul className="space-y-1 text-orange-700">
-            <li>• <strong>Delay Hours:</strong> How late employees were for their shifts</li>
+            <li>• <strong>Delay Minutes:</strong> How late employees were for their shifts</li>
             <li>• <strong>Regular Hours:</strong> Normal work hours within shift limits</li>
             <li>• <strong>Overtime Hours:</strong> Extra work using flexible rules (Day: before 9AM/after 4PM, Night: after 8h)</li>
+            <li>• <strong>✨ Delay to Finish:</strong> Automatically updated based on new calculations (Delay - Overtime)</li>
           </ul>
+          <div className="mt-2 p-1 bg-blue-50 rounded text-blue-700 text-xs">
+            <strong>💡 Note:</strong> After recalculation, the Summary cards will automatically show updated "Delay to Finish" values
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -328,7 +328,7 @@ const ExportManager: React.FC<ExportManagerProps> = ({ data, dateRange, departme
       // Work Hours Analysis
       if (data.analytics.workHoursData?.length > 0) {
         const hoursData = [
-          ['Date', 'Regular Hours', 'Overtime Hours', 'Total Hours']
+          ['Date', 'Regular Hours', 'Overtime Hours', 'Delay Time']
         ];
 
         data.analytics.workHoursData.forEach((hours: any) => {
@@ -336,7 +336,7 @@ const ExportManager: React.FC<ExportManagerProps> = ({ data, dateRange, departme
             hours.date,
             hours.regularHours,
             hours.overtimeHours,
-            hours.totalHours
+            hours.delayTime || 0
           ]);
         });
 

@@ -41,6 +41,7 @@ import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
 import LoyalCustomersPage from "./pages/LoyalCustomersPage";
+import CustomerServiceCRMPage from "./pages/CustomerServiceCRMPage";
 import CopyWritingDashboard from "./pages/CopyWritingDashboard";
 import CopyWritingProductsPage from "./pages/CopyWritingProductsPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
@@ -408,6 +409,16 @@ const AppWithAuth = () => {
                           <AdminBugReportsPage />
                         </SidebarNavigation>
                       </AdminRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/customer-service-crm" 
+                    element={
+                      <CustomerServiceRoute>
+                        <SidebarNavigation>
+                          <CustomerServiceCRMPage />
+                        </SidebarNavigation>
+                      </CustomerServiceRoute>
                     } 
                   />
                   <Route 

@@ -27,7 +27,8 @@ import {
   Crown,
   TrendingUp,
   Edit3,
-  Package
+  Package,
+  Globe
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -265,6 +266,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Customer Service Tools',
       color: 'emerald',
       items: [
+        { name: 'CRM System', path: '/customer-service-crm', icon: Globe, customerServiceOnly: true, color: 'emerald' },
         { name: 'Create Order', path: '/create-order', icon: ShoppingCart, customerServiceOnly: true, color: 'emerald' },
         { name: 'Loyal Customers', path: '/loyal-customers', icon: Crown, customerServiceOnly: true, color: 'amber' },
       ] as NavItem[]

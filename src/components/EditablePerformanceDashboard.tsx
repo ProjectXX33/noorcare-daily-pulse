@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from '@/lib/supabase';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isToday } from 'date-fns';
 import { 
   Edit3, 
   Save, 
@@ -15,12 +15,24 @@ import {
   Trash2,
   Award,
   AlertTriangle,
+  AlertCircle,
   TrendingUp,
   RefreshCw,
   Loader2,
   Zap,
   RotateCcw,
-  User
+  User,
+  Calendar,
+  Clock,
+  CheckCircle,
+  Target,
+  FileText,
+  Crown,
+  Star,
+  Trophy,
+  Wrench,
+  Database,
+  Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { recalculateOvertimeHours } from '@/utils/recalculateOvertime';
@@ -32,6 +44,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from '@/contexts/AuthContext';
 
 // Helper function to format delay in hours and minutes
 const formatDelayHoursAndMinutes = (totalMinutes: number): string => {
@@ -65,26 +84,36 @@ const formatHoursAndMinutes = (decimalHours: number): string => {
   }
 };
 
-interface PerformanceRecord {
+interface PerformanceData {
   id: string;
-  employee_id: string;
-  employee_name: string;
-  employee_position?: string;
-  month_year: string;
-  total_working_days: number;
-  total_delay_minutes: number;
-  total_delay_hours: number;
-  total_overtime_hours: number;
-  average_performance_score: number;
-  punctuality_percentage: number;
-  performance_status: string;
-  // Enhanced metrics
-  total_logins?: number;
-  app_usage_hours?: number;
-  tasks_completed?: number;
-  tasks_success_rate?: number;
-  check_ins_count?: number;
-  average_daily_hours?: number;
+  name: string;
+  department: string;
+  position: string;
+  days: number;
+  delay: number;
+  overtime: number;
+  workTime: number; // NEW: Work time hours based on shift
+  tasks: {
+    total: number;
+    completed: number;
+    successRate: number;
+  };
+  logins: {
+    count: number;
+    avgPerDay: number;
+  };
+  appUsage: {
+    totalMinutes: number;
+    avgPerDay: number;
+  };
+  performance: number;
+  status: 'Excellent' | 'Good' | 'Average' | 'Poor';
+  delayToFinish: number; // NEW: Overtime - Delay calculation
+  workReports: {
+    submitted: number;
+    total: number;
+    completionRate: number;
+  };
 }
 
 interface EditablePerformanceDashboardProps {
@@ -129,1612 +158,1030 @@ function calcStatus(score: number, punctuality: number): string {
 const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> = ({ 
   currentMonth = format(new Date(), 'yyyy-MM') 
 }) => {
-  const [performanceData, setPerformanceData] = useState<PerformanceRecord[]>([]);
-  const [filteredPerformanceData, setFilteredPerformanceData] = useState<PerformanceRecord[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<PerformanceRecord>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [employees, setEmployees] = useState<Array<{id: string, name: string, position?: string}>>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
-  const [selectedPosition, setSelectedPosition] = useState<string>('all');
+  const { user } = useAuth();
+  const [employees, setEmployees] = useState<PerformanceData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFixingRecords, setIsFixingRecords] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<PerformanceData | null>(null);
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    department: '',
+    position: '',
+    performance: 0,
+    status: 'Good' as 'Excellent' | 'Good' | 'Average' | 'Poor'
+  });
 
   useEffect(() => {
-    loadData();
-    loadEmployees();
-  }, [currentMonth]);
-
-  // Filter performance data based on selected filters
-  useEffect(() => {
-    let filtered = [...performanceData];
-    
-    if (selectedEmployee !== 'all') {
-      filtered = filtered.filter(record => record.employee_id === selectedEmployee);
+    if (user?.role === 'admin') {
+      fetchEmployeeData();
     }
-    
-    if (selectedPosition !== 'all') {
-      filtered = filtered.filter(record => record.employee_position === selectedPosition);
-    }
-    
-    setFilteredPerformanceData(filtered);
-  }, [performanceData, selectedEmployee, selectedPosition]);
+  }, [user, currentMonth]);
 
-  const loadEmployees = async () => {
+  const fetchEmployeeData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, position')
-        .in('position', ['Customer Service', 'Designer'])
-        .eq('role', 'employee')
-        .order('name');
-
-      if (error) throw error;
-      setEmployees(data || []);
-    } catch (error) {
-      console.error('Error loading employees:', error);
-    }
-  };
-
-  const loadData = async () => {
     setIsLoading(true);
-    try {
-      console.log('Loading performance data for month:', currentMonth);
-      
-      // First, auto-calculate performance from monthly shifts
-      await autoCalculatePerformanceFromShifts();
-      
-      // Then load the updated performance data
-      const { data, error } = await supabase
-        .from('admin_performance_dashboard')
+
+      const startDate = startOfMonth(new Date(currentMonth));
+      const endDate = endOfMonth(new Date(currentMonth));
+
+      console.log('📅 Fetching data for date range:', {
+        currentMonth: currentMonth,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      });
+
+      // Fetch ALL employees (not just Customer Service and Designers)
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, department, position, role')
+        .eq('role', 'employee'); // Include ALL employee positions
+
+      if (usersError) throw usersError;
+
+      console.log('👥 All employees found:', usersData.length);
+
+      // Fetch monthly shifts for ALL employees
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('monthly_shifts')
         .select(`
           *,
-          users:employee_id(position)
+          shifts:shift_id(name, start_time, end_time)
         `)
-        .eq('month_year', currentMonth)
-        .order('average_performance_score', { ascending: false });
+        .gte('work_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('work_date', format(endDate, 'yyyy-MM-dd'));
 
-      if (error) throw error;
+      if (shiftsError) throw shiftsError;
+
+      // Fetch task data for ALL employees with enhanced completion detection
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+      if (tasksError) throw tasksError;
+
+      // Fetch work reports from database for the selected month
+      const { data: workReportsData, error: reportsError } = await supabase
+        .from('work_reports')
+        .select('*')
+        .gte('date', format(startDate, 'yyyy-MM-dd'))
+        .lte('date', format(endDate, 'yyyy-MM-dd'));
+
+      if (reportsError) {
+        console.error('Work reports error:', reportsError);
+      }
+
+      const monthlyWorkReports = workReportsData || [];
+
+      // Process each employee's data
+      const processedEmployees: PerformanceData[] = [];
+
+      for (const employee of usersData) {
+        console.log(`\n👤 Processing employee: ${employee.name} (${employee.position})`);
+
+        // Get employee's shifts
+        const employeeShifts = shiftsData.filter(shift => shift.user_id === employee.id);
+        console.log(`📊 ${employee.name} shifts found:`, employeeShifts.length);
+
+        // Enhanced task detection - check multiple assignment fields
+        const employeeTasks = tasksData.filter(task => {
+          return task.user_id === employee.id || 
+                 task.assigned_to === employee.id || 
+                 task.task_assignee === employee.id;
+        });
+        console.log(`📝 ${employee.name} tasks found:`, employeeTasks.length);
+
+        // Get employee's work reports - check multiple possible user ID fields
+        const employeeReports = monthlyWorkReports.filter(report => {
+          return report.userId === employee.id || 
+                 report.user_id === employee.id || 
+                 report.employee_id === employee.id;
+        });
+        console.log(`📋 ${employee.name} work reports found:`, employeeReports.length);
+
+        // Calculate days worked
+        const daysWorked = employeeShifts.length;
+
+        // Calculate total delay and overtime
+        const totalDelay = employeeShifts.reduce((sum, shift) => sum + (shift.delay_minutes || 0), 0) / 60; // Convert to hours
+        const totalOvertime = employeeShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0);
+
+        // Calculate work time based on role
+        let totalWorkTime = 0;
+        const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Copy Writing', 'Content Creator', 'Social Media Manager'].includes(employee.position);
+        
+        if (isRemoteRole) {
+          // For remote roles, estimate work time based on tasks and reports
+          totalWorkTime = (employeeTasks.length * 2) + (employeeReports.length * 1); // 2h per task, 1h per report
+        } else {
+          // For office roles, use shift-based calculation
+          employeeShifts.forEach(shift => {
+            if (shift.shifts?.name?.toLowerCase().includes('day')) {
+              totalWorkTime += 7; // Day shift: 7 hours
+            } else if (shift.shifts?.name?.toLowerCase().includes('night')) {
+              totalWorkTime += 8; // Night shift: 8 hours
+            } else {
+              totalWorkTime += 8; // Default: 8 hours
+            }
+          });
+        }
+
+        // Enhanced task completion detection
+        const completedTasks = employeeTasks.filter(task => {
+          // Check multiple completion indicators
+          const statusComplete = ['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status);
+          const hasCompletionDate = task.completed_at || task.completion_date || task.finished_at;
+          const hasVisualContent = task.visual_feeding || task.image_url || task.visual_content || task.completion_image;
+          
+          return statusComplete || hasCompletionDate || hasVisualContent;
+        }).length;
+        
+        const tasksWithImages = employeeTasks.filter(task => {
+          return task.visual_feeding || task.image_url || task.visual_content || task.completion_image;
+        }).length;
+        
+        const taskSuccessRate = employeeTasks.length > 0 ? (completedTasks / employeeTasks.length) * 100 : 0;
+
+        // Login tracking (simplified - you may want to add actual login tracking)
+        const loginCount = daysWorked; // Assuming one login per work day
+        const avgLoginsPerDay = daysWorked > 0 ? loginCount / daysWorked : 0;
+
+        // Work reports tracking - adjusted for different roles
+        let expectedReports = 0;
+        if (isRemoteRole) {
+          // Remote roles: expect reports based on actual task activity, not calendar days
+          // Use tasks + 5 as baseline (task-based workers should report when they have work)
+          expectedReports = Math.max(employeeTasks.length, employeeReports.length);
+          if (expectedReports === 0) expectedReports = 5; // Minimum baseline
+        } else {
+          // Office roles: one report per check-in day
+          expectedReports = daysWorked;
+        }
+        
+        const reportCompletionRate = expectedReports > 0 ? (employeeReports.length / expectedReports) * 100 : 0;
+
+        // Enhanced performance calculation
+        let performanceScore = 0;
+
+        if (isRemoteRole) {
+          // Task and report-based calculation for remote employees
+          const baseScore = 50; // Start with 50%
+          
+          // Task completion component (40% weight)
+          const taskComponent = taskSuccessRate * 0.4;
+          
+          // Visual content bonus (20% weight)
+          const visualComponent = employeeTasks.length > 0 ? (tasksWithImages / employeeTasks.length) * 20 : 0;
+          
+          // Report completion component (40% weight) 
+          const reportComponent = Math.min(40, reportCompletionRate * 0.4);
+          
+          // Daily consistency bonus
+          const consistencyBonus = (employeeReports.length >= 20) ? 10 : (employeeReports.length >= 15) ? 5 : 0;
+          
+          performanceScore = Math.min(100, baseScore + taskComponent + visualComponent + reportComponent + consistencyBonus);
+          
+        } else if (daysWorked > 0) {
+          // Traditional calculation for employees with check-ins
+          const delayScore = totalDelay <= 0 ? 100 : Math.max(0, 100 - (totalDelay * 10));
+          const overtimeBonus = Math.min(20, totalOvertime * 2);
+          const taskBonus = tasksWithImages * 5; // 5 points per task with images
+          const reportBonus = reportCompletionRate > 80 ? 10 : 0; // 10 points for consistent reporting
+          
+          performanceScore = Math.min(100, delayScore + overtimeBonus + taskBonus + reportBonus);
+        } else {
+          // Fallback for employees with no check-ins and no remote role designation
+          const taskPerformance = taskSuccessRate;
+          const imageBonus = employeeTasks.length > 0 ? (tasksWithImages / employeeTasks.length) * 20 : 0;
+          const reportBonus = reportCompletionRate > 50 ? 15 : 0;
+          
+          performanceScore = Math.min(100, taskPerformance + imageBonus + reportBonus);
+        }
+
+        // NEW: Calculate "Delay to Finish" = Overtime - Delay (reversed formula)
+        const delayToFinish = Math.max(0, totalOvertime - totalDelay);
+
+        // Determine status
+        let status: 'Excellent' | 'Good' | 'Average' | 'Poor';
+        if (performanceScore >= 90) status = 'Excellent';
+        else if (performanceScore >= 75) status = 'Good';
+        else if (performanceScore >= 60) status = 'Average';
+        else status = 'Poor';
+
+        processedEmployees.push({
+          id: employee.id,
+          name: employee.name,
+          department: employee.department,
+          position: employee.position,
+          days: isRemoteRole ? -1 : daysWorked, // -1 indicates "No Track"
+          delay: isRemoteRole ? -1 : totalDelay, // -1 indicates "No Track"
+          overtime: isRemoteRole ? -1 : totalOvertime, // -1 indicates "No Track"
+          workTime: isRemoteRole ? -1 : totalWorkTime, // -1 indicates "No Track"
+          tasks: {
+            total: employeeTasks.length,
+            completed: completedTasks,
+            successRate: taskSuccessRate
+          },
+          logins: {
+            count: loginCount,
+            avgPerDay: avgLoginsPerDay
+          },
+          appUsage: {
+            totalMinutes: daysWorked * 480, // Estimate: 8 hours per day
+            avgPerDay: 480
+          },
+          performance: performanceScore,
+          status,
+          delayToFinish: isRemoteRole ? -1 : delayToFinish, // -1 indicates "No Track"
+          workReports: {
+            submitted: employeeReports.length,
+            total: expectedReports,
+            completionRate: reportCompletionRate
+          }
+        });
+
+        console.log(`✅ ${employee.name} processed:`, {
+          days: daysWorked,
+          delay: totalDelay.toFixed(2),
+          overtime: totalOvertime.toFixed(2),
+          workTime: totalWorkTime,
+          delayToFinish: delayToFinish.toFixed(2),
+          performance: performanceScore.toFixed(1),
+          reports: `${employeeReports.length}/${expectedReports}`
+        });
+      }
+
+      // Sort by performance score
+      processedEmployees.sort((a, b) => b.performance - a.performance);
       
-      console.log('Performance data loaded:', data?.length || 0);
-      const formattedData = (data || []).map(item => ({
-        ...item,
-        employee_position: item.users?.position
-      }));
-      setPerformanceData(formattedData);
-      setFilteredPerformanceData(formattedData); // Initialize filtered data
+      setEmployees(processedEmployees);
+      console.log('📊 Final processed employees:', processedEmployees.length);
+
     } catch (error) {
-      console.error('Error loading performance data:', error);
-      toast.error('Failed to load performance data');
+      console.error('Error fetching employee data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Auto-calculate performance metrics from monthly_shifts data
-  const autoCalculatePerformanceFromShifts = async () => {
-    try {
-      console.log('🔄 Auto-calculating comprehensive performance metrics...');
-      
-      // Get all monthly shifts for the current month
-      const monthStart = `${currentMonth}-01`;
-      const nextMonth = currentMonth.split('-');
-      const nextMonthDate = new Date(parseInt(nextMonth[0]), parseInt(nextMonth[1]), 1);
-      const monthEnd = nextMonthDate.toISOString().split('T')[0];
-
-      console.log(`📅 Searching for data between ${monthStart} and ${monthEnd}`);
-
-      // Get monthly shifts data
-      const { data: monthlyShifts, error: shiftsError } = await supabase
-        .from('monthly_shifts')
-        .select(`
-          *,
-          users:user_id(name, position)
-        `)
-        .gte('work_date', monthStart)
-        .lt('work_date', monthEnd)
-        .in('users.position', ['Customer Service', 'Designer']);
-
-      if (shiftsError) throw shiftsError;
-
-      // Get check-ins data for login frequency and app usage
-      const { data: checkIns, error: checkInsError } = await supabase
-        .from('check_ins')
-        .select(`
-          *,
-          users:user_id(name, position)
-        `)
-        .gte('timestamp', monthStart)
-        .lt('timestamp', monthEnd + 'T23:59:59')
-        .in('users.position', ['Customer Service', 'Designer']);
-
-      if (checkInsError) throw checkInsError;
-
-      // Get tasks data for productivity metrics
-      const { data: tasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select(`
-          *,
-          users:assigned_to(name, position)
-        `)
-        .gte('created_at', monthStart)
-        .lt('created_at', monthEnd + 'T23:59:59')
-        .in('users.position', ['Customer Service', 'Designer']);
-
-      if (tasksError) throw tasksError;
-
-      console.log(`📊 Found ${monthlyShifts.length} shifts, ${checkIns.length} check-ins, ${tasks.length} tasks`);
-
-      // Group by employee
-      const employeeData: Record<string, {
-        name: string;
-        position: string;
-        workingDays: Set<string>;
-        workingDatesArray: string[];
-        totalDelayMinutes: number;
-        totalOvertimeHours: number;
-        checkInsCount: number;
-        loginDays: Set<string>;
-        tasksCompleted: number;
-        tasksTotal: number;
-        totalWorkHours: number;
-      }> = {};
-
-      // Process monthly shifts
-      for (const shift of monthlyShifts) {
-        const userId = shift.user_id;
-        const userName = shift.users?.name || 'Unknown';
-        const userPosition = shift.users?.position;
-
-        if (!employeeData[userId]) {
-          employeeData[userId] = {
-            name: userName,
-            position: userPosition,
-            workingDays: new Set(),
-            workingDatesArray: [],
-            totalDelayMinutes: 0,
-            totalOvertimeHours: 0,
-            checkInsCount: 0,
-            loginDays: new Set(),
-            tasksCompleted: 0,
-            tasksTotal: 0,
-            totalWorkHours: 0,
-          };
-        }
-
-        // Add working day
-        const workDate = shift.work_date;
-        employeeData[userId].workingDays.add(workDate);
-        if (!employeeData[userId].workingDatesArray.includes(workDate)) {
-          employeeData[userId].workingDatesArray.push(workDate);
-        }
-        
-        console.log(`📝 Processing shift for ${userName} on ${workDate}: delay=${shift.delay_minutes || 0}min, overtime=${shift.overtime_hours || 0}h`);
-        
-        // Add delay minutes and overtime hours
-        employeeData[userId].totalDelayMinutes += shift.delay_minutes || 0;
-        employeeData[userId].totalOvertimeHours += shift.overtime_hours || 0;
-        employeeData[userId].totalWorkHours += (shift.regular_hours || 0) + (shift.overtime_hours || 0);
-      }
-
-      // Process check-ins for login frequency
-      for (const checkIn of checkIns) {
-        const userId = checkIn.user_id;
-        if (employeeData[userId]) {
-          employeeData[userId].checkInsCount++;
-          const loginDate = new Date(checkIn.timestamp).toISOString().split('T')[0];
-          employeeData[userId].loginDays.add(loginDate);
-        }
-      }
-
-      // Process tasks for productivity metrics
-      for (const task of tasks) {
-        const userId = task.assigned_to;
-        if (employeeData[userId]) {
-          employeeData[userId].tasksTotal++;
-          if (task.status === 'completed') {
-            employeeData[userId].tasksCompleted++;
-          }
-        }
-      }
-
-      // Process each employee's data
-      const records = [];
-      for (const [userId, data] of Object.entries(employeeData)) {
-        const delayMinutes = data.totalDelayMinutes;
-        const workingDays = data.workingDays.size;
-        const overtimeHours = data.totalOvertimeHours;
-        const workingDatesArray = data.workingDatesArray.sort();
-        const totalLogins = data.loginDays.size;
-        const checkInsCount = data.checkInsCount;
-        const tasksCompleted = data.tasksCompleted;
-        const tasksTotal = data.tasksTotal;
-        const tasksSuccessRate = tasksTotal > 0 ? (tasksCompleted / tasksTotal) * 100 : 0;
-        const averageDailyHours = workingDays > 0 ? data.totalWorkHours / workingDays : 0;
-        const appUsageHours = data.totalWorkHours; // Using work hours as app usage proxy
-
-        console.log(`👥 ${data.name}: ${workingDays} unique working days from dates: [${workingDatesArray.join(', ')}]`);
-        console.log(`   📊 Logins: ${totalLogins} days, Check-ins: ${checkInsCount}, Tasks: ${tasksCompleted}/${tasksTotal}`);
-
-        const performanceScore = calcPerformanceScore(delayMinutes, overtimeHours);
-        const punctuality = calcPunctuality(delayMinutes);
-        const status = calcStatus(performanceScore, punctuality);
-
-        const record = {
-          employee_id: userId,
-          employee_name: data.name,
-          month_year: currentMonth,
-          total_working_days: workingDays,
-          worked_dates: workingDatesArray, // Store the actual dates worked
-          total_delay_minutes: Math.round(delayMinutes),
-          total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100,
-          total_overtime_hours: Math.round(overtimeHours * 100) / 100,
-          average_performance_score: Math.round(performanceScore * 100) / 100,
-          punctuality_percentage: Math.round(punctuality * 100) / 100,
-          performance_status: status,
-          // Enhanced metrics
-          total_logins: totalLogins,
-          app_usage_hours: Math.round(appUsageHours * 100) / 100,
-          tasks_completed: tasksCompleted,
-          tasks_success_rate: Math.round(tasksSuccessRate * 100) / 100,
-          check_ins_count: checkInsCount,
-          average_daily_hours: Math.round(averageDailyHours * 100) / 100,
-        };
-
-        records.push(record);
-        console.log(`✅ Calculated for ${data.name}: ${workingDays} days, ${delayMinutes.toFixed(0)} delay min, ${overtimeHours.toFixed(2)}h overtime, ${tasksCompleted} tasks`);
-      }
-
-      // Upsert records into admin_performance_dashboard
-      if (records.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('admin_performance_dashboard')
-          .upsert(records, { 
-            onConflict: 'employee_id,month_year',
-            ignoreDuplicates: false 
-          });
-
-        if (upsertError) {
-          console.error('Error upserting performance records:', upsertError);
-          
-          // If the error is due to missing columns, create records without enhanced metrics
-          if (upsertError.message?.includes('column') || upsertError.code === '42703') {
-            console.log('⚠️ Enhanced columns not available, using basic metrics only...');
-            
-            const basicRecords = records.map(record => ({
-              employee_id: record.employee_id,
-              employee_name: record.employee_name,
-              month_year: record.month_year,
-              total_working_days: record.total_working_days,
-              worked_dates: record.worked_dates,
-              total_delay_minutes: record.total_delay_minutes,
-              total_delay_hours: record.total_delay_hours,
-              total_overtime_hours: record.total_overtime_hours,
-              average_performance_score: record.average_performance_score,
-              punctuality_percentage: record.punctuality_percentage,
-              performance_status: record.performance_status,
-            }));
-
-            const { error: basicUpsertError } = await supabase
-              .from('admin_performance_dashboard')
-              .upsert(basicRecords, { 
-                onConflict: 'employee_id,month_year',
-                ignoreDuplicates: false 
-              });
-
-            if (basicUpsertError) {
-              console.error('Error upserting basic performance records:', basicUpsertError);
-              toast.error('Failed to update performance records');
-            } else {
-              console.log(`✅ Successfully updated ${basicRecords.length} basic performance records`);
-              toast.warning('Performance updated with basic metrics only. Database schema needs enhancement.');
-            }
-          } else {
-            toast.error('Failed to update performance records');
-          }
-        } else {
-          console.log(`✅ Successfully auto-calculated and updated ${records.length} comprehensive performance records`);
-        }
-      } else {
-        console.log('⚠️ No performance records to update');
-      }
-
-    } catch (error) {
-      console.error('❌ Error auto-calculating performance:', error);
-      toast.error('Failed to calculate performance from comprehensive data');
-      // Don't throw error here, just log it - we still want to load existing data
-    }
+  const handleEditEmployee = (employee: PerformanceData) => {
+    setEditingEmployee(employee);
+    setEditForm({
+      name: employee.name,
+      department: employee.department,
+      position: employee.position,
+      performance: employee.performance,
+      status: employee.status
+    });
+    setIsEditSheetOpen(true);
   };
 
-  const startEditing = (record: PerformanceRecord) => {
-    setEditingId(record.id);
-    setEditForm(record);
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditForm({});
-    setIsAddingNew(false);
-  };
-
-  const saveRecord = async () => {
-    try {
-      if (!editForm.employee_name || !editForm.employee_id) {
-        toast.error('Employee name and ID are required');
-        return;
-      }
-
-      // Ensure all required numeric fields have valid values
-      const delayMinutes = Number(editForm.total_delay_minutes) || 0;
-      const workingDays = Math.max(1, Number(editForm.total_working_days) || 1);
-      const overtimeHours = Number(editForm.total_overtime_hours) || 0;
-
-      const dataToSave = {
-        employee_id: editForm.employee_id,
-        employee_name: editForm.employee_name,
-        month_year: currentMonth,
-        total_working_days: workingDays,
-        total_delay_minutes: delayMinutes,
-        total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100, // Convert minutes to hours
-        total_overtime_hours: overtimeHours,
-        average_performance_score: calcPerformanceScore(delayMinutes, overtimeHours),
-        punctuality_percentage: calcPunctuality(delayMinutes),
-        performance_status: calcStatus(
-          calcPerformanceScore(delayMinutes, overtimeHours),
-          calcPunctuality(delayMinutes)
-        ),
-      };
-
-      console.log('💾 Saving record with data:', dataToSave);
-      console.log('🔧 Is adding new:', isAddingNew);
-      console.log('📝 Edit ID:', editingId);
-
-      let result;
-      
-      if (isAddingNew) {
-        // Insert new record - don't include id
-        console.log('➕ Inserting new record...');
-        result = await supabase
-          .from('admin_performance_dashboard')
-          .insert([dataToSave])
-          .select()
-          .single();
-      } else {
-        // Update existing record
-        console.log('✏️ Updating existing record...');
-        result = await supabase
-          .from('admin_performance_dashboard')
-          .update(dataToSave)
-          .eq('id', editingId)
-          .select()
-          .single();
-      }
-
-      console.log('📊 Supabase result:', result);
-
-      if (result.error) {
-        console.error('❌ Database error details:', {
-          message: result.error.message,
-          details: result.error.details,
-          hint: result.error.hint,
-          code: result.error.code
-        });
-        
-        // Show more specific error messages
-        if (result.error.code === 'PGRST301') {
-          toast.error('Permission denied. Make sure you are logged in as an admin.');
-        } else if (result.error.code === '23505') {
-          toast.error('Record already exists for this employee and month.');
-        } else if (result.error.message.includes('RLS')) {
-          toast.error('Access denied by database security policies. Admin access required.');
-        } else {
-          toast.error(`Database error: ${result.error.message}`);
-        }
-        return;
-      }
-
-      console.log('✅ Record saved successfully:', result.data);
-      toast.success(isAddingNew ? 'Record added successfully!' : 'Record updated successfully!');
-      
-      // Reload data
-      await loadData();
-      cancelEditing();
-    } catch (error) {
-      console.error('❌ Error saving record:', error);
-      
-      // Better error message handling
-      let errorMessage = 'Unknown error';
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.error?.message) {
-        errorMessage = error.error.message;
-      }
-      
-      console.error('📋 Full error object:', JSON.stringify(error, null, 2));
-      toast.error(`Failed to save record: ${errorMessage}`);
-    }
-  };
-
-  const deleteRecord = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this record?')) return;
+  const handleSaveEdit = async () => {
+    if (!editingEmployee) return;
 
     try {
+      // Update employee data in the database
       const { error } = await supabase
-        .from('admin_performance_dashboard')
-        .delete()
-        .eq('id', id);
+        .from('users')
+        .update({
+          name: editForm.name,
+          department: editForm.department,
+          position: editForm.position
+        })
+        .eq('id', editingEmployee.id);
 
       if (error) throw error;
 
-      toast.success('Record deleted successfully!');
-      await loadData();
+      toast.success('Employee updated successfully');
+      setIsEditSheetOpen(false);
+      setEditingEmployee(null);
+      
+      // Refresh the data
+      await fetchEmployeeData();
+      
     } catch (error) {
-      console.error('Error deleting record:', error);
-      toast.error('Failed to delete record');
+      console.error('Error updating employee:', error);
+      toast.error('Failed to update employee');
     }
   };
 
-  const startAddingNew = () => {
-    setIsAddingNew(true);
-    setEditForm({
-      employee_id: '',
-      employee_name: '',
-      month_year: currentMonth,
-      total_working_days: 0,
-      total_delay_minutes: 0,
-      total_delay_hours: 0,
-      total_overtime_hours: 0
-    });
+  const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
+    if (!confirm(`Are you sure you want to delete ${employeeName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', employeeId);
+
+      if (error) throw error;
+
+      toast.success('Employee deleted successfully');
+      
+      // Refresh the data
+      await fetchEmployeeData();
+      
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      toast.error('Failed to delete employee');
+    }
   };
 
-  const getPerformanceColor = (score: number) => {
-    if (score >= 95) return 'text-green-600';
-    if (score >= 85) return 'text-blue-600';
-    if (score >= 70) return 'text-yellow-600';
-    return 'text-red-600';
+  const fixRecords = async () => {
+    if (!user || user.role !== 'admin') {
+      toast.error('Only administrators can fix records');
+      return;
+    }
+
+    setIsFixingRecords(true);
+    
+    try {
+      const startDate = startOfMonth(new Date(currentMonth));
+      const endDate = endOfMonth(new Date(currentMonth));
+
+      console.log('🔧 Starting to fix task completion records...');
+
+      // Get all tasks for the current month
+      const { data: allTasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString());
+
+      if (tasksError) throw tasksError;
+
+      let fixedCount = 0;
+
+      // Process each task to fix completion status
+      for (const task of allTasks) {
+        const shouldBeComplete = !!(
+          task.visual_feeding || 
+          task.image_url || 
+          task.visual_content || 
+          task.completion_image ||
+          task.completed_at ||
+          task.completion_date ||
+          task.finished_at
+        );
+
+        // If task has completion indicators but status isn't marked complete
+        if (shouldBeComplete && !['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status)) {
+          console.log(`🔧 Fixing task ${task.id}: ${task.task_name} - marking as Complete`);
+          
+          const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ 
+              status: 'Complete',
+              completed_at: task.completed_at || task.completion_date || new Date().toISOString()
+            })
+            .eq('id', task.id);
+
+          if (!updateError) {
+            fixedCount++;
+          } else {
+            console.error(`Failed to fix task ${task.id}:`, updateError);
+          }
+        }
+      }
+
+      toast.success(`Fixed ${fixedCount} task completion records`);
+      
+      // Refresh the data
+      await fetchEmployeeData();
+      
+    } catch (error) {
+      console.error('Error fixing records:', error);
+      toast.error('Failed to fix records');
+    } finally {
+      setIsFixingRecords(false);
+    }
   };
 
-  // Calculate summary statistics
-  const summaryStats = performanceData.reduce((acc, record) => {
-    acc.totalEmployees += 1;
-    acc.totalWorkingDays += record.total_working_days;
-    acc.totalDelayMinutes += record.total_delay_minutes;
-    acc.totalOvertimeHours += record.total_overtime_hours;
+  const formatTime = (hours: number): string => {
+    if (hours === 0) return '0min';
     
-    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
-    acc.averagePerformanceScore += realTimeScore;
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
     
-    // Count best performers (score >= 95)
-    if (realTimeScore >= 95) {
-      acc.bestPerformers += 1;
+    if (wholeHours === 0) {
+      return `${minutes}min`;
+    } else if (minutes === 0) {
+      return `${wholeHours}h`;
+        } else {
+      return `${wholeHours}h ${minutes}min`;
     }
-    
-    return acc;
-  }, {
-    totalEmployees: 0,
-    totalWorkingDays: 0,
-    totalDelayMinutes: 0,
-    totalOvertimeHours: 0,
-    averagePerformanceScore: 0,
-    bestPerformers: 0
-  });
+  };
 
-  // Calculate filtered statistics
-  const filteredStats = filteredPerformanceData.reduce((acc, record) => {
-    acc.totalEmployees += 1;
-    acc.totalDelayMinutes += record.total_delay_minutes;
-    acc.totalOvertimeHours += record.total_overtime_hours;
-    
-    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
-    if (realTimeScore >= 95) {
-      acc.bestPerformers += 1;
+  // NEW: Format delay to finish with sign
+  const formatDelayToFinish = (delayToFinish: number): string => {
+    if (delayToFinish === 0) return 'No Extra Time';
+    return `+${formatTime(delayToFinish)}`; // Always positive since we use Math.max(0, ...)
+  };
+
+  // NEW: Get delay to finish color
+  const getDelayToFinishColor = (delayToFinish: number): string => {
+    return delayToFinish > 0 ? 'text-green-600' : 'text-gray-500';
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'Excellent': return 'bg-green-100 text-green-800';
+      case 'Good': return 'bg-blue-100 text-blue-800';
+      case 'Average': return 'bg-yellow-100 text-yellow-800';
+      case 'Poor': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
-    
-    return acc;
-  }, {
-    totalEmployees: 0,
-    totalDelayMinutes: 0,
-    totalOvertimeHours: 0,
-    bestPerformers: 0
-  });
+  };
 
-  // Finalize average calculation
-  if (summaryStats.totalEmployees > 0) {
-    summaryStats.averagePerformanceScore = Math.round((summaryStats.averagePerformanceScore / summaryStats.totalEmployees) * 100) / 100;
+  if (!user || user.role !== 'admin') {
+    return null;
   }
 
-  // When editing/adding, always calculate these fields
-  const delayMinutes = editForm.total_delay_minutes || 0;
-  const overtimeHours = editForm.total_overtime_hours || 0;
-  const workingDays = editForm.total_working_days || 1;
-  const calculatedScore = calcPerformanceScore(delayMinutes, overtimeHours);
-  const calculatedPunctuality = calcPunctuality(delayMinutes);
-  const calculatedStatus = calcStatus(calculatedScore, calculatedPunctuality);
+  if (isLoading) {
+  return (
+        <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Employee Performance Dashboard (Editable)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          </CardContent>
+        </Card>
+    );
+  }
 
-  // New function to recalculate performance metrics
-  const recalculatePerformanceMetrics = async () => {
-    try {
-      // Get all performance records for recalculation
-      const { data: performanceRecords, error: fetchError } = await supabase
-        .from('admin_performance_dashboard')
-        .select('*')
-        .eq('month_year', currentMonth);
-
-      if (fetchError) throw fetchError;
-
-      let recordsUpdated = 0;
-      const updates = [];
-
-      for (const record of performanceRecords) {
-        // Recalculate metrics
-        const delayMinutes = record.total_delay_minutes || 0;
-        const workingDays = record.total_working_days || 1;
-        
-        // Recalculate performance score using new logic
-        const overtimeHours = record.total_overtime_hours || 0;
-        const newPerformanceScore = calcPerformanceScore(delayMinutes, overtimeHours);
-        
-        // Recalculate punctuality percentage
-        let newPunctuality = 100.0;
-        if (record.total_delay_hours >= 1) {
-          newPunctuality = 0.0;
-        } else if (delayMinutes > 30) {
-          newPunctuality = Math.max(0, 50 - (delayMinutes * 2));
-        } else if (delayMinutes > 0) {
-          newPunctuality = Math.max(0, 90 - (delayMinutes * 3));
-        }
-        
-        // Recalculate status
-        let newStatus = 'Good';
-        if (newPerformanceScore >= 95 && newPunctuality >= 95) {
-          newStatus = 'Excellent';
-        } else if (newPerformanceScore >= 85 && newPunctuality >= 80) {
-          newStatus = 'Good';
-        } else if (newPerformanceScore >= 70 && newPunctuality >= 60) {
-          newStatus = 'Needs Improvement';
-        } else {
-          newStatus = 'Poor';
-        }
-        
-        // Check if update is needed
-        const scoreChanged = Math.abs(newPerformanceScore - record.average_performance_score) > 0.1;
-        const punctualityChanged = Math.abs(newPunctuality - record.punctuality_percentage) > 0.1;
-        const statusChanged = newStatus !== record.performance_status;
-        
-        if (scoreChanged || punctualityChanged || statusChanged) {
-          updates.push({
-            id: record.id,
-            average_performance_score: Math.round(newPerformanceScore * 100) / 100,
-            punctuality_percentage: Math.round(newPunctuality * 100) / 100,
-            performance_status: newStatus,
-            updated_at: new Date().toISOString()
-          });
-          recordsUpdated++;
-        }
-      }
-
-      if (updates.length > 0) {
-        // Batch update records
-        const updatePromises = updates.map(update => 
-          supabase
-            .from('admin_performance_dashboard')
-            .update(update)
-            .eq('id', update.id)
-        );
-
-        const results = await Promise.all(updatePromises);
-        const errors = results.filter(result => result.error);
-        
-        if (errors.length > 0) {
-          throw new Error(`${errors.length} updates failed`);
-        }
-      }
-
-      return { success: true, recordsUpdated, message: `Updated ${recordsUpdated} performance records` };
-    } catch (error) {
-      console.error('Error recalculating performance metrics:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  // Re-record all records from scratch with current month data
-  const rerecordAllRecords = async () => {
-    if (!confirm(`This will clear and re-record ALL performance data for ${currentMonth} from check-in/out records. This cannot be undone! Continue?`)) return;
-
-    toast.info('🔄 Re-recording all performance data from scratch...');
-
-    try {
-      // Step 1: Clear existing records for this month
-      const { error: deleteError } = await supabase
-        .from('admin_performance_dashboard')
-        .delete()
-        .eq('month_year', currentMonth);
-
-      if (deleteError) throw deleteError;
-
-      // Step 2: Get all check-ins for the current month
-      const monthStart = `${currentMonth}-01`;
-      const nextMonth = currentMonth.split('-');
-      const nextMonthDate = new Date(parseInt(nextMonth[0]), parseInt(nextMonth[1]), 1);
-      const monthEnd = nextMonthDate.toISOString().split('T')[0];
-
-      const { data: checkIns, error: checkInError } = await supabase
-        .from('check_ins')
-        .select(`
-          *,
-          users:user_id(name, position)
-        `)
-        .gte('timestamp', monthStart)
-        .lt('timestamp', monthEnd)
-        .not('checkout_time', 'is', null);
-
-      if (checkInError) throw checkInError;
-
-      // Step 3: Get shift assignments for the month
-      const { data: shiftAssignments, error: shiftError } = await supabase
-        .from('shift_assignments')
-        .select(`
-          *,
-          shifts:assigned_shift_id(name, start_time, end_time)
-        `)
-        .gte('work_date', monthStart)
-        .lt('work_date', monthEnd);
-
-      if (shiftError) throw shiftError;
-
-      // Step 4: Process data by employee
-      const employeeData: Record<string, {
-        name: string;
-        position: string;
-        workingDays: Set<string>;
-        totalDelayMinutes: number;
-        totalOvertimeHours: number;
-        sessions: any[];
-      }> = {};
-      
-      for (const checkIn of checkIns) {
-        const userId = checkIn.user_id;
-        const userName = checkIn.users?.name || 'Unknown';
-        const userPosition = checkIn.users?.position;
-        
-        // Only process Customer Service and Designer
-        if (!['Customer Service', 'Designer'].includes(userPosition)) continue;
-
-        if (!employeeData[userId]) {
-          employeeData[userId] = {
-            name: userName,
-            position: userPosition,
-            workingDays: new Set(),
-            totalDelayMinutes: 0,
-            totalOvertimeHours: 0,
-            sessions: []
-          };
-        }
-
-        const workDate = checkIn.timestamp.split('T')[0];
-        employeeData[userId].workingDays.add(workDate);
-
-        // Find shift assignment for this date
-        const shiftAssignment = shiftAssignments.find(sa => 
-          sa.employee_id === userId && sa.work_date === workDate
-        );
-
-        if (shiftAssignment && !shiftAssignment.is_day_off) {
-          const shift = shiftAssignment.shifts;
-          const checkInTime = new Date(checkIn.timestamp);
-          const checkOutTime = new Date(checkIn.checkout_time);
-          
-          // Calculate delay
-          const scheduledStartTime = shift.start_time;
-          const [schedHour, schedMin] = scheduledStartTime.split(':').map(Number);
-          const scheduledStart = new Date(checkInTime);
-          scheduledStart.setHours(schedHour, schedMin, 0, 0);
-          
-          const delayMs = checkInTime.getTime() - scheduledStart.getTime();
-          const delayMinutes = Math.max(0, delayMs / (1000 * 60));
-          employeeData[userId].totalDelayMinutes += delayMinutes;
-          
-          // Calculate overtime using new flexible rules
-          const totalHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-          const checkInHour = checkInTime.getHours();
-          
-          let standardHours = 8;
-          if (shift.name.toLowerCase().includes('day')) {
-            standardHours = 7;
-          }
-          
-          let overtimeHours = 0;
-          if (shift.name.toLowerCase().includes('day')) {
-            // Day shift: Before 9AM or after 4PM = overtime
-            if (checkInHour < 9) {
-              const earlyStart = new Date(checkInTime);
-              earlyStart.setHours(9, 0, 0, 0);
-              if (checkInTime < earlyStart) {
-                overtimeHours += (earlyStart.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-              }
-            }
-            if (checkOutTime.getHours() >= 16) {
-              const regularEnd = new Date(checkOutTime);
-              regularEnd.setHours(16, 0, 0, 0);
-              if (checkOutTime > regularEnd) {
-                overtimeHours += (checkOutTime.getTime() - regularEnd.getTime()) / (1000 * 60 * 60);
-              }
-            }
-          } else {
-            // Night shift: Standard calculation with midnight overtime
-            const regularHours = Math.min(totalHours, standardHours);
-            overtimeHours = Math.max(0, totalHours - standardHours);
-          }
-          
-          employeeData[userId].totalOvertimeHours += overtimeHours;
-        }
-      }
-
-      // Step 5: Create new performance records
-      let created = 0;
-      for (const [userId, data] of Object.entries(employeeData)) {
-        const delayMinutes = data.totalDelayMinutes;
-        const workingDays = data.workingDays.size;
-        
-        const performanceScore = delayMinutes <= 0 ? 100.0 : 
-          delayMinutes >= 500 ? 0.0 : 
-          Math.max(0, 100.0 - (delayMinutes / 5.0));
-          
-        let punctuality = 100.0;
-        if (delayMinutes >= 60) {
-          punctuality = 0.0;
-        } else if (delayMinutes > 30) {
-          punctuality = Math.max(0, 50 - (delayMinutes * 2));
-        } else if (delayMinutes > 0) {
-          punctuality = Math.max(0, 90 - (delayMinutes * 3));
-        }
-        
-        let status = 'Good';
-        if (performanceScore >= 95 && punctuality >= 95) {
-          status = 'Excellent';
-        } else if (performanceScore >= 85 && punctuality >= 80) {
-          status = 'Good';
-        } else if (performanceScore >= 70 && punctuality >= 60) {
-          status = 'Needs Improvement';
-        } else {
-          status = 'Poor';
-        }
-
-        const recordData = {
-          employee_id: userId,
-          employee_name: data.name,
-          month_year: currentMonth,
-          total_working_days: workingDays,
-          total_delay_minutes: Math.round(delayMinutes),
-          total_delay_hours: Math.round((delayMinutes / 60) * 100) / 100,
-          total_overtime_hours: Math.round(data.totalOvertimeHours * 100) / 100,
-          average_performance_score: Math.round(performanceScore * 100) / 100,
-          punctuality_percentage: Math.round(punctuality * 100) / 100,
-          performance_status: status,
-          worked_dates: Array.from(data.workingDays),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        const { error: insertError } = await supabase
-          .from('admin_performance_dashboard')
-          .insert(recordData);
-
-        if (!insertError) created++;
-      }
-
-      toast.success(`✅ Re-recorded ${created} performance records for ${currentMonth}!`);
-      await loadData();
-      
-      return { success: true, recordsCreated: created };
-    } catch (error) {
-      console.error('Error re-recording data:', error);
-      toast.error(`Failed to re-record: ${error.message}`);
-      return { success: false, error: error.message };
-    } finally {
-      // Clean up
-    }
-  };
-
-
-
-  // Calculate best employee based on comprehensive performance
-  const calculateBestEmployee = () => {
-    if (filteredPerformanceData.length === 0) return null;
-
-    // Sort employees by performance criteria:
-    // 1. Lowest delay minutes (negative impact)
-    // 2. Highest overtime hours (positive impact)
-    // 3. Highest task completion rate (positive impact)
-    // 4. Highest performance score (overall metric)
-    const bestEmployee = filteredPerformanceData.reduce((best, current) => {
-      const currentScore = calcPerformanceScore(current.total_delay_minutes, current.total_overtime_hours);
-      const bestScore = calcPerformanceScore(best.total_delay_minutes, best.total_overtime_hours);
-      
-      // Comprehensive scoring system
-      const currentComprehensiveScore = 
-        (currentScore * 0.4) + // Performance score weight
-        (Math.max(0, 100 - current.total_delay_minutes) * 0.3) + // Punctuality weight
-        ((current.total_overtime_hours || 0) * 2) + // Overtime bonus
-        ((current.tasks_success_rate || 0) * 0.2) + // Task completion weight
-        ((current.average_daily_hours || 0) * 0.1); // Work dedication weight
-
-      const bestComprehensiveScore = 
-        (bestScore * 0.4) +
-        (Math.max(0, 100 - best.total_delay_minutes) * 0.3) +
-        ((best.total_overtime_hours || 0) * 2) +
-        ((best.tasks_success_rate || 0) * 0.2) +
-        ((best.average_daily_hours || 0) * 0.1);
-
-      return currentComprehensiveScore > bestComprehensiveScore ? current : best;
-    });
-
-    return bestEmployee;
-  };
-
-  const bestEmployee = calculateBestEmployee();
+  // Get the best performing employee
+  const bestEmployee = employees.length > 0 ? employees[0] : null;
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Summary Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-        {/* Best Employee Card */}
-        <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium">
-                  🏆 Best Employee
-                </p>
-                {bestEmployee ? (
-                  <>
-                    <p className="text-lg sm:text-xl font-bold text-yellow-700 mb-1">
-                      {bestEmployee.employee_name}
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-xs text-yellow-600">
-                        {formatDelayHoursAndMinutes(bestEmployee.total_delay_minutes)} delay
-                      </p>
-                      <p className="text-xs text-yellow-600">
-                        {formatHoursAndMinutes(bestEmployee.total_overtime_hours)} overtime
-                      </p>
-                      {bestEmployee.tasks_completed !== undefined && (
-                        <p className="text-xs text-yellow-600">
-                          {bestEmployee.tasks_completed} tasks completed
-                        </p>
-                      )}
+    <TooltipProvider>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Best Employee Champion Card - Responsive */}
+        {bestEmployee && (
+          <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 via-orange-50 to-yellow-100 dark:from-yellow-950/30 dark:via-orange-950/30 dark:to-yellow-950/30 shadow-lg">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
+                      <span className="text-white font-bold text-lg sm:text-xl">
+                        {bestEmployee.name.charAt(0).toUpperCase()}
+                      </span>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No data</p>
-                )}
-              </div>
-              <Award className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Best Performers
-                </p>
-                <p className="text-lg sm:text-2xl font-bold text-green-600">
-                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.bestPerformers : summaryStats.bestPerformers}
-                  {(selectedEmployee !== 'all' || selectedPosition !== 'all') && (
-                    <span className="text-sm text-muted-foreground ml-1">
-                      / {summaryStats.bestPerformers}
-                    </span>
-                  )}
-                </p>
-                {(selectedEmployee !== 'all' || selectedPosition !== 'all') && (
-                  <p className="text-xs text-muted-foreground">
-                    Showing {filteredPerformanceData.length} of {performanceData.length} employees
-                  </p>
-                )}
-              </div>
-              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Total Delay
-                </p>
-                <p className="text-lg sm:text-2xl font-bold text-red-600">
-                  {formatDelayHoursAndMinutes(selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.totalDelayMinutes : summaryStats.totalDelayMinutes)}
-                </p>
-              </div>
-              <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {selectedEmployee !== 'all' || selectedPosition !== 'all' ? 'Filtered ' : ''}Total Overtime
-                </p>
-                <p className="text-lg sm:text-2xl font-bold text-blue-600">
-                  {formatHoursAndMinutes(selectedEmployee !== 'all' || selectedPosition !== 'all' ? filteredStats.totalOvertimeHours : summaryStats.totalOvertimeHours)}
-                </p>
-              </div>
-              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Editable Performance Table */}
-      <Card>
-        <CardHeader className="pb-3 sm:pb-4">
-          <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <span className="text-base sm:text-lg">Editable Performance Dashboard - {currentMonth}</span>
-            
-            {/* Mobile action buttons */}
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                onClick={loadData} 
-                variant="outline" 
-                size="sm"
-                disabled={isLoading}
-                className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '🔄'} 
-                <span className="ml-1 hidden sm:inline">Refresh</span>
-              </Button>
-
-              <Button 
-                onClick={rerecordAllRecords} 
-                variant="outline" 
-                size="sm"
-                disabled={isLoading}
-                className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none bg-orange-50 hover:bg-orange-100"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                <span className="ml-1 hidden sm:inline">Re-record All</span>
-              </Button>
-
-              <Button 
-                onClick={startAddingNew} 
-                variant="default" 
-                size="sm"
-                disabled={isAddingNew}
-                className="min-h-[44px] sm:min-h-auto flex-1 sm:flex-none"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="ml-1 hidden sm:inline">Add Record</span>
-              </Button>
-            </div>
-          </CardTitle>
-          
-          {/* Filters Section */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 pt-4 border-t">
-            <div className="flex-1 sm:max-w-xs">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Filter by Employee</label>
-              <Select
-                value={selectedEmployee}
-                onValueChange={setSelectedEmployee}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="All Employees" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex-1 sm:max-w-xs">
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Filter by Position</label>
-              <Select
-                value={selectedPosition}
-                onValueChange={setSelectedPosition}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="All Positions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Positions</SelectItem>
-                  <SelectItem value="Customer Service">Customer Service</SelectItem>
-                  <SelectItem value="Designer">Designer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-end">
-              <Button 
-                onClick={() => {
-                  setSelectedEmployee('all');
-                  setSelectedPosition('all');
-                }}
-                variant="outline" 
-                size="sm"
-                className="h-10 px-3"
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {/* Mobile cards view - Fixed mobile viewing */}
-          <div className="block lg:hidden">
-            <div className="max-h-none overflow-y-auto">
-              <div className="space-y-3 p-4 max-h-[calc(100vh-350px)] overflow-y-auto">
-                {/* Add New Record Card */}
-                {isAddingNew && (
-                  <Card className="border-2 border-blue-200 bg-blue-50/50">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">Add New Record</h4>
-                        <div className="flex gap-2">
-                          <Button onClick={saveRecord} size="sm" variant="outline" className="min-h-[44px] sm:min-h-auto">
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button onClick={cancelEditing} size="sm" variant="outline" className="min-h-[44px] sm:min-h-auto">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Employee</label>
-                          <Select
-                            value={editForm.employee_id}
-                            onValueChange={(value) => {
-                              const employee = employees.find(e => e.id === value);
-                              setEditForm({
-                                ...editForm,
-                                employee_id: value,
-                                employee_name: employee?.name || '',
-                                employee_position: employee?.position || ''
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select employee" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {employees.map((emp) => (
-                                <SelectItem key={emp.id} value={emp.id}>
-                                  {emp.name} ({emp.position})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Working Days</label>
-                            <Input
-                              type="number"
-                              value={editForm.total_working_days || ''}
-                              onChange={(e) => setEditForm({...editForm, total_working_days: Number(e.target.value)})}
-                              className="h-11"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Delay Minutes</label>
-                            <Input
-                              type="number"
-                              value={editForm.total_delay_minutes || ''}
-                              onChange={(e) => setEditForm({...editForm, total_delay_minutes: Number(e.target.value)})}
-                              className="h-11"
-                              placeholder="Minutes"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Overtime Hours</label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editForm.total_overtime_hours || ''}
-                            onChange={(e) => setEditForm({...editForm, total_overtime_hours: Number(e.target.value)})}
-                            className="h-11"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                          <div>
-                            <span className="text-xs text-muted-foreground">Performance Score</span>
-                            <div className={`text-sm font-bold ${getPerformanceColor(calculatedScore)}`}>
-                              {calculatedScore.toFixed(1)}%
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-xs text-muted-foreground">Punctuality</span>
-                            <div className={`text-sm font-bold ${getPerformanceColor(calculatedPunctuality)}`}>
-                              {calculatedPunctuality.toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <Badge className={
-                            calculatedStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                            calculatedStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                            calculatedStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }>
-                            {calculatedStatus}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Loading state */}
-                {isLoading ? (
-                  <div className="text-center py-8">
-                    <div className="flex items-center justify-center mb-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+                    <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-yellow-400 rounded-full p-0.5 sm:p-1 shadow-md">
+                      <Crown className="h-3 w-3 sm:h-5 sm:w-5 text-yellow-800" />
                     </div>
-                    <span className="text-sm text-muted-foreground">Loading...</span>
+                    <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 bg-yellow-300 rounded-full p-0.5 sm:p-1">
+                      <Star className="h-2 w-2 sm:h-3 sm:w-3 text-yellow-700" />
+                    </div>
                   </div>
-                ) : filteredPerformanceData.length === 0 && !isAddingNew ? (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-muted-foreground">No performance data available.</p>
-                    <p className="text-xs text-muted-foreground mt-1">Click "Add Record" to create new entries.</p>
+                  <div className="text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 mb-1">
+                      <h3 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-gray-100">{bestEmployee.name}</h3>
+                      <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm">
+                        🏆 Champion
+                      </Badge>
+                    </div>
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 font-medium">{bestEmployee.position} • {bestEmployee.department}</p>
                   </div>
-                ) : (
-                  filteredPerformanceData.map((record) => {
-                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
-                    const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
-                    const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
-                    const isEditing = editingId === record.id;
-
-                    return (
-                      <Card key={record.id} className={`border ${isEditing ? 'border-blue-200 bg-blue-50/50' : ''}`}>
-                        <CardContent className="p-4 space-y-3">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              {isEditing ? (
-                                <div className="space-y-2">
-                                  <label className="text-xs font-medium text-muted-foreground">Employee</label>
-                                  <Select
-                                    value={editForm.employee_id}
-                                    onValueChange={(value) => {
-                                      const employee = employees.find(e => e.id === value);
-                                      setEditForm({
-                                        ...editForm,
-                                        employee_id: value,
-                                        employee_name: employee?.name || '',
-                                        employee_position: employee?.position || ''
-                                      });
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-10">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {employees.map((emp) => (
-                                        <SelectItem key={emp.id} value={emp.id}>
-                                          {emp.name} ({emp.position})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ) : (
-                                <div>
-                                  <h4 className="font-medium text-sm">{record.employee_name}</h4>
-                                  <Badge variant={record.employee_position === 'Designer' ? 'secondary' : 'default'} className="text-xs mt-1">
-                                    {record.employee_position || 'Unknown'}
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <div className="flex gap-2 ml-2">
-                              {isEditing ? (
-                                <>
-                                  <Button onClick={saveRecord} size="sm" variant="outline" className="min-h-[44px] sm:min-h-auto">
-                                    <Save className="h-4 w-4" />
-                                  </Button>
-                                  <Button onClick={cancelEditing} size="sm" variant="outline" className="min-h-[44px] sm:min-h-auto">
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <div className="flex gap-2">
-                                  <Button onClick={() => startEditing(record)} size="sm" variant="outline">
-                                    <Edit3 className="h-4 w-4" />
-                                  </Button>
-                                  <Button onClick={() => deleteRecord(record.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {isEditing ? (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Working Days</label>
-                                  <Input
-                                    type="number"
-                                    value={editForm.total_working_days || ''}
-                                    onChange={(e) => setEditForm({...editForm, total_working_days: Number(e.target.value)})}
-                                    className="h-10"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Delay Minutes</label>
-                                  <Input
-                                    type="number"
-                                    value={editForm.total_delay_minutes || ''}
-                                    onChange={(e) => setEditForm({...editForm, total_delay_minutes: Number(e.target.value)})}
-                                    className="h-10"
-                                    placeholder="Minutes"
-                                  />
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Overtime Hours</label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={editForm.total_overtime_hours || ''}
-                                  onChange={(e) => setEditForm({...editForm, total_overtime_hours: Number(e.target.value)})}
-                                  className="h-10"
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Performance Score</span>
-                                  <div className={`text-sm font-bold ${getPerformanceColor(calculatedScore)}`}>
-                                    {calculatedScore.toFixed(1)}%
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Punctuality</span>
-                                  <div className={`text-sm font-bold ${getPerformanceColor(calculatedPunctuality)}`}>
-                                    {calculatedPunctuality.toFixed(1)}%
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Working Days</span>
-                                  <div className="text-sm font-medium">{record.total_working_days}</div>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Performance Score</span>
-                                  <div className={`text-sm font-bold ${getPerformanceColor(realTimeScore)}`}>
-                                    {realTimeScore.toFixed(1)}%
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Delay</span>
-                                  <div className={`text-sm font-medium ${record.total_delay_minutes > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                    {formatDelayHoursAndMinutes(record.total_delay_minutes)}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Overtime Hours</span>
-                                  <div className={`text-sm font-medium ${record.total_overtime_hours > 0 ? 'text-blue-600' : 'text-gray-500'}`}>
-                                    {formatHoursAndMinutes(record.total_overtime_hours)}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Enhanced Metrics Section */}
-                              <div className="pt-2 border-t space-y-2">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">Tasks Completed</span>
-                                    <div className="text-sm font-medium text-purple-600">
-                                      {record.tasks_completed || 0}
-                                      {record.tasks_success_rate !== undefined && (
-                                        <span className="text-xs text-muted-foreground ml-1">
-                                          ({record.tasks_success_rate.toFixed(0)}%)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">Login Days</span>
-                                    <div className="text-sm font-medium text-indigo-600">
-                                      {record.total_logins || 0}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">App Usage</span>
-                                    <div className="text-sm font-medium text-green-600">
-                                      {formatHoursAndMinutes(record.app_usage_hours || 0)}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <span className="text-xs text-muted-foreground">Avg Daily Hours</span>
-                                    <div className="text-sm font-medium text-teal-600">
-                                      {formatHoursAndMinutes(record.average_daily_hours || 0)}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Check-ins Count</span>
-                                  <div className="text-sm font-medium text-orange-600">
-                                    {record.check_ins_count || 0}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-2 border-t">
-                                <div>
-                                  <span className="text-xs text-muted-foreground">Punctuality</span>
-                                  <div className={`text-sm font-bold ${getPerformanceColor(realTimePunctuality)}`}>
-                                    {realTimePunctuality.toFixed(1)}%
-                                  </div>
-                                </div>
-                                <div>
-                                  <Badge className={
-                                    realTimeStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                                    realTimeStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                                    realTimeStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-red-100 text-red-800'
-                                  }>
-                                    {realTimeStatus}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop table view */}
-          <div className="hidden lg:block">
-          {isLoading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : (
-              <div className="mobile-table-scroll p-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Delay</TableHead>
-                    <TableHead>Overtime</TableHead>
-                    <TableHead>Tasks</TableHead>
-                    <TableHead>Logins</TableHead>
-                    <TableHead>App Usage</TableHead>
-                    <TableHead>Performance</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Add New Row */}
-                  {isAddingNew && (
-                    <TableRow className="bg-blue-50">
-                      <TableCell>
-                        <Select
-                          value={editForm.employee_id}
-                          onValueChange={(value) => {
-                            const employee = employees.find(e => e.id === value);
-                            setEditForm({
-                              ...editForm,
-                              employee_id: value,
-                                employee_name: employee?.name || '',
-                                employee_position: employee?.position || ''
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select employee" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees.map((emp) => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                  {emp.name} ({emp.position})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-gray-600">
-                            {editForm.employee_position || 'Select employee first'}
-                          </span>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={editForm.total_working_days || ''}
-                          onChange={(e) => setEditForm({...editForm, total_working_days: Number(e.target.value)})}
-                          className="w-20"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <span className={`font-bold ${getPerformanceColor(calculatedScore)}`}>{calculatedScore.toFixed(1)}%</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-red-600 font-medium">
-                          {formatDelayHoursAndMinutes(editForm.total_delay_minutes || 0)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editForm.total_overtime_hours || ''}
-                          onChange={(e) => setEditForm({...editForm, total_overtime_hours: Number(e.target.value)})}
-                          className="w-20"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={editForm.total_delay_minutes || ''}
-                          onChange={(e) => setEditForm({...editForm, total_delay_minutes: Number(e.target.value)})}
-                          className="w-20"
-                          placeholder="Minutes"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <span className={getPerformanceColor(calculatedPunctuality)}>{calculatedPunctuality.toFixed(1)}%</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={
-                          calculatedStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                          calculatedStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                          calculatedStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }>
-                          {calculatedStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button onClick={saveRecord} size="sm" variant="outline">
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button onClick={cancelEditing} size="sm" variant="outline">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {/* Existing Records */}
-                  {filteredPerformanceData.map((record) => {
-                    const realTimeScore = calcPerformanceScore(record.total_delay_minutes, record.total_overtime_hours);
-                    const realTimePunctuality = calcPunctuality(record.total_delay_minutes);
-                    const realTimeStatus = calcStatus(realTimeScore, realTimePunctuality);
-                    
-                    return (
-                    <TableRow key={record.id}>
-                          <TableCell className="sticky left-0 bg-background z-10">
-                            <div>
-                              <div className="font-medium">{record.employee_name}</div>
-                              <Badge variant={record.employee_position === 'Designer' ? 'secondary' : 'default'} className="text-xs">
-                                {record.employee_position || 'Unknown'}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell>{record.total_working_days}</TableCell>
-                          <TableCell>
-                            <span className={record.total_delay_minutes > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
-                              {formatDelayHoursAndMinutes(record.total_delay_minutes)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={record.total_overtime_hours > 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}>
-                              {formatHoursAndMinutes(record.total_overtime_hours)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-purple-600 font-medium">
-                              {record.tasks_completed || 0}
-                              {record.tasks_success_rate !== undefined && (
-                                <div className="text-xs text-muted-foreground">
-                                  {record.tasks_success_rate.toFixed(0)}% success
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-indigo-600 font-medium">
-                              {record.total_logins || 0} days
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-green-600 font-medium">
-                              {formatHoursAndMinutes(record.app_usage_hours || 0)}
-                              {record.average_daily_hours !== undefined && (
-                                <div className="text-xs text-muted-foreground">
-                                  {formatHoursAndMinutes(record.average_daily_hours)} avg/day
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className={`font-bold ${getPerformanceColor(realTimeScore)}`}>
-                              {realTimeScore.toFixed(1)}%
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {realTimePunctuality.toFixed(0)}% punctual
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={
-                              realTimeStatus === 'Excellent' ? 'bg-green-100 text-green-800' :
-                              realTimeStatus === 'Good' ? 'bg-blue-100 text-blue-800' :
-                              realTimeStatus === 'Needs Improvement' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }>
-                              {realTimeStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button onClick={() => startEditing(record)} size="sm" variant="outline">
-                                <Edit3 className="h-4 w-4" />
-                              </Button>
-                              <Button onClick={() => deleteRecord(record.id)} size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {filteredPerformanceData.length === 0 && !isAddingNew && (
-                <div className="text-center py-8 text-gray-500">
-                  No performance data available. Click "Add Record" to create new entries.
                 </div>
-              )}
+                
+                {/* Mobile: Stack metrics vertically, Desktop: Horizontal */}
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-4 w-full sm:w-auto">
+                    <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                      <span className="font-semibold text-green-700 dark:text-green-400">{bestEmployee.performance.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
+                      <span className="font-semibold text-blue-700 dark:text-blue-400">{bestEmployee.tasks.completed} Tasks</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
+                      <span className="font-semibold text-purple-700 dark:text-purple-400">{formatTime(bestEmployee.delay)} Delay</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600" />
+                      <span className="font-semibold text-orange-700 dark:text-orange-400">{formatTime(bestEmployee.overtime)} Overtime</span>
+                    </div>
+                  </div>
+                  
+                  {/* Ranking - hidden on small mobile, shown on larger screens */}
+                  <div className="hidden sm:block text-right">
+                    <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+                      #1
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">Top Performer</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Enhanced Dashboard */}
+        <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
+            <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center gap-3 text-lg sm:text-xl">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Trophy className="h-5 w-5 sm:h-6 sm:w-6" />
+                </div>
+                <div>
+                  <div className="text-xl sm:text-2xl font-bold">Employee Performance Dashboard</div>
+                  <div className="text-blue-100 text-xs sm:text-sm font-medium">{format(new Date(currentMonth), 'MMMM yyyy')}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                  <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  {employees.length} Employees
+                </Badge>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={fixRecords}
+                      disabled={isFixingRecords}
+                      variant="secondary"
+                      size="sm"
+                      className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs sm:text-sm"
+                    >
+                      {isFixingRecords ? (
+                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Wrench className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      )}
+                      Fix Records
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Automatically fix task completion records based on visual content and completion dates</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </CardTitle>
+          </CardHeader>
+                    <CardContent className="p-3 sm:p-6">
+            {/* Mobile Card View */}
+            <div className="block lg:hidden space-y-4">
+              {employees.map((employee, index) => (
+                <Card key={employee.id} className={`
+                  border transition-all duration-200 hover:shadow-md
+                  ${index === 0 ? 'border-yellow-300 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20' : 'border-gray-200 dark:border-gray-700'}
+                `}>
+                  <CardContent className="p-4">
+                    {/* Employee Header */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="relative">
+                        <div className={`
+                          w-12 h-12 rounded-full flex items-center justify-center font-semibold text-white shadow-md
+                          ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-purple-500'}
+                        `}>
+                          {employee.name.charAt(0).toUpperCase()}
+                        </div>
+                        {index === 0 && (
+                          <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-0.5">
+                            <Crown className="h-3 w-3 text-yellow-800" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">{employee.name}</h3>
+                          {index === 0 && (
+                            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-2 py-0.5">
+                              👑 #1
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{employee.position}</p>
+                        <Badge variant="outline" className="text-xs mt-1">{employee.department}</Badge>
+                      </div>
+                    </div>
+
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <Calendar className="h-4 w-4 text-blue-600 mx-auto mb-1" />
+                        <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                          {employee.days === -1 ? 'No Track' : employee.days}
+                        </div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
+                      </div>
+                      <div className={`text-center p-3 rounded-lg ${
+                        index === 0 ? 'bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20' : 'bg-purple-50 dark:bg-purple-900/20'
+                      }`}>
+                        <TrendingUp className={`h-4 w-4 mx-auto mb-1 ${
+                          index === 0 ? 'text-orange-600' : 'text-purple-600'
+                        }`} />
+                        <div className={`text-lg font-bold ${
+                          index === 0 ? 'text-orange-700 dark:text-orange-300' : 'text-purple-700 dark:text-purple-300'
+                        }`}>
+                          {employee.performance.toFixed(1)}%
+                        </div>
+                        <div className={`text-xs ${
+                          index === 0 ? 'text-orange-600 dark:text-orange-400' : 'text-purple-600 dark:text-purple-400'
+                        }`}>
+                          Performance
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Secondary Metrics */}
+                    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                      <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                        <Clock className="h-3 w-3 text-red-600" />
+                        <span className="text-red-700 dark:text-red-300 font-medium">
+                          {employee.delay === -1 ? 'No Track' : `${formatTime(employee.delay)} Delay`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                        <TrendingUp className="h-3 w-3 text-green-600" />
+                        <span className="text-green-700 dark:text-green-300 font-medium">
+                          {employee.overtime === -1 ? 'No Track' : `${formatTime(employee.overtime)} Overtime`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Expandable Details */}
+                    <div className="space-y-2 text-sm border-t pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Work Time:</span>
+                        <span className="font-medium">
+                          {employee.workTime === -1 ? 'No Track' : formatTime(employee.workTime)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Tasks:</span>
+                        <span className="font-medium">{employee.tasks.completed}/{employee.tasks.total}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">Delay to Finish:</span>
+                        <span className={`font-medium ${employee.delayToFinish === -1 ? 'text-gray-500' : getDelayToFinishColor(employee.delayToFinish)}`}>
+                          {employee.delayToFinish === -1 ? 'No Track' : formatDelayToFinish(employee.delayToFinish)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {user?.role === 'admin' && (
+                      <div className="flex gap-2 mt-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleEditEmployee(employee)}
+                        >
+                          <Edit3 className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleDeleteEmployee(employee.id, employee.name)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          )}
+
+                        {/* Desktop Table View */}
+            <div className="hidden lg:block">
+              <div className="w-full overflow-hidden rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse bg-white dark:bg-gray-800">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600">
+                        <th className="text-left p-2 font-semibold text-gray-700 dark:text-gray-200 w-[180px]">Employee</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[60px]">Days</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[80px]">Work Time</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[60px]">Delay</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[80px]">Overtime</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[90px]">Delay to Finish</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[70px]">Tasks</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[70px]">Reports</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[90px]">Performance</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[70px]">Status</th>
+                        <th className="text-center p-2 font-semibold text-gray-700 dark:text-gray-200 w-[80px]">Actions</th>
+                      </tr>
+                    </thead>
+              <tbody>
+                {employees.map((employee, index) => (
+                  <tr key={employee.id} className={`
+                    border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors
+                    ${index === 0 ? 'bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border-yellow-200' : ''}
+                  `}>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          <div className="relative">
+                            <div className={`
+                              w-6 h-6 rounded-full flex items-center justify-center font-semibold text-white shadow-md text-xs
+                              ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-purple-500'}
+                            `}>
+                              {employee.name.charAt(0).toUpperCase()}
+                            </div>
+                            {index === 0 && (
+                              <div className="absolute -top-0.5 -right-0.5 bg-yellow-400 rounded-full p-0.5">
+                                <Crown className="h-1.5 w-1.5 text-yellow-800" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1">
+                              <span className="font-semibold text-gray-900 dark:text-gray-100 text-xs truncate">{employee.name}</span>
+                              {index === 0 && (
+                                <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-1 py-0.5 flex-shrink-0">
+                                  👑
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 truncate">{employee.position}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex items-center justify-center gap-1">
+                          {employee.days === -1 ? (
+                            <span className="font-semibold text-gray-500 dark:text-gray-400 text-sm">No Track</span>
+                          ) : (
+                            <>
+                              <Calendar className="h-3 w-3 text-blue-600" />
+                              <span className="font-semibold text-blue-700 dark:text-blue-300 text-sm">{employee.days}</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex items-center justify-center gap-1">
+                          {employee.workTime === -1 ? (
+                            <span className="font-semibold text-gray-500 dark:text-gray-400 text-sm">No Track</span>
+                          ) : (
+                            <>
+                              <Clock className="h-3 w-3 text-indigo-600" />
+                              <span className="font-semibold text-indigo-700 dark:text-indigo-300 text-sm">
+                                {formatTime(employee.workTime)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex items-center justify-center gap-1">
+                          {employee.delay === -1 ? (
+                            <span className="font-semibold text-gray-500 dark:text-gray-400 text-sm">No Track</span>
+                          ) : (
+                            <>
+                              <Clock className={`h-3 w-3 ${employee.delay > 0 ? 'text-red-600' : 'text-green-600'}`} />
+                              <span className={`font-semibold text-sm ${employee.delay > 0 ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
+                                {formatTime(employee.delay)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex items-center justify-center gap-1">
+                          {employee.overtime === -1 ? (
+                            <span className="font-semibold text-gray-500 dark:text-gray-400 text-sm">No Track</span>
+                          ) : (
+                            <>
+                              <TrendingUp className="h-3 w-3 text-green-600" />
+                              <span className="font-semibold text-green-700 dark:text-green-300 text-sm">
+                                {formatTime(employee.overtime)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex items-center justify-center gap-1">
+                          {employee.delayToFinish === -1 ? (
+                            <span className="font-semibold text-gray-500 dark:text-gray-400 text-sm">No Track</span>
+                          ) : (
+                            <>
+                              <Target className={`h-3 w-3 ${employee.delayToFinish > 0 ? 'text-orange-600' : 'text-green-600'}`} />
+                              <span className={`font-semibold text-sm ${getDelayToFinishColor(employee.delayToFinish)}`}>
+                                {formatDelayToFinish(employee.delayToFinish)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="text-center">
+                          <div className="font-semibold text-emerald-700 dark:text-emerald-300 text-xs">
+                            {employee.tasks.completed}/{employee.tasks.total}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {employee.tasks.successRate.toFixed(0)}%
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="text-center">
+                          <div className="font-semibold text-purple-700 dark:text-purple-300 text-xs">
+                            {employee.workReports.submitted}/{employee.workReports.total}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {employee.workReports.completionRate.toFixed(0)}%
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className={`
+                          px-2 py-1 rounded-full text-center
+                          ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white' : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'}
+                        `}>
+                          <div className="font-bold text-xs">
+                            {employee.performance.toFixed(1)}%
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <Badge className={`${getStatusColor(employee.status)} px-1 py-0.5 text-xs`}>
+                          {employee.status}
+                        </Badge>
+                      </td>
+
+                      <td className="text-center p-2">
+                        <div className="flex justify-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-700 px-1 py-1 h-6 w-6"
+                            onClick={() => handleEditEmployee(employee)}
+                          >
+                            <Edit3 className="h-3 w-3 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="hover:bg-red-50 dark:hover:bg-red-900/30 border-red-200 dark:border-red-700 px-1 py-1 h-6 w-6"
+                            onClick={() => handleDeleteEmployee(employee.id, employee.name)}
+                          >
+                            <Trash2 className="h-3 w-3 text-red-600" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {employees.length === 0 && (
+              <div className="text-center py-12">
+                <div className="max-w-md mx-auto">
+                  <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="h-12 w-12 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Performance Data</h3>
+                  <p className="text-gray-600 dark:text-gray-400">No employee data found for the selected period. Check back after employees have logged work hours.</p>
+                </div>
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Edit Employee Sheet */}
+    <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
+      <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Edit3 className="h-5 w-5" />
+            Edit Employee
+          </SheetTitle>
+        </SheetHeader>
+        
+        <div className="mt-6 space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              placeholder="Employee name"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Department</label>
+            <Select 
+              value={editForm.department} 
+              onValueChange={(value) => setEditForm({ ...editForm, department: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Customer Service">Customer Service</SelectItem>
+                <SelectItem value="Design">Design</SelectItem>
+                <SelectItem value="Marketing">Marketing</SelectItem>
+                <SelectItem value="Content">Content</SelectItem>
+                <SelectItem value="Development">Development</SelectItem>
+                <SelectItem value="Management">Management</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Position</label>
+            <Select 
+              value={editForm.position} 
+              onValueChange={(value) => setEditForm({ ...editForm, position: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select position" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Customer Service">Customer Service</SelectItem>
+                <SelectItem value="Designer">Designer</SelectItem>
+                <SelectItem value="Media Buyer">Media Buyer</SelectItem>
+                <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                <SelectItem value="Content Creator">Content Creator</SelectItem>
+                <SelectItem value="Social Media Manager">Social Media Manager</SelectItem>
+                <SelectItem value="Developer">Developer</SelectItem>
+                <SelectItem value="Manager">Manager</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Performance Override (%)</label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={editForm.performance}
+              onChange={(e) => setEditForm({ ...editForm, performance: parseFloat(e.target.value) || 0 })}
+              placeholder="Performance percentage"
+            />
+            <p className="text-xs text-gray-500">Leave as calculated value or override manually</p>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Status Override</label>
+            <Select 
+              value={editForm.status} 
+              onValueChange={(value) => setEditForm({ ...editForm, status: value as any })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Excellent">Excellent</SelectItem>
+                <SelectItem value="Good">Good</SelectItem>
+                <SelectItem value="Average">Average</SelectItem>
+                <SelectItem value="Poor">Poor</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="flex gap-2 pt-4">
+            <Button onClick={handleSaveEdit} className="flex-1">
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsEditSheetOpen(false)}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  </div>
+</TooltipProvider>
+);
 };
 
 export default EditablePerformanceDashboard; 
