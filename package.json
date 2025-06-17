@@ -1,7 +1,7 @@
 {
   "name": "noorhub-daily-pulse",
   "private": true,
-  "version": "1.8.8",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -68,6 +68,7 @@
     "input-otp": "^1.2.4",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "quill": "^2.0.3",

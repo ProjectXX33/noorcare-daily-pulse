@@ -1,18 +1,20 @@
 {
-  "version": "1.8.5",
-  "buildTime": "2025-06-15T23:32:50.015Z",
-  "buildTimestamp": "1750030370016",
-  "buildDate": "6/16/2025",
+  "version": "2.0.0",
+  "buildTime": "2025-06-17T12:45:00.000Z",
+  "buildTimestamp": "1750164300000",
+  "buildDate": "6/17/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "✨ Major New Features",
-    "🔧 Advanced Employee Management System",
-    "✅ Complete Edit Functionality: Full CRUD operations for employee management",
-    "✅ Real-time Updates: Instant reflection of changes across the dashboard",
-    "✅ Performance Override: Manual adjustment capabilities for special cases",
-    "✅ Status Management: Update employee status with proper tracking",
-    "✅ Secure Operations: Admin-only access with confirmation dialogs"
+    "🎬 **Version 2.0.0 - Major Animation & UI Overhaul**",
+    "✨ **Animated Icons System**: Premium Lottie animations throughout the app",
+    "🕒 **Animated Clock**: Work timer now features smooth animated clock instead of static timer",
+    "🔥 **Animated Fire**: Overtime mode displays animated fire for visual impact",
+    "🔔 **Smart Notification Bell**: Custom SVG bell that animates when notifications arrive",
+    "⏰ **Enhanced Timer**: Countdown from full shift duration (7h day / 8h night shifts)",
+    "🎯 **Improved UX**: Animations only show after actions (check-in/check-out completion)",
+    "📱 **Better Visual Feedback**: Gold notification bell when messages are waiting",
+    "🚀 **Performance Optimized**: Smooth 60fps animations with fallback to static icons"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

@@ -455,7 +455,7 @@ export const eventService = {
         console.log('⚠️ No rows affected - checking if question exists');
         
         const { data: checkQA, error: checkError } = await supabase
-          .from('event_qa')
+      .from('event_qa')
           .select('id, is_active, created_by')
           .eq('id', id)
           .single();

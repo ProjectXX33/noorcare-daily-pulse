@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { Check, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { AnimatedClock } from '@/components/AnimatedClock';
 
 const CheckInButton = () => {
   const { user } = useAuth();
@@ -220,9 +221,10 @@ const CheckInButton = () => {
 
   const getButtonContent = () => {
     if (alreadyCheckedIn) {
+      console.log('✅ User is checked in, showing AnimatedClock');
       return (
         <div className="flex flex-col items-center">
-          <Check className="h-6 w-6 mb-1" />
+          <AnimatedClock className="h-6 w-6 mb-1" />
           <span>Checked In</span>
         </div>
       );

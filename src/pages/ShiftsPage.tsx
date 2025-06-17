@@ -153,7 +153,7 @@ const ShiftsPage = () => {
       notWorked: "لم يعمل",
       summary: "الملخص",
       totalRegularHours: "إجمالي الساعات العادية",
-              totalOvertimeHours: "إجمالي ساعات العمل الإضافي",
+      totalOvertimeHours: "إجمالي ساعات العمل الإضافي",
       delayToFinish: "التأخير للإنهاء",
       totalWorkingDays: "إجمالي أيام العمل",
       averageHoursPerDay: "متوسط الساعات/اليوم",

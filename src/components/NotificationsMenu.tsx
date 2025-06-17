@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
+import { AnimatedNotificationBell } from '@/components/NotificationBell';
 import { 
   Popover, 
   PopoverContent, 
@@ -242,10 +243,27 @@ const NotificationsMenu = () => {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className={`h-5 w-5 transition-all ${unreadCount > 0 ? 'animate-bounce text-yellow-500' : ''}`} />
+          <AnimatedNotificationBell 
+            className="h-5 w-5 transition-all" 
+            hasNotifications={unreadCount > 0} 
+          />
           {unreadCount > 0 && (
-            <Badge variant="destructive" className="absolute -top-1 -right-1 px-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs">
-              {unreadCount}
+            <Badge 
+              variant="destructive" 
+              className={`
+                absolute -top-0.5 -right-0.5
+                px-1.5 min-w-[20px] h-[20px] 
+                flex items-center justify-center 
+                text-xs font-bold
+                bg-gradient-to-br from-red-500 to-red-600
+                border-2 border-white
+                shadow-lg shadow-red-500/25
+                animate-pulse
+                transform hover:scale-110 transition-transform duration-200
+                ${unreadCount > 99 ? 'px-1 text-[10px]' : ''}
+              `}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
           )}
         </Button>

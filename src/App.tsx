@@ -40,6 +40,8 @@ import AdminBugReportsPage from "./pages/AdminBugReportsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
+import MyOrdersPage from "./pages/MyOrdersPage";
+import AdminTotalOrdersPage from "./pages/AdminTotalOrdersPage";
 import LoyalCustomersPage from "./pages/LoyalCustomersPage";
 import CustomerServiceCRMPage from "./pages/CustomerServiceCRMPage";
 import CopyWritingDashboard from "./pages/CopyWritingDashboard";
@@ -429,6 +431,26 @@ const AppWithAuth = () => {
                           <CreateOrderPage />
                         </SidebarNavigation>
                       </CustomerServiceRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/my-orders" 
+                    element={
+                      <CustomerServiceRoute>
+                        <SidebarNavigation>
+                          <MyOrdersPage />
+                        </SidebarNavigation>
+                      </CustomerServiceRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin-total-orders" 
+                    element={
+                      <AdminRoute>
+                        <SidebarNavigation>
+                          <AdminTotalOrdersPage />
+                        </SidebarNavigation>
+                      </AdminRoute>
                     } 
                   />
                   <Route 

@@ -4,6 +4,7 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { Check, Clock, AlertCircle } from 'lucide-react';
+import { AnimatedClock } from '@/components/AnimatedClock';
 
 const CheckOutButton = () => {
   const { user } = useAuth();
@@ -55,7 +56,7 @@ const CheckOutButton = () => {
         >
           {checkedOutToday ? (
             <div className="flex flex-col items-center">
-              <Check className="h-6 w-6 mb-1" />
+              <AnimatedClock className="h-6 w-6 mb-1" />
               <span>Checked Out</span>
             </div>
           ) : isLoading ? (

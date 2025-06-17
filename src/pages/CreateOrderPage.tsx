@@ -32,6 +32,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import wooCommerceAPI, { isWooCommerceConfigured } from '@/lib/woocommerceApi';
+import { createOrderSubmission, OrderSubmission, OrderItem as OrderSubmissionItem } from '@/lib/orderSubmissionsApi';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Product {
   id: number;
@@ -599,6 +601,49 @@ const CreateOrderPage: React.FC = () => {
     
     setIsLoading(true);
     try {
+      // Prepare order submission data for our database
+      const orderSubmissionData: OrderSubmission = {
+        customer_first_name: billingInfo.first_name,
+        customer_last_name: billingInfo.last_name,
+        customer_phone: billingInfo.phone,
+        customer_email: '',
+        billing_address_1: billingInfo.address_1,
+        billing_address_2: billingInfo.address_2,
+        billing_city: billingInfo.city,
+        billing_state: billingInfo.state,
+        billing_postcode: billingInfo.postcode,
+        billing_country: billingInfo.country,
+        order_items: orderItems.map(item => ({
+          product_id: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          price: item.product.sale_price || item.product.price,
+          sku: item.product.sku,
+          regular_price: item.product.regular_price,
+          sale_price: item.product.sale_price
+        })),
+        subtotal: calculateSubtotal(),
+        discount_amount: calculateDiscount(),
+        shipping_amount: calculateShipping(),
+        total_amount: parseFloat(calculateTotal()),
+        coupon_code: appliedCoupon?.code,
+        coupon_discount_type: appliedCoupon?.discount_type,
+        coupon_amount: appliedCoupon?.amount,
+        customer_note: customerNote,
+        include_shipping: includeShipping,
+        status: 'processing',
+        payment_method: 'cod',
+        payment_status: 'pending'
+      };
+
+      // Save to our database first
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      
+      const savedOrder = await createOrderSubmission(orderSubmissionData, user.id, user.name);
+      console.log('Order saved to database:', savedOrder);
+
       // Prepare order data for WooCommerce API
       const orderData = {
         payment_method: 'cod', // Cash on delivery
@@ -635,6 +680,10 @@ const CreateOrderPage: React.FC = () => {
           {
             key: '_customer_service_note',
             value: customerNote
+          },
+          {
+            key: '_internal_order_id',
+            value: savedOrder.id?.toString() || ''
           }
         ],
         status: 'processing' // Set order status to processing
@@ -643,59 +692,63 @@ const CreateOrderPage: React.FC = () => {
       console.log('Creating order in WooCommerce with data:', orderData);
       
       if (isWooCommerceConfigured()) {
-        // Create real order in WooCommerce
-        const createdOrder = await wooCommerceAPI.createOrder(orderData);
-        console.log('Order created successfully:', createdOrder);
-        
-        toast.success(`Order #${createdOrder.number} created successfully!`, {
-          description: `Total: ${calculateTotal()} SAR - Status: ${createdOrder.status}`
-        });
-        
-        // Reset form after successful order creation
-        setBillingInfo({
-          first_name: '',
-          last_name: '',
-          address_1: '',
-          address_2: '',
-          city: '',
-          state: '',
-          postcode: '',
-          country: 'Saudi Arabia',
-          phone: ''
-        });
-        setOrderItems([]);
-        setAppliedCoupon(null);
-        setCouponCode('');
-        setCustomerNote('');
-        setIncludeShipping(true);
-        
+        try {
+          // Create real order in WooCommerce
+          const createdOrder = await wooCommerceAPI.createOrder(orderData);
+          console.log('Order created successfully:', createdOrder);
+          
+          // Update our database record with the real WooCommerce order number
+          if (savedOrder.id && createdOrder.number) {
+            try {
+              await supabase
+                .from('order_submissions')
+                .update({ 
+                  order_number: `#${createdOrder.number}`,
+                  woocommerce_order_id: createdOrder.id,
+                  is_synced_to_woocommerce: true
+                })
+                .eq('id', savedOrder.id);
+              
+              console.log(`Updated order ${savedOrder.id} with WooCommerce number: #${createdOrder.number}`);
+            } catch (updateError) {
+              console.error('Failed to update order with WooCommerce number:', updateError);
+            }
+          }
+          
+          toast.success(`Order #${createdOrder.number} created successfully!`, {
+            description: `Total: ${calculateTotal()} SAR - Saved to database and WooCommerce`
+          });
+        } catch (wcError) {
+          console.error('WooCommerce sync failed:', wcError);
+          toast.warning(`Order saved locally but WooCommerce sync failed`, {
+            description: `Order #${savedOrder.order_number} - Total: ${calculateTotal()} SAR`
+          });
+        }
       } else {
         // Fallback for testing without WooCommerce
-        console.log('WooCommerce not configured, simulating order creation');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        toast.success('Order created successfully! (Test Mode)', {
-          description: `Total: ${calculateTotal()} SAR - Customer Service Order`
+        console.log('WooCommerce not configured, order saved to database only');
+        toast.success('Order created successfully!', {
+          description: `Order #${savedOrder.order_number} - Total: ${calculateTotal()} SAR`
         });
-        
-        // Reset form
-        setBillingInfo({
-          first_name: '',
-          last_name: '',
-          address_1: '',
-          address_2: '',
-          city: '',
-          state: '',
-          postcode: '',
-          country: 'Saudi Arabia',
-          phone: ''
-        });
-        setOrderItems([]);
-        setAppliedCoupon(null);
-        setCouponCode('');
-        setCustomerNote('');
-        setIncludeShipping(true);
       }
+
+      // Reset form after successful order creation
+      setBillingInfo({
+        first_name: '',
+        last_name: '',
+        address_1: '',
+        address_2: '',
+        city: '',
+        state: '',
+        postcode: '',
+        country: 'Saudi Arabia',
+        phone: ''
+      });
+      setOrderItems([]);
+      setAppliedCoupon(null);
+      setCouponCode('');
+      setCustomerNote('');
+      setIncludeShipping(true);
       
     } catch (error) {
       console.error('Error creating order:', error);

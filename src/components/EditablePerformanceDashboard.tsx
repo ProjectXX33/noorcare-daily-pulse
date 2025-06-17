@@ -275,14 +275,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         if (isRemoteRole) {
           // For remote roles, estimate work time based on tasks and reports
           totalWorkTime = (employeeTasks.length * 2) + (employeeReports.length * 1); // 2h per task, 1h per report
-        } else {
+            } else {
           // For office roles, use shift-based calculation
           employeeShifts.forEach(shift => {
             if (shift.shifts?.name?.toLowerCase().includes('day')) {
               totalWorkTime += 7; // Day shift: 7 hours
             } else if (shift.shifts?.name?.toLowerCase().includes('night')) {
               totalWorkTime += 8; // Night shift: 8 hours
-            } else {
+          } else {
               totalWorkTime += 8; // Default: 8 hours
             }
           });
@@ -635,11 +635,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
                       <span className="text-white font-bold text-lg sm:text-xl">
                         {bestEmployee.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    </span>
+              </div>
                     <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-yellow-400 rounded-full p-0.5 sm:p-1 shadow-md">
                       <Crown className="h-3 w-3 sm:h-5 sm:w-5 text-yellow-800" />
-                    </div>
+            </div>
                     <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 bg-yellow-300 rounded-full p-0.5 sm:p-1">
                       <Star className="h-2 w-2 sm:h-3 sm:w-3 text-yellow-700" />
                     </div>
@@ -661,11 +661,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
                       <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                       <span className="font-semibold text-green-700 dark:text-green-400">{bestEmployee.performance.toFixed(1)}%</span>
-                    </div>
+              </div>
                     <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
                       <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                       <span className="font-semibold text-blue-700 dark:text-blue-400">{bestEmployee.tasks.completed} Tasks</span>
-                    </div>
+            </div>
                     <div className="flex items-center gap-1 bg-white/60 dark:bg-gray-800/60 rounded-full px-2 sm:px-3 py-1 text-xs sm:text-sm">
                       <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600" />
                       <span className="font-semibold text-purple-700 dark:text-purple-400">{formatTime(bestEmployee.delay)} Delay</span>
@@ -680,13 +680,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   <div className="hidden sm:block text-right">
                     <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
                       #1
-                    </div>
+              </div>
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">Top Performer</p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
         )}
 
         {/* Enhanced Dashboard */}
@@ -696,12 +696,12 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               <div className="flex items-center gap-3 flex-1">
                 <div className="p-2 bg-white/20 rounded-lg">
                   <Trophy className="h-5 w-5 sm:h-6 sm:w-6" />
-                </div>
+            </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-bold">Employee Performance Dashboard</div>
                   <div className="text-blue-100 text-xs sm:text-sm font-medium">{format(new Date(currentMonth), 'MMMM yyyy')}</div>
-                </div>
-              </div>
+            </div>
+            </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
                   <Smartphone className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -709,11 +709,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                 </Badge>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
+              <Button 
                       onClick={fixRecords}
                       disabled={isFixingRecords}
                       variant="secondary"
-                      size="sm"
+                size="sm"
                       className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-xs sm:text-sm"
                     >
                       {isFixingRecords ? (
@@ -722,15 +722,15 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <Wrench className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       )}
                       Fix Records
-                    </Button>
+              </Button>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Automatically fix task completion records based on visual content and completion dates</p>
                   </TooltipContent>
                 </Tooltip>
-              </div>
+            </div>
             </CardTitle>
-          </CardHeader>
+        </CardHeader>
                     <CardContent className="p-3 sm:p-6">
             {/* Mobile Card View */}
             <div className="block lg:hidden space-y-4">
@@ -752,9 +752,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         {index === 0 && (
                           <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full p-0.5">
                             <Crown className="h-3 w-3 text-yellow-800" />
-                          </div>
-                        )}
                       </div>
+                        )}
+                        </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{employee.name}</h3>
@@ -763,11 +763,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               👑 #1
                             </Badge>
                           )}
-                        </div>
+                          </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{employee.position}</p>
                         <Badge variant="outline" className="text-xs mt-1">{employee.department}</Badge>
-                      </div>
-                    </div>
+                          </div>
+                        </div>
 
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
@@ -777,7 +777,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           {employee.days === -1 ? 'No Track' : employee.days}
                         </div>
                         <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
-                      </div>
+                            </div>
                       <div className={`text-center p-3 rounded-lg ${
                         index === 0 ? 'bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20' : 'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
@@ -788,14 +788,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           index === 0 ? 'text-orange-700 dark:text-orange-300' : 'text-purple-700 dark:text-purple-300'
                         }`}>
                           {employee.performance.toFixed(1)}%
-                        </div>
+                          </div>
                         <div className={`text-xs ${
                           index === 0 ? 'text-orange-600 dark:text-orange-400' : 'text-purple-600 dark:text-purple-400'
                         }`}>
                           Performance
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
                     {/* Secondary Metrics */}
                     <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
@@ -804,7 +804,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <span className="text-red-700 dark:text-red-300 font-medium">
                           {employee.delay === -1 ? 'No Track' : `${formatTime(employee.delay)} Delay`}
                         </span>
-                      </div>
+                        </div>
                       <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
                         <TrendingUp className="h-3 w-3 text-green-600" />
                         <span className="text-green-700 dark:text-green-300 font-medium">
@@ -820,19 +820,19 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <span className="font-medium">
                           {employee.workTime === -1 ? 'No Track' : formatTime(employee.workTime)}
                         </span>
-                      </div>
+                                </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Tasks:</span>
                         <span className="font-medium">{employee.tasks.completed}/{employee.tasks.total}</span>
-                      </div>
+                                </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Delay to Finish:</span>
                         <span className={`font-medium ${employee.delayToFinish === -1 ? 'text-gray-500' : getDelayToFinishColor(employee.delayToFinish)}`}>
                           {employee.delayToFinish === -1 ? 'No Track' : formatDelayToFinish(employee.delayToFinish)}
                         </span>
                       </div>
-                    </div>
-
+                            </div>
+                            
                     {/* Actions */}
                     {user?.role === 'admin' && (
                       <div className="flex gap-2 mt-4">
@@ -844,21 +844,21 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         >
                           <Edit3 className="h-4 w-4 mr-1" />
                           Edit
-                        </Button>
+                                  </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDeleteEmployee(employee.id, employee.name)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
                   </CardContent>
                 </Card>
               ))}
-            </div>
+                          </div>
 
                         {/* Desktop Table View */}
             <div className="hidden lg:block">
@@ -894,13 +894,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-purple-500'}
                             `}>
                               {employee.name.charAt(0).toUpperCase()}
-                            </div>
+                                </div>
                             {index === 0 && (
                               <div className="absolute -top-0.5 -right-0.5 bg-yellow-400 rounded-full p-0.5">
                                 <Crown className="h-1.5 w-1.5 text-yellow-800" />
-                              </div>
+                                </div>
                             )}
-                          </div>
+                              </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1">
                               <span className="font-semibold text-gray-900 dark:text-gray-100 text-xs truncate">{employee.name}</span>
@@ -909,10 +909,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                                   👑
                                 </Badge>
                               )}
-                            </div>
+                              </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 truncate">{employee.position}</div>
-                          </div>
-                        </div>
+                                  </div>
+                                </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -925,7 +925,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               <span className="font-semibold text-blue-700 dark:text-blue-300 text-sm">{employee.days}</span>
                             </>
                           )}
-                        </div>
+                                  </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -940,7 +940,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               </span>
                             </>
                           )}
-                        </div>
+                                </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -955,7 +955,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               </span>
                             </>
                           )}
-                        </div>
+                                </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -970,7 +970,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               </span>
                             </>
                           )}
-                        </div>
+                                  </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -982,32 +982,32 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               <Target className={`h-3 w-3 ${employee.delayToFinish > 0 ? 'text-orange-600' : 'text-green-600'}`} />
                               <span className={`font-semibold text-sm ${getDelayToFinishColor(employee.delayToFinish)}`}>
                                 {formatDelayToFinish(employee.delayToFinish)}
-                              </span>
+                                        </span>
                             </>
-                          )}
-                        </div>
+                                      )}
+                                    </div>
                       </td>
 
                       <td className="text-center p-2">
                         <div className="text-center">
                           <div className="font-semibold text-emerald-700 dark:text-emerald-300 text-xs">
                             {employee.tasks.completed}/{employee.tasks.total}
-                          </div>
+                                  </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {employee.tasks.successRate.toFixed(0)}%
-                          </div>
-                        </div>
+                                    </div>
+                                  </div>
                       </td>
 
                       <td className="text-center p-2">
                         <div className="text-center">
                           <div className="font-semibold text-purple-700 dark:text-purple-300 text-xs">
                             {employee.workReports.submitted}/{employee.workReports.total}
-                          </div>
+                                    </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {employee.workReports.completionRate.toFixed(0)}%
-                          </div>
-                        </div>
+                                  </div>
+                                    </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -1017,8 +1017,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         `}>
                           <div className="font-bold text-xs">
                             {employee.performance.toFixed(1)}%
-                          </div>
-                        </div>
+                                  </div>
+                                </div>
                       </td>
 
                       <td className="text-center p-2">
@@ -1045,29 +1045,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           >
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
-                        </div>
+                                  </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+                              </div>
 
             {employees.length === 0 && (
               <div className="text-center py-12">
                 <div className="max-w-md mx-auto">
                   <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                     <AlertCircle className="h-12 w-12 text-gray-400" />
-                  </div>
+                                  </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Performance Data</h3>
                   <p className="text-gray-600 dark:text-gray-400">No employee data found for the selected period. Check back after employees have logged work hours.</p>
-                </div>
-              </div>
+                                </div>
+                                </div>
             )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+                              </div>
+                            </div>
+                        </CardContent>
+                      </Card>
 
     {/* Edit Employee Sheet */}
     <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
@@ -1087,7 +1087,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               placeholder="Employee name"
             />
-          </div>
+              </div>
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Department</label>
@@ -1108,17 +1108,17 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Position</label>
-            <Select 
+                        <Select
               value={editForm.position} 
               onValueChange={(value) => setEditForm({ ...editForm, position: value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select position" />
-              </SelectTrigger>
-              <SelectContent>
+                          </SelectTrigger>
+                          <SelectContent>
                 <SelectItem value="Customer Service">Customer Service</SelectItem>
                 <SelectItem value="Designer">Designer</SelectItem>
                 <SelectItem value="Media Buyer">Media Buyer</SelectItem>
@@ -1127,14 +1127,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                 <SelectItem value="Social Media Manager">Social Media Manager</SelectItem>
                 <SelectItem value="Developer">Developer</SelectItem>
                 <SelectItem value="Manager">Manager</SelectItem>
-              </SelectContent>
-            </Select>
+                          </SelectContent>
+                        </Select>
           </div>
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Performance Override (%)</label>
-            <Input
-              type="number"
+                        <Input
+                          type="number"
               min="0"
               max="100"
               step="0.1"
@@ -1143,7 +1143,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               placeholder="Performance percentage"
             />
             <p className="text-xs text-gray-500">Leave as calculated value or override manually</p>
-          </div>
+                        </div>
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Status Override</label>
@@ -1161,27 +1161,27 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                 <SelectItem value="Poor">Poor</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+                            </div>
           
           <div className="flex gap-2 pt-4">
             <Button onClick={handleSaveEdit} className="flex-1">
               <Save className="h-4 w-4 mr-2" />
               Save Changes
-            </Button>
+                              </Button>
             <Button 
               variant="outline" 
               onClick={() => setIsEditSheetOpen(false)}
             >
               <X className="h-4 w-4 mr-2" />
               Cancel
-            </Button>
-          </div>
-        </div>
+                              </Button>
+                            </div>
+                </div>
       </SheetContent>
     </Sheet>
-  </div>
+            </div>
 </TooltipProvider>
-);
+  );
 };
 
 export default EditablePerformanceDashboard; 

@@ -4,6 +4,8 @@ import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { AnimatedClock } from '@/components/AnimatedClock';
+import { AnimatedFire } from '@/components/AnimatedFire';
 
 const WorkShiftTimer: React.FC = () => {
   const { user } = useAuth();
@@ -480,7 +482,7 @@ const WorkShiftTimer: React.FC = () => {
     // Overtime mode - no flashing, solid design
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-red-50 to-orange-50 text-red-700 border-red-400 shadow-md">
-        <Flame className="h-4 w-4 text-red-600" />
+        <AnimatedFire className="h-4 w-4 text-red-600" />
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm tracking-wide text-red-800">
             +{formatTimeMinutes(overtimeMinutes * 60)}
@@ -495,56 +497,56 @@ const WorkShiftTimer: React.FC = () => {
     );
   }
 
-  // Regular work time mode with countdown to shift end
+  // Regular work time mode with countdown from full shift duration
   const checkInTime = new Date(activeCheckIn.timestamp);
   const checkInHour = checkInTime.getHours();
   
-  // Use the same shift end time calculation logic as in overtime calculation
-  let shiftEndTime;
+  // Determine shift type and duration
   let shiftType = 'day'; // Default
+  let shiftDurationHours = 7; // Default day shift duration
   
   // Use database shift assignment if available
   if (shiftInfo && shiftInfo.name) {
     if (shiftInfo.name.toLowerCase().includes('day')) {
       shiftType = 'day';
+      shiftDurationHours = 7; // Day shift = 7 hours
     } else if (shiftInfo.name.toLowerCase().includes('night')) {
       shiftType = 'night';
+      shiftDurationHours = 8; // Night shift = 8 hours
     }
   } else {
     // Fallback to check-in time based detection
-    shiftType = (checkInHour >= 8 && checkInHour < 16) ? 'day' : 'night';
-  }
-  
-  if (shiftType === 'day') {
-    // Day shift: 9AM to 4PM - ends at 4PM same day
-    shiftEndTime = new Date(checkInTime);
-    shiftEndTime.setHours(16, 0, 0, 0); // 4PM
-  } else {
-    // Night shift: 4PM to 12AM (midnight)
-    shiftEndTime = new Date(checkInTime);
-    
-    if (checkInHour >= 15) {
-      // Checked in during afternoon/evening (3:30PM+)
-      // Shift ends at midnight (start of next day)
-      shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-      shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
-    } else if (checkInHour < 4) {
-      // Checked in during early morning (12AM-3:59AM) - overtime period
-      shiftEndTime.setHours(0, 0, 0, 0); // Midnight of current day
+    if (checkInHour >= 8 && checkInHour < 16) {
+      shiftType = 'day';
+      shiftDurationHours = 7; // Day shift = 7 hours
     } else {
-      // Checked in during morning but classified as night shift
-      shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-      shiftEndTime.setHours(0, 0, 0, 0);
+      shiftType = 'night';
+      shiftDurationHours = 8; // Night shift = 8 hours
     }
   }
   
+  // Calculate countdown from full shift duration
+  const shiftDurationSeconds = shiftDurationHours * 3600; // Convert hours to seconds
   const now = new Date();
-  const remainingMs = Math.max(0, shiftEndTime.getTime() - now.getTime());
-  const remainingSeconds = Math.floor(remainingMs / 1000);
-  
-  const totalShiftMs = shiftEndTime.getTime() - checkInTime.getTime();
   const elapsedMs = now.getTime() - checkInTime.getTime();
-  const progressPercentage = Math.min(100, (elapsedMs / totalShiftMs) * 100);
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  
+  // Debug logging
+  console.log('⏰ Timer Debug:', {
+    shiftType,
+    shiftDurationHours,
+    shiftDurationSeconds,
+    elapsedSeconds,
+    timeWorked,
+    checkInTime: checkInTime.toISOString(),
+    shiftInfo: shiftInfo?.name
+  });
+  
+  // Remaining time = Full shift duration - time worked
+  const remainingSeconds = Math.max(0, shiftDurationSeconds - elapsedSeconds);
+  
+  // Progress calculation
+  const progressPercentage = Math.min(100, (elapsedSeconds / shiftDurationSeconds) * 100);
   
   // Dynamic color coding based on remaining time
   let colorClass = 'from-emerald-50 to-green-50 text-emerald-700 border-emerald-300';
@@ -574,12 +576,11 @@ const WorkShiftTimer: React.FC = () => {
         ></div>
       </div>
       
-      <Timer className={`h-4 w-4 ${iconColor}`} />
+      <AnimatedClock className={`h-4 w-4 ${iconColor}`} />
       
       <div className="flex items-center gap-2">
         {/* Countdown Timer */}
         <div className="flex items-center gap-1">
-          <ArrowDown className="h-3 w-3 opacity-60" />
           <span className="font-mono text-sm tracking-wide font-bold">
             {formatCountdown(remainingSeconds)}
           </span>
