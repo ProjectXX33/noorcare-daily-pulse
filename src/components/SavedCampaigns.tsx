@@ -1,0 +1,1572 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { Calendar, Target, TrendingUp, Users, DollarSign, BarChart3, Download, Play, Pause, Trash2, Eye, X, Globe, Clock, Zap, Award, Star, ExternalLink } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import * as XLSX from 'xlsx';
+
+// SAR Icon Component
+const SARIcon = ({ className = "inline-block align-[-0.125em]" }: { className?: string }) => (
+  <svg 
+    className={`riyal-svg ${className}`}
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 1124.14 1256.39" 
+    width="14" 
+    height="15.432" 
+    style={{display:'inline-block', verticalAlign:'-0.125em'}}
+  >
+    <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+    <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+  </svg>
+);
+
+interface SavedCampaign {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  budget: {
+    min: number;
+    recommended: number;
+    max: number;
+  } | null;
+  platformBudgets?: any;
+  expectedResults: {
+    clicks: number;
+    conversions: number;
+    revenue: number;
+    roas: number;
+    cpc: number;
+    ctr: number;
+  } | null;
+  targetProducts: any[];
+  strategy: {
+    audience: string[];
+    platforms: string[];
+    adFormats: string[];
+    keywords: string[];
+    marketFocus: string;
+    compliance: string[];
+  } | null;
+  priority: 'high' | 'medium' | 'low';
+  confidence: number;
+  status: 'active' | 'paused' | 'draft';
+  createdAt: string;
+  approvedAt?: string;
+  isCustom: boolean;
+}
+
+const SavedCampaigns: React.FC = () => {
+  const { user } = useAuth();
+  const [savedCampaigns, setSavedCampaigns] = useState<SavedCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [selectedCampaign, setSelectedCampaign] = useState<SavedCampaign | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [campaignProducts, setCampaignProducts] = useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Helper function to detect Arabic products (similar to CopyWritingProductsPage)
+  const detectProductLanguage = (product: any): 'ar' | 'en' => {
+    // First priority: explicit language field
+    if (product.language) {
+      return product.language;
+    }
+    
+    // Second priority: check SKU suffix for Polylang
+    if (product.sku) {
+      if (product.sku.endsWith('-ar')) {
+        return 'ar';
+      }
+      if (product.sku.endsWith('-en')) {
+        return 'en';
+      }
+    }
+    
+    // Third priority: analyze text content
+    const arabicPattern = /[\u0600-\u06FF\u0750-\u077F]/;
+    const productName = product.name || '';
+    const productDesc = product.description || '';
+    
+    if (arabicPattern.test(productName) || arabicPattern.test(productDesc)) {
+      return 'ar';
+    }
+    
+    // Default to English
+    return 'en';
+  };
+
+  // Helper function to generate proper Polylang URL
+  const generatePolylangUrl = (product: any): string => {
+    if (product.permalink && product.permalink !== '') {
+      return product.permalink;
+    }
+    
+    // Generate Polylang-compatible URL
+    const baseUrl = window.location.origin;
+    const isArabic = detectProductLanguage(product) === 'ar';
+    
+    if (isArabic) {
+      // For Arabic products with Polylang
+      return `${baseUrl}/ar/product/${product.slug || `product-${product.id}`}/`;
+    } else {
+      // For English products
+      return `${baseUrl}/product/${product.slug || `product-${product.id}`}/`;
+    }
+  };
+
+  useEffect(() => {
+    loadSavedCampaigns();
+  }, [user]);
+
+  // Manage body scroll when modal is open
+  useEffect(() => {
+    if (showDetailsModal) {
+      document.body.classList.add('modal-open');
+      return () => document.body.classList.remove('modal-open');
+    }
+  }, [showDetailsModal]);
+
+  const loadSavedCampaigns = async () => {
+    try {
+      setLoading(true);
+      
+      // Load from Supabase custom_campaign_strategies table
+      const { data, error: supabaseError } = await supabase
+        .from('custom_campaign_strategies')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (supabaseError) {
+        console.error('Supabase error:', supabaseError);
+        // Fall back to localStorage if Supabase fails
+        const localSaved = localStorage.getItem('savedCampaigns');
+        setSavedCampaigns(localSaved ? JSON.parse(localSaved) : []);
+      } else {
+        // Transform Supabase data to our format with safe property access
+        const campaigns = data.map(campaign => ({
+          id: campaign.id,
+          type: campaign.campaign_type || 'custom',
+          title: campaign.title || 'Untitled Campaign',
+          description: campaign.description || 'No description available',
+          budget: {
+            min: campaign.budget_min || 0,
+            recommended: campaign.budget_recommended || 0,
+            max: campaign.budget_max || 0
+          },
+          platformBudgets: campaign.platform_budgets || {},
+          expectedResults: {
+            clicks: campaign.expected_clicks || 0,
+            conversions: campaign.expected_conversions || 0,
+            revenue: campaign.expected_revenue || 0,
+            roas: campaign.expected_roas || 0,
+            cpc: campaign.expected_cpc || 0,
+            ctr: campaign.expected_ctr || 0
+          },
+          targetProducts: campaign.target_product_ids || [],
+          strategy: {
+            audience: campaign.target_audiences || [],
+            platforms: campaign.platforms || [],
+            adFormats: campaign.ad_formats || [],
+            keywords: campaign.keywords || [],
+            marketFocus: 'Saudi Arabia',
+            compliance: ['Arabic language support', 'Cultural appropriateness']
+          },
+          priority: campaign.priority || 'medium',
+          confidence: campaign.confidence_score || 80,
+          status: campaign.status || 'draft',
+          createdAt: campaign.created_at,
+          approvedAt: campaign.approved_at,
+          isCustom: campaign.is_template === false && campaign.campaign_type === 'custom'
+        }));
+        setSavedCampaigns(campaigns);
+      }
+    } catch (err) {
+      console.error('Error loading saved campaigns:', err);
+      setError('Failed to load saved campaigns');
+      // Fall back to localStorage
+      const localSaved = localStorage.getItem('savedCampaigns');
+      setSavedCampaigns(localSaved ? JSON.parse(localSaved) : []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCampaignProducts = async (productIds: number[]) => {
+    if (!productIds || productIds.length === 0) {
+      setCampaignProducts([]);
+      return;
+    }
+
+    setLoadingProducts(true);
+    try {
+      // First try to get products from copy_writing_products table
+      const { data: supabaseProducts, error: supabaseError } = await supabase
+        .from('copy_writing_products')
+        .select('*')
+        .in('id', productIds);
+
+      if (supabaseError) {
+        console.error('Error fetching products from Supabase:', supabaseError);
+      }
+
+      let products = [];
+
+      if (supabaseProducts && supabaseProducts.length > 0) {
+        // Transform the data to a consistent format
+        products = supabaseProducts.map(product => ({
+          id: product.id,
+          name: product.name || 'Unknown Product',
+          description: product.description || product.short_description || 'No description available',
+          short_description: product.short_description || '',
+          price: parseFloat(product.price) || 0,
+          regular_price: parseFloat(product.regular_price) || 0,
+          sale_price: parseFloat(product.sale_price) || 0,
+          on_sale: product.on_sale || false,
+          stock_status: product.stock_status || 'instock',
+          total_sales: product.total_sales || 0,
+          featured: product.featured || false,
+          categories: product.categories || [],
+          tags: product.tags || [],
+          images: product.images || [],
+          average_rating: parseFloat(product.average_rating) || 0,
+          rating_count: product.rating_count || 0,
+          sku: product.sku || '',
+          permalink: product.permalink || '',
+          slug: product.slug || '',
+          // Enhanced language detection for Arabic products  
+          language: product.language || (product.sku && product.sku.endsWith('-ar') ? 'ar' : 'en'),
+          // Enhanced performance calculation based on total sales
+          performance: product.total_sales > 100 ? 'excellent' : 
+                      product.total_sales > 50 ? 'good' : 
+                      product.total_sales > 10 ? 'average' : 
+                      product.total_sales > 0 ? 'poor' : 'terrible'
+        }));
+      } else {
+        // Fallback: Try to fetch from WooCommerce API
+        try {
+          console.log('Products not found in Supabase, trying WooCommerce API...');
+          
+          // Import WooCommerce API dynamically
+          const { default: wooCommerceAPI } = await import('@/lib/woocommerceApi');
+          
+          // Fetch products from WooCommerce
+          const wooProducts = [];
+          
+          for (const productId of productIds) {
+            try {
+              const product = await wooCommerceAPI.fetchProduct(productId);
+              if (product) {
+                wooProducts.push(product);
+              }
+            } catch (productError) {
+              console.warn(`Failed to fetch product ${productId}:`, productError);
+            }
+          }
+
+          if (wooProducts && wooProducts.length > 0) {
+            products = wooProducts.map(product => ({
+              id: product.id,
+              name: product.name || 'Unknown Product',
+              description: product.description || product.short_description || 'No description available',
+              short_description: product.short_description || '',
+              price: parseFloat(product.price) || 0,
+              regular_price: parseFloat(product.regular_price) || 0,
+              sale_price: parseFloat(product.sale_price) || 0,
+              on_sale: product.on_sale || false,
+              stock_status: product.stock_status || 'instock',
+              total_sales: product.total_sales || 0,
+              featured: product.featured || false,
+              categories: product.categories || [],
+              tags: product.tags || [],
+              images: product.images || [],
+              average_rating: parseFloat(product.average_rating) || 0,
+              rating_count: product.rating_count || 0,
+              sku: product.sku || '',
+              // Enhanced permalink for Arabic products with Polylang
+              permalink: product.permalink || '',
+              slug: product.slug || '',
+              // Enhanced language detection for Arabic products  
+              language: product.language || (product.sku && product.sku.endsWith('-ar') ? 'ar' : 'en'),
+              // Enhanced performance calculation based on total sales
+              performance: product.total_sales > 100 ? 'excellent' : 
+                          product.total_sales > 50 ? 'good' : 
+                          product.total_sales > 10 ? 'average' : 
+                          product.total_sales > 0 ? 'poor' : 'terrible'
+            }));
+            
+            console.log(`✅ Fetched ${products.length} products from WooCommerce API`);
+          } else {
+            console.log('❌ No products found in WooCommerce either');
+          }
+        } catch (wooError) {
+          console.error('❌ Failed to fetch from WooCommerce API:', wooError);
+        }
+      }
+
+      // Remove duplicates based on product ID
+      const uniqueProducts = products.filter((product, index, array) => 
+        array.findIndex(p => p.id === product.id) === index
+      );
+      
+      setCampaignProducts(uniqueProducts);
+    } catch (error) {
+      console.error('Error fetching campaign products:', error);
+      setCampaignProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const updateCampaignStatus = async (campaignId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('custom_campaign_strategies')
+        .update({ status: newStatus })
+        .eq('id', campaignId);
+
+      if (error) {
+        console.error('Error updating campaign status:', error);
+        return;
+      }
+
+      // Update local state
+      setSavedCampaigns(prev => 
+        prev.map(campaign => 
+          campaign.id === campaignId 
+            ? { ...campaign, status: newStatus as 'active' | 'paused' | 'draft' }
+            : campaign
+        )
+      );
+
+      // Update localStorage as backup
+      const updated = savedCampaigns.map(campaign => 
+        campaign.id === campaignId 
+          ? { ...campaign, status: newStatus as 'active' | 'paused' | 'draft' }
+          : campaign
+      );
+      localStorage.setItem('savedCampaigns', JSON.stringify(updated));
+
+    } catch (err) {
+      console.error('Error updating campaign status:', err);
+    }
+  };
+
+  const deleteCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('custom_campaign_strategies')
+        .delete()
+        .eq('id', campaignId);
+
+      if (error) {
+        console.error('Error deleting campaign:', error);
+        return;
+      }
+
+      // Update local state
+      setSavedCampaigns(prev => prev.filter(campaign => campaign.id !== campaignId));
+
+      // Update localStorage as backup
+      const updated = savedCampaigns.filter(campaign => campaign.id !== campaignId);
+      localStorage.setItem('savedCampaigns', JSON.stringify(updated));
+
+    } catch (err) {
+      console.error('Error deleting campaign:', err);
+    }
+  };
+
+  const exportToExcel = (campaign?: SavedCampaign) => {
+    try {
+      let dataToExport;
+      let filename;
+
+      if (campaign) {
+        // Export single campaign
+        dataToExport = [{
+          'Campaign Title': campaign.title,
+          'Description': campaign.description,
+          'Type': campaign.isCustom ? 'Custom' : campaign.type,
+          'Priority': campaign.priority,
+          'Status': campaign.status,
+          'Min Budget': campaign.budget?.min || 0,
+          'Recommended Budget': campaign.budget?.recommended || 0,
+          'Max Budget': campaign.budget?.max || 0,
+          'Expected ROAS': campaign.expectedResults?.roas || 0,
+          'Expected Conversions': campaign.expectedResults?.conversions || 0,
+          'Expected Revenue': campaign.expectedResults?.revenue || 0,
+          'Target Products Count': campaign.targetProducts?.length || 0,
+          'Platforms': campaign.strategy?.platforms?.join(', ') || '',
+          'Keywords': campaign.strategy?.keywords?.join(', ') || '',
+          'Created Date': new Date(campaign.createdAt).toLocaleDateString(),
+          'Confidence': campaign.confidence
+        }];
+        filename = `campaign-${campaign.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xlsx`;
+      } else {
+        // Export all campaigns
+        dataToExport = savedCampaigns.map(campaign => ({
+          'Campaign Title': campaign.title,
+          'Description': campaign.description,
+          'Type': campaign.isCustom ? 'Custom' : campaign.type,
+          'Priority': campaign.priority,
+          'Status': campaign.status,
+          'Min Budget': campaign.budget?.min || 0,
+          'Recommended Budget': campaign.budget?.recommended || 0,
+          'Max Budget': campaign.budget?.max || 0,
+          'Expected ROAS': campaign.expectedResults?.roas || 0,
+          'Expected Conversions': campaign.expectedResults?.conversions || 0,
+          'Expected Revenue': campaign.expectedResults?.revenue || 0,
+          'Target Products Count': campaign.targetProducts?.length || 0,
+          'Platforms': campaign.strategy?.platforms?.join(', ') || '',
+          'Keywords': campaign.strategy?.keywords?.join(', ') || '',
+          'Created Date': new Date(campaign.createdAt).toLocaleDateString(),
+          'Confidence': campaign.confidence
+        }));
+        filename = `all-campaigns-${new Date().toISOString().split('T')[0]}.xlsx`;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Campaigns');
+      XLSX.writeFile(wb, filename);
+
+    } catch (err) {
+      console.error('Error exporting to Excel:', err);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'paused': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'draft': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading saved campaigns...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Saved Campaigns</h2>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Approved and Custom Campaigns</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
+          {savedCampaigns.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => exportToExcel()}
+              className="flex items-center justify-center gap-2 h-10 sm:h-auto text-sm sm:text-base"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export All to Excel</span>
+              <span className="sm:hidden">Export All</span>
+            </Button>
+          )}
+          <Badge variant="outline" className="text-sm sm:text-lg px-2 sm:px-3 py-1 text-center">
+            {savedCampaigns.length} Saved
+          </Badge>
+        </div>
+      </div>
+
+      {savedCampaigns.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Saved Campaigns</h3>
+            <p className="text-gray-600 mb-4">
+              Create a custom campaign or approve a campaign from Strategy Creator to view it here
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-3 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <CardTitle className="text-lg sm:text-xl">Campaign Management</CardTitle>
+              <div className="flex gap-1 sm:gap-2 w-full sm:w-auto">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+                >
+                  <span className="hidden sm:inline">Table View</span>
+                  <span className="sm:hidden">📊 Table</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="flex-1 sm:flex-none h-9 text-xs sm:text-sm"
+                >
+                  <span className="hidden sm:inline">Card View</span>
+                  <span className="sm:hidden">🎴 Cards</span>
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6">
+            {viewMode === 'table' ? (
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
+                <Table className="min-w-[800px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Campaign</TableHead>
+                      <TableHead className="min-w-[80px]">Type</TableHead>
+                      <TableHead className="min-w-[80px]">Priority</TableHead>
+                      <TableHead className="min-w-[80px]">Status</TableHead>
+                      <TableHead className="min-w-[120px]">Budget</TableHead>
+                      <TableHead className="min-w-[100px]">ROAS</TableHead>
+                      <TableHead className="min-w-[80px]">Products</TableHead>
+                      <TableHead className="min-w-[100px]">Created</TableHead>
+                      <TableHead className="min-w-[140px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                <TableBody>
+                  {savedCampaigns.map((campaign) => (
+                    <TableRow key={campaign.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium text-sm">{campaign.title}</div>
+                          <div className="text-xs text-gray-500 mt-1">{campaign.description.slice(0, 60)}...</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {campaign.isCustom ? 'Custom' : campaign.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getPriorityColor(campaign.priority)}>
+                          {campaign.priority === 'high' ? 'High' : 
+                           campaign.priority === 'medium' ? 'Medium' : 'Low'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getStatusColor(campaign.status)}>
+                          {campaign.status === 'active' ? 'Active' : 
+                           campaign.status === 'paused' ? 'Paused' : 'Draft'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium text-green-600 flex items-center gap-1">
+                          {campaign.budget?.recommended?.toLocaleString() || 'N/A'} <SARIcon />
+                        </div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          {campaign.budget?.min?.toLocaleString()} - {campaign.budget?.max?.toLocaleString()} <SARIcon />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-blue-600" />
+                          <span className="text-sm font-medium">
+                            {campaign.expectedResults?.roas?.toFixed(1) || 'N/A'}x
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {campaign.expectedResults?.conversions || 0} conversions
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Target className="h-3 w-3 text-orange-600" />
+                          <span className="text-sm">{campaign.targetProducts?.length || 0}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(campaign.createdAt).getFullYear()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant={campaign.status === 'active' ? 'destructive' : 'default'}
+                            size="sm"
+                            onClick={() => updateCampaignStatus(
+                              campaign.id, 
+                              campaign.status === 'active' ? 'paused' : 'active'
+                            )}
+                          >
+                            {campaign.status === 'active' ? (
+                              <Pause className="h-3 w-3" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportToExcel(campaign)}
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedCampaign(campaign);
+                              setShowDetailsModal(true);
+                              fetchCampaignProducts(campaign.targetProducts || []);
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteCampaign(campaign.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {savedCampaigns.map((campaign) => (
+                  <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base sm:text-lg mb-1 sm:mb-2 line-clamp-2">{campaign.title}</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm line-clamp-2">
+                            {campaign.description}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3">
+                        <Badge variant="outline" className={`text-xs ${getPriorityColor(campaign.priority)}`}>
+                          {campaign.priority === 'high' ? 'High' : 
+                           campaign.priority === 'medium' ? 'Medium' : 'Low'}
+                        </Badge>
+                        <Badge variant="outline" className={`text-xs ${getStatusColor(campaign.status)}`}>
+                          {campaign.status === 'active' ? 'Active' : 
+                           campaign.status === 'paused' ? 'Paused' : 'Draft'}
+                        </Badge>
+                        {campaign.isCustom && (
+                          <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200 text-xs">
+                            Custom
+                          </Badge>
+                        )}
+                        {/* Arabic Targeting Indicator */}
+                        {campaign.strategy?.keywords?.some(keyword => 
+                          /[\u0600-\u06FF\u0750-\u077F]/.test(keyword)
+                        ) && (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                            🇸🇦 Arabic
+                          </Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6 pt-0">
+                      {/* Budget */}
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />
+                        <div className="text-xs sm:text-sm min-w-0">
+                          <span className="font-medium">Budget: </span>
+                          <span className="text-green-600 font-bold flex items-center gap-1">
+                            {campaign.budget?.recommended?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expected Results */}
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                          <span className="truncate">ROAS: {campaign.expectedResults?.roas?.toFixed(2) || 'N/A'}x</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <BarChart3 className="h-3 w-3 text-purple-600 flex-shrink-0" />
+                          <span className="truncate">{campaign.expectedResults?.conversions || 0} conv.</span>
+                        </div>
+                      </div>
+
+                      {/* Target Products */}
+                      <div className="flex items-center gap-2">
+                        <Target className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm truncate">
+                          {campaign.targetProducts?.length || 0} products
+                        </span>
+                      </div>
+
+                      {/* Platforms */}
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm truncate">
+                          {campaign.strategy?.platforms?.slice(0, 2).join(', ') || 'N/A'}
+                          {campaign.strategy?.platforms?.length > 2 && ` +${campaign.strategy?.platforms?.length - 2}`}
+                        </span>
+                      </div>
+
+                      {/* Created Date */}
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="text-xs">
+                          {new Date(campaign.createdAt).toLocaleDateString('en-US')}
+                        </span>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-1 sm:gap-2 pt-2 sm:pt-3 border-t border-gray-100">
+                        <Button
+                          variant={campaign.status === 'active' ? 'destructive' : 'default'}
+                          size="sm"
+                          onClick={() => updateCampaignStatus(
+                            campaign.id, 
+                            campaign.status === 'active' ? 'paused' : 'active'
+                          )}
+                          className="flex-1 sm:flex-none h-8 text-xs"
+                        >
+                          {campaign.status === 'active' ? (
+                            <>
+                              <Pause className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Pause</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-3 w-3 mr-1" />
+                              <span className="hidden sm:inline">Activate</span>
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel(campaign)}
+                          className="flex-1 sm:flex-none h-8 text-xs"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          <span className="hidden sm:inline">Export</span>
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCampaign(campaign);
+                            setShowDetailsModal(true);
+                            fetchCampaignProducts(campaign.targetProducts || []);
+                          }}
+                          className="flex-1 sm:flex-none text-blue-600 hover:text-blue-700 h-8 text-xs"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          <span className="hidden sm:inline">Details</span>
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteCampaign(campaign.id)}
+                          className="flex-1 sm:flex-none text-red-600 hover:text-red-700 h-8 text-xs"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Stats */}
+      {savedCampaigns.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Campaign Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {savedCampaigns.filter(c => c.status === 'active').length}
+                </div>
+                <div className="text-sm text-gray-600">Active Campaigns</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {savedCampaigns.filter(c => c.status === 'paused').length}
+                </div>
+                <div className="text-sm text-gray-600">Paused Campaigns</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {savedCampaigns.filter(c => c.isCustom).length}
+                </div>
+                <div className="text-sm text-gray-600">Custom Campaigns</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600 flex items-center justify-center gap-1">
+                  {savedCampaigns.reduce((sum, c) => sum + (c.budget?.recommended || 0), 0).toLocaleString()} <SARIcon />
+                </div>
+                <div className="text-sm text-gray-600">Total Budget</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Campaign Details Modal */}
+      <AnimatePresence>
+        {showDetailsModal && selectedCampaign && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-2 sm:p-4 modal-overlay"
+            onClick={() => {
+              setShowDetailsModal(false);
+              setCampaignProducts([]);
+              setSelectedCampaign(null);
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start sm:items-center justify-between p-4 sm:p-6 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                <div className="flex-1 min-w-0 pr-4">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold line-clamp-2">{selectedCampaign.title}</h2>
+                  <p className="text-blue-100 text-xs sm:text-sm md:text-base mt-1 line-clamp-2">{selectedCampaign.description}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setCampaignProducts([]);
+                    setSelectedCampaign(null);
+                  }}
+                  className="text-white hover:bg-white/20 flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                >
+                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                </Button>
+              </div>
+
+              {/* Content */}
+              <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-120px)] sm:max-h-[calc(90vh-120px)]">
+                <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 text-xs sm:text-sm h-auto gap-1 p-1">
+                    <TabsTrigger value="overview" className="text-xs sm:text-sm py-2 px-2 sm:px-3">
+                      <span className="hidden sm:inline">Overview</span>
+                      <span className="sm:hidden">📊</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="budget" className="text-xs sm:text-sm py-2 px-2 sm:px-3">
+                      <span className="hidden sm:inline">Budget & Results</span>
+                      <span className="sm:hidden">💰</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="strategy" className="text-xs sm:text-sm py-2 px-2 sm:px-3">
+                      <span className="hidden sm:inline">Strategy</span>
+                      <span className="sm:hidden">🎯</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="details" className="text-xs sm:text-sm py-2 px-2 sm:px-3">
+                      <span className="hidden sm:inline">Technical Details</span>
+                      <span className="sm:hidden">⚙️</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Overview Tab */}
+                  <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+                    <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                      {/* Campaign Info */}
+                      <Card>
+                        <CardHeader className="pb-2 sm:pb-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <Award className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                            Campaign Information
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div>
+                              <p className="text-xs sm:text-sm font-medium text-gray-500">Type</p>
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                {selectedCampaign.isCustom ? 'Custom' : selectedCampaign.type}
+                              </Badge>
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm font-medium text-gray-500">Priority</p>
+                              <Badge variant="outline" className={`mt-1 text-xs ${getPriorityColor(selectedCampaign.priority)}`}>
+                                {selectedCampaign.priority === 'high' ? 'High' : 
+                                 selectedCampaign.priority === 'medium' ? 'Medium' : 'Low'}
+                              </Badge>
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm font-medium text-gray-500">Status</p>
+                              <Badge variant="outline" className={`mt-1 text-xs ${getStatusColor(selectedCampaign.status)}`}>
+                                {selectedCampaign.status === 'active' ? 'Active' : 
+                                 selectedCampaign.status === 'paused' ? 'Paused' : 'Draft'}
+                              </Badge>
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm font-medium text-gray-500">Confidence</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full"
+                                    style={{ width: `${selectedCampaign.confidence}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs sm:text-sm font-medium">{selectedCampaign.confidence}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Timeline */}
+                      <Card>
+                        <CardHeader className="pb-2 sm:pb-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                            Timeline
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div>
+                            <p className="text-xs sm:text-sm font-medium text-gray-500">Created</p>
+                            <p className="text-xs sm:text-sm mt-1">
+                              {new Date(selectedCampaign.createdAt).toLocaleDateString('en-US', { 
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          {selectedCampaign.approvedAt && (
+                            <div>
+                              <p className="text-xs sm:text-sm font-medium text-gray-500">Approved</p>
+                              <p className="text-xs sm:text-sm mt-1">
+                                {new Date(selectedCampaign.approvedAt).toLocaleDateString('en-US', { 
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+
+                  {/* Budget & Results Tab */}
+                  <TabsContent value="budget" className="space-y-4 sm:space-y-6">
+                    <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                      {/* Budget Information */}
+                      <Card>
+                        <CardHeader className="pb-2 sm:pb-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                            Budget Breakdown
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div className="space-y-2 sm:space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs sm:text-sm font-medium text-gray-500">Minimum Budget</span>
+                              <span className="font-bold text-red-600 flex items-center gap-1 text-sm sm:text-base">
+                                {selectedCampaign.budget?.min?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs sm:text-sm font-medium text-gray-500">Recommended Budget</span>
+                              <span className="font-bold text-green-600 flex items-center gap-1 text-sm sm:text-base">
+                                {selectedCampaign.budget?.recommended?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs sm:text-sm font-medium text-gray-500">Maximum Budget</span>
+                              <span className="font-bold text-blue-600 flex items-center gap-1 text-sm sm:text-base">
+                                {selectedCampaign.budget?.max?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Expected Results */}
+                      <Card>
+                        <CardHeader className="pb-2 sm:pb-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                            Expected Results
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                            <div className="text-center p-2 sm:p-3 bg-blue-50 rounded-lg">
+                              <p className="text-lg sm:text-2xl font-bold text-blue-600">
+                                {selectedCampaign.expectedResults?.roas?.toFixed(2) || 'N/A'}x
+                              </p>
+                              <p className="text-xs text-gray-600">ROAS</p>
+                            </div>
+                            <div className="text-center p-2 sm:p-3 bg-green-50 rounded-lg">
+                              <p className="text-lg sm:text-2xl font-bold text-green-600 flex items-center justify-center gap-1">
+                                {selectedCampaign.expectedResults?.revenue?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                              </p>
+                              <p className="text-xs text-gray-600">Revenue</p>
+                            </div>
+                            <div className="text-center p-2 sm:p-3 bg-purple-50 rounded-lg">
+                              <p className="text-lg sm:text-2xl font-bold text-purple-600">
+                                {selectedCampaign.expectedResults?.conversions?.toLocaleString() || 'N/A'}
+                              </p>
+                              <p className="text-xs text-gray-600">Conversions</p>
+                            </div>
+                            <div className="text-center p-2 sm:p-3 bg-orange-50 rounded-lg">
+                              <p className="text-lg sm:text-2xl font-bold text-orange-600">
+                                {selectedCampaign.expectedResults?.clicks?.toLocaleString() || 'N/A'}
+                              </p>
+                              <p className="text-xs text-gray-600">Clicks</p>
+                            </div>
+                          </div>
+                          <Separator />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Cost per Click</span>
+                              <span className="font-medium flex items-center gap-1">
+                                {selectedCampaign.expectedResults?.cpc?.toFixed(2) || 'N/A'} <SARIcon className="h-2 w-2" />
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Click-through Rate</span>
+                              <span className="font-medium">
+                                {selectedCampaign.expectedResults?.ctr?.toFixed(2) || 'N/A'}%
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Platform Budget Breakdown */}
+                    {selectedCampaign.platformBudgets && Object.keys(selectedCampaign.platformBudgets).length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2 sm:pb-6">
+                          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+                            Platform Budget Breakdown
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div className="space-y-3 sm:space-y-4">
+                            {(() => {
+                              const budgetEntries = Array.isArray(selectedCampaign.platformBudgets) 
+                                ? selectedCampaign.platformBudgets.map((item, idx) => [`${idx}`, item])
+                                : Object.entries(selectedCampaign.platformBudgets);
+                              
+                              return budgetEntries.map(([key, data]: [string, any], index) => {
+                                const platformMapping: Record<string, string> = {
+                                  'facebook': 'Facebook/Instagram',
+                                  'instagram': 'Facebook/Instagram', 
+                                  'google': 'Google Ads',
+                                  'tiktok': 'TikTok',
+                                  'snapchat': 'Snapchat',
+                                  'twitter': 'Twitter',
+                                  'linkedin': 'LinkedIn'
+                                };
+                                
+                                let platformName = data?.platform || data?.name || key || `Platform ${index + 1}`;
+                                let cleanPlatformName = platformName
+                                  .replace(/\d+\.\s*/g, '')
+                                  .replace(/^\d+\s*-?\s*/g, '')
+                                  .trim();
+                                
+                                const lowerPlatform = cleanPlatformName.toLowerCase();
+                                for (const [mapKey, value] of Object.entries(platformMapping)) {
+                                  if (lowerPlatform.includes(mapKey)) {
+                                    cleanPlatformName = value;
+                                    break;
+                                  }
+                                }
+                              
+                                return (
+                                  <div key={index} className="border rounded-lg p-3 sm:p-4 bg-gradient-to-r from-indigo-50 to-blue-50">
+                                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                                      <h4 className="font-semibold text-indigo-900 text-sm sm:text-base truncate">{cleanPlatformName}</h4>
+                                      <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs">
+                                        {data?.percentage || 0}%
+                                      </Badge>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                                      <div>
+                                        <p className="text-xs sm:text-sm font-medium text-gray-600">Budget Allocation</p>
+                                        <p className="text-lg sm:text-xl font-bold text-green-600 flex items-center gap-1 mt-1">
+                                          {data?.budget?.toLocaleString() || 'N/A'} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                                        </p>
+                                      </div>
+                                      
+                                      <div>
+                                        <p className="text-xs sm:text-sm font-medium text-gray-600">Percentage Share</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className="bg-gradient-to-r from-indigo-500 to-blue-500 h-2 rounded-full"
+                                              style={{ width: `${data?.percentage || 0}%` }}
+                                            />
+                                          </div>
+                                          <span className="text-xs sm:text-sm font-medium">{data?.percentage || 0}%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                          
+                          {/* Total Budget Summary */}
+                          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                              <div>
+                                <h4 className="font-semibold text-green-900 text-sm sm:text-base">Total Platform Budget</h4>
+                                <p className="text-xs sm:text-sm text-green-700">Sum of all platform allocations</p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <p className="text-xl sm:text-2xl font-bold text-green-600 flex items-center gap-1">
+                                  {Object.values(selectedCampaign.platformBudgets)
+                                    .reduce((sum: number, platform: any) => sum + (platform?.budget || 0), 0)
+                                    .toLocaleString()} <SARIcon className="h-2 w-2 sm:h-3 sm:w-3" />
+                                </p>
+                                <p className="text-xs sm:text-sm text-green-600">
+                                  {Object.keys(selectedCampaign.platformBudgets).length} platforms
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  {/* Strategy Tab */}
+                  <TabsContent value="strategy" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Target Audience */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5 text-indigo-600" />
+                            Target Audience
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCampaign.strategy?.audience?.map((audience, index) => (
+                              <Badge key={index} variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                                {audience}
+                              </Badge>
+                            )) || <p className="text-gray-500">No audience data available</p>}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Platforms */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Globe className="h-5 w-5 text-blue-600" />
+                            Platforms
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCampaign.strategy?.platforms?.map((platform, index) => (
+                              <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                {platform}
+                              </Badge>
+                            )) || <p className="text-gray-500">No platform data available</p>}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Ad Formats */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Zap className="h-5 w-5 text-yellow-600" />
+                            Ad Formats
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCampaign.strategy?.adFormats?.map((format, index) => (
+                              <Badge key={index} variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                {format}
+                              </Badge>
+                            )) || <p className="text-gray-500">No ad format data available</p>}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Keywords */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Target className="h-5 w-5 text-orange-600" />
+                            Keywords
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCampaign.strategy?.keywords?.map((keyword, index) => (
+                              <Badge key={index} variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                                {keyword}
+                              </Badge>
+                            )) || <p className="text-gray-500">No keyword data available</p>}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Target Products */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-purple-600" />
+                          Target Products ({selectedCampaign.targetProducts?.length || 0})
+                        </CardTitle>
+                        <CardDescription>
+                          Click on any product to open it in a new tab
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {loadingProducts ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="text-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                              <p className="text-gray-600">Loading product details...</p>
+                            </div>
+                          </div>
+                        ) : campaignProducts.length > 0 ? (
+                          <div className="space-y-4">
+                            {campaignProducts.map((product, index) => (
+                              <div 
+                                key={product.id} 
+                                className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-gradient-to-r from-purple-50 to-pink-50 cursor-pointer group"
+                                onClick={() => {
+                                  const productUrl = generatePolylangUrl(product);
+                                  window.open(productUrl, '_blank');
+                                }}
+                                title={`Click to open ${product.name} in new tab`}
+                              >
+                                <div className="flex items-start gap-4">
+                                  {/* Product Image */}
+                                  <div className="flex-shrink-0">
+                                    {product.images && product.images.length > 0 ? (
+                                      <img 
+                                        src={product.images[0].src} 
+                                        alt={product.name}
+                                        className="w-16 h-16 object-cover rounded-lg border"
+                                        onError={(e) => {
+                                          e.currentTarget.src = '/placeholder.svg';
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                                        <BarChart3 className="h-8 w-8 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Product Details */}
+                                  <div className="flex-1">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <h4 className="font-semibold text-purple-900">{product.name}</h4>
+                                          <ExternalLink className="h-4 w-4 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                          {product.short_description || product.description?.replace(/<[^>]*>/g, '').slice(0, 100) + '...' || 'No description available'}
+                                        </p>
+                                        
+                                        <div className="flex items-center gap-4 text-sm">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-gray-500">Price:</span>
+                                            <span className="font-bold text-green-600 flex items-center gap-1">
+                                              {product.on_sale && product.sale_price ? (
+                                                <>
+                                                  <span className="line-through text-gray-400">
+                                                    {product.regular_price.toLocaleString()} <SARIcon />
+                                                  </span>
+                                                  <span className="text-red-600">
+                                                    {product.sale_price.toLocaleString()} <SARIcon />
+                                                  </span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  {product.price.toLocaleString()} <SARIcon />
+                                                </>
+                                              )}
+                                            </span>
+                                          </div>
+                                          
+                                          {product.average_rating > 0 && (
+                                            <div className="flex items-center gap-1">
+                                              <Star className="h-3 w-3 text-yellow-500 fill-current" />
+                                              <span className="text-yellow-600 font-medium">
+                                                {product.average_rating.toFixed(1)}
+                                              </span>
+                                              <span className="text-gray-400">
+                                                ({product.rating_count})
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Product Badges */}
+                                      <div className="flex flex-col gap-1 ml-4">
+                                        {product.featured && (
+                                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs">
+                                            Featured
+                                          </Badge>
+                                        )}
+                                        {product.on_sale && (
+                                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 text-xs">
+                                            Sale
+                                          </Badge>
+                                        )}
+                                        <Badge variant="outline" className={`text-xs ${
+                                          product.stock_status === 'instock' 
+                                            ? 'bg-green-100 text-green-800 border-green-200' 
+                                            : 'bg-red-100 text-red-800 border-red-200'
+                                        }`}>
+                                          {product.stock_status === 'instock' ? 'In Stock' : 'Out of Stock'}
+                                        </Badge>
+                                        {/* Language Badge */}
+                                        <Badge variant="outline" className={`text-xs ${
+                                          detectProductLanguage(product) === 'ar' 
+                                            ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                                            : 'bg-gray-100 text-gray-800 border-gray-200'
+                                        }`}>
+                                          {detectProductLanguage(product) === 'ar' ? '🇸🇦 عربي' : '🇺🇸 English'}
+                                        </Badge>
+                                        {/* Performance Badge */}
+                                        <Badge variant="outline" className={`text-xs ${
+                                          product.performance === 'excellent' ? 'bg-green-100 text-green-800 border-green-200' :
+                                          product.performance === 'good' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                          product.performance === 'average' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                          product.performance === 'poor' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                                          'bg-red-100 text-red-800 border-red-200'
+                                        }`}>
+                                          {product.performance || 'unknown'}
+                                        </Badge>
+                                        <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <ExternalLink className="h-3 w-3 mr-1" />
+                                          View Product
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Additional Product Info */}
+                                    <div className="mt-3 pt-3 border-t border-purple-200">
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                        <div>
+                                          <span className="text-gray-500">SKU:</span>
+                                          <span className="ml-1 font-medium">{product.sku || 'N/A'}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Sales:</span>
+                                          <span className="ml-1 font-medium">{product.total_sales.toLocaleString()}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">Categories:</span>
+                                          <span className="ml-1 font-medium">
+                                            {product.categories?.length > 0 ? product.categories[0].name : 'N/A'}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-500">ID:</span>
+                                          <span className="ml-1 font-medium">#{product.id}</span>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Product Tags */}
+                                      {product.tags && product.tags.length > 0 && (
+                                        <div className="mt-2">
+                                          <span className="text-gray-500 text-xs">Tags: </span>
+                                          <div className="inline-flex flex-wrap gap-1 mt-1">
+                                            {product.tags.slice(0, 3).map((tag, tagIndex) => (
+                                              <Badge key={tagIndex} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                                {tag.name}
+                                              </Badge>
+                                            ))}
+                                            {product.tags.length > 3 && (
+                                              <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs">
+                                                +{product.tags.length - 3} more
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center p-6">
+                            <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Product Details Available</h3>
+                            <p className="text-gray-600 mb-2">
+                              {selectedCampaign.targetProducts?.length > 0 
+                                ? 'Product details could not be loaded from the database.' 
+                                : 'This campaign has no target products specified.'}
+                            </p>
+                            {selectedCampaign.targetProducts?.length > 0 && (
+                              <p className="text-sm text-gray-500">
+                                Product IDs: {selectedCampaign.targetProducts.slice(0, 10).join(', ')}
+                                {selectedCampaign.targetProducts.length > 10 && ` +${selectedCampaign.targetProducts.length - 10} more`}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* Technical Details Tab */}
+                  <TabsContent value="details" className="space-y-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Technical Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="font-medium text-gray-500">Campaign ID</p>
+                            <p className="font-mono text-xs bg-gray-100 p-2 rounded mt-1">{selectedCampaign.id}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-500">Market Focus</p>
+                            <p className="mt-1">{selectedCampaign.strategy?.marketFocus || 'Saudi Arabia'}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-500">Compliance</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {selectedCampaign.strategy?.compliance?.map((item, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {item}
+                                </Badge>
+                              )) || <p className="text-gray-500">No compliance data</p>}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-500">Campaign Source</p>
+                            <p className="mt-1">{selectedCampaign.isCustom ? 'Custom Created' : 'AI Generated'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  Campaign created on {new Date(selectedCampaign.createdAt).toLocaleDateString()}
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => exportToExcel(selectedCampaign)}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export Campaign
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setCampaignProducts([]);
+                      setSelectedCampaign(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default SavedCampaigns; 

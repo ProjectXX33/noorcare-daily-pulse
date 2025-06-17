@@ -264,8 +264,15 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true, color: 'indigo' },
         { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true, color: 'red' },
         { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, adminOnly: true, color: 'purple' },
-        { name: 'Strategy', path: '/strategy', icon: GrowthStrategyIcon, adminAndMediaBuyerOnly: true, color: 'blue' },
+        { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, adminOnly: true, color: 'purple' },
         { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true, color: 'blue' },
+      ] as NavItem[]
+    },
+    {
+      label: 'Media Buyer Tools',
+      color: 'purple',
+      items: [
+        { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, mediaBuyerOnly: true, color: 'purple' },
       ] as NavItem[]
     },
     {
