@@ -224,7 +224,7 @@ const CheckInButton = () => {
       console.log('✅ User is checked in, showing AnimatedClock');
       return (
         <div className="flex flex-col items-center">
-          <AnimatedClock className="h-6 w-6 mb-1" />
+          <AnimatedClock className="h-6 w-6 mb-1" isActive={true} animationType="normal" />
           <span>Checked In</span>
         </div>
       );

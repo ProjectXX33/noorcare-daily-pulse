@@ -482,7 +482,7 @@ const WorkShiftTimer: React.FC = () => {
     // Overtime mode - no flashing, solid design
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-red-50 to-orange-50 text-red-700 border-red-400 shadow-md">
-        <AnimatedFire className="h-4 w-4 text-red-600" />
+        <AnimatedFire className="h-6 w-6 text-red-600" />
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm tracking-wide text-red-800">
             +{formatTimeMinutes(overtimeMinutes * 60)}
@@ -531,6 +531,9 @@ const WorkShiftTimer: React.FC = () => {
   const elapsedMs = now.getTime() - checkInTime.getTime();
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
   
+  // Remaining time = Full shift duration - time worked
+  const remainingSeconds = Math.max(0, shiftDurationSeconds - elapsedSeconds);
+  
   // Debug logging
   console.log('⏰ Timer Debug:', {
     shiftType,
@@ -538,12 +541,11 @@ const WorkShiftTimer: React.FC = () => {
     shiftDurationSeconds,
     elapsedSeconds,
     timeWorked,
+    remainingSeconds,
+    remainingMinutes: Math.floor(remainingSeconds / 60),
     checkInTime: checkInTime.toISOString(),
     shiftInfo: shiftInfo?.name
   });
-  
-  // Remaining time = Full shift duration - time worked
-  const remainingSeconds = Math.max(0, shiftDurationSeconds - elapsedSeconds);
   
   // Progress calculation
   const progressPercentage = Math.min(100, (elapsedSeconds / shiftDurationSeconds) * 100);
@@ -553,17 +555,28 @@ const WorkShiftTimer: React.FC = () => {
   let iconColor = 'text-emerald-600';
   let progressColor = 'bg-emerald-500';
   let progressBgColor = 'bg-emerald-100/50';
+  let isClockActive = false; // Clock animation only when time is running low
+  let animationType: 'normal' | 'warning' | 'urgent' = 'normal';
   
-  if (remainingSeconds <= 30 * 60) { // Last 30 minutes
+  if (remainingSeconds <= 30 * 60) { // Last 30 minutes - URGENT
     colorClass = 'from-orange-50 to-amber-50 text-orange-700 border-orange-400';
     iconColor = 'text-orange-600';
     progressColor = 'bg-orange-500';
     progressBgColor = 'bg-orange-100/50';
-  } else if (remainingSeconds <= 60 * 60) { // Last hour
+    isClockActive = true;
+    animationType = 'urgent'; // Use 3minuts animation
+  } else if (remainingSeconds <= 50 * 60) { // Last 50 minutes - WARNING
     colorClass = 'from-yellow-50 to-amber-50 text-yellow-700 border-yellow-400';
     iconColor = 'text-yellow-600';
     progressColor = 'bg-yellow-500';
     progressBgColor = 'bg-yellow-100/50';
+    isClockActive = true;
+    animationType = 'warning'; // Use 1hour animation
+  }
+
+  // Log clock animation state for debugging
+  if (isClockActive) {
+    console.log(`🟡 Clock Animation ACTIVE - Type: ${animationType} - Remaining:`, Math.floor(remainingSeconds / 60), 'minutes');
   }
 
   return (
@@ -576,7 +589,7 @@ const WorkShiftTimer: React.FC = () => {
         ></div>
       </div>
       
-      <AnimatedClock className={`h-4 w-4 ${iconColor}`} />
+      <AnimatedClock className={`h-4 w-4 ${iconColor}`} isActive={isClockActive} animationType={animationType} />
       
       <div className="flex items-center gap-2">
         {/* Countdown Timer */}

@@ -28,6 +28,7 @@ import { LanguageProvider } from "./contexts/LanguageContext";
 import { WorkspaceMessageProvider } from "./contexts/WorkspaceMessageContext";
 import { LoyalCustomersProvider } from "./contexts/LoyalCustomersContext";
 import { CopyWritingProductsProvider } from "./contexts/CopyWritingProductsContext";
+import { StrategyProvider } from "./contexts/StrategyContext";
 import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
@@ -56,11 +57,9 @@ import FloatingChatbot from "./components/FloatingChatbot";
 import BackgroundProcessIndicator from "./components/BackgroundProcessIndicator";
 import CustomerLoader from "./components/MobileCustomerLoader";
 import CopyWritingLoader from "./components/MobileCopyWritingLoader";
-
+import StrategyPage from "./pages/StrategyPage";  
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
-
-
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -153,8 +152,6 @@ const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-
-
 // Designer route component for designer-only access
 const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
@@ -175,6 +172,33 @@ const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
+};
+
+// Strategy route component for admin and media buyer access
+const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Component to conditionally show NotificationBanner only for authenticated users
+const AuthenticatedNotificationBanner = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  
+  // Don't show notification banner on login page or index page
+  const hideOnPages = ['/', '/login'];
+  
+  // Only show if user is authenticated and not on excluded pages
+  if (!user || hideOnPages.includes(location.pathname)) {
+    return null;
+  }
+  
+  return <NotificationBanner />;
 };
 
 // This component is outside the BrowserRouter but inside the other providers
@@ -204,333 +228,330 @@ const AppWithAuth = () => {
             <CheckInProvider>
               <LoyalCustomersProvider>
                 <CopyWritingProductsProvider>
-              <LanguageProvider>
-                <AnimatePresence>
-                  {showOpeningAnimation && <OpeningAnimation />}
-                </AnimatePresence>
-                <AuthenticatedNotificationBanner />
-                <NotificationHandler />
-                <Routes>
-                  <Route path="/" element={<PageTransition><Index /></PageTransition>} />
-                  <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
-                  <Route 
-                    path="/dashboard" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <Dashboard />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/employee-dashboard" 
-                    element={
-                      <EmployeeDashboardRoute>
-                        <SidebarNavigation>
-                          <EmployeeDashboard />
-                        </SidebarNavigation>
-                      </EmployeeDashboardRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/copy-writing-dashboard" 
-                    element={
-                      <CopyWritingRoute>
-                        <SidebarNavigation>
-                          <CopyWritingDashboard />
-                        </SidebarNavigation>
-                      </CopyWritingRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/check-in" 
-                    element={
-                      <PrivateRoute>
-                        <SidebarNavigation>
-                          <CheckInPage />
-                        </SidebarNavigation>
-                      </PrivateRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/shifts" 
-                    element={
-                      <PrivateRoute>
-                        <SidebarNavigation>
-                          <ShiftsPage />
-                        </SidebarNavigation>
-                      </PrivateRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/report" 
-                    element={
-                      <PrivateRoute>
-                        <SidebarNavigation>
-                          <ReportPage />
-                        </SidebarNavigation>
-                      </PrivateRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/employees" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminEmployeesPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/reports" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminReportsPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/tasks" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminTasksPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin-ratings" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminRatingsPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/employee-tasks" 
-                    element={
-                      <EmployeeRoute>
-                        <SidebarNavigation>
-                          <EmployeeTasksPage />
-                        </SidebarNavigation>
-                      </EmployeeRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/my-ratings" 
-                    element={
-                      <EmployeeRoute>
-                        <SidebarNavigation>
-                          <EmployeeRatingsPage />
-                        </SidebarNavigation>
-                      </EmployeeRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/settings" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <SettingsPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/events" 
-                    element={
-                      <PrivateRoute>
-                        <SidebarNavigation>
-                          <EventsPage />
-                        </SidebarNavigation>
-                      </PrivateRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/media-buyer-tasks" 
-                    element={
-                      <MediaBuyerRoute>
-                        <SidebarNavigation>
-                          <MediaBuyerTasksPage />
-                        </SidebarNavigation>
-                      </MediaBuyerRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin-shift-management" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminShiftManagement />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/performance-dashboard" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminPerformancePage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/workspace" 
-                    element={
-                      <PrivateRoute>
-                        <SidebarNavigation>
-                          <WorkspacePage />
-                        </SidebarNavigation>
-                      </PrivateRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/analytics" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminAnalyticsPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin-bug-reports" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminBugReportsPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/customer-service-crm" 
-                    element={
-                      <CustomerServiceRoute>
-                        <SidebarNavigation>
-                          <CustomerServiceCRMPage />
-                        </SidebarNavigation>
-                      </CustomerServiceRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/create-order" 
-                    element={
-                      <CustomerServiceRoute>
-                        <SidebarNavigation>
-                          <CreateOrderPage />
-                        </SidebarNavigation>
-                      </CustomerServiceRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/my-orders" 
-                    element={
-                      <CustomerServiceRoute>
-                        <SidebarNavigation>
-                          <MyOrdersPage />
-                        </SidebarNavigation>
-                      </CustomerServiceRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin-total-orders" 
-                    element={
-                      <AdminRoute>
-                        <SidebarNavigation>
-                          <AdminTotalOrdersPage />
-                        </SidebarNavigation>
-                      </AdminRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/loyal-customers" 
-                    element={
-                      <CustomerServiceRoute>
-                        <SidebarNavigation>
-                          <LoyalCustomersPage />
-                        </SidebarNavigation>
-                      </CustomerServiceRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/designer-dashboard" 
-                    element={
-                      <DesignerRoute>
-                        <SidebarNavigation>
-                          <DesignerDashboard />
-                        </SidebarNavigation>
-                      </DesignerRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/copy-writing-dashboard" 
-                    element={
-                      <CopyWritingRoute>
-                        <SidebarNavigation>
-                          <CopyWritingDashboard />
-                        </SidebarNavigation>
-                      </CopyWritingRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/copy-writing-products" 
-                    element={
-                      <CopyWritingRoute>
-                        <SidebarNavigation>
-                          <CopyWritingProductsPage />
-                        </SidebarNavigation>
-                      </CopyWritingRoute>
-                    } 
-                  />
-                  <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
-                </Routes>
-                <AppUpdateManager />
-                <UpdateTrigger />
-                <PWAVersionChecker />
-                <PWAUpdateInstructions />
-                <FloatingChatbot />
-                <BackgroundProcessIndicator />
-                <CustomerLoader />
-                <CopyWritingLoader />
+                  <StrategyProvider>
+                    <LanguageProvider>
+                      <AnimatePresence>
+                        {showOpeningAnimation && <OpeningAnimation />}
+                      </AnimatePresence>
+                      <AuthenticatedNotificationBanner />
+                      <NotificationHandler />
+                      <Routes>
+                        <Route path="/" element={<PageTransition><Index /></PageTransition>} />
+                        <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+                        <Route 
+                          path="/dashboard" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <Dashboard />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/employee-dashboard" 
+                          element={
+                            <EmployeeDashboardRoute>
+                              <SidebarNavigation>
+                                <EmployeeDashboard />
+                              </SidebarNavigation>
+                            </EmployeeDashboardRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/copy-writing-dashboard" 
+                          element={
+                            <CopyWritingRoute>
+                              <SidebarNavigation>
+                                <CopyWritingDashboard />
+                              </SidebarNavigation>
+                            </CopyWritingRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/check-in" 
+                          element={
+                            <PrivateRoute>
+                              <SidebarNavigation>
+                                <CheckInPage />
+                              </SidebarNavigation>
+                            </PrivateRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/shifts" 
+                          element={
+                            <PrivateRoute>
+                              <SidebarNavigation>
+                                <ShiftsPage />
+                              </SidebarNavigation>
+                            </PrivateRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/report" 
+                          element={
+                            <PrivateRoute>
+                              <SidebarNavigation>
+                                <ReportPage />
+                              </SidebarNavigation>
+                            </PrivateRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/employees" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminEmployeesPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/reports" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminReportsPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/tasks" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminTasksPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/admin-ratings" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminRatingsPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/employee-tasks" 
+                          element={
+                            <EmployeeRoute>
+                              <SidebarNavigation>
+                                <EmployeeTasksPage />
+                              </SidebarNavigation>
+                            </EmployeeRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/my-ratings" 
+                          element={
+                            <EmployeeRoute>
+                              <SidebarNavigation>
+                                <EmployeeRatingsPage />
+                              </SidebarNavigation>
+                            </EmployeeRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/settings" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <SettingsPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/events" 
+                          element={
+                            <PrivateRoute>
+                              <SidebarNavigation>
+                                <EventsPage />
+                              </SidebarNavigation>
+                            </PrivateRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/media-buyer-tasks" 
+                          element={
+                            <MediaBuyerRoute>
+                              <SidebarNavigation>
+                                <MediaBuyerTasksPage />
+                              </SidebarNavigation>
+                            </MediaBuyerRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/admin-shift-management" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminShiftManagement />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/performance-dashboard" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminPerformancePage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/workspace" 
+                          element={
+                            <PrivateRoute>
+                              <SidebarNavigation>
+                                <WorkspacePage />
+                              </SidebarNavigation>
+                            </PrivateRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/analytics" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminAnalyticsPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/admin-bug-reports" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminBugReportsPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/customer-service-crm" 
+                          element={
+                            <CustomerServiceRoute>
+                              <SidebarNavigation>
+                                <CustomerServiceCRMPage />
+                              </SidebarNavigation>
+                            </CustomerServiceRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/create-order" 
+                          element={
+                            <CustomerServiceRoute>
+                              <SidebarNavigation>
+                                <CreateOrderPage />
+                              </SidebarNavigation>
+                            </CustomerServiceRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/my-orders" 
+                          element={
+                            <CustomerServiceRoute>
+                              <SidebarNavigation>
+                                <MyOrdersPage />
+                              </SidebarNavigation>
+                            </CustomerServiceRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/admin-total-orders" 
+                          element={
+                            <AdminRoute>
+                              <SidebarNavigation>
+                                <AdminTotalOrdersPage />
+                              </SidebarNavigation>
+                            </AdminRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/loyal-customers" 
+                          element={
+                            <CustomerServiceRoute>
+                              <SidebarNavigation>
+                                <LoyalCustomersPage />
+                              </SidebarNavigation>
+                            </CustomerServiceRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/designer-dashboard" 
+                          element={
+                            <DesignerRoute>
+                              <SidebarNavigation>
+                                <DesignerDashboard />
+                              </SidebarNavigation>
+                            </DesignerRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/copy-writing-dashboard" 
+                          element={
+                            <CopyWritingRoute>
+                              <SidebarNavigation>
+                                <CopyWritingDashboard />
+                              </SidebarNavigation>
+                            </CopyWritingRoute>
+                          } 
+                        />
+                        <Route 
+                          path="/copy-writing-products" 
+                          element={
+                            <CopyWritingRoute>
+                              <SidebarNavigation>
+                                <CopyWritingProductsPage />
+                              </SidebarNavigation>
+                            </CopyWritingRoute>
+                          } 
+                        />
+                        {/* Strategy Page */}
+                        <Route 
+                          path="/strategy" 
+                          element={
+                            <StrategyRoute>
+                              <SidebarNavigation>
+                                <StrategyPage />
+                              </SidebarNavigation>
+                            </StrategyRoute>
+                          } 
+                        />
+                        <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+                      </Routes>
+                      <AppUpdateManager />
+                      <UpdateTrigger />
+                      <PWAVersionChecker />
+                      <PWAUpdateInstructions />
+                      <FloatingChatbot />
+                      <BackgroundProcessIndicator />
+                      <CustomerLoader />
+                      <CopyWritingLoader />
 
-                <PWAInstallPrompt />
-                <Toaster />
-                <Sonner />
-              </LanguageProvider>
+                      <PWAInstallPrompt />
+                      <Toaster />
+                      <Sonner />
+                    </LanguageProvider>
+                  </StrategyProvider>
                 </CopyWritingProductsProvider>
-                </LoyalCustomersProvider>
+              </LoyalCustomersProvider>
             </CheckInProvider>
           </WorkspaceMessageProvider>
         </AuthProvider>
       </BrowserRouter>
   );
-};
-
-// Component to conditionally show NotificationBanner only for authenticated users
-const AuthenticatedNotificationBanner = () => {
-  const { user } = useAuth();
-  const location = useLocation();
-  
-  // Don't show notification banner on login page or index page
-  const hideOnPages = ['/', '/login'];
-  
-  // Only show if user is authenticated and not on excluded pages
-  if (!user || hideOnPages.includes(location.pathname)) {
-    return null;
-  }
-  
-  return <NotificationBanner />;
 };
 
 const App = () => {

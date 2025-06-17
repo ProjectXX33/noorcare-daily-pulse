@@ -318,7 +318,9 @@ class WooCommerceAPI {
   }
 
   private getApiUrl(endpoint: string): string {
-    return `${this.config.url}/wp-json/${this.config.version}/${endpoint}`;
+    // Remove trailing slash from URL to avoid double slashes
+    const baseUrl = this.config.url.replace(/\/$/, '');
+    return `${baseUrl}/wp-json/${this.config.version}/${endpoint}`;
   }
 
   async fetchProducts(params?: {
@@ -344,25 +346,41 @@ class WooCommerceAPI {
       const url = `${this.getApiUrl('products')}?${searchParams.toString()}`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log('WooCommerce API timeout reached, aborting request...');
+        controller.abort();
+      }, 60000); // Increased to 60 second timeout
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': this.getAuthHeader(),
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': this.getAuthHeader(),
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.statusText}`);
+        }
+
+        const products: WooCommerceProduct[] = await response.json();
+        return products;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        // Handle specific abort errors more gracefully
+        if (error.name === 'AbortError') {
+          console.log('WooCommerce API request was aborted (timeout or manual cancel)');
+          throw new Error('Request timeout - please try again or check your internet connection');
+        }
+        
+        console.error('Error fetching products:', error);
+        throw error;
       }
-
-      const products: WooCommerceProduct[] = await response.json();
-      return products;
     } catch (error) {
       console.error('Error fetching products:', error);
       throw error;

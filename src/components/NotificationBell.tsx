@@ -88,8 +88,7 @@ export const AnimatedNotificationBell: React.FC<{
       style={{ 
         display: 'inline-flex', 
         alignItems: 'center', 
-        justifyContent: 'center',
-        filter: 'hue-rotate(40deg) saturate(1.8) brightness(1.3) drop-shadow(0 0 8px rgba(245, 158, 11, 0.6))' // Enhanced gold filter with glow
+        justifyContent: 'center'
       }}
     >
       <Lottie 
@@ -97,15 +96,6 @@ export const AnimatedNotificationBell: React.FC<{
         loop={true}
         autoplay={true}
         style={{ width: '100%', height: '100%' }}
-      />
-      
-      {/* Additional glow effect for animated bell */}
-      <div 
-        className="absolute inset-0 rounded-full opacity-30 animate-pulse"
-        style={{
-          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, transparent 70%)',
-          pointerEvents: 'none'
-        }}
       />
     </div>
   );

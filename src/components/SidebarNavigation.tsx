@@ -30,8 +30,10 @@ import {
   Package,
   Globe,
   Receipt,
-  DatabaseIcon
+  DatabaseIcon,
+  Target
 } from 'lucide-react';
+import { GrowthStrategyIcon } from './GrowthStrategyIcon';
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -221,6 +223,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     excludeCopyWriting?: boolean;
     copyWritingOnly?: boolean;
     hasCounter?: boolean;
+    adminAndMediaBuyerOnly?: boolean;
   }
 
   // Organize navigation items into groups with colors
@@ -260,7 +263,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       items: [
         { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true, color: 'indigo' },
         { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true, color: 'red' },
-        { name: 'Total Orders', path: '/admin-total-orders', icon: DatabaseIcon, adminOnly: true, color: 'purple' },
+        { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, adminOnly: true, color: 'purple' },
+        { name: 'Strategy', path: '/strategy', icon: GrowthStrategyIcon, adminAndMediaBuyerOnly: true, color: 'blue' },
         { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true, color: 'blue' },
       ] as NavItem[]
     },
@@ -417,6 +421,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.designerOnly && user?.position !== 'Designer') return false;
       if (item.copyWritingOnly && user?.position !== 'Copy Writing') return false;
+      if (item.adminAndMediaBuyerOnly && !(user?.role === 'admin' || user?.position === 'Media Buyer')) return false;
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
       if (item.excludeDesigner && user?.position === 'Designer') return false;
       if (item.excludeCopyWriting && user?.position === 'Copy Writing') return false;
