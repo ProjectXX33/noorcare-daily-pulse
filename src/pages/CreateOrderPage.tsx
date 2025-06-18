@@ -720,8 +720,25 @@ const CreateOrderPage: React.FC = () => {
           });
         } catch (wcError) {
           console.error('WooCommerce sync failed:', wcError);
+          
+          // Update order with sync error for later retry
+          if (savedOrder.id) {
+            try {
+              await supabase
+                .from('order_submissions')
+                .update({ 
+                  sync_error: wcError.message || 'WooCommerce sync failed',
+                  last_sync_attempt: new Date().toISOString(),
+                  is_synced_to_woocommerce: false
+                })
+                .eq('id', savedOrder.id);
+            } catch (updateError) {
+              console.error('Failed to update sync error:', updateError);
+            }
+          }
+          
           toast.warning(`Order saved locally but WooCommerce sync failed`, {
-            description: `Order #${savedOrder.order_number} - Total: ${calculateTotal()} SAR`
+            description: `Order #${savedOrder.order_number} - You can retry sync later from My Orders page`
           });
         }
       } else {

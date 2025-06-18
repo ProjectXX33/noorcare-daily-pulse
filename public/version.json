@@ -6,18 +6,8 @@
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🚀 **Version 2.1.0 - Campaign Strategy Integration & Enhanced WooCommerce API**",
-    "🎯 **Campaign Strategy Integration**: Direct connection with WooCommerce for advanced product analytics and campaign targeting",
-    "📊 **Advanced Product Analytics**: Performance scoring, campaign readiness indicators, and smart product categorization",
-    "💰 **Revenue Analytics**: Enhanced revenue tracking with profit margins, ROI calculations, and market trend analysis",
-    "🎨 **Modern Strategy Icon**: Updated navbar and floating button with professional strategy.svg icon design",
-    "🔧 **Enhanced WooCommerce API v2.1.0**: Comprehensive error handling, retry logic, and performance optimization",
-    "📱 **Mobile Optimization**: Enhanced mobile data loading with background sync and real-time auto-refresh every 10 minutes",
-    "🎪 **Smart Product Categorization**: AI-powered classification with 25+ categories for better campaign targeting",
-    "⚡ **Bulk Operations**: Batch product updates and bulk campaign targeting for improved efficiency",
-    "🔄 **Real-time Sync**: Automatic strategy data refresh every 10 minutes for up-to-date campaign insights",
-    "🎨 **Professional UI**: Clean strategy icons throughout navbar, floating buttons, and campaign interfaces",
-    "💎 **Campaign Performance Tracking**: Integration with custom campaign strategies table for comprehensive analytics"
+    "Hotfix: Fixed issue with overtime countdown not updating correctly",
+    "Hotfix: Fixed issue with order sync not working correctly"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

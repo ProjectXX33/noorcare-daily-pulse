@@ -675,6 +675,7 @@ class WooCommerceAPI {
     order?: string;
     search?: string;
     category?: string;
+    stock_status?: string;
   } = {}): Promise<any[]> {
     const {
       per_page = 50, // Reduced from 100 to 50 for better performance with 360+ products
@@ -683,7 +684,8 @@ class WooCommerceAPI {
       orderby = 'menu_order',
       order = 'asc',
       search,
-      category
+      category,
+      stock_status
     } = params;
     
     // Build query parameters with essential fields only for faster loading
@@ -723,6 +725,11 @@ class WooCommerceAPI {
     // Add optional category filter
     if (category) {
       queryParams.append('category', category);
+    }
+    
+    // Add optional stock status filter
+    if (stock_status) {
+      queryParams.append('stock_status', stock_status);
     }
     
     const url = `${API_CONFIG.baseURL}/products?${queryParams.toString()}`;
@@ -956,6 +963,105 @@ class WooCommerceAPI {
     } catch (error: any) {
       console.error('❌ Error fetching WooCommerce customers:', error);
       throw error;
+    }
+  }
+
+  // Create a new order in WooCommerce
+  async createOrder(orderData: WooCommerceOrderData): Promise<WooCommerceOrder> {
+    const url = `${API_CONFIG.baseURL}/orders`;
+    
+    try {
+      console.log('🛒 Creating order in WooCommerce:', orderData);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${btoa(`${API_CONFIG.consumerKey}:${API_CONFIG.consumerSecret}`)}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'NoorHub-Orders/2.0'
+        },
+        body: JSON.stringify(orderData),
+        signal: controller.signal,
+        mode: 'cors'
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log(`📡 Create order response status: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorText = await response.text();
+          if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
+            errorMessage = `Server returned HTML page instead of JSON. Check WooCommerce REST API configuration.`;
+          } else {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorMessage;
+          }
+        } catch (e) {
+          // Use original error message if we can't parse the response
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const responseText = await response.text();
+      
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        throw new Error('Server returned HTML page instead of JSON. The WooCommerce REST API may not be properly configured.');
+      }
+      
+      let createdOrder;
+      try {
+        createdOrder = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parse error. Response text:', responseText.substring(0, 200) + '...');
+        throw new Error(`Invalid JSON response from WooCommerce API when creating order.`);
+      }
+      
+      console.log(`✅ Order created successfully in WooCommerce: #${createdOrder.number} (ID: ${createdOrder.id})`);
+      return createdOrder;
+      
+    } catch (error: any) {
+      console.error('❌ Error creating WooCommerce order:', error);
+      throw error;
+    }
+  }
+
+  // Get a single order by ID
+  async getOrder(orderId: number): Promise<WooCommerceOrder> {
+    const url = `${API_CONFIG.baseURL}/orders/${orderId}`;
+    
+    try {
+      const order = await makeRequest(url);
+      return order;
+      
+    } catch (error: any) {
+      console.error(`❌ Error fetching WooCommerce order ${orderId}:`, error);
+      throw error;
+    }
+  }
+
+  // Get coupon by code
+  async getCouponByCode(couponCode: string): Promise<WooCommerceCoupon | null> {
+    try {
+      // Search for coupons by code
+      const url = `${API_CONFIG.baseURL}/coupons?code=${encodeURIComponent(couponCode)}`;
+      const coupons = await makeRequest(url);
+      
+      if (Array.isArray(coupons) && coupons.length > 0) {
+        return coupons[0]; // Return the first matching coupon
+      }
+      
+      return null; // No coupon found
+      
+    } catch (error: any) {
+      console.error(`❌ Error fetching coupon ${couponCode}:`, error);
+      return null; // Return null instead of throwing to allow graceful handling
     }
   }
 

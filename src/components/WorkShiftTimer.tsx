@@ -296,8 +296,11 @@ const WorkShiftTimer: React.FC = () => {
           }
         }
         
-        // Check if in overtime (current time is after shift end time)
-        if (now > shiftEndTime) {
+        // Check if in overtime (current time is after shift end time AND worked minimum hours)
+        const minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day shift: 7 hours, Night shift: 8 hours
+        const hoursWorked = timeWorked / 3600; // Convert seconds to hours
+        
+        if (now > shiftEndTime && hoursWorked >= minimumHoursForOvertime) {
           setIsOvertime(true);
           const overtimeMs = now.getTime() - shiftEndTime.getTime();
           const overtimeMinutesCalc = Math.floor(overtimeMs / (1000 * 60));
@@ -492,6 +495,65 @@ const WorkShiftTimer: React.FC = () => {
           <span className="hidden sm:inline text-xs opacity-75 ml-1">
             ({formatTime(timeWorked)} total)
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if working past shift hours but haven't reached minimum for overtime
+  const currentTime = new Date();
+  const sessionStartTime = new Date(activeCheckIn.timestamp);
+  const sessionStartHour = sessionStartTime.getHours();
+  
+  // Determine shift type and end time
+  let currentShiftType = 'day';
+  let shiftEndTime = new Date(sessionStartTime);
+  
+  if (shiftInfo && shiftInfo.name) {
+    if (shiftInfo.name.toLowerCase().includes('day')) {
+      currentShiftType = 'day';
+      shiftEndTime.setHours(16, 0, 0, 0); // 4PM
+    } else if (shiftInfo.name.toLowerCase().includes('night')) {
+      currentShiftType = 'night';
+      if (sessionStartHour >= 15) {
+        shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+        shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+      } else {
+        shiftEndTime.setHours(0, 0, 0, 0); // Midnight current day
+      }
+    }
+  } else {
+    // Fallback detection
+    if (sessionStartHour >= 8 && sessionStartHour < 16) {
+      currentShiftType = 'day';
+      shiftEndTime.setHours(16, 0, 0, 0); // 4PM
+    } else {
+      currentShiftType = 'night';
+      if (sessionStartHour >= 15) {
+        shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+        shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+      } else {
+        shiftEndTime.setHours(0, 0, 0, 0); // Midnight current day
+      }
+    }
+  }
+
+  const minimumHoursForOvertime = currentShiftType === 'day' ? 7 : 8;
+  const hoursWorked = timeWorked / 3600;
+  
+  // Show "Extended Work" state when past shift hours but haven't reached minimum overtime hours
+  if (currentTime > shiftEndTime && hoursWorked < minimumHoursForOvertime) {
+    const hoursNeeded = minimumHoursForOvertime - hoursWorked;
+    const secondsNeeded = Math.ceil(hoursNeeded * 3600); // Convert to seconds and round up
+    
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-amber-400 shadow-md">
+        <AnimatedClock className="h-4 w-4 text-amber-600" isActive={true} animationType="warning" />
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm tracking-wide text-amber-800">
+            {formatCountdown(secondsNeeded)}
+          </span>
+
         </div>
       </div>
     );

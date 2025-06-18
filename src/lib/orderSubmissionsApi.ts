@@ -451,6 +451,149 @@ export const syncOrderStatusFromWooCommerce = async (orderSubmissionId: number):
   }
 };
 
+// Retry syncing an order that failed to sync to WooCommerce
+export const retrySyncOrderToWooCommerce = async (orderSubmissionId: number): Promise<{
+  success: boolean;
+  message: string;
+  orderNumber?: string;
+}> => {
+  try {
+    console.log('🔄 Retrying WooCommerce sync for order:', orderSubmissionId);
+
+    // Get the order submission from database
+    const { data: orderSubmission, error: fetchError } = await supabase
+      .from('order_submissions')
+      .select('*')
+      .eq('id', orderSubmissionId)
+      .single();
+
+    if (fetchError || !orderSubmission) {
+      throw new Error(`Order submission not found: ${fetchError?.message}`);
+    }
+
+    // Check if already synced
+    if (orderSubmission.is_synced_to_woocommerce && orderSubmission.woocommerce_order_id) {
+      return {
+        success: true,
+        message: 'Order is already synced to WooCommerce',
+        orderNumber: orderSubmission.order_number
+      };
+    }
+
+    // Prepare order data for WooCommerce
+    const orderData = {
+      payment_method: orderSubmission.payment_method || 'cod',
+      payment_method_title: 'Cash on Delivery',
+      set_paid: false,
+      status: 'processing',
+      billing: {
+        first_name: orderSubmission.customer_first_name,
+        last_name: orderSubmission.customer_last_name,
+        company: '',
+        address_1: orderSubmission.billing_address_1,
+        address_2: orderSubmission.billing_address_2 || '',
+        city: orderSubmission.billing_city,
+        state: orderSubmission.billing_state || '',
+        postcode: orderSubmission.billing_postcode || '',
+        country: orderSubmission.billing_country || 'SA',
+        email: orderSubmission.customer_email || '',
+        phone: orderSubmission.customer_phone
+      },
+      shipping: {
+        first_name: orderSubmission.customer_first_name,
+        last_name: orderSubmission.customer_last_name,
+        company: '',
+        address_1: orderSubmission.billing_address_1,
+        address_2: orderSubmission.billing_address_2 || '',
+        city: orderSubmission.billing_city,
+        state: orderSubmission.billing_state || '',
+        postcode: orderSubmission.billing_postcode || '',
+        country: orderSubmission.billing_country || 'SA',
+        phone: orderSubmission.customer_phone
+      },
+      line_items: (orderSubmission.order_items as OrderItem[]).map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity
+      })),
+      shipping_lines: orderSubmission.include_shipping && orderSubmission.shipping_amount && orderSubmission.shipping_amount > 0 ? [
+        {
+          method_id: 'flat_rate',
+          method_title: 'Standard Shipping',
+          total: orderSubmission.shipping_amount.toString()
+        }
+      ] : [],
+      coupon_lines: orderSubmission.coupon_code ? [
+        {
+          code: orderSubmission.coupon_code
+        }
+      ] : [],
+      customer_note: orderSubmission.customer_note || '',
+      meta_data: [
+        {
+          key: '_created_by_customer_service',
+          value: orderSubmission.created_by_name || 'Customer Service'
+        },
+        {
+          key: '_internal_order_id',
+          value: orderSubmission.id?.toString() || ''
+        },
+        {
+          key: '_retry_sync',
+          value: 'true'
+        }
+      ]
+    };
+
+    console.log('📦 Creating order in WooCommerce (retry):', orderData);
+
+    // Create order in WooCommerce
+    const createdOrder = await wooCommerceAPI.createOrder(orderData);
+
+    console.log('✅ Order successfully created in WooCommerce:', createdOrder);
+
+    // Update our database record with the real WooCommerce order info
+    const { error: updateError } = await supabase
+      .from('order_submissions')
+      .update({
+        order_number: `#${createdOrder.number}`,
+        woocommerce_order_id: createdOrder.id,
+        is_synced_to_woocommerce: true,
+        sync_error: null,
+        last_sync_attempt: new Date().toISOString(),
+        status: 'processing'
+      })
+      .eq('id', orderSubmissionId);
+
+    if (updateError) {
+      throw new Error(`Failed to update order record: ${updateError.message}`);
+    }
+
+    return {
+      success: true,
+      message: `Order successfully synced to WooCommerce as #${createdOrder.number}`,
+      orderNumber: `#${createdOrder.number}`
+    };
+
+  } catch (error: any) {
+    console.error('❌ Error retrying WooCommerce sync:', error);
+
+    // Update last sync attempt and error
+    await supabase
+      .from('order_submissions')
+      .update({
+        sync_error: error.message || 'Retry sync failed',
+        last_sync_attempt: new Date().toISOString(),
+        is_synced_to_woocommerce: false
+      })
+      .eq('id', orderSubmissionId);
+
+    return {
+      success: false,
+      message: `Failed to sync order to WooCommerce: ${error.message}`
+    };
+  }
+};
+
 // Sync all order statuses from WooCommerce (for orders that have WooCommerce IDs)
 export const syncAllOrderStatusesFromWooCommerce = async (): Promise<{
   success: boolean;

@@ -30,6 +30,7 @@ import {
   getOrderStatistics,
   syncOrderStatusFromWooCommerce,
   syncAllOrderStatusesFromWooCommerce,
+  retrySyncOrderToWooCommerce,
   OrderSubmission, 
   OrderSubmissionFilters 
 } from '@/lib/orderSubmissionsApi';
@@ -242,6 +243,26 @@ const MyOrdersPage: React.FC = () => {
     } catch (error) {
       console.error('Error syncing order:', error);
       toast.error('Failed to sync order with WooCommerce');
+    }
+  };
+
+  // Retry syncing failed order to WooCommerce
+  const handleRetrySync = async (orderId: number) => {
+    try {
+      toast.info('Retrying WooCommerce sync...');
+      
+      const result = await retrySyncOrderToWooCommerce(orderId);
+      
+      if (result.success) {
+        toast.success(result.message);
+        // Refresh data to show updated order number
+        await fetchData();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error('Error retrying sync:', error);
+      toast.error('Failed to retry sync with WooCommerce');
     }
   };
 
@@ -560,6 +581,17 @@ const MyOrdersPage: React.FC = () => {
                               Sync
                             </Button>
                           )}
+                          {!order.is_synced_to_woocommerce && order.order_number?.startsWith('TEMP-') && (
+                            <Button
+                              onClick={() => handleRetrySync(order.id!)}
+                              variant="outline"
+                              size="sm"
+                              className="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Retry Sync
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -650,6 +682,11 @@ const MyOrdersPage: React.FC = () => {
                             Synced
                           </Badge>
                         )}
+                        {!selectedOrder.is_synced_to_woocommerce && selectedOrder.order_number?.startsWith('TEMP-') && (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                            Needs Sync
+                          </Badge>
+                        )}
                         {selectedOrder.woocommerce_order_id && (
                           <Button
                             onClick={() => handleSyncOrder(selectedOrder.id!)}
@@ -659,6 +696,17 @@ const MyOrdersPage: React.FC = () => {
                           >
                             <RefreshCw className="h-4 w-4 mr-1" />
                             Sync Status
+                          </Button>
+                        )}
+                        {!selectedOrder.is_synced_to_woocommerce && selectedOrder.order_number?.startsWith('TEMP-') && (
+                          <Button
+                            onClick={() => handleRetrySync(selectedOrder.id!)}
+                            variant="outline"
+                            size="sm"
+                            className="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700"
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Retry Sync
                           </Button>
                         )}
                       </div>

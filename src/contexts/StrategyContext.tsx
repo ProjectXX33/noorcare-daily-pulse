@@ -98,7 +98,7 @@ export const StrategyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [details, setDetails] = useState('');
   const [isBackgroundProcessing, setIsBackgroundProcessing] = useState(false);
 
-  // Load from localStorage on component mount
+  // Load from localStorage on component mount (but don't auto-fetch)
   useEffect(() => {
     const loadFromCache = () => {
       try {
@@ -127,11 +127,10 @@ export const StrategyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return false;
     };
 
-    const hasCache = loadFromCache();
-    if (!hasCache && products.length === 0 && orders.length === 0) {
-      console.log('🚀 No cache found, starting fresh fetch...');
-      fetchStrategyData();
-    }
+    // Only load from cache, don't auto-fetch fresh data
+    // User must manually click "Load Data" button
+    loadFromCache();
+    console.log('💡 Strategy context initialized. Manual loading required by Media Buyer/Admin.');
   }, []);
 
   // Save to localStorage when data changes

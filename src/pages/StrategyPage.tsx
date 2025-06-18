@@ -467,6 +467,59 @@ const StrategyPage: React.FC = () => {
     );
   }
 
+  // Show load data prompt when no data is available
+  if (!loading && products.length === 0 && !error) {
+    return (
+      <div className="p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-lg mx-auto"
+        >
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                <StrategyIcon className="w-12 h-12 text-blue-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-blue-800 mb-2">
+                Strategy Analytics Ready
+              </h3>
+              <p className="text-blue-700 mb-6">
+                Load your WooCommerce data to generate AI-powered insights and campaign strategies.
+              </p>
+              
+              <div className="space-y-4">
+                <Button 
+                  onClick={startFetching}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                >
+                  <StrategyIcon className="w-5 h-5 mr-2" />
+                  Load Strategy Data
+                </Button>
+                
+                <div className="p-4 bg-blue-100 rounded-lg border border-blue-200 text-left">
+                  <p className="text-sm font-medium text-blue-800 mb-2">📊 What will be analyzed:</p>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• All WooCommerce products and their performance</li>
+                    <li>• Completed orders and revenue data</li>
+                    <li>• AI-generated campaign strategies</li>
+                    <li>• Product performance insights and recommendations</li>
+                  </ul>
+                </div>
+                
+                <p className="text-xs text-blue-600">
+                  Only Media Buyers and Admins can load strategy data
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Floating loading button is now handled globally by BackgroundProcessIndicator */}
