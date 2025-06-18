@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart3, TrendingUp, Target, Brain } from 'lucide-react';
 import { useStrategy } from '@/contexts/StrategyContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Professional Strategy SVG Icon Component - Using strategy.svg design
 const GrowthStrategyIcon = ({ className, animated = false }: { className?: string, animated?: boolean }) => (
@@ -27,6 +28,7 @@ const GrowthStrategyIcon = ({ className, animated = false }: { className?: strin
 );
 
 const BackgroundProcessIndicator: React.FC = () => {
+  const { user } = useAuth();
   const { 
     isBackgroundProcessing, 
     progress, 
@@ -36,21 +38,22 @@ const BackgroundProcessIndicator: React.FC = () => {
   } = useStrategy();
   
   const navigate = useNavigate();
+  const location = useLocation();
   const [isHovered, setIsHovered] = useState(false);
 
-  // Auto-sync functionality - refresh every 10 minutes
-  React.useEffect(() => {
-    if (!isBackgroundProcessing) {
-      const autoSyncInterval = setInterval(() => {
-        console.log('🔄 Auto-refreshing strategy data (10-minute interval)');
-        refreshData();
-      }, 10 * 60 * 1000); // 10 minutes
+  // Only show for Media Buyer and Admin
+  const hasAccess = user && (user.role === 'admin' || user.position === 'Media Buyer');
+  
+  // Show on all pages when processing is active (not just strategy page)
+  const shouldShow = hasAccess && isBackgroundProcessing;
 
-      return () => clearInterval(autoSyncInterval);
-    }
-  }, [isBackgroundProcessing, refreshData]);
+  // Manual refresh handler
+  const handleRefresh = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    refreshData();
+  };
 
-  if (!isBackgroundProcessing) return null;
+  if (!shouldShow) return null;
 
   const handleClick = () => {
     navigate('/strategy');
@@ -160,6 +163,8 @@ const BackgroundProcessIndicator: React.FC = () => {
               </motion.span>
             </motion.div>
 
+
+
             {/* Sparkle effect */}
             <motion.div
               className="absolute inset-0 rounded-full"
@@ -188,10 +193,6 @@ const BackgroundProcessIndicator: React.FC = () => {
               <div className="text-xs text-purple-200">{Math.round(progress)}% complete</div>
               <div className="text-xs text-blue-200 mt-1">
                 {stage || 'Analyzing your business data...'}
-              </div>
-              <div className="text-xs text-green-300 mt-1 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                Auto-sync every 10 minutes
               </div>
             </div>
           </div>

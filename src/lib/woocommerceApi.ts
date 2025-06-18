@@ -506,19 +506,26 @@ class WooCommerceAPI {
       status,
       orderby: 'date',
       order: 'desc',
-      // Request essential order fields
+      // Request all essential order fields for full sync
       _fields: [
         'id',
         'number',
         'status',
-        'currency',
+        'currency', 
         'total',
         'total_tax',
+        'shipping_total',
+        'discount_total',
         'date_created',
+        'date_modified',
         'date_completed',
         'line_items',
         'customer_id',
-        'billing'
+        'customer_note',
+        'payment_method',
+        'payment_method_title',
+        'billing',
+        'shipping'
       ].join(',')
     });
     

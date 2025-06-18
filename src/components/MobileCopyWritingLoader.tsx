@@ -3,14 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Edit3, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCopyWritingProducts } from '@/contexts/CopyWritingProductsContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const CopyWritingLoader = () => {
   const { loading, progress, products, stage, details } = useCopyWritingProducts();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleClick = () => {
     navigate('/copy-writing-products');
   };
+
+  // Only show for Media Buyer and Admin users
+  if (!user || (user.position !== 'Media Buyer' && user.role !== 'admin')) {
+    return null;
+  }
 
   // Show on both mobile and desktop when loading and no products loaded yet
   if (!loading || products.length > 0) {

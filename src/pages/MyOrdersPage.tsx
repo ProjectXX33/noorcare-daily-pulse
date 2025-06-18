@@ -61,6 +61,7 @@ const MyOrdersPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncingOrderId, setSyncingOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderSubmission | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   const [stats, setStats] = useState({
@@ -194,30 +195,53 @@ const MyOrdersPage: React.FC = () => {
     });
   };
 
-  // Sync all orders with WooCommerce
+  // Sync only this employee's orders with WooCommerce
   const handleSyncAllOrders = async () => {
     if (!user) return;
     
     try {
       setIsSyncing(true);
-      toast.info('Starting sync with WooCommerce...');
+      toast.info(`📥 Starting sync for your orders...`);
       
-      const result = await syncAllOrderStatusesFromWooCommerce();
+      // Get only this user's orders that have WooCommerce IDs
+      const myOrdersToSync = orders.filter(order => order.woocommerce_order_id);
       
-      if (result.success) {
-        toast.success(result.message);
-        
-        // Show errors if any
-        if (result.errors.length > 0) {
-          toast.warning(`${result.errors.length} orders had sync errors. Check console for details.`);
-          console.warn('Sync errors:', result.errors);
-        }
-        
-        // Refresh data to show updated statuses
-        await fetchData();
-      } else {
-        toast.error(result.message);
+      if (myOrdersToSync.length === 0) {
+        toast.info('No WooCommerce orders found to sync');
+        return;
       }
+      
+      let syncedCount = 0;
+      let errorCount = 0;
+      
+      for (const order of myOrdersToSync) {
+        try {
+          const result = await syncOrderStatusFromWooCommerce(order.id!);
+          if (result.success) {
+            syncedCount++;
+          } else {
+            errorCount++;
+          }
+          
+          // Small delay between syncs
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`Error syncing order ${order.order_number}:`, error);
+          errorCount++;
+        }
+      }
+      
+      // Show results
+      if (syncedCount > 0) {
+        toast.success(`✅ Synced ${syncedCount} of your orders from WooCommerce`);
+      }
+      if (errorCount > 0) {
+        toast.warning(`⚠️ ${errorCount} orders had sync errors`);
+      }
+      
+      // Refresh data to show updated statuses
+      await fetchData();
+      
     } catch (error) {
       console.error('Error syncing orders:', error);
       toast.error('Failed to sync orders with WooCommerce');
@@ -226,10 +250,11 @@ const MyOrdersPage: React.FC = () => {
     }
   };
 
-  // Sync individual order
+  // Sync individual order with loading animation
   const handleSyncOrder = async (orderId: number) => {
     try {
-      toast.info('Syncing order...');
+      setSyncingOrderId(orderId);
+      toast.info('📥 Syncing order from WooCommerce...');
       
       const result = await syncOrderStatusFromWooCommerce(orderId);
       
@@ -243,6 +268,8 @@ const MyOrdersPage: React.FC = () => {
     } catch (error) {
       console.error('Error syncing order:', error);
       toast.error('Failed to sync order with WooCommerce');
+    } finally {
+      setSyncingOrderId(null);
     }
   };
 
@@ -343,14 +370,14 @@ const MyOrdersPage: React.FC = () => {
               onClick={handleSyncAllOrders} 
               disabled={isRefreshing || isSyncing}
               variant="outline"
-              className="bg-blue-500/10 border-blue-300/20 text-white hover:bg-blue-500/20"
+              className="bg-green-500/10 border-green-300/20 text-white hover:bg-green-500/20"
             >
               {isSyncing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
-              Sync with WooCommerce
+              Sync from WooCommerce
             </Button>
           </div>
         </div>
@@ -507,35 +534,57 @@ const MyOrdersPage: React.FC = () => {
             <div className="space-y-4">
               {filteredOrders.map((order) => (
                 <Card key={order.id} className="border border-gray-200 hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-lg">{order.order_number}</h3>
-                          {getStatusBadge(order.status || 'pending')}
+                  <CardContent className="p-3 sm:p-4">
+                    {/* Mobile-First Layout */}
+                    <div className="space-y-3">
+                      {/* Header Row - Order Number, Status, and Amount */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-base sm:text-lg truncate">{order.order_number}</h3>
+                            {getStatusBadge(order.status || 'pending')}
+                          </div>
                           {order.is_synced_to_woocommerce && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Synced to WooCommerce
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs mt-1">
+                              <span className="hidden sm:inline">Synced to WooCommerce</span>
+                              <span className="sm:hidden">Synced</span>
                             </Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span>{order.customer_first_name} {order.customer_last_name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span>{order.customer_phone}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span>{order.billing_city}</span>
-                          </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-lg sm:text-2xl font-bold text-emerald-600 flex items-center gap-1">
+                            <SARIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                            {order.total_amount.toFixed(2)}
+                          </p>
+                          {order.discount_amount && order.discount_amount > 0 && (
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                              Discount: -{order.discount_amount.toFixed(2)} SAR
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
+                      </div>
+                      
+                      {/* Customer Info Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate">{order.customer_first_name} {order.customer_last_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate">{order.customer_phone}</span>
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate">{order.billing_city}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Date and Items Info */}
+                      <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">
                             {order.created_at && new Date(order.created_at).toLocaleDateString('en-US', {
                               month: 'short',
                               day: '2-digit',
@@ -544,55 +593,66 @@ const MyOrdersPage: React.FC = () => {
                               minute: '2-digit'
                             })}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Package className="h-4 w-4" />
-                            {order.order_items.length} items
+                          <span className="sm:hidden">
+                            {order.created_at && new Date(order.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: '2-digit'
+                            })}
                           </span>
-                        </div>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                          {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                        </span>
                       </div>
-                      <div className="flex flex-col md:items-end space-y-2">
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-emerald-600">
-                            {order.total_amount.toFixed(2)} SAR
-                          </p>
-                          {order.discount_amount && order.discount_amount > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              Discount: -{order.discount_amount.toFixed(2)} SAR
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
+                        <Button
+                          onClick={() => viewOrderDetails(order)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          <span className="hidden sm:inline">View Details</span>
+                          <span className="sm:hidden">Details</span>
+                        </Button>
+                        
+                        {order.woocommerce_order_id && (
                           <Button
-                            onClick={() => viewOrderDetails(order)}
+                            onClick={() => handleSyncOrder(order.id!)}
                             variant="outline"
                             size="sm"
+                            disabled={syncingOrderId === order.id}
+                            className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700 disabled:opacity-50 flex-1 sm:flex-none"
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
+                            {syncingOrderId === order.id ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                            )}
+                            <span className="hidden sm:inline">
+                              {syncingOrderId === order.id ? 'Syncing...' : 'Sync from WooCommerce'}
+                            </span>
+                            <span className="sm:hidden">
+                              {syncingOrderId === order.id ? 'Syncing...' : 'Sync'}
+                            </span>
                           </Button>
-                          {order.woocommerce_order_id && (
-                            <Button
-                              onClick={() => handleSyncOrder(order.id!)}
-                              variant="outline"
-                              size="sm"
-                              className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Sync
-                            </Button>
-                          )}
-                          {!order.is_synced_to_woocommerce && order.order_number?.startsWith('TEMP-') && (
-                            <Button
-                              onClick={() => handleRetrySync(order.id!)}
-                              variant="outline"
-                              size="sm"
-                              className="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700"
-                            >
-                              <RefreshCw className="h-4 w-4 mr-1" />
-                              Retry Sync
-                            </Button>
-                          )}
-                        </div>
+                        )}
+                        
+                        {!order.is_synced_to_woocommerce && order.order_number?.startsWith('TEMP-') && (
+                          <Button
+                            onClick={() => handleRetrySync(order.id!)}
+                            variant="outline"
+                            size="sm"
+                            className="bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 flex-1 sm:flex-none"
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            <span className="hidden sm:inline">Retry Sync</span>
+                            <span className="sm:hidden">Retry</span>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -692,10 +752,15 @@ const MyOrdersPage: React.FC = () => {
                             onClick={() => handleSyncOrder(selectedOrder.id!)}
                             variant="outline"
                             size="sm"
-                            className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                            disabled={syncingOrderId === selectedOrder.id}
+                            className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700 disabled:opacity-50"
                           >
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Sync Status
+                            {syncingOrderId === selectedOrder.id ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                            )}
+                            {syncingOrderId === selectedOrder.id ? 'Syncing...' : ' Sync from WooCommerce'}
                           </Button>
                         )}
                         {!selectedOrder.is_synced_to_woocommerce && selectedOrder.order_number?.startsWith('TEMP-') && (

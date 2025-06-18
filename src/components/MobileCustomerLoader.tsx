@@ -3,14 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLoyalCustomers } from '@/contexts/LoyalCustomersContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const CustomerLoader = () => {
   const { loading, progress, customers } = useLoyalCustomers();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleClick = () => {
     navigate('/loyal-customers');
   };
+
+  // Only show for Customer Service and Admin users
+  if (!user || (user.position !== 'Customer Service' && user.role !== 'admin')) {
+    return null;
+  }
 
   // Show on both mobile and desktop when loading and no customers loaded yet
   if (!loading || customers.length > 0) {

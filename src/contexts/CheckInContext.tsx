@@ -1381,19 +1381,140 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
     const workDateStr = format(workDate, 'yyyy-MM-dd');
     
-    const { error } = await supabase
-      .from('monthly_shifts')
-      .update({
+    try {
+      // RECALCULATE DELAY ON CHECKOUT
+      // First, get the check-in time and shift start time
+      const { data: monthlyShift, error: fetchError } = await supabase
+        .from('monthly_shifts')
+        .select(`
+          check_in_time,
+          shifts:shift_id(start_time, name)
+        `)
+        .eq('user_id', userId)
+        .eq('work_date', workDateStr)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching monthly shift for delay calculation:', fetchError);
+        throw fetchError;
+      }
+
+      let delayMinutes = 0;
+      let earlyCheckoutPenalty = 0;
+
+      if (monthlyShift?.check_in_time && monthlyShift?.shifts) {
+        const checkInTime = new Date(monthlyShift.check_in_time);
+        const shift = monthlyShift.shifts as any; // Type assertion for the shift object
+        
+        // Calculate total work time and expected hours
+        const totalHoursWorked = regularHours + overtimeHours;
+        const expectedHours = shift.name.toLowerCase().includes('day') ? 7 : 8; // Day: 7h, Night: 8h
+        
+        // Calculate scheduled start time (used in both scenarios)
+        const [startHour, startMin] = shift.start_time.split(':').map(Number);
+        const scheduledStart = new Date(checkInTime);
+        scheduledStart.setHours(startHour, startMin, 0, 0);
+        const rawDelayMs = checkInTime.getTime() - scheduledStart.getTime();
+        const rawDelayHours = Math.max(0, rawDelayMs / (1000 * 60 * 60));
+        
+        // NEW LOGIC: Smart Delay Calculation Based on Work Completion
+        // If worked less than expected: Delay = Expected Hours - Worked Hours
+        // If worked full/overtime: Delay = Raw Delay - Overtime Hours
+        
+        const rawDelayMinutes = rawDelayHours * 60; // Convert to minutes
+        const totalWorkedHours = regularHours + overtimeHours; // Combined hours
+        
+        if (totalWorkedHours < expectedHours) {
+          // Early checkout: Show missing hours as delay
+          const hoursShort = expectedHours - totalWorkedHours;
+          delayMinutes = hoursShort * 60; // Convert to minutes
+          
+          console.log('⚠️ Early Checkout - Hours Short as Delay:', {
+            expectedHours,
+            workedHours: totalWorkedHours.toFixed(2),
+            hoursShort: hoursShort.toFixed(2),
+            delayMinutes: delayMinutes.toFixed(1)
+          });
+        } else if (totalWorkedHours >= expectedHours) {
+          // Completed expected hours or more: No delay penalty
+          delayMinutes = 0;
+          
+          console.log('✅ Full Shift Completed - No Delay Penalty:', {
+            expectedHours,
+            workedHours: totalWorkedHours.toFixed(2),
+            rawDelayMinutes: rawDelayMinutes.toFixed(1),
+            finalDelay: 0
+          });
+        } else {
+          // Overtime work: Apply offset formula
+          const overtimeOffset = overtimeHours * 60; // Convert to minutes
+          delayMinutes = Math.max(0, rawDelayMinutes - overtimeOffset);
+          
+          console.log('✅ Overtime Work - Delay with Overtime Offset:', {
+            rawDelayMinutes: rawDelayMinutes.toFixed(1),
+            overtimeOffset: overtimeOffset.toFixed(1),
+            finalDelay: delayMinutes.toFixed(1)
+          });
+        }
+        
+        // Track early checkout penalty separately
+        if (totalHoursWorked < expectedHours) {
+          earlyCheckoutPenalty = expectedHours - totalHoursWorked;
+        } else {
+          earlyCheckoutPenalty = 0;
+        }
+        
+                 console.log('✅ Smart Delay Calculation Applied:', {
+           totalWorkedHours: totalWorkedHours.toFixed(2),
+           expectedHours: expectedHours,
+           regularHours: regularHours.toFixed(2),
+           overtimeHours: overtimeHours.toFixed(2),
+           finalDelayMinutes: delayMinutes.toFixed(1),
+           delayToFinishHours: (delayMinutes / 60).toFixed(2) + 'h',
+           earlyCheckoutPenalty: earlyCheckoutPenalty.toFixed(2) + 'h'
+         });
+        
+        console.log('🔄 Delay & Penalty Recalculated on Checkout:', {
+          employee: userId,
+          shift: shift.name,
+          scheduledStart: scheduledStart.toLocaleTimeString(),
+          actualCheckIn: checkInTime.toLocaleTimeString(),
+          delayMinutes: delayMinutes.toFixed(2),
+          totalWorked: totalHoursWorked.toFixed(2),
+          expectedHours,
+          earlyCheckoutPenalty: earlyCheckoutPenalty.toFixed(2)
+        });
+      }
+
+      // Update with recalculated values
+      const updateData: any = {
         check_out_time: checkOutTime.toISOString(),
         regular_hours: regularHours,
         overtime_hours: overtimeHours,
+        delay_minutes: Math.round(delayMinutes * 100) / 100, // Round to 2 decimal places
         updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('work_date', workDateStr);
+      };
 
-    if (error) {
-      console.error('Error updating monthly shift checkout:', error);
+      // Add early checkout penalty if applicable
+      if (earlyCheckoutPenalty > 0) {
+        updateData.early_checkout_penalty = Math.round(earlyCheckoutPenalty * 100) / 100;
+      }
+
+      const { error } = await supabase
+        .from('monthly_shifts')
+        .update(updateData)
+        .eq('user_id', userId)
+        .eq('work_date', workDateStr);
+
+      if (error) {
+        console.error('Error updating monthly shift checkout:', error);
+        throw error;
+      }
+
+      console.log('✅ Monthly shift updated with recalculated delay and penalty:', updateData);
+      
+    } catch (error) {
+      console.error('Error in updateMonthlyShiftCheckout:', error);
       throw error;
     }
   };

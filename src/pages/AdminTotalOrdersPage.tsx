@@ -36,6 +36,8 @@ import {
   OrderSubmission, 
   OrderSubmissionFilters 
 } from '@/lib/orderSubmissionsApi';
+import wooCommerceAPI from '@/lib/woocommerceApi';
+import { supabase } from '@/lib/supabase';
 // Remove date-fns dependency and use built-in date formatting
 
 // SAR Icon Component
@@ -62,8 +64,11 @@ const AdminTotalOrdersPage: React.FC = () => {
   const [filteredOrders, setFilteredOrders] = useState<OrderSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [syncingOrderId, setSyncingOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderSubmission | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
   const [stats, setStats] = useState({
     total_orders: 0,
     total_revenue: 0,
@@ -104,13 +109,25 @@ const AdminTotalOrdersPage: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Fetch orders and statistics
+  // Fetch orders and statistics (current month only)
   const fetchData = async (showRefreshMessage = false) => {
     try {
       setIsRefreshing(showRefreshMessage);
       
+      // Get current month date range
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      
+      // Add current month filter to existing filters
+      const monthlyFilters = {
+        ...filters,
+        date_from: startOfCurrentMonth.toISOString().split('T')[0], // YYYY-MM-DD format
+        date_to: endOfCurrentMonth.toISOString().split('T')[0]
+      };
+      
       const [ordersData, statsData, csStatsData] = await Promise.all([
-        getAllOrderSubmissions(filters),
+        getAllOrderSubmissions(monthlyFilters),
         getOrderStatistics(user?.id || '', true),
         getCustomerServiceOrderStats()
       ]);
@@ -121,7 +138,8 @@ const AdminTotalOrdersPage: React.FC = () => {
       setCustomerServiceStats(csStatsData);
       
       if (showRefreshMessage) {
-        toast.success('Orders refreshed successfully');
+        const monthName = startOfCurrentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        toast.success(`${monthName} orders refreshed successfully (${ordersData.length} orders)`);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -131,6 +149,387 @@ const AdminTotalOrdersPage: React.FC = () => {
       setIsRefreshing(false);
     }
   };
+
+  // Bidirectional sync: Update WooCommerce when local order changes
+  const syncOrderToWooCommerce = async (order: OrderSubmission) => {
+    try {
+      if (!order.woocommerce_order_id) {
+        console.log('⚠️ Order has no WooCommerce ID, skipping sync');
+        return;
+      }
+
+      console.log(`🔄 Syncing order ${order.order_number} back to WooCommerce...`);
+
+      // Update WooCommerce order status and price
+      // Fix email validation issue - provide default email if invalid or missing
+      const isValidEmail = (email: string) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return email && emailRegex.test(email);
+      };
+      
+      const validEmail = isValidEmail(order.customer_email || '') 
+        ? order.customer_email 
+        : 'customerservice@nooralqmar.com';
+
+      const updateData = {
+        status: order.status,
+        total: order.total_amount.toString(),
+        billing: {
+          first_name: order.customer_first_name,
+          last_name: order.customer_last_name,
+          phone: order.customer_phone,
+          email: validEmail,
+          address_1: order.billing_address_1,
+          city: order.billing_city,
+          state: order.billing_state || '',
+          country: order.billing_country || '',
+          postcode: order.billing_postcode || ''
+        }
+      };
+
+      // Use WooCommerce API to update the order
+      const wooConfig = {
+        url: import.meta.env.VITE_WOOCOMMERCE_URL || 'https://nooralqmar.com/',
+        consumerKey: import.meta.env.VITE_WOOCOMMERCE_CONSUMER_KEY || 'ck_dc373790e65a510998fbc7278cb12b987d90b04a',
+        consumerSecret: import.meta.env.VITE_WOOCOMMERCE_CONSUMER_SECRET || 'cs_815de347330e130a58e3e53e0f87b0cd4f0de90f'
+      };
+
+      const response = await fetch(`${wooConfig.url}/wp-json/wc/v3/orders/${order.woocommerce_order_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${btoa(`${wooConfig.consumerKey}:${wooConfig.consumerSecret}`)}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        console.log(`✅ Successfully updated WooCommerce order ${order.order_number}`);
+        toast.success(`✅ Order ${order.order_number} synced to WooCommerce`);
+        
+        // Update local record to mark as synced
+        await supabase
+          .from('order_submissions')
+          .update({ 
+            last_sync_attempt: new Date().toISOString(),
+            is_synced_to_woocommerce: true,
+            sync_error: null
+          })
+          .eq('id', order.id);
+      } else {
+        const error = await response.text();
+        console.error(`❌ Failed to update WooCommerce order:`, error);
+        toast.error(`❌ Failed to sync order ${order.order_number} to WooCommerce`);
+        
+        // Update local record with sync error
+        await supabase
+          .from('order_submissions')
+          .update({ 
+            last_sync_attempt: new Date().toISOString(),
+            sync_error: error
+          })
+          .eq('id', order.id);
+      }
+    } catch (error) {
+      console.error('❌ Error syncing to WooCommerce:', error);
+      toast.error(`❌ Error syncing order to WooCommerce`);
+    }
+  };
+
+  // Sync specific order FROM WooCommerce  
+  const syncFromWooCommerce = async (order: OrderSubmission) => {
+    try {
+      setSyncingOrderId(order.id);
+      
+      if (!order.woocommerce_order_id) {
+        toast.error('This order is not linked to WooCommerce');
+        return;
+      }
+
+      console.log('Syncing order from WooCommerce:', order.order_number);
+      toast.info('Fetching latest data from WooCommerce...');
+      
+      // Fetch the latest order data from WooCommerce
+      const wooOrder = await wooCommerceAPI.getOrder(order.woocommerce_order_id);
+      
+      if (!wooOrder) {
+        toast.error('Order not found in WooCommerce');
+        return;
+      }
+
+      // Map WooCommerce status to local status
+      const statusMapping: { [key: string]: string } = {
+        'pending': 'pending',
+        'processing': 'processing', 
+        'on-hold': 'processing',
+        'completed': 'completed',
+        'cancelled': 'cancelled',
+        'refunded': 'cancelled',
+        'failed': 'cancelled'
+      };
+
+      const wooStatus = statusMapping[wooOrder.status] || wooOrder.status;
+      const wooTotal = parseFloat(wooOrder.total || '0');
+
+      // Update local order with WooCommerce data
+      const { error: updateError } = await supabase
+        .from('order_submissions')
+        .update({
+          status: wooStatus,
+          total_amount: wooTotal,
+          subtotal: wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
+          shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
+          payment_method: wooOrder.payment_method_title,
+          updated_at: new Date().toISOString(),
+          is_synced_to_woocommerce: true
+        })
+        .eq('id', order.id);
+
+      if (updateError) {
+        console.error('❌ Failed to update local order:', updateError);
+        toast.error('Failed to update local order');
+        return;
+      }
+
+      console.log('✅ Updated local order from WooCommerce data');
+      toast.success(`✅ Order updated from WooCommerce: ${wooOrder.number}`);
+      
+      // Refresh data
+      await fetchData(false);
+      
+    } catch (error) {
+      console.error('❌ Failed to sync order from WooCommerce:', error);
+      toast.error('Failed to sync order from WooCommerce');
+    } finally {
+      setSyncingOrderId(null);
+    }
+  };
+
+  // Enhanced WooCommerce import sync (WooCommerce → Local only)
+  const handleSync = async () => {
+    try {
+      setIsRefreshing(true);
+      toast.info('📥 Starting WooCommerce import sync...');
+
+      // Test WooCommerce connection first
+      console.log('🔗 Testing WooCommerce connection...');
+      const isConnected = await wooCommerceAPI.testConnection();
+      if (!isConnected) {
+        console.error('❌ WooCommerce connection failed');
+        toast.error('❌ Failed to connect to WooCommerce. Please check your store credentials and connection.');
+        return;
+      }
+      console.log('✅ WooCommerce connection successful');
+
+      const syncStats = {
+        new: 0,
+        updated: 0,
+        errors: 0,
+        skipped: 0
+      };
+
+      // Import WooCommerce orders to Local
+      toast.info('📥 Importing WooCommerce orders and updates...');
+      console.log('📦 Fetching recent WooCommerce orders...');
+      
+      // Get current month's date range
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+      console.log(`📅 Syncing orders for current month: ${startOfCurrentMonth.toISOString()} to ${endOfCurrentMonth.toISOString()}`);
+
+      // Fetch orders with all statuses (WooCommerce doesn't support 'any', so we need multiple calls)
+      console.log('📦 Fetching orders with multiple status calls...');
+      const statusesToSync = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'];
+      let allWooOrders: any[] = [];
+      
+      for (const status of statusesToSync) {
+        try {
+          console.log(`📦 Fetching ${status} orders...`);
+          const statusOrders = await wooCommerceAPI.fetchOrders({
+            per_page: 100,
+            status: status,
+            after: startOfCurrentMonth.toISOString(),
+            before: endOfCurrentMonth.toISOString()
+          });
+          allWooOrders.push(...statusOrders);
+          console.log(`✅ Found ${statusOrders.length} ${status} orders`);
+          
+          // Small delay between status calls
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (statusError) {
+          console.error(`❌ Error fetching ${status} orders:`, statusError);
+          // Continue with other statuses
+        }
+      }
+      
+      const wooOrders = allWooOrders;
+
+      console.log(`📊 Found ${wooOrders.length} WooCommerce orders`);
+
+      // Process each WooCommerce order
+      for (const wooOrder of wooOrders) {
+        try {
+          // Check if order already exists in our system
+                      const { data: existingOrder, error: checkError } = await supabase
+              .from('order_submissions')
+              .select('id, order_number, status, total_amount, updated_at, created_at')
+              .eq('woocommerce_order_id', wooOrder.id)
+              .maybeSingle();
+
+            if (checkError) {
+              console.error(`❌ Error checking existing order ${wooOrder.id}:`, checkError);
+              syncStats.errors++;
+              continue;
+            }
+
+            if (existingOrder) {
+              // Order exists - check if it needs updating
+              const wooStatus = wooOrder.status === 'completed' ? 'completed' : 
+                               wooOrder.status === 'processing' ? 'processing' : 
+                               wooOrder.status === 'cancelled' ? 'cancelled' : 'pending';
+              
+              const wooTotal = parseFloat(wooOrder.total);
+              const lastModified = new Date(wooOrder.date_modified);
+              const localLastUpdate = new Date(existingOrder.updated_at || existingOrder.created_at);
+
+                          if (existingOrder.status !== wooStatus || 
+                  Math.abs(existingOrder.total_amount - wooTotal) > 0.01 ||
+                  lastModified > localLastUpdate) {
+                
+                console.log(`🔄 Updating existing order: ${wooOrder.number}`);
+                
+                const { error: updateError } = await supabase
+                  .from('order_submissions')
+                  .update({
+                    status: wooStatus,
+                    total_amount: wooTotal,
+                    subtotal: wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
+                    shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
+                    payment_method: wooOrder.payment_method_title,
+                    updated_at: new Date().toISOString(),
+                    is_synced_to_woocommerce: true
+                  })
+                  .eq('id', existingOrder.id);
+
+                if (updateError) {
+                  console.error(`❌ Failed to update order ${wooOrder.number}:`, updateError);
+                  syncStats.errors++;
+                } else {
+                  console.log(`✅ Updated order ${wooOrder.number}`);
+                  syncStats.updated++;
+                }
+              } else {
+                console.log(`⚠️ Order ${wooOrder.number} is already up to date`);
+                syncStats.skipped++;
+              }
+              continue;
+          }
+
+          console.log(`🆕 New order found: ${wooOrder.number} (WooCommerce ID: ${wooOrder.id})`);
+          
+          // Create new order submission from WooCommerce data
+          const orderData = {
+            woocommerce_order_id: wooOrder.id,
+            order_number: wooOrder.number,
+            customer_first_name: wooOrder.billing.first_name,
+            customer_last_name: wooOrder.billing.last_name,
+            customer_phone: wooOrder.billing.phone || '',
+            customer_email: wooOrder.billing.email || '',
+            billing_address_1: wooOrder.billing.address_1,
+            billing_address_2: wooOrder.billing.address_2 || '',
+            billing_city: wooOrder.billing.city,
+            billing_state: wooOrder.billing.state || '',
+            billing_country: wooOrder.billing.country || '',
+            billing_postcode: wooOrder.billing.postcode || '',
+            total_amount: parseFloat(wooOrder.total),
+            subtotal: parseFloat(wooOrder.total) - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
+            shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
+            payment_method: wooOrder.payment_method_title,
+            status: wooOrder.status === 'completed' ? 'completed' : 
+                   wooOrder.status === 'processing' ? 'processing' : 
+                   wooOrder.status === 'cancelled' ? 'cancelled' : 'pending',
+            order_items: wooOrder.line_items.map(item => ({
+              product_id: item.product_id,
+              product_name: item.name,
+              quantity: item.quantity,
+              price: item.price.toString(),
+              sku: item.sku || ''
+            })),
+            created_by_name: 'WooCommerce Import',
+            is_synced_to_woocommerce: true,
+            created_at: wooOrder.date_created,
+            updated_at: wooOrder.date_modified
+          };
+
+          const { data: insertedData, error: insertError } = await supabase
+            .from('order_submissions')
+            .insert(orderData)
+            .select();
+
+                      if (insertError) {
+              console.error(`❌ Failed to import order ${wooOrder.number}:`, insertError);
+              syncStats.errors++;
+            } else {
+              console.log(`✅ Successfully imported order ${wooOrder.number}`);
+              syncStats.new++;
+            }
+
+            // Small delay to prevent overwhelming the database
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+          } catch (orderError) {
+            console.error(`❌ Error processing WooCommerce order ${wooOrder.id}:`, orderError);
+            syncStats.errors++;
+          }
+        }
+
+        // Final status report
+        const totalNew = syncStats.new;
+        const totalUpdated = syncStats.updated;
+        const totalSkipped = syncStats.skipped;
+        const totalErrors = syncStats.errors;
+
+        let message = `🎉 WooCommerce Import Complete!\n`;
+        if (totalNew > 0) message += `📥 ${totalNew} new orders imported\n`;
+        if (totalUpdated > 0) message += `🔄 ${totalUpdated} orders updated\n`;
+        if (totalSkipped > 0) message += `⏭️ ${totalSkipped} orders already up to date\n`;
+        if (totalErrors > 0) message += `⚠️ ${totalErrors} errors occurred`;
+
+        if (totalErrors > 0) {
+          toast.warning(message);
+        } else {
+          toast.success(message);
+        }
+
+        console.log('📊 Import Statistics:', syncStats);
+
+      // Update last sync time
+      setLastSyncTime(new Date());
+
+      // Refresh local data
+      await fetchData(false);
+      
+    } catch (error) {
+      console.error('❌ Error in WooCommerce sync:', error);
+      toast.error('Failed to sync with WooCommerce');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Auto-sync functionality
+  useEffect(() => {
+    if (!autoSyncEnabled || !user || user.role !== 'admin') return;
+
+    const autoSyncInterval = setInterval(() => {
+      console.log('🔄 Auto-sync triggered');
+      handleSync();
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
+
+    return () => clearInterval(autoSyncInterval);
+  }, [autoSyncEnabled, user]);
 
   // Initial data load
   useEffect(() => {
@@ -256,10 +655,10 @@ const AdminTotalOrdersPage: React.FC = () => {
           <div className="flex-1">
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2 md:gap-3">
               <SARIcon className="h-6 w-6 md:h-8 md:w-8" />
-              Total Orders
+              Total Orders - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h1>
             <p className="mt-1 md:mt-2 text-purple-100 text-sm md:text-base">
-              Admin dashboard - All customer service order submissions
+              Admin dashboard - Current month order submissions ({orders.length} orders)
             </p>
           </div>
           <div className="flex gap-2">
@@ -280,22 +679,75 @@ const AdminTotalOrdersPage: React.FC = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={() => fetchData(true)} 
-              disabled={isRefreshing}
-              variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              {isRefreshing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
+
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={handleSync} 
+                disabled={isRefreshing}
+                variant="outline"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all duration-200"
+              >
+                {isRefreshing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                 Sync from WooCommerce
+              </Button>
+              
+              <Button
+                onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                variant="outline"
+                className={`border-white/20 text-white hover:scale-105 transition-all duration-200 ${
+                  autoSyncEnabled 
+                    ? 'bg-green-500/20 hover:bg-green-500/30 border-green-400/50' 
+                    : 'bg-white/10 hover:bg-white/20'
+                }`}
+              >
+                {autoSyncEnabled ? '🟢 Auto-Import ON' : '⚪ Auto-Import OFF'}
+              </Button>
+              
+              {lastSyncTime && (
+                <div className="text-white/80 text-sm bg-white/10 px-3 py-2 rounded-md">
+                  Last sync: {lastSyncTime.toLocaleTimeString()}
+                </div>
               )}
-              Refresh
-            </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Sync Status Info */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <RefreshCw className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-900">WooCommerce Import Status</h3>
+                <p className="text-sm text-blue-700">
+                  {isRefreshing 
+                    ? '📥 Importing from WooCommerce...' 
+                    : autoSyncEnabled 
+                      ? '✅ Auto-import enabled (every 24 hours)' 
+                      : '⏸️ Manual import only'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-medium text-blue-900">
+                {lastSyncTime ? 'Last Sync' : 'Never Synced'}
+              </div>
+              <div className="text-xs text-blue-600">
+                {lastSyncTime ? lastSyncTime.toLocaleDateString() : 'Click sync to start'}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -536,72 +988,116 @@ const AdminTotalOrdersPage: React.FC = () => {
                 <div className="space-y-4">
                   {filteredOrders.map((order) => (
                     <Card key={order.id} className="border border-gray-200 hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-lg">{order.order_number}</h3>
-                              {getStatusBadge(order.status || 'pending')}
+                      <CardContent className="p-3 sm:p-4">
+                        {/* Mobile-First Layout */}
+                        <div className="space-y-3">
+                          {/* Header Row - Order Number, Status, and Amount */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-base sm:text-lg truncate">{order.order_number}</h3>
+                                {getStatusBadge(order.status || 'pending')}
+                              </div>
                               {order.is_synced_to_woocommerce && (
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                  Synced to WooCommerce
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs mt-1">
+                                  <span className="hidden sm:inline">Synced to WooCommerce</span>
+                                  <span className="sm:hidden">Synced</span>
                                 </Badge>
                               )}
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                <span>{order.customer_first_name} {order.customer_last_name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span>{order.customer_phone}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <span>{order.billing_city}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium text-purple-600">{order.created_by_name}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {order.created_at && new Date(order.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                              <span className="flex items-center gap-1">
-                                <Package className="h-4 w-4" />
-                                {order.order_items.length} items
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col md:items-end space-y-2">
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-purple-600">
-                                {order.total_amount.toFixed(2)} SAR
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-lg sm:text-2xl font-bold text-purple-600 flex items-center gap-1">
+                                <SARIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                                {order.total_amount.toFixed(2)}
                               </p>
                               {order.discount_amount && order.discount_amount > 0 && (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs sm:text-sm text-muted-foreground">
                                   Discount: -{order.discount_amount.toFixed(2)} SAR
                                 </p>
                               )}
                             </div>
+                          </div>
+                          
+                          {/* Customer Info Row */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">{order.customer_first_name} {order.customer_last_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">{order.customer_phone}</span>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">{order.billing_city}</span>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium text-purple-600 truncate">{order.created_by_name}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Date and Items Info */}
+                          <div className="flex items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden sm:inline">
+                                {order.created_at && new Date(order.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                              <span className="sm:hidden">
+                                {order.created_at && new Date(order.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: '2-digit'
+                                })}
+                              </span>
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                              {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
                             <Button
                               onClick={() => viewOrderDetails(order)}
                               variant="outline"
                               size="sm"
+                              className="flex-1 sm:flex-none"
                             >
                               <Eye className="h-4 w-4 mr-2" />
-                              View Details
+                              <span className="hidden sm:inline">View Details</span>
+                              <span className="sm:hidden">Details</span>
                             </Button>
+                            
+                            {order.woocommerce_order_id && (
+                              <Button
+                                onClick={() => syncFromWooCommerce(order)}
+                                variant="outline"
+                                size="sm"
+                                disabled={syncingOrderId === order.id}
+                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 disabled:opacity-50 flex-1 sm:flex-none"
+                              >
+                                {syncingOrderId === order.id ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                )}
+                                <span className="hidden sm:inline">
+                                  {syncingOrderId === order.id ? 'Syncing...' : 'Sync from WooCommerce'}
+                                </span>
+                                <span className="sm:hidden">
+                                  {syncingOrderId === order.id ? 'Syncing...' : 'Sync'}
+                                </span>
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>

@@ -430,8 +430,8 @@ const WorkShiftTimer: React.FC = () => {
 
 
 
-  // For employees only
-  if (user?.role === 'employee') {
+  // For employees only (excluding Media Buyers who don't use check-in/out)
+  if (user?.role === 'employee' && user?.position !== 'Media Buyer') {
     // Check if user has checked out today (show "Work Done!") using work day boundaries
     const now = new Date();
     const currentHour = now.getHours();
@@ -477,7 +477,7 @@ const WorkShiftTimer: React.FC = () => {
       );
     }
   } else {
-    return null; // Don't show for non-employees
+    return null; // Don't show for non-employees or Media Buyers
   }
 
   // Enhanced timer display for active work session

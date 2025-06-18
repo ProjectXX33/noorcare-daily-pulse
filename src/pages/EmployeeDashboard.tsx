@@ -6,11 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from 'react-router-dom';
 import { CheckIn, WorkReport, EmployeeRating } from '@/types';
 import { getLatestEmployeeRating, getEmployeeAverageRating } from '@/lib/ratingsApi';
 import StarRating from '@/components/StarRating';
-import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare, AlertCircle, Star, User } from 'lucide-react';
+import { Loader2, Clock, CalendarDays, ClipboardList, CheckSquare, AlertCircle, Star, User, Crown, Trophy, TrendingUp } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const EmployeeDashboard = () => {
   const { user } = useAuth();
@@ -25,6 +27,9 @@ const EmployeeDashboard = () => {
   const [latestRating, setLatestRating] = useState<EmployeeRating | null>(null);
   const [averageRating, setAverageRating] = useState<number | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
+  const [isTopPerformer, setIsTopPerformer] = useState(false);
+  const [performanceRank, setPerformanceRank] = useState<number | null>(null);
+  const [performanceScore, setPerformanceScore] = useState<number | null>(null);
 
   // Translation object for multilingual support
   const translations = {
@@ -80,6 +85,7 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     if (user) {
       loadRatingData();
+      checkTopPerformerStatus();
     }
   }, [user]);
 
@@ -99,6 +105,39 @@ const EmployeeDashboard = () => {
       console.error('Error loading rating data:', error);
     } finally {
       setIsLoadingRating(false);
+    }
+  };
+
+  const checkTopPerformerStatus = async () => {
+    if (!user) return;
+    
+    try {
+      // Get current month's performance data
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      
+      const { data: performanceData, error } = await supabase
+        .from('admin_performance_dashboard')
+        .select('employee_id, average_performance_score')
+        .eq('month_year', currentMonth)
+        .order('average_performance_score', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching performance data:', error);
+        return;
+      }
+
+      if (performanceData && performanceData.length > 0) {
+        // Find current user's ranking
+        const userPerformance = performanceData.find(p => p.employee_id === user.id);
+        if (userPerformance) {
+          const rank = performanceData.findIndex(p => p.employee_id === user.id) + 1;
+          setPerformanceRank(rank);
+          setPerformanceScore(userPerformance.average_performance_score);
+          setIsTopPerformer(rank === 1);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking top performer status:', error);
     }
   };
 
@@ -142,26 +181,7 @@ const EmployeeDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
-      <div className="border-b border-border/50 bg-background/98 w-full">
-        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
-            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
-                {t.welcome}, {user.name}
-              </h1>
-              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
         {/* Mobile-responsive dashboard cards */}

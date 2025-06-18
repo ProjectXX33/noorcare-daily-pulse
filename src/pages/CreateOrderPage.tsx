@@ -17,7 +17,6 @@ import {
   Package, 
   Plus,
   Trash2,
-  DollarSign,
   Loader2,
   Search,
   Tag,
@@ -82,6 +81,95 @@ interface CouponInfo {
   description: string;
 }
 
+interface CustomDiscount {
+  type: 'percent' | 'fixed';
+  amount: number;
+  reason: string;
+}
+
+// Custom Discount Form Component
+const CustomDiscountForm: React.FC<{
+  onApplyDiscount: (type: 'percent' | 'fixed', amount: number, reason: string) => void;
+  subtotal: number;
+}> = ({ onApplyDiscount, subtotal }) => {
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+
+  const handleApply = () => {
+    const amount = parseFloat(discountAmount);
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid discount amount');
+      return;
+    }
+    
+    if (!discountReason.trim()) {
+      toast.error('Please provide a reason for the discount');
+      return;
+    }
+    
+    onApplyDiscount(discountType, amount, discountReason.trim());
+    setDiscountAmount('');
+    setDiscountReason('');
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="discount-type">Type</Label>
+          <Select value={discountType} onValueChange={(value: 'percent' | 'fixed') => setDiscountType(value)}>
+            <SelectTrigger id="discount-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="percent">Percentage</SelectItem>
+              <SelectItem value="fixed">Fixed Amount (SAR)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="discount-amount">
+            Amount {discountType === 'percent' ? '(%)' : '(SAR)'}
+          </Label>
+          <Input
+            id="discount-amount"
+            type="number"
+            min="0"
+            max={discountType === 'percent' ? '100' : subtotal.toString()}
+            step={discountType === 'percent' ? '1' : '0.01'}
+            placeholder={discountType === 'percent' ? '10' : '50.00'}
+            value={discountAmount}
+            onChange={(e) => setDiscountAmount(e.target.value)}
+          />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="discount-reason">Reason for Discount</Label>
+        <Input
+          id="discount-reason"
+          placeholder="e.g., Customer loyalty, Price match, etc."
+          value={discountReason}
+          onChange={(e) => setDiscountReason(e.target.value)}
+        />
+      </div>
+      <Button 
+        onClick={handleApply} 
+        disabled={!discountAmount || !discountReason.trim()}
+        className="w-full"
+        size="sm"
+      >
+        Apply Custom Discount
+      </Button>
+      {discountType === 'percent' && discountAmount && (
+        <p className="text-xs text-muted-foreground">
+          This will discount {(subtotal * parseFloat(discountAmount || '0') / 100).toFixed(2)} SAR from the subtotal
+        </p>
+      )}
+    </div>
+  );
+};
+
 const CreateOrderPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -120,6 +208,7 @@ const CreateOrderPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<CouponInfo | null>(null);
+  const [customDiscount, setCustomDiscount] = useState<CustomDiscount | null>(null);
   const [customerNote, setCustomerNote] = useState('');
   const [includeShipping, setIncludeShipping] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -476,14 +565,29 @@ const CreateOrderPage: React.FC = () => {
   };
 
   const calculateDiscount = () => {
-    if (!appliedCoupon) return 0;
+    let discount = 0;
     
-    const subtotal = calculateSubtotal();
-    if (appliedCoupon.discount_type === 'percent') {
-      return (subtotal * parseFloat(appliedCoupon.amount)) / 100;
-    } else {
-      return parseFloat(appliedCoupon.amount);
+    // Calculate coupon discount
+    if (appliedCoupon) {
+      const subtotal = calculateSubtotal();
+      if (appliedCoupon.discount_type === 'percent') {
+        discount += (subtotal * parseFloat(appliedCoupon.amount)) / 100;
+      } else {
+        discount += parseFloat(appliedCoupon.amount);
+      }
     }
+    
+    // Add custom discount
+    if (customDiscount) {
+      const subtotal = calculateSubtotal();
+      if (customDiscount.type === 'percent') {
+        discount += (subtotal * customDiscount.amount) / 100;
+      } else {
+        discount += customDiscount.amount;
+      }
+    }
+    
+    return discount;
   };
 
   const calculateShipping = () => {
@@ -572,6 +676,35 @@ const CreateOrderPage: React.FC = () => {
     toast.info('Coupon removed');
   };
 
+  // Custom discount functions
+  const applyCustomDiscount = (type: 'percent' | 'fixed', amount: number, reason: string) => {
+    if (amount <= 0) {
+      toast.error('Discount amount must be greater than 0');
+      return;
+    }
+    
+    const subtotal = calculateSubtotal();
+    if (type === 'percent' && amount > 100) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
+    
+    if (type === 'fixed' && amount > subtotal) {
+      toast.error('Fixed discount cannot exceed subtotal');
+      return;
+    }
+
+    setCustomDiscount({ type, amount, reason });
+    toast.success(`Custom ${type === 'percent' ? 'percentage' : 'fixed'} discount applied: ${amount}${type === 'percent' ? '%' : ' SAR'}`, {
+      description: `Reason: ${reason}`
+    });
+  };
+
+  const removeCustomDiscount = () => {
+    setCustomDiscount(null);
+    toast.info('Custom discount removed');
+  };
+
   const validateForm = (): boolean => {
     if (!billingInfo.first_name || !billingInfo.last_name) {
       toast.error('Customer name is required');
@@ -629,6 +762,9 @@ const CreateOrderPage: React.FC = () => {
         coupon_code: appliedCoupon?.code,
         coupon_discount_type: appliedCoupon?.discount_type,
         coupon_amount: appliedCoupon?.amount,
+        custom_discount_type: customDiscount?.type,
+        custom_discount_amount: customDiscount?.amount,
+        custom_discount_reason: customDiscount?.reason,
         customer_note: customerNote,
         include_shipping: includeShipping,
         status: 'processing',
@@ -667,6 +803,15 @@ const CreateOrderPage: React.FC = () => {
             code: appliedCoupon.code
           }
         ] : [],
+        fee_lines: customDiscount ? [
+          {
+            name: customDiscount.reason || 'Custom Discount',
+            total: (-(customDiscount.type === 'percent' 
+              ? (calculateSubtotal() * customDiscount.amount) / 100 
+              : customDiscount.amount)).toString(), // Negative amount for discount
+            tax_status: 'none'
+          }
+        ] : [],
         customer_note: customerNote,
         meta_data: [
           {
@@ -684,7 +829,21 @@ const CreateOrderPage: React.FC = () => {
           {
             key: '_internal_order_id',
             value: savedOrder.id?.toString() || ''
-          }
+          },
+          ...(customDiscount ? [
+            {
+              key: '_custom_discount_type',
+              value: customDiscount.type
+            },
+            {
+              key: '_custom_discount_amount',
+              value: customDiscount.amount.toString()
+            },
+            {
+              key: '_custom_discount_reason',
+              value: customDiscount.reason
+            }
+          ] : [])
         ],
         status: 'processing' // Set order status to processing
       };
@@ -763,6 +922,7 @@ const CreateOrderPage: React.FC = () => {
       });
       setOrderItems([]);
       setAppliedCoupon(null);
+      setCustomDiscount(null);
       setCouponCode('');
       setCustomerNote('');
       setIncludeShipping(true);
@@ -1200,6 +1360,42 @@ const CreateOrderPage: React.FC = () => {
             </CardContent>
           </Card>
 
+          {/* Custom Discount Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="20" height="22" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                  <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                  <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                </svg>
+                Custom Discount
+              </CardTitle>
+              <CardDescription>
+                Apply a manual discount to this order (Customer Service only)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {customDiscount ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-blue-700">
+                      {customDiscount.type === 'percent' ? `${customDiscount.amount}%` : `${customDiscount.amount} SAR`} Custom Discount
+                    </p>
+                    <p className="text-sm text-blue-600">{customDiscount.reason}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={removeCustomDiscount}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <CustomDiscountForm 
+                  onApplyDiscount={applyCustomDiscount}
+                  subtotal={calculateSubtotal()}
+                />
+              )}
+            </CardContent>
+          </Card>
+
           {/* Order Summary */}
           <Card className="lg:sticky lg:top-6">
             <CardHeader>
@@ -1269,13 +1465,32 @@ const CreateOrderPage: React.FC = () => {
                     
                     {appliedCoupon && (
                       <div className="flex justify-between text-emerald-600">
-                        <span>Discount ({appliedCoupon.code}):</span>
+                        <span>Coupon Discount ({appliedCoupon.code}):</span>
                         <span className="flex items-center gap-1">
                           -<svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="12" height="13.432" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
                             <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
                             <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
                           </svg>
-                          {calculateDiscount().toFixed(2)}
+                          {appliedCoupon.discount_type === 'percent' ? 
+                            ((calculateSubtotal() * parseFloat(appliedCoupon.amount)) / 100).toFixed(2) : 
+                            parseFloat(appliedCoupon.amount).toFixed(2)
+                          }
+                        </span>
+                      </div>
+                    )}
+                    
+                    {customDiscount && (
+                      <div className="flex justify-between text-blue-600">
+                        <span>Custom Discount:</span>
+                        <span className="flex items-center gap-1">
+                          -<svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="12" height="13.432" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                            <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                            <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                          </svg>
+                          {customDiscount.type === 'percent' ? 
+                            ((calculateSubtotal() * customDiscount.amount) / 100).toFixed(2) : 
+                            customDiscount.amount.toFixed(2)
+                          }
                         </span>
                       </div>
                     )}
@@ -1415,7 +1630,10 @@ const CreateOrderPage: React.FC = () => {
               {/* Price Section */}
               <div className="p-4 bg-muted/50 rounded-lg">
                 <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
+                  <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="16" height="17.432" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                    <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                    <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                  </svg>
                   Pricing
                 </h4>
                 <div className="flex items-center gap-4">

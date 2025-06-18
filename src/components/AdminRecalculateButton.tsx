@@ -34,23 +34,29 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
     try {
       console.log('🔄 Starting delay and overtime recalculation...');
       
-      // Get all monthly shift records with check-in data
-      const { data: monthlyShifts, error: shiftsError } = await supabase
+      // Fetch all monthly shift records with their shift info
+      const { data: monthlyShifts, error: fetchError } = await supabase
         .from('monthly_shifts')
         .select(`
           *,
-          shifts:shift_id(name, start_time, end_time)
+          shifts:shift_id(*)
         `)
-        .not('check_in_time', 'is', null);
+        .not('check_in_time', 'is', null)
+        .not('check_out_time', 'is', null)
+        .order('work_date', { ascending: false });
 
-      if (shiftsError) {
-        throw shiftsError;
+      if (fetchError) {
+        throw fetchError;
       }
 
-      console.log(`📊 Found ${monthlyShifts.length} monthly shift records to process`);
+      if (!monthlyShifts || monthlyShifts.length === 0) {
+        toast.info('No shift records found to recalculate');
+        return;
+      }
+
+      console.log(`📊 Found ${monthlyShifts.length} records to recalculate`);
       
-      let totalRecords = monthlyShifts.length;
-      let updatedRecords = 0;
+      let updated = 0;
       let errors = 0;
 
       // Process each record
@@ -66,17 +72,11 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             continue;
           }
 
-          // Calculate delay minutes
-          const [startHour, startMin] = shift.start_time.split(':').map(Number);
-          const scheduledStart = new Date(checkInTime);
-          scheduledStart.setHours(startHour, startMin, 0, 0);
-          
-          const delayMs = checkInTime.getTime() - scheduledStart.getTime();
-          const delayMinutes = Math.max(0, delayMs / (1000 * 60));
-
-          // Calculate overtime (only if checked out)
+          // Calculate work hours and overtime (only if checked out)
           let regularHours = record.regular_hours || 0;
           let overtimeHours = record.overtime_hours || 0;
+          let delayMinutes = 0;
+          let earlyCheckoutPenalty = 0;
 
           if (checkOutTime) {
             const totalHours = differenceInMinutes(checkOutTime, checkInTime) / 60;
@@ -87,42 +87,100 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
               standardWorkHours = 7; // Day shift is 7 hours
             }
 
-            // Recalculate using flexible overtime rules
-            if (shift.name.toLowerCase().includes('day')) {
-              // Day shift: Up to 7 hours regular, rest is overtime
-              // But be flexible about when those hours are worked
-              regularHours = Math.min(totalHours, standardWorkHours);
-              overtimeHours = Math.max(0, totalHours - standardWorkHours);
+            // Calculate regular and overtime hours
+            regularHours = Math.min(totalHours, standardWorkHours);
+            overtimeHours = Math.max(0, totalHours - standardWorkHours);
+            
+            // NEW LOGIC: Smart Delay Calculation Based on Work Completion
+            // If worked less than expected: Delay = Expected Hours - Worked Hours
+            // If worked full/overtime: Delay = Raw Delay - Overtime Hours
+            
+            const [startHour, startMin] = shift.start_time.split(':').map(Number);
+            const scheduledStart = new Date(checkInTime);
+            scheduledStart.setHours(startHour, startMin, 0, 0);
+            const rawDelayMs = checkInTime.getTime() - scheduledStart.getTime();
+            const rawDelayHours = Math.max(0, rawDelayMs / (1000 * 60 * 60));
+            
+            // Convert to minutes and get total worked hours
+            const rawDelayMinutes = rawDelayHours * 60;
+            const totalWorkedHours = regularHours + overtimeHours;
+            
+            if (totalWorkedHours < standardWorkHours) {
+              // Early checkout: Show missing hours as delay
+              const hoursShort = standardWorkHours - totalWorkedHours;
+              delayMinutes = hoursShort * 60; // Convert to minutes
               
-              console.log(`Day shift calculation: Total=${totalHours.toFixed(2)}h, Regular=${regularHours.toFixed(2)}h, Overtime=${overtimeHours.toFixed(2)}h`);
+              console.log(`⚠️ ${shift.name} - Early Checkout (Hours Short as Delay):`, {
+                expectedHours: standardWorkHours,
+                workedHours: totalWorkedHours.toFixed(2),
+                hoursShort: hoursShort.toFixed(2),
+                delayMinutes: delayMinutes.toFixed(1)
+              });
+            } else if (totalWorkedHours >= standardWorkHours) {
+              // Completed expected hours or more: No delay penalty
+              delayMinutes = 0;
+              
+              console.log(`✅ ${shift.name} - Full Shift Completed (No Delay Penalty):`, {
+                expectedHours: standardWorkHours,
+                workedHours: totalWorkedHours.toFixed(2),
+                rawDelayMinutes: rawDelayMinutes.toFixed(1),
+                finalDelay: 0
+              });
             } else {
-              // Night shift or other: standard calculation
-              regularHours = Math.min(totalHours, standardWorkHours);
-              overtimeHours = Math.max(0, totalHours - standardWorkHours);
+              // Overtime work: Apply offset formula
+              const overtimeOffset = overtimeHours * 60; // Convert to minutes
+              delayMinutes = Math.max(0, rawDelayMinutes - overtimeOffset);
+              
+              console.log(`✅ ${shift.name} - Overtime Work (Delay with Overtime Offset):`, {
+                rawDelayMinutes: rawDelayMinutes.toFixed(1),
+                overtimeOffset: overtimeOffset.toFixed(1),
+                finalDelay: delayMinutes.toFixed(1)
+              });
             }
+            
+            // Track early checkout penalty
+            if (totalHours < standardWorkHours) {
+              earlyCheckoutPenalty = standardWorkHours - totalHours;
+            } else {
+              earlyCheckoutPenalty = 0;
+            }
+            
+            console.log(`✅ ${shift.name} - Smart Delay Calculation Complete:`, {
+              finalDelayMinutes: delayMinutes.toFixed(1),
+              regularHours: regularHours.toFixed(2),
+              overtimeHours: overtimeHours.toFixed(2),
+              delayToFinishHours: (delayMinutes / 60).toFixed(2) + 'h'
+            });
 
             // Ensure non-negative values
             regularHours = Math.max(0, regularHours);
             overtimeHours = Math.max(0, overtimeHours);
+            delayMinutes = Math.max(0, delayMinutes);
           }
 
-          // Update the record
+          // Update the record with new calculations
+          const updateData: any = {
+            delay_minutes: Math.round(delayMinutes * 100) / 100, // Round to 2 decimal places
+            regular_hours: Math.round(regularHours * 100) / 100,
+            overtime_hours: Math.round(overtimeHours * 100) / 100,
+            updated_at: new Date().toISOString()
+          };
+
+          // Add early checkout penalty field if needed
+          if (earlyCheckoutPenalty > 0) {
+            updateData.early_checkout_penalty = Math.round(earlyCheckoutPenalty * 100) / 100;
+          }
+
           const { error: updateError } = await supabase
             .from('monthly_shifts')
-            .update({
-              delay_minutes: Math.round(delayMinutes * 100) / 100, // Round to 2 decimal places
-              regular_hours: Math.round(regularHours * 100) / 100,
-              overtime_hours: Math.round(overtimeHours * 100) / 100,
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', record.id);
 
           if (updateError) {
-            console.error(`❌ Error updating record ${record.id}:`, updateError);
+            console.error(`❌ Failed to update record ${record.id}:`, updateError);
             errors++;
           } else {
-            updatedRecords++;
-            console.log(`✅ Updated record ${record.id}: delay=${delayMinutes.toFixed(2)}min, regular=${regularHours.toFixed(2)}h, overtime=${overtimeHours.toFixed(2)}h`);
+            updated++;
           }
 
         } catch (recordError) {
@@ -131,47 +189,167 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         }
       }
 
-      setRecalculationStats({
-        totalRecords,
-        updatedRecords,
-        errors
-      });
-
-      setLastRecalculation(new Date());
+      console.log(`✅ Recalculation complete: ${updated} updated, ${errors} errors`);
       
       if (errors === 0) {
-        toast.success(`✅ Successfully recalculated ${updatedRecords} records!`, {
+        toast.success(`🎯 Recalculation completed! Updated ${updated} records`, {
           duration: 5000,
         });
       } else {
-        toast.warning(`⚠️ Recalculated ${updatedRecords} records with ${errors} errors. Check console for details.`, {
-          duration: 6000,
+        toast.warning(`⚠️ Recalculation finished with ${errors} errors. Updated ${updated} records`, {
+          duration: 7000,
         });
       }
 
-      console.log('🎉 Recalculation completed:', {
-        totalRecords,
-        updatedRecords,
-        errors
-      });
-
-      // Call the callback to refresh parent data
+      // Trigger callback if provided
       if (onRecalculationComplete) {
         onRecalculationComplete();
       }
-
+      
+      // Also trigger performance recalculation if needed
+      await recalculatePerformanceData();
     } catch (error) {
-      console.error('❌ Fatal error during recalculation:', error);
-      toast.error('Failed to recalculate delay and overtime data');
-      setRecalculationStats({
-        totalRecords: 0,
-        updatedRecords: 0,
-        errors: 1
+      console.error('❌ Recalculation failed:', error);
+      toast.error(`Failed to recalculate: ${error.message}`, {
+        duration: 8000,
       });
     } finally {
       setIsRecalculating(false);
     }
   };
+
+  // Function to recalculate performance data using new automatic logic
+  const recalculatePerformanceData = async () => {
+    try {
+      console.log('🔄 Starting performance data recalculation...');
+      
+      // Get current month
+      const currentMonth = format(new Date(), 'yyyy-MM');
+      
+      // Get all users with Customer Service or Designer positions
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, position')
+        .in('position', ['Customer Service', 'Designer']);
+
+      if (usersError) {
+        console.error('❌ Error fetching users:', usersError);
+        return;
+      }
+
+      console.log(`📊 Found ${users.length} users to recalculate performance for`);
+      
+      for (const user of users) {
+        try {
+          // Get user's monthly shifts for this month
+          const { data: monthlyShifts, error: shiftsError } = await supabase
+            .from('monthly_shifts')
+            .select(`
+              *,
+              shifts:shift_id(name, start_time, end_time)
+            `)
+            .eq('user_id', user.id)
+            .like('work_date', `${currentMonth}%`)
+            .not('check_in_time', 'is', null)
+            .not('check_out_time', 'is', null);
+
+          if (shiftsError) {
+            console.error(`❌ Error fetching shifts for ${user.name}:`, shiftsError);
+            continue;
+          }
+
+          if (!monthlyShifts || monthlyShifts.length === 0) {
+            console.log(`⚠️ No shifts found for ${user.name}`);
+            continue;
+          }
+
+          // Calculate totals using the new automatic logic
+          const totalWorkingDays = monthlyShifts.length;
+          const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + (shift.delay_minutes || 0), 0);
+          const totalDelayHours = totalDelayMinutes / 60;
+          const totalOvertimeHours = monthlyShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0);
+          const totalRegularHours = monthlyShifts.reduce((sum, shift) => sum + (shift.regular_hours || 0), 0);
+
+          // Calculate average performance score based on completion of expected hours
+          let totalPerformanceScore = 0;
+          let validShifts = 0;
+
+          for (const shift of monthlyShifts) {
+            if (shift.shifts) {
+              const expectedHours = shift.shifts.name?.toLowerCase().includes('day') ? 7 : 8;
+              const actualHours = (shift.regular_hours || 0) + (shift.overtime_hours || 0);
+              
+              // Performance score based on completion
+              let performanceScore = 75; // Base score
+              
+              if (actualHours >= expectedHours) {
+                // Completed full hours - high score
+                performanceScore = 90 + Math.min(10, (shift.overtime_hours || 0) * 2); // Bonus for overtime
+              } else {
+                // Incomplete hours - lower score
+                const completionRate = actualHours / expectedHours;
+                performanceScore = Math.max(20, completionRate * 80);
+              }
+              
+              totalPerformanceScore += performanceScore;
+              validShifts++;
+            }
+          }
+
+          const averagePerformanceScore = validShifts > 0 ? totalPerformanceScore / validShifts : 75;
+          
+          // Calculate punctuality percentage
+          const punctualityPercentage = totalDelayHours >= 1 ? 0 : 
+                                      totalDelayMinutes > 30 ? Math.max(0, 50 - (totalDelayMinutes * 2)) :
+                                      totalDelayMinutes > 0 ? Math.max(0, 90 - (totalDelayMinutes * 3)) : 100;
+
+          // Determine performance status
+          let performanceStatus = 'Poor';
+          if (averagePerformanceScore >= 85 && punctualityPercentage >= 85) {
+            performanceStatus = 'Excellent';
+          } else if (averagePerformanceScore >= 70 && punctualityPercentage >= 70) {
+            performanceStatus = 'Good';
+          } else if (averagePerformanceScore >= 50 || punctualityPercentage >= 50) {
+            performanceStatus = 'Needs Improvement';
+          }
+
+          // Update or create performance record
+          const { error: upsertError } = await supabase
+            .from('admin_performance_dashboard')
+            .upsert({
+              employee_id: user.id,
+              employee_name: user.name,
+              month_year: currentMonth,
+              total_working_days: totalWorkingDays,
+              total_delay_minutes: totalDelayMinutes,
+              total_delay_hours: totalDelayHours,
+              total_overtime_hours: totalOvertimeHours,
+              total_regular_hours: totalRegularHours,
+              average_performance_score: Math.round(averagePerformanceScore * 100) / 100,
+              punctuality_percentage: Math.round(punctualityPercentage * 100) / 100,
+              performance_status: performanceStatus,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'employee_id,month_year'
+            });
+
+          if (upsertError) {
+            console.error(`❌ Error updating performance for ${user.name}:`, upsertError);
+          } else {
+            console.log(`✅ Updated performance for ${user.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`);
+          }
+
+        } catch (userError) {
+          console.error(`❌ Error processing ${user.name}:`, userError);
+        }
+      }
+      
+             console.log('✅ Performance data recalculation completed');
+       
+     } catch (error) {
+       console.error('❌ Performance recalculation failed:', error);
+     }
+   };
 
   return (
     <Card className="border border-orange-200 bg-orange-50/50">
@@ -201,7 +379,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             ) : (
               <>
                 <Calculator className="h-4 w-4 mr-2" />
-                Recalculate Delay & Overtime
+                Fix Delay & Overtime
               </>
             )}
           </Button>
@@ -238,10 +416,11 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             <li>• <strong>Delay Minutes:</strong> How late employees were for their shifts</li>
             <li>• <strong>Regular Hours:</strong> Normal work hours within shift limits</li>
             <li>• <strong>Overtime Hours:</strong> Extra work using flexible rules (Day: before 9AM/after 4PM, Night: after 8h)</li>
-            <li>• <strong>✨ Delay to Finish:</strong> Automatically updated based on new calculations (Delay - Overtime)</li>
+            <li>• <strong>✨ Delay to Finish:</strong> Smart calculation - 0 if worked full hours (7h day/8h night)</li>
+            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with new automatic logic</li>
           </ul>
           <div className="mt-2 p-1 bg-blue-50 rounded text-blue-700 text-xs">
-            <strong>💡 Note:</strong> After recalculation, the Summary cards will automatically show updated "Delay to Finish" values
+            <strong>💡 Smart Logic:</strong> Employees who work their full expected hours get 0 delay automatically, regardless of arrival time
           </div>
         </div>
       </CardContent>

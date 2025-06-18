@@ -47,6 +47,11 @@ export interface OrderSubmission {
   coupon_discount_type?: string;
   coupon_amount?: string;
   
+  // Custom Discount Information
+  custom_discount_type?: string;
+  custom_discount_amount?: number;
+  custom_discount_reason?: string;
+  
   // Additional Information
   customer_note?: string;
   internal_notes?: string;

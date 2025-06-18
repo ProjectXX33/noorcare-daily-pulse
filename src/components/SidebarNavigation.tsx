@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -31,7 +31,9 @@ import {
   Globe,
   Receipt,
   DatabaseIcon,
-  Target
+  Target,
+  Medal,
+  Award
 } from 'lucide-react';
 import { GrowthStrategyIcon } from './GrowthStrategyIcon';
 import { 
@@ -65,6 +67,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import WorkShiftTimer from '@/components/WorkShiftTimer';
 import VersionDisplay from '@/components/VersionDisplay';
+import UserRankingProfile, { useUserRankingTheme, useUserRanking } from '@/components/UserRankingProfile';
 
 // SAR Icon Component
 const SARIcon = ({ className }: { className?: string }) => (
@@ -85,6 +88,189 @@ interface SidebarNavigationProps {
   children?: React.ReactNode;
 }
 
+// Special effects component for ranked headers
+const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
+  if (effectType === 'none') return null;
+
+  // Add custom CSS for static flashing effects
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes flashPulse {
+        0%, 100% { opacity: 0.3; transform: scale(0.8); }
+        50% { opacity: 1; transform: scale(1.2); }
+      }
+      
+      @keyframes colorShift {
+        0% { filter: hue-rotate(0deg); }
+        50% { filter: hue-rotate(180deg); }
+        100% { filter: hue-rotate(360deg); }
+      }
+      
+      @keyframes gentleGlow {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.8; }
+      }
+      
+      .animate-flash-pulse { animation: flashPulse 2s ease-in-out infinite; }
+      .animate-color-shift { animation: colorShift 4s ease-in-out infinite; }
+      .animate-gentle-glow { animation: gentleGlow 3s ease-in-out infinite; }
+      
+      .animation-delay-200 { animation-delay: 0.2s; }
+      .animation-delay-400 { animation-delay: 0.4s; }
+      .animation-delay-600 { animation-delay: 0.6s; }
+      .animation-delay-800 { animation-delay: 0.8s; }
+      .animation-delay-1000 { animation-delay: 1s; }
+      .animation-delay-1200 { animation-delay: 1.2s; }
+      .animation-delay-1400 { animation-delay: 1.4s; }
+      .animation-delay-1600 { animation-delay: 1.6s; }
+      .animation-delay-1800 { animation-delay: 1.8s; }
+      .animation-delay-2000 { animation-delay: 2s; }
+      .animation-delay-2200 { animation-delay: 2.2s; }
+      .animation-delay-2400 { animation-delay: 2.4s; }
+      .animation-delay-2600 { animation-delay: 2.6s; }
+      .animation-delay-2800 { animation-delay: 2.8s; }
+      .animation-delay-3000 { animation-delay: 3s; }
+      
+      /* Custom Small Scrollbar Styles */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 2px;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 2px;
+        transition: background 0.2s ease;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar-thumb:active {
+        background: #64748b;
+      }
+      
+      /* Firefox scrollbar styling */
+      .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f1f5f9;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  if (effectType === 'gold') {
+    return (
+      <>
+        {/* Golden Flashing Balls in Static Positions */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Large Golden Orbs - Well distributed */}
+          <div className="absolute top-2 left-8 w-4 h-4 bg-gradient-to-br from-yellow-300 to-orange-500 rounded-full animate-flash-pulse shadow-lg"></div>
+          <div className="absolute top-1 right-12 w-5 h-5 bg-gradient-to-br from-amber-300 to-yellow-600 rounded-full animate-color-shift animation-delay-800 shadow-xl"></div>
+          <div className="absolute bottom-2 left-32 w-3 h-3 bg-gradient-to-br from-orange-400 to-red-500 rounded-full animate-flash-pulse animation-delay-1600 shadow-lg"></div>
+          <div className="absolute top-3 right-24 w-3.5 h-3.5 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-full animate-gentle-glow animation-delay-600 shadow-md"></div>
+          
+          {/* Medium Golden Particles - Strategic placement */}
+          <div className="absolute top-2 left-20 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-flash-pulse animation-delay-400 shadow-md"></div>
+          <div className="absolute bottom-3 right-8 w-2 h-2 bg-amber-500 rounded-full animate-color-shift animation-delay-1200 shadow-md"></div>
+          <div className="absolute top-4 left-48 w-2.5 h-2.5 bg-orange-400 rounded-full animate-gentle-glow animation-delay-2000 shadow-sm"></div>
+          <div className="absolute bottom-1 right-32 w-2 h-2 bg-yellow-500 rounded-full animate-flash-pulse animation-delay-2400 shadow-sm"></div>
+          
+          {/* Small Golden Sparkles - Fill gaps */}
+          <div className="absolute top-1 left-64 w-1.5 h-1.5 bg-yellow-300 rounded-full animate-flash-pulse animation-delay-1000 shadow-sm"></div>
+          <div className="absolute bottom-2 right-48 w-1.5 h-1.5 bg-orange-300 rounded-full animate-gentle-glow animation-delay-2200 shadow-sm"></div>
+          <div className="absolute top-3 left-96 w-1 h-1 bg-amber-400 rounded-full animate-flash-pulse animation-delay-1800 shadow-sm"></div>
+          <div className="absolute bottom-4 right-64 w-1 h-1 bg-yellow-400 rounded-full animate-color-shift animation-delay-2800 shadow-sm"></div>
+          
+          {/* Corner accents */}
+          <div className="absolute top-1 left-2 w-2 h-2 bg-gradient-to-br from-yellow-400 via-amber-400 to-orange-500 rounded-full animate-gentle-glow animation-delay-200 shadow-md"></div>
+          <div className="absolute bottom-1 right-2 w-2 h-2 bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-400 rounded-full animate-flash-pulse animation-delay-3000 shadow-md"></div>
+        </div>
+        
+        {/* Subtle Golden Atmosphere */}
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/15 via-amber-100/25 to-orange-100/15 animate-gentle-glow animation-delay-800 opacity-60"></div>
+      </>
+    );
+  }
+
+  if (effectType === 'silver') {
+    return (
+      <>
+        {/* Silver Flashing Balls in Static Positions */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Large Silver Orbs - Balanced placement */}
+          <div className="absolute top-2 left-10 w-4 h-4 bg-gradient-to-br from-slate-200 to-gray-500 rounded-full animate-flash-pulse shadow-lg"></div>
+          <div className="absolute bottom-2 right-10 w-3.5 h-3.5 bg-gradient-to-br from-gray-300 to-slate-600 rounded-full animate-color-shift animation-delay-1000 shadow-lg"></div>
+          <div className="absolute top-3 left-40 w-3 h-3 bg-gradient-to-br from-white to-gray-400 rounded-full animate-gentle-glow animation-delay-1400 shadow-md"></div>
+          <div className="absolute bottom-1 right-28 w-3.5 h-3.5 bg-gradient-to-br from-slate-300 to-gray-400 rounded-full animate-flash-pulse animation-delay-800 shadow-md"></div>
+          
+          {/* Medium Silver Particles */}
+          <div className="absolute top-1 right-16 w-2.5 h-2.5 bg-slate-300 rounded-full animate-flash-pulse animation-delay-600 shadow-md"></div>
+          <div className="absolute bottom-3 left-24 w-2 h-2 bg-gray-400 rounded-full animate-color-shift animation-delay-1800 shadow-sm"></div>
+          <div className="absolute top-4 right-40 w-2.5 h-2.5 bg-slate-400 rounded-full animate-gentle-glow animation-delay-1200 shadow-sm"></div>
+          <div className="absolute bottom-2 left-56 w-2 h-2 bg-gray-300 rounded-full animate-flash-pulse animation-delay-2000 shadow-sm"></div>
+          
+          {/* Small Silver Sparkles */}
+          <div className="absolute top-2 left-72 w-1.5 h-1.5 bg-slate-300 rounded-full animate-gentle-glow animation-delay-400 shadow-sm"></div>
+          <div className="absolute bottom-4 right-56 w-1.5 h-1.5 bg-gray-400 rounded-full animate-flash-pulse animation-delay-2400 shadow-sm"></div>
+          <div className="absolute top-1 left-88 w-1 h-1 bg-slate-400 rounded-full animate-color-shift animation-delay-1600 shadow-sm"></div>
+          
+          {/* Corner metallic accents */}
+          <div className="absolute top-1 left-4 w-2 h-2 bg-gradient-to-br from-slate-300 via-gray-200 to-slate-500 rounded-full animate-flash-pulse animation-delay-200 shadow-md"></div>
+          <div className="absolute bottom-1 right-4 w-2 h-2 bg-gradient-to-br from-gray-200 via-slate-300 to-gray-500 rounded-full animate-gentle-glow animation-delay-2600 shadow-md"></div>
+        </div>
+        
+        {/* Silver Atmosphere */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-100/15 via-gray-100/25 to-slate-100/15 animate-gentle-glow animation-delay-1200 opacity-50"></div>
+      </>
+    );
+  }
+
+  if (effectType === 'bronze') {
+    return (
+      <>
+        {/* Bronze Flashing Balls in Static Positions */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Large Brown Orbs - Cozy placement */}
+          <div className="absolute top-2 left-12 w-3.5 h-3.5 bg-gradient-to-br from-amber-800 to-orange-900 rounded-full animate-flash-pulse shadow-lg"></div>
+          <div className="absolute bottom-2 right-14 w-4 h-4 bg-gradient-to-br from-orange-800 to-amber-900 rounded-full animate-color-shift animation-delay-1200 shadow-lg"></div>
+          <div className="absolute top-3 left-36 w-3 h-3 bg-gradient-to-br from-amber-900 to-orange-800 rounded-full animate-gentle-glow animation-delay-2000 shadow-md"></div>
+          <div className="absolute bottom-1 right-36 w-3.5 h-3.5 bg-gradient-to-br from-orange-900 to-amber-800 rounded-full animate-flash-pulse animation-delay-600 shadow-md"></div>
+          
+          {/* Medium Brown Particles */}
+          <div className="absolute top-1 right-20 w-2.5 h-2.5 bg-amber-800 rounded-full animate-gentle-glow animation-delay-800 shadow-md"></div>
+          <div className="absolute bottom-3 left-28 w-2 h-2 bg-orange-800 rounded-full animate-color-shift animation-delay-1600 shadow-sm"></div>
+          <div className="absolute top-4 right-44 w-2.5 h-2.5 bg-amber-900 rounded-full animate-flash-pulse animation-delay-1000 shadow-sm"></div>
+          <div className="absolute bottom-2 left-52 w-2 h-2 bg-orange-900 rounded-full animate-gentle-glow animation-delay-2400 shadow-sm"></div>
+          
+          {/* Small Brown Sparkles */}
+          <div className="absolute top-2 left-68 w-1.5 h-1.5 bg-amber-800 rounded-full animate-flash-pulse animation-delay-400 shadow-sm"></div>
+          <div className="absolute bottom-4 right-52 w-1.5 h-1.5 bg-orange-800 rounded-full animate-gentle-glow animation-delay-1800 shadow-sm"></div>
+          <div className="absolute top-1 left-84 w-1 h-1 bg-amber-900 rounded-full animate-color-shift animation-delay-1400 shadow-sm"></div>
+          
+          {/* Brown corner accents */}
+          <div className="absolute top-1 left-6 w-2 h-2 bg-gradient-to-br from-amber-800 via-orange-800 to-amber-900 rounded-full animate-gentle-glow animation-delay-200 shadow-md"></div>
+          <div className="absolute bottom-1 right-6 w-2 h-2 bg-gradient-to-br from-orange-800 via-amber-900 to-orange-900 rounded-full animate-flash-pulse animation-delay-2800 shadow-md"></div>
+        </div>
+        
+        {/* Brown Atmosphere */}
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-900/15 via-orange-900/25 to-amber-900/15 animate-gentle-glow animation-delay-1400 opacity-70"></div>
+      </>
+    );
+  }
+
+  return null;
+};
+
 const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -94,6 +280,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const isMobile = useIsMobile();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
+  const userRankingTheme = useUserRankingTheme();
+  const { userRanking } = useUserRanking();
   
   // Ref to track sidebar scroll position
   const sidebarContentRef = useRef<HTMLDivElement>(null);
@@ -310,7 +498,44 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     }
   ];
 
-  // Color mapping function
+  // Get theme colors based on user ranking
+  const getThemeColors = (theme: 'gold' | 'silver' | 'bronze' | 'default') => {
+    switch (theme) {
+      case 'gold':
+        return {
+          header: 'bg-gradient-to-r from-yellow-50/80 to-amber-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-yellow-50/60 border-yellow-200 relative overflow-hidden',
+          sidebar: 'bg-background', // Normal sidebar color
+          text: 'text-yellow-800',
+          accent: 'text-yellow-600',
+          effects: 'gold'
+        };
+      case 'silver':
+        return {
+          header: 'bg-gradient-to-r from-gray-50/80 to-slate-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-gray-50/60 border-gray-200 relative overflow-hidden',
+          sidebar: 'bg-background', // Normal sidebar color
+          text: 'text-gray-800',
+          accent: 'text-gray-600',
+          effects: 'silver'
+        };
+      case 'bronze':
+        return {
+          header: 'bg-gradient-to-r from-amber-900/10 to-orange-900/10 backdrop-blur-md supports-[backdrop-filter]:bg-amber-900/5 border-amber-700/30 relative overflow-hidden',
+          sidebar: 'bg-background', // Normal sidebar color
+          text: 'text-amber-900',
+          accent: 'text-amber-700',
+          effects: 'bronze'
+        };
+      default:
+        return {
+          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          sidebar: 'bg-background',
+          text: 'text-foreground',
+          accent: 'text-muted-foreground',
+          effects: 'none'
+        };
+    }
+  };
+
   const getColorClasses = (color: string = 'gray', isActive: boolean = false) => {
     const colorMap: Record<string, { icon: string; text: string; activeIcon: string; activeText: string; activeBg: string }> = {
       blue: { 
@@ -434,13 +659,16 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.excludeCopyWriting && user?.position === 'Copy Writing') return false;
       return true;
     })
-  })).filter(group => group.items.length > 0); // Only show groups that have items
+      })).filter(group => group.items.length > 0); // Only show groups that have items
+
+  // Get theme colors with memoization to prevent unnecessary re-renders
+  const themeColors = useMemo(() => getThemeColors(userRankingTheme), [userRankingTheme]);
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
-          className="sidebar-glass"
+          className="bg-background transition-all duration-500 ease-in-out"
           side={language === 'ar' ? 'right' : 'left'}
         >
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
@@ -451,8 +679,12 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           </SidebarHeader>
           <SidebarContent 
             ref={sidebarContentRef}
-            className="flex-1 overflow-y-auto py-2 md:py-4 scrollbar-hide"
+            className="flex-1 overflow-y-auto py-2 md:py-4 custom-scrollbar"
             onScroll={handleScroll}
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#cbd5e1 #f1f5f9'
+            }}
           >
             {filteredNavGroups.map((group) => {
               const groupColorClasses = getColorClasses(group.color);
@@ -532,12 +764,15 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         </Sidebar>
         
         <div className="flex flex-col flex-1">
-          <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 shadow-sm">
-            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'}`}>
+          <header className={`sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 md:px-6 shadow-sm transition-colors duration-300 ease-in-out ${themeColors.header}`}>
+            {/* Special effects for top 3 performers */}
+            <HeaderEffects effectType={themeColors.effects} />
+            
+            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'} relative z-10`}>
               <SidebarTrigger />
               <WorkShiftTimer />
             </div>
-            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'}`}>
+            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'} relative z-10`}>
               <NotificationsMenu />
               
               {/* Report Bug Button */}
@@ -554,17 +789,50 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-8 md:h-9 w-auto flex items-center gap-2 rounded-full p-0">
-                    <span className="hidden md:inline-block text-sm">{user?.name}</span>
-                    <Avatar className="h-7 w-7 md:h-8 md:w-8">
-                      <AvatarImage src="" alt={user?.name} />
-                      <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-                    </Avatar>
+                    <div className="hidden md:flex items-center gap-2">
+                      <span className="text-sm">{user?.name}</span>
+                      <UserRankingProfile />
+                    </div>
+                    <div className="relative">
+                      <Avatar className="h-7 w-7 md:h-8 md:w-8">
+                        <AvatarImage src="" alt={user?.name} />
+                        <AvatarFallback userRank={userRanking?.position}>{user?.name?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      
+                      {/* Enhanced ranking icons with performance dashboard styling */}
+                      {userRanking?.position === 1 && (
+                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                          <Crown className="h-3 w-3 text-yellow-600" />
+                        </div>
+                      )}
+                      {userRanking?.position === 2 && (
+                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                          <Medal className="h-3 w-3 text-slate-600" />
+                        </div>
+                      )}
+                      {userRanking?.position === 3 && (
+                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                          <Award className="h-3 w-3 text-amber-800" />
+                        </div>
+                      )}
+                      
+                      {/* Special effects for gold ranking - removed sparkles */}
+                      {userRanking?.position === 1 && (
+                        <>
+                          {/* Subtle pulsing golden background */}
+                          <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-10 -z-10"></div>
+                        </>
+                      )}
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-56 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                   <DropdownMenuLabel>
                     <div className="flex flex-col gap-1">
-                      <p className="font-medium">{user?.name}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{user?.name}</p>
+                        <UserRankingProfile />
+                      </div>
                       <p className="text-xs text-muted-foreground">{user?.email}</p>
                     </div>
                   </DropdownMenuLabel>

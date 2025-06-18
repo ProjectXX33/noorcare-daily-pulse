@@ -1,13 +1,20 @@
 {
-  "version": "2.2.0",
-  "buildTime": "2025-06-17T23:01:01.136Z",
-  "buildTimestamp": "1750201261137",
+  "version": "2.6.0",
+  "buildTime": "2025-06-18T17:20:44.346Z",
+  "buildTimestamp": "1750267244346",
   "buildDate": "6/18/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Hotfix: Fixed issue with overtime countdown not updating correctly",
-    "Hotfix: Fixed issue with order sync not working correctly"
+    "Enhanced user ranking system with special header effects for top 3 performers",
+    "Added bronze theme with brown color scheme for 3rd place ranking",
+    "Implemented static flashing ball effects in header for ranking visualization",
+    "Fixed shift delay calculation logic with smart overtime handling",
+    "Improved navigation performance with caching system to prevent flickering",
+    "Enhanced floating strategy button visibility across all pages",
+    "Added professional scrollbar styling for navigation menu",
+    "Fixed custom discount integration for WooCommerce orders",
+    "Updated currency display to SAR riyal symbols throughout the app"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

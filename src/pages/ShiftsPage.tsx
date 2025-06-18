@@ -377,23 +377,30 @@ const ShiftsPage = () => {
     const workingDays = monthlyShifts.filter(shift => shift.checkInTime).length;
     const averagePerDay = workingDays > 0 ? (totalRegular + actualOvertimeHours) / workingDays : 0;
     
-    // Calculate total delay in minutes
+    // Calculate total delay in minutes (already processed by smart delay calculation)
     const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
-    // Convert total delay minutes to hours
+    // Convert total delay minutes to hours for display
     const totalDelayHours = totalDelayMinutes / 60;
     
-    // Smart calculation based on delay vs overtime comparison
+    // Smart Summary Logic: Only apply offsetting for individual employee, show actual numbers for all employees
     let delayToFinish = 0;
     let totalOvertime = 0;
     
-    if (totalDelayHours > actualOvertimeHours) {
-      // If Delay > Overtime: Show remaining delay, set overtime to 0
-      delayToFinish = totalDelayHours - actualOvertimeHours;
-      totalOvertime = 0;
+    if (selectedEmployee !== 'all') {
+      // Individual employee: Apply smart offsetting logic
+      if (actualOvertimeHours > totalDelayHours) {
+        // If Overtime > Delay: Show remaining overtime after offsetting delay, set delay to "All Clear"
+        totalOvertime = actualOvertimeHours - totalDelayHours;
+        delayToFinish = 0; // All Clear
+      } else {
+        // If Delay >= Overtime: Show remaining delay after offsetting overtime, set overtime to 0
+        delayToFinish = totalDelayHours - actualOvertimeHours;
+        totalOvertime = 0;
+      }
     } else {
-      // If Overtime >= Delay: Show real overtime, set delay to finish as 0 (All Clear)
-      delayToFinish = 0;
-      totalOvertime = actualOvertimeHours - totalDelayHours;
+      // All employees: Show actual numbers without offsetting
+      delayToFinish = totalDelayHours;
+      totalOvertime = actualOvertimeHours;
     }
 
     return {
@@ -654,12 +661,12 @@ const ShiftsPage = () => {
             <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="text-center space-y-2 sm:space-y-3">
                 <div className="flex justify-center">
-                  <div className={`p-2 sm:p-3 rounded-full ${summary.delayToFinish > 0 ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
-                    <Clock className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.delayToFinish > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`} />
+                  <div className={`p-2 sm:p-3 rounded-full ${summary.delayToFinish > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                    <Clock className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.delayToFinish > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} />
                   </div>
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.delayToFinish}</p>
-                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {summary.delayToFinish > 0 ? formatHoursAndMinutes(summary.delayToFinish) : 'All Clear'}
                 </div>
               </div>
@@ -1025,17 +1032,9 @@ const ShiftsPage = () => {
                           <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              (() => {
-                                const delayHours = shift.delayMinutes / 60;
-                                const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
-                                return delayToFinish > 0 ? 'text-red-600' : 'text-green-600';
-                              })()
+                              shift.delayMinutes > 0 ? 'text-red-600' : 'text-green-600'
                             }`}>
-                              {(() => {
-                                const delayHours = shift.delayMinutes / 60;
-                                const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
-                                return delayToFinish > 0 ? formatHoursAndMinutes(delayToFinish) : 'All Clear';
-                              })()}
+                              {shift.delayMinutes > 0 ? formatDelayHoursAndMinutes(shift.delayMinutes) : 'All Clear'}
                             </span>
                           </div>
                         </div>
@@ -1168,17 +1167,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            (() => {
-                              const delayHours = shift.delayMinutes / 60;
-                              const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
-                              return delayToFinish > 0 ? 'text-red-600' : 'text-green-600';
-                            })()
+                            shift.delayMinutes > 0 ? 'text-red-600' : 'text-green-600'
                           }`}>
-                            {(() => {
-                              const delayHours = shift.delayMinutes / 60;
-                              const delayToFinish = Math.max(0, delayHours - shift.overtimeHours);
-                              return delayToFinish > 0 ? formatHoursAndMinutes(delayToFinish) : 'All Clear';
-                            })()}
+                            {shift.delayMinutes > 0 ? formatDelayHoursAndMinutes(shift.delayMinutes) : 'All Clear'}
                           </TableCell>
                         </TableRow>
                       ))
