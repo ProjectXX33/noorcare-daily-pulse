@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { createNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 import { Coffee, Play, Pause, Timer, Edit3 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -121,11 +122,56 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
         description: 'Work time is now completely frozen until you stop the break.'
       });
 
+      // Notify all admins about the break
+      await notifyAdminsAboutBreak(user, breakReason.trim(), breakStartTime);
+
     } catch (error) {
       console.error('Error starting break:', error);
       toast.error('Failed to start break');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to notify all admins when employee starts break
+  const notifyAdminsAboutBreak = async (employee: any, reason: string, startTime: Date) => {
+    try {
+      // Get all admin users
+      const { data: admins, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'admin');
+
+      if (error) {
+        console.error('Error fetching admins:', error);
+        return;
+      }
+
+      if (!admins || admins.length === 0) {
+        console.log('No admins found to notify');
+        return;
+      }
+
+      // Create notification message
+      const notificationTitle = '☕ Employee Break Started';
+      const notificationMessage = `${employee.name} (${employee.position || 'Employee'}) started a break at ${format(startTime, 'h:mm a')}\n\nReason: ${reason}\n\nWork timer is now frozen until break ends.`;
+
+      // Send notification to each admin
+      for (const admin of admins) {
+        await createNotification({
+          user_id: admin.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          related_to: 'break',
+          related_id: activeCheckInId,
+          created_by: employee.id
+        });
+      }
+
+      console.log(`✅ Break notification sent to ${admins.length} admin(s)`);
+
+    } catch (error) {
+      console.error('❌ Error sending break notifications to admins:', error);
     }
   };
 
@@ -185,11 +231,56 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
         description: `Break: ${breakDurationMinutes} minutes (${currentBreakReason}). Work timer resumed.`
       });
 
+      // Notify all admins about break ending
+      await notifyAdminsAboutBreakEnd(user, currentBreakReason, breakStartTime, breakEndTime, breakDurationMinutes);
+
     } catch (error) {
       console.error('Error stopping break:', error);
       toast.error('Failed to stop break');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to notify all admins when employee ends break
+  const notifyAdminsAboutBreakEnd = async (employee: any, reason: string, startTime: Date, endTime: Date, durationMinutes: number) => {
+    try {
+      // Get all admin users
+      const { data: admins, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'admin');
+
+      if (error) {
+        console.error('Error fetching admins:', error);
+        return;
+      }
+
+      if (!admins || admins.length === 0) {
+        console.log('No admins found to notify');
+        return;
+      }
+
+      // Create notification message
+      const notificationTitle = '⏰ Employee Break Ended';
+      const notificationMessage = `${employee.name} (${employee.position || 'Employee'}) ended their break at ${format(endTime, 'h:mm a')}\n\nBreak Duration: ${durationMinutes} minutes\nReason: ${reason}\n\nWork timer has resumed.`;
+
+      // Send notification to each admin
+      for (const admin of admins) {
+        await createNotification({
+          user_id: admin.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          related_to: 'break',
+          related_id: activeCheckInId,
+          created_by: employee.id
+        });
+      }
+
+      console.log(`✅ Break end notification sent to ${admins.length} admin(s)`);
+
+    } catch (error) {
+      console.error('❌ Error sending break end notifications to admins:', error);
     }
   };
 
