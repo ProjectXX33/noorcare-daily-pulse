@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DashboardCard from '@/components/DashboardCard';
 import CheckInHistory from '@/components/CheckInHistory';
 import ReportHistory from '@/components/ReportHistory';
+import EmployeePerformanceSummary from '@/components/EmployeePerformanceSummary';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { Button } from '@/components/ui/button';
@@ -330,6 +331,11 @@ const EmployeeDashboard = () => {
           </div>
         </div>
             
+        {/* Performance Summary - only for employees with check-in access */}
+        {hasCheckInAccess && (
+          <EmployeePerformanceSummary />
+        )}
+
         {/* Mobile-optimized action button */}
         <div className="flex">
           <Button 

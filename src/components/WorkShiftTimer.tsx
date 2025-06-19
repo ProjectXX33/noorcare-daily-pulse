@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Flame, CheckCircle, AlertTriangle, Play, Timer, ArrowDown, AlertCircle } from 'lucide-react';
+import { Clock, Flame, CheckCircle, AlertTriangle, Play, Timer, ArrowDown, AlertCircle, Coffee } from 'lucide-react';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +15,44 @@ const WorkShiftTimer: React.FC = () => {
   const [isOvertime, setIsOvertime] = useState<boolean>(false);
   const [overtimeMinutes, setOvertimeMinutes] = useState<number>(0);
   const [shiftInfo, setShiftInfo] = useState<any>(null);
+  
+  // Break time tracking states (for display only, not freezing)
+  const [isOnBreak, setIsOnBreak] = useState<boolean>(false);
+  const [totalBreakTime, setTotalBreakTime] = useState<number>(0);
+  const [currentBreakStartTime, setCurrentBreakStartTime] = useState<Date | null>(null);
+  const [currentBreakDuration, setCurrentBreakDuration] = useState<number>(0);
+
+  // Function to check break status from database
+  const checkBreakStatus = async (checkInId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('check_ins')
+        .select('is_on_break, total_break_minutes, break_start_time')
+        .eq('id', checkInId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const breakStatus = data.is_on_break || false;
+        const breakTime = (data.total_break_minutes || 0) * 60; // Convert minutes to seconds
+        const breakStartTime = data.break_start_time ? new Date(data.break_start_time) : null;
+        
+        console.log('🔄 Break status loaded from DB:', {
+          isOnBreak: breakStatus,
+          totalBreakMinutes: data.total_break_minutes,
+          totalBreakSeconds: breakTime,
+          breakStartTime: breakStartTime?.toISOString()
+        });
+        
+        setIsOnBreak(breakStatus);
+        setTotalBreakTime(breakTime);
+        setCurrentBreakStartTime(breakStartTime);
+      }
+    } catch (error) {
+      console.error('Error checking break status:', error);
+    }
+  };
   
   // New states for post-checkout tracking
   const [postCheckoutTime, setPostCheckoutTime] = useState<number>(0);
@@ -57,7 +95,7 @@ const WorkShiftTimer: React.FC = () => {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )[0];
       
-      if (latestCheckIn) {
+              if (latestCheckIn) {
         // Check if this check-in has been checked out
         const hasCheckedOut = !!(latestCheckIn.checkOutTime || latestCheckIn.checkoutTime);
         
@@ -69,12 +107,17 @@ const WorkShiftTimer: React.FC = () => {
           setPostCheckoutTime(0);
           setCheckoutTime(null);
           setActiveCheckIn(null);
+          setIsOnBreak(false);
+          setTotalBreakTime(0);
         } else {
-          // Still checked in
+          // Still checked in - check break status
           setIsPostCheckout(false);
           setPostCheckoutTime(0);
           setCheckoutTime(null);
           setActiveCheckIn(latestCheckIn);
+          
+          // Check break status from database
+          checkBreakStatus(latestCheckIn.id);
         }
         
                 // Get user's assigned shift information with multiple lookup strategies
@@ -167,7 +210,7 @@ const WorkShiftTimer: React.FC = () => {
     findActiveCheckIn();
   }, [user, checkIns]);
 
-  // Subscribe to real-time changes in shift_assignments to detect shift assignment changes
+  // Subscribe to real-time changes in shift_assignments and check_ins for break tracking
   useEffect(() => {
     if (!user?.id) return;
 
@@ -203,14 +246,85 @@ const WorkShiftTimer: React.FC = () => {
           }, 500);
         }
       )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'check_ins',
+          filter: `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          // Listen for break status changes
+          console.log('📡 Real-time UPDATE received for check_ins:', payload);
+          
+          if (payload.new && activeCheckIn && payload.new.id === activeCheckIn.id) {
+            const newData = payload.new as any;
+            const wasOnBreak = isOnBreak;
+            const nowOnBreak = newData.is_on_break || false;
+            
+            console.log('🔄 Break status change detected:', {
+              checkInId: activeCheckIn.id,
+              wasOnBreak,
+              nowOnBreak,
+              breakStartTime: newData.break_start_time,
+              totalBreakMinutes: newData.total_break_minutes,
+              currentWorkTime: timeWorked
+            });
+            
+            // Break status changed - update break start time if break just started
+            if (!wasOnBreak && nowOnBreak && newData.break_start_time) {
+              setCurrentBreakStartTime(new Date(newData.break_start_time));
+            } else if (wasOnBreak && !nowOnBreak) {
+              setCurrentBreakStartTime(null);
+            }
+            
+            setIsOnBreak(nowOnBreak);
+            setTotalBreakTime((newData.total_break_minutes || 0) * 60);
+            
+            // Force timer re-calculation immediately
+            setTimeout(() => {
+              console.log('⚡ Forcing timer recalculation after break status change');
+            }, 100);
+          } else {
+            console.log('❌ Real-time update ignored:', {
+              hasPayloadNew: !!payload.new,
+              hasActiveCheckIn: !!activeCheckIn,
+              idsMatch: payload.new?.id === activeCheckIn?.id,
+              payloadId: payload.new?.id,
+              activeCheckInId: activeCheckIn?.id
+            });
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id]);
+  }, [user?.id, activeCheckIn?.id, isOnBreak, timeWorked]);
 
+  // Real-time break timer - updates current break duration every second
+  useEffect(() => {
+    if (!isOnBreak || !currentBreakStartTime) {
+      setCurrentBreakDuration(0);
+      return;
+    }
 
+    const updateBreakTimer = () => {
+      const now = new Date();
+      const breakDurationMs = now.getTime() - currentBreakStartTime.getTime();
+      const breakDurationSeconds = Math.max(0, Math.floor(breakDurationMs / 1000));
+      setCurrentBreakDuration(breakDurationSeconds);
+    };
+
+    // Update immediately
+    updateBreakTimer();
+
+    // Update every second
+    const interval = setInterval(updateBreakTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [isOnBreak, currentBreakStartTime]);
 
   // Enhanced timer logic - runs every second for real-time updates
   useEffect(() => {
@@ -232,10 +346,33 @@ const WorkShiftTimer: React.FC = () => {
         // Regular check-in tracking
         const checkInTime = new Date(activeCheckIn.timestamp);
         
-        // Calculate total time worked in seconds for more precision
-        const timeWorkedMs = now.getTime() - checkInTime.getTime();
-        const timeWorkedSeconds = Math.floor(timeWorkedMs / 1000);
-        setTimeWorked(timeWorkedSeconds);
+        // Calculate work time excluding break time (FREEZING MODE)
+        const totalElapsedTimeMs = now.getTime() - checkInTime.getTime();
+        const totalElapsedSeconds = Math.floor(totalElapsedTimeMs / 1000);
+        
+        // Calculate actual work time by subtracting break time
+        let actualWorkSeconds = totalElapsedSeconds - totalBreakTime;
+        
+        // If currently on break, subtract the current break duration
+        if (isOnBreak && currentBreakStartTime) {
+          const currentBreakMs = now.getTime() - currentBreakStartTime.getTime();
+          const currentBreakSeconds = Math.floor(currentBreakMs / 1000);
+          actualWorkSeconds = totalElapsedSeconds - totalBreakTime - currentBreakSeconds;
+        }
+        
+        // Ensure work time doesn't go negative
+        actualWorkSeconds = Math.max(0, actualWorkSeconds);
+        
+        // FREEZE MODE: Work time freezes during breaks
+        setTimeWorked(actualWorkSeconds);
+        
+        console.log('⏱️ FREEZE MODE: Work time calculation:', {
+          totalElapsedSeconds,
+          totalBreakTimeSeconds: totalBreakTime,
+          currentBreakSeconds: isOnBreak && currentBreakStartTime ? Math.floor((now.getTime() - currentBreakStartTime.getTime()) / 1000) : 0,
+          actualWorkSeconds,
+          isOnBreak: isOnBreak ? '(FROZEN - on break)' : '(RUNNING - working)'
+        });
         
         // Determine shift type based on database assignment (shiftInfo) or fallback to check-in time
         const checkInHour = checkInTime.getHours();
@@ -298,7 +435,7 @@ const WorkShiftTimer: React.FC = () => {
         
         // Check if in overtime (current time is after shift end time AND worked minimum hours)
         const minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day shift: 7 hours, Night shift: 8 hours
-        const hoursWorked = timeWorked / 3600; // Convert seconds to hours
+        const hoursWorked = actualWorkSeconds / 3600; // Convert actual work seconds (excluding breaks) to hours
         
         if (now > shiftEndTime && hoursWorked >= minimumHoursForOvertime) {
           setIsOvertime(true);
@@ -325,7 +462,7 @@ const WorkShiftTimer: React.FC = () => {
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [activeCheckIn, shiftInfo, isPostCheckout, checkoutTime]);
+  }, [activeCheckIn, shiftInfo, isPostCheckout, checkoutTime, isOnBreak, totalBreakTime, currentBreakStartTime, currentBreakDuration]);
 
   // Auto checkout function
   const handleAutoCheckout = async () => {
@@ -559,6 +696,25 @@ const WorkShiftTimer: React.FC = () => {
     );
   }
 
+  // Show break time counter if currently on break
+  if (isOnBreak) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 text-xs font-bold bg-gradient-to-r from-orange-50 to-yellow-50 text-orange-700 border-orange-400 shadow-md">
+        <Coffee className="h-4 w-4 text-orange-600" />
+        <div className="flex items-center gap-2">
+          {/* Desktop: Show "ON BREAK" text */}
+          <span className="hidden sm:inline text-xs font-bold text-orange-800">
+            ON BREAK
+          </span>
+          {/* Both: Show break time counter */}
+          <span className="font-mono text-sm tracking-wide text-orange-800">
+            {formatTime(currentBreakDuration)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   // Regular work time mode with countdown from full shift duration
   const checkInTime = new Date(activeCheckIn.timestamp);
   const checkInHour = checkInTime.getHours();
@@ -587,30 +743,29 @@ const WorkShiftTimer: React.FC = () => {
     }
   }
   
-  // Calculate countdown from full shift duration
+  // Calculate countdown from full shift duration (FREEZE MODE: Use actual work time, not elapsed time)
   const shiftDurationSeconds = shiftDurationHours * 3600; // Convert hours to seconds
-  const now = new Date();
-  const elapsedMs = now.getTime() - checkInTime.getTime();
-  const elapsedSeconds = Math.floor(elapsedMs / 1000);
   
-  // Remaining time = Full shift duration - time worked
-  const remainingSeconds = Math.max(0, shiftDurationSeconds - elapsedSeconds);
+  // FREEZE MODE: Use timeWorked (actual work time excluding breaks) instead of elapsed time
+  // Remaining time = Full shift duration - actual work time (this freezes during breaks)
+  const remainingSeconds = Math.max(0, shiftDurationSeconds - timeWorked);
   
   // Debug logging
-  console.log('⏰ Timer Debug:', {
+  console.log('⏰ Timer Debug (FREEZE MODE):', {
     shiftType,
     shiftDurationHours,
     shiftDurationSeconds,
-    elapsedSeconds,
-    timeWorked,
+    timeWorked: timeWorked + 's',
+    timeWorkedMinutes: Math.floor(timeWorked / 60),
     remainingSeconds,
     remainingMinutes: Math.floor(remainingSeconds / 60),
+    isOnBreak: isOnBreak ? '(FROZEN - on break)' : '(RUNNING)',
     checkInTime: checkInTime.toISOString(),
     shiftInfo: shiftInfo?.name
   });
   
-  // Progress calculation
-  const progressPercentage = Math.min(100, (elapsedSeconds / shiftDurationSeconds) * 100);
+  // Progress calculation (FREEZE MODE: Use actual work time)
+  const progressPercentage = Math.min(100, (timeWorked / shiftDurationSeconds) * 100);
   
   // Dynamic color coding based on remaining time
   let colorClass = 'from-emerald-50 to-green-50 text-emerald-700 border-emerald-300';

@@ -24,6 +24,18 @@ export type CheckIn = {
   department: Department;
   position: Position;
   checkOutTime: Date | null;
+  // Break time tracking
+  breakStartTime?: Date | null;
+  breakEndTime?: Date | null;
+  totalBreakMinutes?: number;
+  isOnBreak?: boolean;
+  currentBreakReason?: string;
+  breakSessions?: Array<{
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+    reason: string;
+  }>;
 };
 
 export type WorkReport = {
@@ -130,6 +142,14 @@ export type MonthlyShift = {
   shiftName?: string;
   shiftStartTime?: string;
   shiftEndTime?: string;
+  // Break time tracking
+  totalBreakMinutes?: number;
+  breakSessions?: Array<{
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+    reason: string;
+  }>;
 };
 
 // Rating Types
@@ -191,6 +211,18 @@ export type CheckInRecord = {
   timestamp: string;
   checkout_time: string | null;
   created_at: string;
+  // Break time tracking
+  break_start_time?: string | null;
+  break_end_time?: string | null;
+  total_break_minutes?: number;
+  is_on_break?: boolean;
+  current_break_reason?: string;
+  break_sessions?: Array<{
+    start_time: string;
+    end_time: string;
+    duration_minutes: number;
+    reason: string;
+  }>;
 };
 
 export type WorkReportRecord = {

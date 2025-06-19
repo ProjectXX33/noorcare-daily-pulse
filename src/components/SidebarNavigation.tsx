@@ -54,6 +54,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import NotificationsMenu from '@/components/NotificationsMenu';
 import ReportBugModal from '@/components/ReportBugModal';
+
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 

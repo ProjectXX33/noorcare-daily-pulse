@@ -17,6 +17,21 @@ export interface CheckIn {
   department: string;
   position: string;
   checkOutTime?: Date; // Added to match types/index.ts
+  // Break time fields
+  breakStartTime?: Date | null;
+  breakEndTime?: Date | null;
+  totalBreakMinutes?: number;
+  isOnBreak?: boolean;
+  currentBreakReason?: string;
+  breakSessions?: BreakSession[];
+}
+
+export interface BreakSession {
+  id: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  reason: string;
 }
 
 export interface WorkReport {
@@ -327,7 +342,16 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const { data: checkInsData, error: checkInsError } = await supabase
         .from('check_ins')
-        .select('*, users:user_id(name, department, position)')
+        .select(`
+          *, 
+          users:user_id(name, department, position),
+          break_sessions,
+          break_start_time,
+          break_end_time,
+          total_break_minutes,
+          is_on_break,
+          current_break_reason
+        `)
         .order('timestamp', { ascending: false });
         
       if (checkInsError) {
@@ -352,6 +376,28 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       const formattedCheckIns: CheckIn[] = checkInsData.map(item => {
         const userInfo = usersMap[item.user_id] || {};
+        
+        // Parse break sessions from JSONB
+        let breakSessions: BreakSession[] = [];
+        try {
+          if (item.break_sessions && Array.isArray(item.break_sessions)) {
+            breakSessions = item.break_sessions;
+          } else if (typeof item.break_sessions === 'string') {
+            breakSessions = JSON.parse(item.break_sessions);
+          }
+        } catch (error) {
+          console.warn('Error parsing break sessions for check-in:', item.id, error);
+          breakSessions = [];
+        }
+        
+        console.log('🔍 Check-in break data for', userInfo.name || 'Unknown', ':', {
+          id: item.id,
+          totalBreakMinutes: item.total_break_minutes,
+          isOnBreak: item.is_on_break,
+          breakSessions: breakSessions,
+          currentBreakReason: item.current_break_reason
+        });
+        
         return {
           id: item.id,
           userId: item.user_id,
@@ -361,6 +407,13 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userName: userInfo.name || 'Unknown User',
           department: userInfo.department || 'Unknown',
           position: userInfo.position || 'Unknown',
+          // Break time fields
+          breakStartTime: item.break_start_time ? new Date(item.break_start_time) : null,
+          breakEndTime: item.break_end_time ? new Date(item.break_end_time) : null,
+          totalBreakMinutes: item.total_break_minutes || 0,
+          isOnBreak: item.is_on_break || false,
+          currentBreakReason: item.current_break_reason || '',
+          breakSessions: breakSessions,
         };
       });
       
@@ -806,13 +859,19 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       const checkOutTime = new Date();
       
-      // Update the check-in record with checkout time
-      const { error } = await supabase
+      // Update the check-in record with checkout time and get the updated record with break time data
+      const { data: updatedCheckIn, error } = await supabase
         .from('check_ins')
         .update({ checkout_time: checkOutTime.toISOString() })
-        .eq('id', existingCheckIn.id);
+        .eq('id', existingCheckIn.id)
+        .select('total_break_minutes')
+        .single();
         
       if (error) throw error;
+      
+      // Get break time data (default to 0 if not available)
+      const totalBreakMinutes = updatedCheckIn?.total_break_minutes || 0;
+      console.log('🔄 Break time at checkout:', { totalBreakMinutes });
       
       // Enhanced shift tracking for all employees
       try {
@@ -840,9 +899,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         
         if (detectedShift) {
-          // Calculate hours using flexible overtime rules
-          const hoursWorked = calculateHours(existingCheckIn.timestamp, checkOutTime);
-          const { regularHours, overtimeHours } = await calculateRegularAndOvertimeHours(existingCheckIn.timestamp, checkOutTime, detectedShift);
+          // Calculate hours using flexible overtime rules (excluding break time)
+          const hoursWorked = calculateHours(existingCheckIn.timestamp, checkOutTime, totalBreakMinutes);
+          const { regularHours, overtimeHours } = await calculateRegularAndOvertimeHours(existingCheckIn.timestamp, checkOutTime, detectedShift, totalBreakMinutes);
           
           console.log('⏱️ Hours calculation:', {
             hoursWorked: hoursWorked.toFixed(2),
@@ -1346,20 +1405,45 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Helper function to calculate work hours
-  const calculateHours = (checkInTime: Date, checkOutTime: Date): number => {
+  const calculateHours = (checkInTime: Date, checkOutTime: Date, totalBreakMinutes: number = 0): number => {
     const diffMs = checkOutTime.getTime() - checkInTime.getTime();
-    return diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+    const totalHours = diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+    const breakHours = totalBreakMinutes / 60; // Convert break minutes to hours
+    const actualWorkHours = Math.max(0, totalHours - breakHours); // Actual work time excluding breaks
+    
+    console.log('⏱️ Hours calculation with break time:', {
+      totalTime: totalHours.toFixed(2) + 'h',
+      breakTime: breakHours.toFixed(2) + 'h',
+      actualWorkTime: actualWorkHours.toFixed(2) + 'h'
+    });
+    
+    return actualWorkHours;
   };
 
   // Helper function to calculate regular and overtime hours with flexible rules
-  const calculateRegularAndOvertimeHours = async (checkInTime: Date, checkOutTime: Date, shift: Shift) => {
+  const calculateRegularAndOvertimeHours = async (checkInTime: Date, checkOutTime: Date, shift: Shift, totalBreakMinutes: number = 0) => {
     // Use the new flexible calculateWorkHours function from shiftsApi
     const { calculateWorkHours } = await import('@/lib/shiftsApi');
-    const result = calculateWorkHours(checkInTime, checkOutTime, shift);
     
-    console.log(`📊 Flexible hours calculation for ${shift.name}:`, {
+    // Calculate total time first
+    const totalMinutes = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    
+    // Subtract break time to get actual work time
+    const breakHours = totalBreakMinutes / 60;
+    const actualWorkHours = Math.max(0, totalHours - breakHours);
+    
+    // Create adjusted check-out time to reflect actual work duration
+    const adjustedCheckOutTime = new Date(checkInTime.getTime() + (actualWorkHours * 60 * 60 * 1000));
+    
+    const result = calculateWorkHours(checkInTime, adjustedCheckOutTime, shift);
+    
+    console.log(`📊 Flexible hours calculation for ${shift.name} (with break adjustment):`, {
       checkInTime: checkInTime.toISOString(),
       checkOutTime: checkOutTime.toISOString(),
+      totalHours: totalHours.toFixed(2),
+      breakHours: breakHours.toFixed(2),
+      actualWorkHours: actualWorkHours.toFixed(2),
       regularHours: result.regularHours.toFixed(2),
       overtimeHours: result.overtimeHours.toFixed(2),
       rules: shift.name.toLowerCase().includes('day') 

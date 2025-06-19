@@ -81,22 +81,25 @@ const formatBreakTime = (totalMinutes: number): string => {
   }
 };
 
-// Helper function to calculate "Delay to Finish" = Break Time + Delay Minutes (Simple Addition)
+// Helper function to calculate "Delay to Finish" = Original Delay to Finish + Break Time
 const calculateDelayToFinish = (breakMinutes: number, delayMinutes: number, regularHours: number, overtimeHours: number): string => {
-  // SIMPLE FORMULA: Break Time + Delay Minutes
-  const totalDelayMinutes = breakMinutes + delayMinutes;
+  // ENHANCED FORMULA: Original Delay to Finish + Break Time
+  // Where "Original Delay to Finish" is the existing delay calculation (delayMinutes)
+  // And we ADD break time to it
+  const originalDelayToFinish = delayMinutes; // This is the original "Delay to Finish" value
+  const enhancedDelayToFinish = originalDelayToFinish + breakMinutes;
   
-  console.log('🧮 Simple Delay to Finish Calculation:', {
-    breakMinutes,
-    delayMinutes,
-    totalDelayMinutes,
-    formula: `${breakMinutes}min + ${delayMinutes}min = ${totalDelayMinutes}min`
+  console.log('🧮 Enhanced Delay to Finish Calculation:', {
+    originalDelayToFinish: `${originalDelayToFinish}min`,
+    breakMinutes: `${breakMinutes}min`,
+    enhancedDelayToFinish: `${enhancedDelayToFinish}min`,
+    formula: `${originalDelayToFinish}min (original delay) + ${breakMinutes}min (break time) = ${enhancedDelayToFinish}min`
   });
   
-  if (totalDelayMinutes <= 0) return 'All Clear';
+  if (enhancedDelayToFinish <= 0) return 'All Clear';
   
-  const hours = Math.floor(totalDelayMinutes / 60);
-  const minutes = Math.round(totalDelayMinutes % 60);
+  const hours = Math.floor(enhancedDelayToFinish / 60);
+  const minutes = Math.round(enhancedDelayToFinish % 60);
   
   if (hours === 0) {
     return `${minutes}min`;
@@ -479,33 +482,28 @@ const ShiftsPage = () => {
     const totalDelayAndBreakMinutes = totalBreakMinutes + totalDelayMinutes;
     const rawDelayToFinishHours = totalDelayAndBreakMinutes / 60; // Convert to hours
     
-    // Step 2: Apply smart offsetting logic for EMPLOYEE VIEW: Total Overtime Hours - Delay to Finish
+    // Step 2: Apply smart offsetting logic for ALL USERS (Admin + Employee): Total Overtime Hours - Delay to Finish
     let finalOvertimeHours = 0;
     let finalDelayToFinishHours = 0;
     
-    if (user?.role !== 'admin') {
-      // EMPLOYEE VIEW: Apply smart offsetting directly to displayed values
-      if (actualOvertimeHours > rawDelayToFinishHours) {
-        // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
-        finalOvertimeHours = actualOvertimeHours - rawDelayToFinishHours;
-        finalDelayToFinishHours = 0; // All Clear
-      } else {
-        // If Delay >= Overtime: Show remaining delay, overtime becomes 0
-        finalDelayToFinishHours = rawDelayToFinishHours - actualOvertimeHours;
-        finalOvertimeHours = 0;
-      }
+    // UNIVERSAL SMART OFFSETTING: Apply to both admin and employee views
+    if (actualOvertimeHours > rawDelayToFinishHours) {
+      // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
+      finalOvertimeHours = actualOvertimeHours - rawDelayToFinishHours;
+      finalDelayToFinishHours = 0; // All Clear
     } else {
-      // ADMIN VIEW: Show raw values without smart offsetting
-      finalOvertimeHours = actualOvertimeHours;
-      finalDelayToFinishHours = rawDelayToFinishHours;
+      // If Delay >= Overtime: Show remaining delay, overtime becomes 0
+      finalDelayToFinishHours = rawDelayToFinishHours - actualOvertimeHours;
+      finalOvertimeHours = 0;
     }
 
-    // Smart offsetting metadata (only for employees)
-    const hasSmartOffsetting = user?.role !== 'admin' && actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
+    // Smart offsetting metadata (for both admin and employees)
+    const hasSmartOffsetting = actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
     const offsettingType = actualOvertimeHours > rawDelayToFinishHours ? 'overtime_covers_delay' : 'delay_covers_overtime';
     
-    console.log('📊 Summary with Smart Offsetting Logic (Employee View):', {
+    console.log('📊 Summary with Universal Smart Offsetting Logic (All Users):', {
       userRole: user?.role,
+      selectedEmployee,
       totalDelayMinutes,
       totalBreakMinutes,
       totalDelayAndBreakMinutes,
@@ -515,13 +513,11 @@ const ShiftsPage = () => {
       finalDelayToFinishHours: finalDelayToFinishHours.toFixed(2),
       hasSmartOffsetting,
       offsettingType,
-      smartOffsetingApplied: user?.role !== 'admin',
-      logic: user?.role !== 'admin' 
-        ? (actualOvertimeHours > rawDelayToFinishHours ? 'EMPLOYEE: Overtime covers delay' : 'EMPLOYEE: Delay remains after overtime offset')
-        : 'ADMIN: Raw values displayed',
-      formula: user?.role !== 'admin' 
-        ? `EMPLOYEE SMART: ${actualOvertimeHours.toFixed(2)}h OT - ${rawDelayToFinishHours.toFixed(2)}h Delay = OT:${finalOvertimeHours.toFixed(2)}h, Delay:${finalDelayToFinishHours.toFixed(2)}h`
-        : `ADMIN RAW: OT=${finalOvertimeHours.toFixed(2)}h, Delay=${finalDelayToFinishHours.toFixed(2)}h`
+      smartOffsetingApplied: true,
+      logic: actualOvertimeHours > rawDelayToFinishHours 
+        ? 'UNIVERSAL: Overtime covers delay' 
+        : 'UNIVERSAL: Delay remains after overtime offset',
+      formula: `UNIVERSAL SMART: ${actualOvertimeHours.toFixed(2)}h OT - ${rawDelayToFinishHours.toFixed(2)}h Delay = OT:${finalOvertimeHours.toFixed(2)}h, Delay:${finalDelayToFinishHours.toFixed(2)}h`
     });
 
     return {
@@ -536,7 +532,7 @@ const ShiftsPage = () => {
       hasSmartOffsetting,
       offsettingType
     };
-  }, [monthlyShifts, selectedEmployee]);
+  }, [monthlyShifts, selectedEmployee, user]);
 
   const formatTime = useCallback((date: Date | undefined) => {
     if (!date) return '-';
@@ -694,16 +690,6 @@ const ShiftsPage = () => {
 
 
 
-  // Debug: Log smart offsetting status at render
-  console.log('🔍 Render Debug - Smart Offsetting Status:', {
-    hasSmartOffsetting: summary.hasSmartOffsetting,
-    offsettingType: summary.offsettingType,
-    totalOvertime: summary.totalOvertime,
-    delayToFinish: summary.delayToFinish,
-    actualOvertimeHours: summary.actualOvertimeHours,
-    rawDelayHours: summary.rawDelayHours
-  });
-
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -762,7 +748,7 @@ const ShiftsPage = () => {
             </TooltipContent>
           </Tooltip>
 
-          <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full relative">
+          <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
             <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="text-center space-y-2 sm:space-y-3">
                 <div className="flex justify-center">
@@ -770,31 +756,23 @@ const ShiftsPage = () => {
                     <TrendingUp className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.totalOvertime > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'}`} />
                   </div>
                 </div>
-                <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
-                  {t.totalOvertimeHours}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && user?.role !== 'admin' && (
-                    <span className="ml-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">✨ SMART</span>
-                  )}
-                </p>
-                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
-                  {summary.totalOvertime > 0 ? formatHoursAndMinutes(summary.totalOvertime) : '0h 0min'}
-                  {/* DEBUG: Show if smart offsetting is detected */}
-                  {user?.role !== 'admin' && (
-                    <span className="text-xs bg-yellow-200 px-1 py-0.5 rounded ml-2">
-                      DEBUG: Role={user?.role}, Smart={summary.hasSmartOffsetting ? 'YES' : 'NO'}
-                    </span>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalOvertimeHours}</p>
+                  {summary.hasSmartOffsetting && (
+                    <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">✨ SMART</span>
                   )}
                 </div>
+                <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
+                  {summary.totalOvertime > 0 ? formatHoursAndMinutes(summary.totalOvertime) : '0h 0min'}
+                </div>
                 {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && (
-                  <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                    ✨ Offset by {formatHoursAndMinutes(summary.rawDelayHours)} delay
-                  </p>
+                  <p className="text-xs text-green-600 font-medium">After covering delay</p>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full relative">
+          <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
             <CardContent className="p-3 sm:p-4 md:p-5">
               <div className="text-center space-y-2 sm:space-y-3">
                 <div className="flex justify-center">
@@ -802,24 +780,17 @@ const ShiftsPage = () => {
                     <Clock className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summary.delayToFinish > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} />
                   </div>
                 </div>
-                <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
-                  {t.delayToFinish}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && (
-                    <span className="ml-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">✨ SMART</span>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.delayToFinish}</p>
+                  {summary.hasSmartOffsetting && (
+                    <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">✨ SMART</span>
                   )}
-                </p>
+                </div>
                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {summary.delayToFinish > 0 ? formatHoursAndMinutes(summary.delayToFinish) : 'All Clear'}
                 </div>
-                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && (
-                  <p className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                    ✨ After {formatHoursAndMinutes(summary.actualOvertimeHours)} overtime offset
-                  </p>
-                )}
-                {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && summary.delayToFinish === 0 && user?.role !== 'admin' && (
-                  <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                    ✨ Covered by overtime
-                  </p>
+                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && (
+                  <p className="text-xs text-red-600 font-medium">After overtime offset</p>
                 )}
               </div>
             </CardContent>
@@ -855,44 +826,62 @@ const ShiftsPage = () => {
           </Card>
         </div>
 
-        {/* Smart Offsetting Summary - Only for Employees */}
-        {summary.hasSmartOffsetting && user?.role !== 'admin' && (
-          <Card className="border-2 border-dashed border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10">
+        {/* Smart Offsetting Summary - For All Users (Admin + Employees) */}
+        {summary.hasSmartOffsetting && (
+          <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-900/20 shadow-sm w-full">
             <CardContent className="p-4">
               <div className="text-center space-y-3">
-                <div className="flex justify-center items-center gap-2">
-                  <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-                    <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <div className="flex items-center justify-center gap-2">
+                  <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30">
+                    <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-200">✨ Smart Calculation Applied</h3>
+                  <h3 className="text-lg font-bold text-green-700 dark:text-green-300">
+                    Smart Offsetting Summary
+                    {user?.role === 'admin' && selectedEmployee !== 'all' && (
+                      <span className="text-sm font-normal text-muted-foreground ml-2">
+                        - {customerServiceEmployees.find(emp => emp.id === selectedEmployee)?.name || 'Selected Employee'}
+                      </span>
+                    )}
+                  </h3>
                 </div>
-                <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-2">
-                  <div className="bg-white/50 p-3 rounded-lg border border-emerald-200">
-                    <p className="font-semibold mb-2">Formula: Total Overtime Hours - Delay to Finish</p>
-                    <div className="text-xs space-y-1">
-                      <p><strong>Your Overtime:</strong> {formatHoursAndMinutes(summary.actualOvertimeHours)}</p>
-                      <p><strong>Your Delay:</strong> {formatHoursAndMinutes(summary.rawDelayHours)}</p>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-muted-foreground font-medium">Raw Overtime</p>
+                      <p className="font-bold text-orange-600">{formatHoursAndMinutes(summary.actualOvertimeHours)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground font-medium">Raw Delay</p>
+                      <p className="font-bold text-red-600">{formatHoursAndMinutes(summary.rawDelayHours)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground font-medium">Net Result</p>
+                      <p className="font-bold text-green-600">
+                        {summary.offsettingType === 'overtime_covers_delay' 
+                          ? `+${formatHoursAndMinutes(summary.totalOvertime)} OT` 
+                          : `${formatHoursAndMinutes(summary.delayToFinish)} Delay`
+                        }
+                      </p>
                     </div>
                   </div>
-                  {summary.offsettingType === 'overtime_covers_delay' ? (
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                      <p className="text-green-800 font-bold text-base">
-                        🎉 Overtime Covers Your Delay!
+                  
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-center text-muted-foreground">
+                      <span className="font-medium">Smart Logic:</span> {formatHoursAndMinutes(summary.actualOvertimeHours)} Overtime - {formatHoursAndMinutes(summary.rawDelayHours)} Delay = 
+                      <span className="font-bold text-green-600 ml-1">
+                        {summary.offsettingType === 'overtime_covers_delay' 
+                          ? `${formatHoursAndMinutes(summary.totalOvertime)} Net Overtime` 
+                          : `${formatHoursAndMinutes(summary.delayToFinish)} Net Delay`
+                        }
+                      </span>
+                    </p>
+                    {user?.role === 'admin' && selectedEmployee === 'all' && (
+                      <p className="text-xs text-center text-blue-600 font-medium mt-2">
+                        ℹ️ Admin Note: This shows combined totals. Select individual employees to see their smart offsetting calculations.
                       </p>
-                      <p className="text-green-700 text-sm mt-1">
-                        Net Result: {formatHoursAndMinutes(summary.totalOvertime)} overtime remaining
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                      <p className="text-orange-800 font-bold text-base">
-                        ⚠️ Delay Remains After Overtime Offset
-                      </p>
-                      <p className="text-orange-700 text-sm mt-1">
-                        Net Result: {formatHoursAndMinutes(summary.delayToFinish)} delay to finish
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1234,7 +1223,11 @@ const ShiftsPage = () => {
                         </div>
                         
                         <div className="pt-2 border-t border-border/50">
-                          <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
+                          <div className={`flex justify-between items-center rounded-lg p-2 ${
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours) === 'All Clear' 
+                              ? 'bg-gradient-to-r from-green-100/50 to-green-50/30 dark:from-green-900/20 dark:to-green-800/10' 
+                              : 'bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10'
+                          }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
                               calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours) === 'All Clear' ? 'text-green-600' : 'text-red-600'

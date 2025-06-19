@@ -6,9 +6,10 @@ import CheckOutButton from '@/components/CheckOutButton';
 import CheckInHistory from '@/components/CheckInHistory';
 import WorkShiftTimer from '@/components/WorkShiftTimer';
 import AutoCheckoutService from '@/components/AutoCheckoutService';
+import BreakTimeButton from '@/components/BreakTimeButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ArrowRightLeft, Clock, Loader2, AlertCircle, CheckCircle, LogIn, LogOut } from 'lucide-react';
+import { ArrowRightLeft, Clock, Loader2, AlertCircle, CheckCircle, LogIn, LogOut, Coffee, Timer } from 'lucide-react';
 import { checkIfDayOff } from '@/lib/performanceApi';
 
 const CheckInPage = () => {
@@ -27,6 +28,7 @@ const CheckInPage = () => {
   const [isDayOff, setIsDayOff] = useState(false);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState('en');
+  const [activeCheckInId, setActiveCheckInId] = useState<string | null>(null);
 
   useEffect(() => {
     const storedLang = localStorage.getItem('preferredLanguage');
@@ -46,7 +48,7 @@ const CheckInPage = () => {
     }
     fetchDayOffStatus();
   }, [user?.id]);
-  
+
   if (!user) return null;
   
   // Check if user is Customer Service or Designer
@@ -125,6 +127,20 @@ const CheckInPage = () => {
     currentStatus = 'not-checked-in';
   }
   
+  // Find active check-in ID for break tracking
+  useEffect(() => {
+    if (actualIsCheckedIn && !isCheckedOut && todayCheckIns.length > 0) {
+      // Get the most recent check-in that hasn't been checked out
+      const activeCheckIn = todayCheckIns
+        .filter(ci => !ci.checkOutTime && !ci.checkoutTime)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      
+      setActiveCheckInId(activeCheckIn?.id || null);
+    } else {
+      setActiveCheckInId(null);
+    }
+  }, [actualIsCheckedIn, isCheckedOut, todayCheckIns]);
+
   // Function to format time from date
   const formatTime = (date: string | Date) => {
     return format(new Date(date), 'h:mm a');
@@ -264,7 +280,21 @@ const CheckInPage = () => {
                   {!isDayOff && (
                     <>
                       {currentStatus === 'not-checked-in' && <CheckInButton />}
-                      {currentStatus === 'checked-in' && <CheckOutButton />}
+                      {currentStatus === 'checked-in' && (
+                        <div className="flex flex-col items-center gap-6">
+                          <CheckOutButton />
+                          {/* Break Time Button - Only show when checked in */}
+                          <div className="w-full flex justify-center">
+                            <BreakTimeButton 
+                              activeCheckInId={activeCheckInId}
+                              onBreakStateChange={(isOnBreak) => {
+                                // You can add additional break state handling here if needed
+                                console.log('Break state changed:', isOnBreak);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                       {currentStatus === 'workday-complete' && (
                         <div className="text-center p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
                           <div className="text-green-600 font-medium text-sm sm:text-base">
@@ -322,6 +352,50 @@ const CheckInPage = () => {
                               </div>
                             )}
                           </div>
+                          
+                          {/* Break Information */}
+                          {(checkIn as any).totalBreakMinutes > 0 && (
+                            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Coffee className="h-3 w-3 text-orange-600" />
+                                <span className="font-medium text-orange-700">
+                                  Break Time: {(checkIn as any).totalBreakMinutes} minutes
+                                </span>
+                              </div>
+                              {(checkIn as any).breakSessions && (checkIn as any).breakSessions.length > 0 && (
+                                <div className="space-y-1">
+                                  {(checkIn as any).breakSessions.map((session: any, index: number) => (
+                                    <div key={index} className="text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                                      <span className="font-medium">
+                                        {format(new Date(session.start_time), 'h:mm a')} - {format(new Date(session.end_time), 'h:mm a')} ({session.duration_minutes}m)
+                                      </span>
+                                      {session.reason && (
+                                        <div className="text-orange-500 text-xs mt-1">
+                                          Reason: {session.reason}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Current break status */}
+                          {(checkIn as any).isOnBreak && (
+                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                              <div className="flex items-center gap-2">
+                                <Timer className="h-3 w-3 text-yellow-600 animate-pulse" />
+                                <span className="font-medium text-yellow-700">Currently on break</span>
+                              </div>
+                              {(checkIn as any).currentBreakReason && (
+                                <div className="text-yellow-600 mt-1">
+                                  Reason: {(checkIn as any).currentBreakReason}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
                           {(checkIn.checkOutTime || checkIn.checkoutTime) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               Duration: {Math.round(

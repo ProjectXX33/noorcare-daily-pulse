@@ -19,7 +19,7 @@ import AdminRatingsPage from "./pages/AdminRatingsPage";
 import EmployeeTasksPage from "./pages/EmployeeTasksPage";
 import EmployeeRatingsPage from "./pages/EmployeeRatingsPage";
 import SettingsPage from "./pages/SettingsPage";
-import ShiftsPage from "./pages/ShiftsPage";
+import ShiftsPageWrapper from "./pages/ShiftsPageWrapper";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
@@ -283,7 +283,7 @@ const AppWithAuth = () => {
                           element={
                             <PrivateRoute>
                               <SidebarNavigation>
-                                <ShiftsPage />
+                                <ShiftsPageWrapper />
                               </SidebarNavigation>
                             </PrivateRoute>
                           } 

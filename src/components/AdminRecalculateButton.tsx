@@ -32,7 +32,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
     setRecalculationStats(null);
     
     try {
-      console.log('🔄 Starting delay and overtime recalculation...');
+      console.log('🔄 Starting BREAK-TIME-AWARE delay and overtime recalculation...');
       
       // Fetch all monthly shift records with their shift info
       const { data: monthlyShifts, error: fetchError } = await supabase
@@ -44,6 +44,34 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         .not('check_in_time', 'is', null)
         .not('check_out_time', 'is', null)
         .order('work_date', { ascending: false });
+
+      // Fetch break time data for all records
+      const { data: breakTimeData, error: breakTimeError } = await supabase
+        .from('check_ins')
+        .select('user_id, timestamp, total_break_minutes, break_sessions')
+        .gte('timestamp', '2024-01-01') // Get all recent data
+        .order('timestamp', { ascending: false });
+
+      if (breakTimeError) {
+        console.warn('⚠️ Could not fetch break time data:', breakTimeError);
+      }
+
+      // Create a map of break time data by user and date
+      const breakTimeMap = new Map();
+      if (breakTimeData) {
+        breakTimeData.forEach(item => {
+          const dateKey = format(new Date(item.timestamp), 'yyyy-MM-dd');
+          const key = `${item.user_id}-${dateKey}`;
+          if (!breakTimeMap.has(key) || (breakTimeMap.get(key).totalBreakMinutes || 0) < (item.total_break_minutes || 0)) {
+            breakTimeMap.set(key, {
+              totalBreakMinutes: item.total_break_minutes || 0,
+              breakSessions: item.break_sessions || []
+            });
+          }
+        });
+      }
+
+      console.log(`📊 Found ${monthlyShifts.length} records to recalculate with break time data`);
 
       if (fetchError) {
         throw fetchError;
@@ -72,6 +100,12 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             continue;
           }
 
+          // Get break time data for this record
+          const dateKey = format(new Date(record.work_date), 'yyyy-MM-dd');
+          const breakKey = `${record.user_id}-${dateKey}`;
+          const breakData = breakTimeMap.get(breakKey) || { totalBreakMinutes: 0, breakSessions: [] };
+          const breakTimeMinutes = breakData.totalBreakMinutes;
+
           // Calculate work hours and overtime (only if checked out)
           let regularHours = record.regular_hours || 0;
           let overtimeHours = record.overtime_hours || 0;
@@ -79,7 +113,20 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
           let earlyCheckoutPenalty = 0;
 
           if (checkOutTime) {
-            const totalHours = differenceInMinutes(checkOutTime, checkInTime) / 60;
+            // NEW BREAK-TIME-AWARE CALCULATION
+            const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
+            const totalHours = totalMinutes / 60;
+            
+            // Subtract break time to get actual work time
+            const breakHours = breakTimeMinutes / 60;
+            const actualWorkHours = Math.max(0, totalHours - breakHours);
+            
+            console.log(`🕐 Break-Time-Aware Hours Calculation:`, {
+              totalHours: totalHours.toFixed(2),
+              breakHours: breakHours.toFixed(2),
+              actualWorkHours: actualWorkHours.toFixed(2),
+              breakTimeMinutes: breakTimeMinutes
+            });
             
             // Determine standard work hours based on shift type
             let standardWorkHours = 8; // Default to night shift
@@ -87,69 +134,44 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
               standardWorkHours = 7; // Day shift is 7 hours
             }
 
-            // Calculate regular and overtime hours
-            regularHours = Math.min(totalHours, standardWorkHours);
-            overtimeHours = Math.max(0, totalHours - standardWorkHours);
+            // Calculate regular and overtime hours using ACTUAL WORK TIME (excluding breaks)
+            regularHours = Math.min(actualWorkHours, standardWorkHours);
+            overtimeHours = Math.max(0, actualWorkHours - standardWorkHours);
             
-            // NEW LOGIC: Smart Delay Calculation Based on Work Completion
-            // If worked less than expected: Delay = Expected Hours - Worked Hours
-            // If worked full/overtime: Delay = Raw Delay - Overtime Hours
-            
+            // Calculate delay: Check-in delay + Break time
             const [startHour, startMin] = shift.start_time.split(':').map(Number);
             const scheduledStart = new Date(checkInTime);
             scheduledStart.setHours(startHour, startMin, 0, 0);
             const rawDelayMs = checkInTime.getTime() - scheduledStart.getTime();
-            const rawDelayHours = Math.max(0, rawDelayMs / (1000 * 60 * 60));
+            const checkInDelayMinutes = Math.max(0, rawDelayMs / (1000 * 60));
             
-            // Convert to minutes and get total worked hours
-            const rawDelayMinutes = rawDelayHours * 60;
-            const totalWorkedHours = regularHours + overtimeHours;
+            // NEW FORMULA: Check-in Delay + Break Time = Total Delay to Finish
+            delayMinutes = checkInDelayMinutes + breakTimeMinutes;
             
-            if (totalWorkedHours < standardWorkHours) {
-              // Early checkout: Show missing hours as delay
-              const hoursShort = standardWorkHours - totalWorkedHours;
-              delayMinutes = hoursShort * 60; // Convert to minutes
-              
-              console.log(`⚠️ ${shift.name} - Early Checkout (Hours Short as Delay):`, {
-                expectedHours: standardWorkHours,
-                workedHours: totalWorkedHours.toFixed(2),
-                hoursShort: hoursShort.toFixed(2),
-                delayMinutes: delayMinutes.toFixed(1)
-              });
-            } else if (totalWorkedHours >= standardWorkHours) {
-              // Completed expected hours or more: No delay penalty
-              delayMinutes = 0;
-              
-              console.log(`✅ ${shift.name} - Full Shift Completed (No Delay Penalty):`, {
-                expectedHours: standardWorkHours,
-                workedHours: totalWorkedHours.toFixed(2),
-                rawDelayMinutes: rawDelayMinutes.toFixed(1),
-                finalDelay: 0
-              });
-            } else {
-              // Overtime work: Apply offset formula
-              const overtimeOffset = overtimeHours * 60; // Convert to minutes
-              delayMinutes = Math.max(0, rawDelayMinutes - overtimeOffset);
-              
-              console.log(`✅ ${shift.name} - Overtime Work (Delay with Overtime Offset):`, {
-                rawDelayMinutes: rawDelayMinutes.toFixed(1),
-                overtimeOffset: overtimeOffset.toFixed(1),
-                finalDelay: delayMinutes.toFixed(1)
-              });
-            }
+            console.log(`🧮 ${shift.name} - NEW Break-Time-Aware Formula:`, {
+              actualWorkHours: actualWorkHours.toFixed(2),
+              regularHours: regularHours.toFixed(2),
+              overtimeHours: overtimeHours.toFixed(2),
+              checkInDelayMinutes: checkInDelayMinutes.toFixed(1),
+              breakTimeMinutes: breakTimeMinutes.toFixed(1),
+              totalDelayMinutes: delayMinutes.toFixed(1),
+              formula: `${checkInDelayMinutes.toFixed(1)}min (check-in delay) + ${breakTimeMinutes.toFixed(1)}min (break time) = ${delayMinutes.toFixed(1)}min total delay`
+            });
             
-            // Track early checkout penalty
-            if (totalHours < standardWorkHours) {
-              earlyCheckoutPenalty = standardWorkHours - totalHours;
+            // Track early checkout penalty (based on actual work hours)
+            if (actualWorkHours < standardWorkHours) {
+              earlyCheckoutPenalty = standardWorkHours - actualWorkHours;
             } else {
               earlyCheckoutPenalty = 0;
             }
             
-            console.log(`✅ ${shift.name} - Smart Delay Calculation Complete:`, {
-              finalDelayMinutes: delayMinutes.toFixed(1),
+            console.log(`✅ ${shift.name} - Break-Time-Aware Calculation Complete:`, {
+              totalDelayMinutes: delayMinutes.toFixed(1),
+              actualWorkHours: actualWorkHours.toFixed(2),
               regularHours: regularHours.toFixed(2),
               overtimeHours: overtimeHours.toFixed(2),
-              delayToFinishHours: (delayMinutes / 60).toFixed(2) + 'h'
+              earlyCheckoutPenalty: earlyCheckoutPenalty.toFixed(2),
+              result: delayMinutes > 0 ? `${(delayMinutes / 60).toFixed(2)}h delay` : 'All Clear'
             });
 
             // Ensure non-negative values
@@ -363,7 +385,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-orange-700">
             <AlertTriangle className="h-4 w-4" />
-            <span>Use this to fix incorrect delay hours and overtime calculations</span>
+            <span>Use this to recalculate with BREAK-TIME-AWARE logic - Work hours exclude break time, Regular hours freeze during breaks</span>
           </div>
           
           <Button
@@ -374,12 +396,12 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             {isRecalculating ? (
               <>
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Recalculating...
+                Break-Time-Aware Recalculating...
               </>
             ) : (
               <>
                 <Calculator className="h-4 w-4 mr-2" />
-                Fix Delay & Overtime
+                Fix Delay & Overtime (Break-Time-Aware)
               </>
             )}
           </Button>
@@ -411,16 +433,16 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         </div>
 
         <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded border">
-          <div className="font-semibold mb-1">What this recalculates:</div>
+          <div className="font-semibold mb-1">🔥 NEW: Break-Time-Aware Calculation:</div>
           <ul className="space-y-1 text-orange-700">
-            <li>• <strong>Delay Minutes:</strong> How late employees were for their shifts</li>
-            <li>• <strong>Regular Hours:</strong> Normal work hours within shift limits</li>
-            <li>• <strong>Overtime Hours:</strong> Extra work using flexible rules (Day: before 9AM/after 4PM, Night: after 8h)</li>
-            <li>• <strong>✨ Delay to Finish:</strong> Smart calculation - 0 if worked full hours (7h day/8h night)</li>
-            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with new automatic logic</li>
+            <li>• <strong>🕐 Work Hours:</strong> Total time MINUS break time (work time freezes during breaks)</li>
+            <li>• <strong>⏰ Regular Hours:</strong> Calculated from actual work time (excluding breaks)</li>
+            <li>• <strong>🔥 Overtime Hours:</strong> Based on actual work time beyond standard hours</li>
+            <li>• <strong>📝 Delay to Finish:</strong> Check-in delay + Break time</li>
+            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with break-aware logic</li>
           </ul>
-          <div className="mt-2 p-1 bg-blue-50 rounded text-blue-700 text-xs">
-            <strong>💡 Smart Logic:</strong> Employees who work their full expected hours get 0 delay automatically, regardless of arrival time
+          <div className="mt-2 p-1 bg-emerald-50 rounded text-emerald-700 text-xs">
+            <strong>✨ Break Time Freezing:</strong> When employees take breaks, their regular work hours counter freezes - only actual working time counts!
           </div>
         </div>
       </CardContent>
