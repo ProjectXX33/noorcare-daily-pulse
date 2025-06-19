@@ -60,50 +60,30 @@ export async function verifyAndFixMonthlyShifts() {
       let correctRegularHours, correctOvertimeHours;
       
       if (shift.name.toLowerCase().includes('day')) {
-        // Day shift: flexible overtime calculation
-        const checkInHour = checkInTime.getHours();
-        const checkOutHour = checkOutTime.getHours();
+        // Day shift: COUNTER-BASED overtime calculation
+        // Overtime starts ONLY after completing required 7 hours
         
-        let overtimeHours = 0;
-        
-        // Early morning overtime (before 9AM)
-        if (checkInHour < 9) {
-          const earlyStart = new Date(checkInTime);
-          earlyStart.setHours(9, 0, 0, 0);
-          if (checkInTime < earlyStart) {
-            const earlyMinutes = (earlyStart.getTime() - checkInTime.getTime()) / (1000 * 60);
-            overtimeHours += earlyMinutes / 60;
-          }
-        }
-        
-        // Evening overtime (after 4PM)
-        if (checkOutHour >= 16) {
-          const regularEnd = new Date(checkOutTime);
-          regularEnd.setHours(16, 0, 0, 0);
-          if (checkOutTime > regularEnd) {
-            const lateMinutes = (checkOutTime.getTime() - regularEnd.getTime()) / (1000 * 60);
-            overtimeHours += lateMinutes / 60;
-          }
-        }
-        
-        correctRegularHours = Math.min(totalHours - overtimeHours, standardWorkHours);
-        correctOvertimeHours = overtimeHours;
-      } else {
-        // Night shift: standard calculation with midnight overtime
-        const midnightToday = new Date(checkInTime);
-        midnightToday.setHours(24, 0, 0, 0);
-        
-        const fourAM = new Date(checkInTime);
-        fourAM.setDate(fourAM.getDate() + 1);
-        fourAM.setHours(4, 0, 0, 0);
-        
-        if (checkOutTime >= midnightToday && checkOutTime <= fourAM) {
-          const lateNightMinutes = (checkOutTime.getTime() - midnightToday.getTime()) / (1000 * 60);
-          correctOvertimeHours = lateNightMinutes / 60;
-          correctRegularHours = totalHours - correctOvertimeHours;
+        if (totalHours <= standardWorkHours) {
+          // Still within required shift hours - NO overtime yet
+          correctRegularHours = totalHours;
+          correctOvertimeHours = 0;
         } else {
-          correctRegularHours = Math.min(totalHours, standardWorkHours);
-          correctOvertimeHours = Math.max(0, totalHours - standardWorkHours);
+          // Completed required hours - NOW overtime starts
+          correctRegularHours = standardWorkHours; // 7 hours regular (completed)
+          correctOvertimeHours = totalHours - standardWorkHours; // Additional time = overtime
+        }
+      } else if (shift.name.toLowerCase().includes('night')) {
+        // Night shift: NEW LOGIC - Work day ends at 4AM (not midnight)
+        // Standard night shift calculation based on total hours worked
+        
+        if (totalHours <= standardWorkHours) {
+          // Within standard 8 hours - all regular time
+          correctRegularHours = totalHours;
+          correctOvertimeHours = 0;
+        } else {
+          // Beyond 8 hours - split into regular and overtime
+          correctRegularHours = standardWorkHours; // 8 hours regular
+          correctOvertimeHours = totalHours - standardWorkHours; // Rest is overtime
         }
       }
 

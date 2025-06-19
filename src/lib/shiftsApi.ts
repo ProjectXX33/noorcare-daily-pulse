@@ -189,55 +189,56 @@ export function calculateWorkHours(
   let regularHours = totalHours;
   
   if (shift.name.toLowerCase().includes('day')) {
-    // Day shift overtime calculation
-    const checkInHour = checkInTime.getHours();
-    const checkOutHour = checkOutTime.getHours();
+    // Day shift overtime calculation - COUNTER-BASED
+    // Overtime starts ONLY after completing required 7 hours
+    const standardWorkHours = 7; // Day shift = 7 hours
     
-    // Early morning overtime (before 9AM)
-    if (checkInHour < 9) {
-      const earlyStart = new Date(checkInTime);
-      earlyStart.setHours(9, 0, 0, 0);
-      
-      if (checkInTime < earlyStart) {
-        const earlyMinutes = differenceInMinutes(earlyStart, checkInTime);
-        overtimeHours += earlyMinutes / 60;
-      }
+    if (totalHours <= standardWorkHours) {
+      // Still within required shift hours - NO overtime yet
+      regularHours = totalHours;
+      overtimeHours = 0;
+    } else {
+      // Completed required hours - NOW overtime starts
+      regularHours = standardWorkHours; // 7 hours regular (completed)
+      overtimeHours = totalHours - standardWorkHours; // Additional time = overtime
     }
     
-    // Evening overtime (after 4PM)
-    if (checkOutHour >= 16) {
-      const regularEnd = new Date(checkOutTime);
-      regularEnd.setHours(16, 0, 0, 0);
-      
-      if (checkOutTime > regularEnd) {
-        const lateMinutes = differenceInMinutes(checkOutTime, regularEnd);
-        overtimeHours += lateMinutes / 60;
-      }
-    }
-    
-    // Regular hours = total - overtime, but minimum of standard hours
-    regularHours = Math.min(totalHours - overtimeHours, standardWorkHours);
-    
+    console.log('☀️ Day shift calculation (Counter-based overtime):', {
+      checkInTime: checkInTime.toISOString(),
+      checkOutTime: checkOutTime.toISOString(),
+      totalHours: totalHours.toFixed(2),
+      requiredHours: standardWorkHours,
+      regularHours: regularHours.toFixed(2),
+      overtimeHours: overtimeHours.toFixed(2),
+      logic: 'Overtime starts ONLY after completing ' + standardWorkHours + ' required hours'
+    });
   } else if (shift.name.toLowerCase().includes('night')) {
     // Night shift overtime calculation
-    // Check if work extends between 12AM-4AM
-    const midnightToday = new Date(checkInTime);
-    midnightToday.setHours(24, 0, 0, 0); // Next day midnight
+    // NEW LOGIC: Overtime starts ONLY after completing required shift hours
+    // Work day ends at 4AM with auto-checkout
     
-    const fourAM = new Date(checkInTime);
-    fourAM.setDate(fourAM.getDate() + 1);
-    fourAM.setHours(4, 0, 0, 0); // Next day 4AM
+    const standardWorkHours = 8; // Night shift = 8 hours
     
-    // If checkout time is between midnight and 4AM, it's overtime
-    if (checkOutTime >= midnightToday && checkOutTime <= fourAM) {
-      const lateNightMinutes = differenceInMinutes(checkOutTime, midnightToday);
-      overtimeHours = lateNightMinutes / 60;
-      regularHours = totalHours - overtimeHours;
+    if (totalHours <= standardWorkHours) {
+      // Still within required shift hours - NO overtime yet
+      regularHours = totalHours;
+      overtimeHours = 0;
     } else {
-      // Standard calculation if no late night work
-      regularHours = Math.min(totalHours, standardWorkHours);
-      overtimeHours = Math.max(0, totalHours - standardWorkHours);
+      // Completed required hours - NOW overtime starts
+      regularHours = standardWorkHours; // 8 hours regular (completed)
+      overtimeHours = totalHours - standardWorkHours; // Additional time = overtime
     }
+    
+    console.log('🌙 Night shift calculation (Counter-based overtime):', {
+      checkInTime: checkInTime.toISOString(),
+      checkOutTime: checkOutTime.toISOString(),
+      totalHours: totalHours.toFixed(2),
+      requiredHours: standardWorkHours,
+      regularHours: regularHours.toFixed(2),
+      overtimeHours: overtimeHours.toFixed(2),
+      logic: 'Overtime starts ONLY after completing ' + standardWorkHours + ' required hours',
+      workDayEnds: '4AM (auto-checkout if not checked out)'
+    });
   } else {
     // Default calculation for other shifts
     regularHours = Math.min(totalHours, standardWorkHours);

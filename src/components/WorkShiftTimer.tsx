@@ -331,16 +331,6 @@ const WorkShiftTimer: React.FC = () => {
     const updateTimer = () => {
       const now = new Date();
       
-      // Check if it's 4AM (auto-checkout time)
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      
-      if (currentHour === 4 && currentMinute === 0 && activeCheckIn) {
-        // Auto checkout at 4AM
-        handleAutoCheckout();
-        return;
-      }
-      
       // Regular timer for active check-ins only
       if (activeCheckIn) {
         // Regular check-in tracking
@@ -413,38 +403,65 @@ const WorkShiftTimer: React.FC = () => {
           shiftEndTime = new Date(checkInTime);
           shiftEndTime.setHours(16, 0, 0, 0); // 4PM
         } else {
-          // Night shift: 4PM to 12AM (midnight)
+          // Night shift: 4PM to 4AM (next day) - NEW LOGIC: ends at 4AM
           shiftEndTime = new Date(checkInTime);
           
           if (checkInHour >= 15) {
             // Checked in during afternoon/evening (3:30PM+)
-            // Shift ends at midnight (start of next day)
+            // Shift ends at 4AM next day (not midnight)
             shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-            shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+            shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day
           } else if (checkInHour < 4) {
-            // Checked in during early morning (12AM-3:59AM) - overtime period
-            // Shift already ended at midnight, so they're in overtime
-            shiftEndTime.setHours(0, 0, 0, 0); // Midnight of current day
+            // Checked in during early morning (12AM-3:59AM) - still in previous day's shift
+            // Shift ends at 4AM current day
+            shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day
           } else {
             // Checked in during morning (4AM-2:59PM) but classified as night shift
-            // This is unusual, default to next midnight
+            // This would be unusual, default to next 4AM
             shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-            shiftEndTime.setHours(0, 0, 0, 0);
+            shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day
           }
         }
         
-        // Check if in overtime (current time is after shift end time AND worked minimum hours)
+        // NEW OVERTIME LOGIC: Overtime starts ONLY after completing required shift hours
+        // Not based on time-of-day, but on hours worked (counter-based)
         const minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day shift: 7 hours, Night shift: 8 hours
         const hoursWorked = actualWorkSeconds / 3600; // Convert actual work seconds (excluding breaks) to hours
         
-        if (now > shiftEndTime && hoursWorked >= minimumHoursForOvertime) {
+        // Check if overtime should start (based on hours worked, not time-of-day)
+        if (hoursWorked >= minimumHoursForOvertime) {
+          // Completed required shift hours - NOW overtime starts
           setIsOvertime(true);
-          const overtimeMs = now.getTime() - shiftEndTime.getTime();
-          const overtimeMinutesCalc = Math.floor(overtimeMs / (1000 * 60));
+          const overtimeSeconds = actualWorkSeconds - (minimumHoursForOvertime * 3600);
+          const overtimeMinutesCalc = Math.floor(overtimeSeconds / 60);
           setOvertimeMinutes(overtimeMinutesCalc);
+          
+          console.log('🔥 OVERTIME ACTIVATED (Counter-based):', {
+            shiftType,
+            minimumHoursRequired: minimumHoursForOvertime,
+            hoursWorked: hoursWorked.toFixed(2),
+            overtimeHours: (overtimeSeconds / 3600).toFixed(2),
+            logic: 'Overtime starts after completing ' + minimumHoursForOvertime + ' hours'
+          });
         } else {
+          // Still working on required hours - no overtime yet
           setIsOvertime(false);
           setOvertimeMinutes(0);
+          
+          console.log('⏱️ REGULAR TIME (Counter-based):', {
+            shiftType,
+            minimumHoursRequired: minimumHoursForOvertime,
+            hoursWorked: hoursWorked.toFixed(2),
+            remainingHours: (minimumHoursForOvertime - hoursWorked).toFixed(2),
+            logic: 'Need to complete ' + minimumHoursForOvertime + ' hours before overtime'
+          });
+        }
+        
+        // Auto-checkout at 4AM regardless of hours worked
+        if (now.getHours() === 4 && now.getMinutes() === 0) {
+          console.log('🕐 4AM AUTO-CHECKOUT triggered');
+          handleAutoCheckout();
+          return;
         }
       } else {
         // No active session
@@ -654,9 +671,9 @@ const WorkShiftTimer: React.FC = () => {
       currentShiftType = 'night';
       if (sessionStartHour >= 15) {
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day (not midnight)
       } else {
-        shiftEndTime.setHours(0, 0, 0, 0); // Midnight current day
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day (not midnight)
       }
     }
   } else {
@@ -668,9 +685,9 @@ const WorkShiftTimer: React.FC = () => {
       currentShiftType = 'night';
       if (sessionStartHour >= 15) {
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        shiftEndTime.setHours(0, 0, 0, 0); // Midnight next day
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day (not midnight)
       } else {
-        shiftEndTime.setHours(0, 0, 0, 0); // Midnight current day
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day (not midnight)
       }
     }
   }
