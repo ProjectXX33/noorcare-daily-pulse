@@ -268,6 +268,21 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     }
   }, [user, currentMonth]);
 
+  // 🤖 Automatic performance calculation DISABLED
+  // useEffect(() => {
+  //   const autoCalculate = async () => {
+  //     // Wait for data to load, then auto-calculate
+  //     if (!isRecalculating && !isLoading && employees.length > 0 && user?.role === 'admin') {
+  //       console.log('🤖 Auto-calculating performance for all employees...');
+  //       setTimeout(async () => {
+  //         await recalculateForAll();
+  //       }, 1500); // 1.5 second delay to ensure data is fully loaded
+  //     }
+  //   };
+
+  //   autoCalculate();
+  // }, [employees.length, isLoading]); // Trigger when employees data changes and loading completes
+
   const fetchEmployeeData = async () => {
     try {
     setIsLoading(true);
@@ -708,11 +723,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       console.log('🔧 Starting complete performance recalculation for ALL employees...');
       toast.info('📊 Recalculating performance for all employees...');
       
-      // Get all employees
+      // Get all employees - try broader query first
+      console.log('🔍 Fetching employees...');
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('*')
         .eq('role', 'employee');
+
+      console.log('📋 Users query result:', { users, usersError });
 
       if (usersError) {
         console.error('Error fetching users:', usersError);
@@ -721,65 +739,402 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       }
 
       if (!users || users.length === 0) {
-        toast.info('No users found');
+        // Try without role filter to see if there are any users at all
+        const { data: allUsers, error: allUsersError } = await supabase
+          .from('users')
+          .select('id, name, role, position');
+        
+        console.log('📋 All users in database:', { allUsers, allUsersError });
+        toast.info(`No employees found. Total users in database: ${allUsers?.length || 0}`);
         return;
       }
 
-      console.log(`👥 Found ${users.length} employees to recalculate`);
+      console.log(`👥 Found ${users.length} employees to recalculate:`, users.map(u => ({ name: u.name, position: u.position })));
 
       let processedCount = 0;
       let updatedCount = 0;
+      let skippedEmployees = [];
       const monthYear = format(new Date(), 'yyyy-MM');
 
-      // Process each user with enhanced performance calculation
+      // Process each user with enhanced performance calculation including rating bonuses
       for (const userRecord of users) {
         try {
           processedCount++;
           console.log(`\n🔄 [${processedCount}/${users.length}] Processing: ${userRecord.name} (${userRecord.position})`);
 
-          // Use the enhanced calculateUserPerformanceFromTasksAndReports function
-          const performanceData = await calculateUserPerformanceFromTasksAndReports(userRecord, monthYear);
+          // Get user's monthly shifts for this month using proper date filtering
+          const startOfMonth = `${monthYear}-01`;
+          // Calculate the actual last day of the month (handles 28/29/30/31 days correctly)
+          const year = parseInt(monthYear.split('-')[0]);
+          const month = parseInt(monthYear.split('-')[1]);
+          const lastDayOfMonth = new Date(year, month, 0).getDate(); // new Date(year, month, 0) gives last day of previous month
+          const endOfMonth = `${monthYear}-${lastDayOfMonth.toString().padStart(2, '0')}`;
           
-          if (performanceData) {
-            // FORCE UPDATE: Delete any existing record and create a new one
-            // This ensures manual edits are completely overridden
-            await supabase
-              .from('admin_performance_dashboard')
-              .delete()
-              .eq('employee_id', userRecord.id)
-              .eq('month_year', monthYear);
+          console.log(`📅 Date range for ${userRecord.name}: ${startOfMonth} to ${endOfMonth}`);
+          
+          const { data: monthlyShifts, error: shiftsError } = await supabase
+            .from('monthly_shifts')
+            .select(`
+              *,
+              shifts:shift_id(name, start_time, end_time)
+            `)
+            .eq('user_id', userRecord.id)
+            .gte('work_date', startOfMonth)
+            .lte('work_date', endOfMonth);
 
-            // Create new record with calculated data
-            const { error: insertError } = await supabase
-              .from('admin_performance_dashboard')
-              .insert({
+          if (shiftsError) {
+            console.error(`❌ Error fetching shifts for ${userRecord.name}:`, shiftsError);
+            continue;
+          }
+
+          console.log(`📊 Found ${monthlyShifts?.length || 0} shifts for ${userRecord.name}`);
+
+          // Handle employees with no shifts (remote workers, etc.)
+          if (!monthlyShifts || monthlyShifts.length === 0) {
+            console.log(`⚠️ No shifts found for ${userRecord.name} - treating as remote worker`);
+            
+            // Calculate performance for remote workers based on tasks and reports
+            const performanceData = await calculateUserPerformanceFromTasksAndReports(userRecord, monthYear);
+            
+            if (performanceData) {
+              // Prepare record data for remote workers
+              const recordData = {
                 employee_id: userRecord.id,
                 employee_name: userRecord.name,
                 month_year: monthYear,
-                ...performanceData,
+                total_working_days: performanceData.total_working_days,
+                total_delay_minutes: performanceData.total_delay_minutes,
+                total_delay_hours: performanceData.total_delay_hours,
+                total_overtime_hours: performanceData.total_overtime_hours,
+                average_performance_score: performanceData.average_performance_score,
+                punctuality_percentage: performanceData.punctuality_percentage,
+                performance_status: performanceData.performance_status,
+                // Rating data (will be null for remote workers without ratings)
+                employee_rating_avg: null,
+                task_rating_avg: null,
+                rating_bonus_points: 0,
+                total_ratings_count: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
-              });
+              };
 
-            if (!insertError) {
-              console.log(`✅ Recalculated ${userRecord.name}: ${performanceData.average_performance_score}% (${performanceData.performance_status})`);
-              updatedCount++;
-          } else {
-              console.error(`❌ Failed to create ${userRecord.name}:`, insertError);
+              // Delete existing record and insert new one
+              await supabase
+                .from('admin_performance_dashboard')
+                .delete()
+                .eq('employee_id', userRecord.id)
+                .eq('month_year', monthYear);
+
+              const { error: insertError } = await supabase
+                .from('admin_performance_dashboard')
+                .insert(recordData);
+
+              if (!insertError) {
+                console.log(`✅ Processed remote worker ${userRecord.name}`);
+                updatedCount++;
+              } else {
+                console.error(`❌ Failed to process remote worker ${userRecord.name}:`, insertError);
+                skippedEmployees.push({
+                  name: userRecord.name,
+                  position: userRecord.position,
+                  reason: `Remote worker processing failed: ${insertError.message}`,
+                  error: insertError
+                });
+              }
             }
+            continue;
+          }
+
+          // Calculate performance metrics with JUSTICE & FAIRNESS
+          const totalWorkingDays = monthlyShifts.length;
+          const totalDelayMinutes = Math.round(monthlyShifts.reduce((sum, shift) => sum + (shift.delay_minutes || 0), 0));
+          const totalDelayHours = totalDelayMinutes / 60;
+          const totalOvertimeHours = Math.round(monthlyShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0) * 100) / 100;
+          const totalRegularHours = Math.round(monthlyShifts.reduce((sum, shift) => sum + (shift.regular_hours || 0), 0) * 100) / 100;
+          const totalBreakMinutes = Math.round(monthlyShifts.reduce((sum, shift) => sum + (shift.total_break_minutes || 0), 0));
+
+          // 🌟 GET RATING DATA FOR BONUS/PENALTY CALCULATION
+          // Calculate proper date range for the month
+          const monthDate = new Date(monthYear + '-01');
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0); // Last day of month
+          
+          const [employeeRatings, employeeTasks] = await Promise.all([
+            // Get employee ratings for this month
+            supabase
+              .from('employee_ratings')
+              .select('rating, rated_at')
+              .eq('employee_id', userRecord.id)
+              .gte('rated_at', monthStart.toISOString().split('T')[0])
+              .lte('rated_at', monthEnd.toISOString().split('T')[0]),
+            
+            // Get user's tasks and their ratings for this month
+            supabase
+              .from('tasks')
+              .select(`
+                id,
+                task_ratings(rating, rated_at)
+              `)
+              .eq('assigned_to', userRecord.id)
+              .gte('created_at', monthStart.toISOString().split('T')[0])
+              .lte('created_at', monthEnd.toISOString().split('T')[0])
+          ]);
+
+          // Calculate Rating Bonus/Penalty
+          let ratingBonus = 0;
+          let employeeRatingAvg = 0;
+          let taskRatingAvg = 0;
+          let totalRatingsCount = 0;
+
+          // Process Employee Ratings
+          if (employeeRatings.data && employeeRatings.data.length > 0) {
+            const ratings = employeeRatings.data.map(r => r.rating);
+            employeeRatingAvg = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+            totalRatingsCount += ratings.length;
+          }
+
+          // Process Task Ratings
+          if (employeeTasks.data && employeeTasks.data.length > 0) {
+            const taskRatings = employeeTasks.data
+              .flatMap(task => task.task_ratings || [])
+              .map(tr => tr.rating);
+            
+            if (taskRatings.length > 0) {
+              taskRatingAvg = taskRatings.reduce((sum, rating) => sum + rating, 0) / taskRatings.length;
+              totalRatingsCount += taskRatings.length;
+            }
+          }
+
+          // 🎯 RATING BONUS SYSTEM
+          if (totalRatingsCount > 0) {
+            // Calculate overall rating average correctly
+            let overallRatingAvg = 0;
+            let ratingCount = 0;
+            
+            if (employeeRatingAvg > 0) {
+              overallRatingAvg += employeeRatingAvg;
+              ratingCount++;
+            }
+            
+            if (taskRatingAvg > 0) {
+              overallRatingAvg += taskRatingAvg;
+              ratingCount++;
+            }
+            
+            if (ratingCount > 0) {
+              overallRatingAvg = overallRatingAvg / ratingCount;
+            }
+
+            if (overallRatingAvg >= 5.0) {
+              ratingBonus = 15; // 🌟 5-star bonus: +15 points
+            } else if (overallRatingAvg >= 4.5) {
+              ratingBonus = 10; // ⭐ 4.5+ bonus: +10 points
+            } else if (overallRatingAvg >= 4.0) {
+              ratingBonus = 5;  // 👍 4+ bonus: +5 points
+            } else if (overallRatingAvg >= 3.0) {
+              ratingBonus = 0;  // 😐 3+ neutral: no change
+            } else if (overallRatingAvg >= 2.0) {
+              ratingBonus = -5; // 😕 2+ penalty: -5 points
+            } else {
+              ratingBonus = -10; // 😞 <2 penalty: -10 points
+            }
+
+            console.log(`⭐ Rating analysis for ${userRecord.name}:`, {
+              employeeRatingAvg: employeeRatingAvg.toFixed(1),
+              taskRatingAvg: taskRatingAvg.toFixed(1),
+              overallRatingAvg: overallRatingAvg.toFixed(1),
+              ratingBonus,
+              totalRatingsCount
+            });
+          }
+
+          // JUSTICE CALCULATION: Fair performance based on multiple factors
+          let totalPerformanceScore = 0;
+          let validShifts = 0;
+
+          for (const shift of monthlyShifts) {
+            if (shift.shifts) {
+              // Get expected hours for this shift type
+              let expectedHours;
+              if (shift.shifts.name.toLowerCase().includes('day')) {
+                expectedHours = 7; // Day shift
+              } else if (shift.shifts.name.toLowerCase().includes('night')) {
+                expectedHours = 8; // Night shift
+              } else {
+                // Custom shift - calculate from start/end times
+                try {
+                  const [startHour, startMin] = shift.shifts.start_time.split(':').map(Number);
+                  const [endHour, endMin] = shift.shifts.end_time.split(':').map(Number);
+                  
+                  let durationMinutes;
+                  if (endHour < startHour || (endHour === startHour && endMin < startMin)) {
+                    durationMinutes = (24 * 60 - (startHour * 60 + startMin)) + (endHour * 60 + endMin);
+                  } else {
+                    durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+                  }
+                  
+                  expectedHours = durationMinutes / 60;
+                } catch (e) {
+                  expectedHours = 8; // Fallback
+                }
+              }
+
+              // Calculate performance for this shift
+              const actualHours = (shift.regular_hours || 0) + (shift.overtime_hours || 0);
+              const shiftDelayMinutes = shift.delay_minutes || 0;
+              const shiftBreakMinutes = shift.total_break_minutes || 0;
+              
+              // 1. Work Completion Score (40%)
+              const workCompletionScore = actualHours >= expectedHours ? 100 : 
+                                        Math.max(0, (actualHours / expectedHours) * 100);
+              
+              // 2. Punctuality Score (30%)
+              const punctualityScore = shiftDelayMinutes === 0 ? 100 :
+                                     shiftDelayMinutes > 60 ? 0 :
+                                     Math.max(0, 100 - (shiftDelayMinutes * 2));
+              
+              // 3. Break Efficiency Score (20%)
+              const expectedBreakMinutes = expectedHours * 8; // 8 min break per hour
+              const breakEfficiencyScore = shiftBreakMinutes <= expectedBreakMinutes ? 100 :
+                                        Math.max(0, 100 - ((shiftBreakMinutes - expectedBreakMinutes) / 5));
+              
+              // 4. Rating Bonus (10%) - NEW FEATURE  
+              const shiftRatingBonus = ratingBonus * 0.1; // Apply rating bonus per shift
+              
+              // Calculate weighted final score with rating bonus (NO overtime bonus)
+              let performanceScore = (workCompletionScore * 0.4) + 
+                                   (punctualityScore * 0.3) + 
+                                   (breakEfficiencyScore * 0.2) + 
+                                   (10) + // Base completion bonus
+                                   shiftRatingBonus;
+              
+              totalPerformanceScore += performanceScore;
+              validShifts++;
+            }
+          }
+
+          // Calculate final metrics
+          const averagePerformanceScore = validShifts > 0 ? totalPerformanceScore / validShifts : 75;
+          const punctualityPercentage = totalDelayHours >= 1 ? 0 : 
+                                      totalDelayMinutes > 30 ? Math.max(0, 50 - (totalDelayMinutes * 2)) :
+                                      totalDelayMinutes > 0 ? Math.max(0, 90 - (totalDelayMinutes * 3)) : 100;
+
+          // Determine performance status
+          let performanceStatus = 'Poor';
+          if (averagePerformanceScore >= 85 && punctualityPercentage >= 85) {
+            performanceStatus = 'Excellent';
+          } else if (averagePerformanceScore >= 70 && punctualityPercentage >= 70) {
+            performanceStatus = 'Good';
+          } else if (averagePerformanceScore >= 50 || punctualityPercentage >= 50) {
+            performanceStatus = 'Needs Improvement';
+          }
+
+          console.log(`📊 Final metrics for ${userRecord.name}:`, {
+            totalWorkingDays,
+            totalDelayMinutes,
+            totalDelayHours,
+            totalOvertimeHours,
+            totalRegularHours,
+            averagePerformanceScore: averagePerformanceScore.toFixed(1),
+            punctualityPercentage: punctualityPercentage.toFixed(1),
+            performanceStatus,
+            validShifts,
+            ratingBonus
+          });
+
+          // FORCE UPDATE: Delete any existing record and create a new one
+          // This ensures manual edits are completely overridden
+          const { error: deleteError } = await supabase
+            .from('admin_performance_dashboard')
+            .delete()
+            .eq('employee_id', userRecord.id)
+            .eq('month_year', monthYear);
+
+          if (deleteError) {
+            console.warn(`⚠️ Could not delete existing record for ${userRecord.name}:`, deleteError);
+          }
+
+          // Prepare record data
+          const recordData = {
+            employee_id: userRecord.id,
+            employee_name: userRecord.name,
+            month_year: monthYear,
+            total_working_days: totalWorkingDays,
+            total_delay_minutes: totalDelayMinutes,
+            total_delay_hours: Math.round(totalDelayHours * 100) / 100,
+            total_overtime_hours: Math.round(totalOvertimeHours * 100) / 100,
+            // NOTE: Removed total_regular_hours and total_break_minutes as they don't exist in the database schema
+            average_performance_score: Math.round(averagePerformanceScore * 100) / 100,
+            punctuality_percentage: Math.round(punctualityPercentage * 100) / 100,
+            performance_status: performanceStatus,
+            // NEW: Add rating data
+            employee_rating_avg: employeeRatingAvg > 0 ? Math.round(employeeRatingAvg * 100) / 100 : null,
+            task_rating_avg: taskRatingAvg > 0 ? Math.round(taskRatingAvg * 100) / 100 : null,
+            rating_bonus_points: ratingBonus,
+            total_ratings_count: totalRatingsCount,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          console.log(`💾 Inserting record for ${userRecord.name}:`, recordData);
+
+          // Create new record with calculated data including rating bonuses
+          const { error: insertError } = await supabase
+            .from('admin_performance_dashboard')
+            .insert(recordData);
+
+          if (!insertError) {
+            console.log(`✅ Recalculated ${userRecord.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`, {
+              ratingBonus: ratingBonus > 0 ? `+${ratingBonus}` : ratingBonus < 0 ? ratingBonus : 'No rating bonus',
+              employeeRating: employeeRatingAvg > 0 ? `${employeeRatingAvg.toFixed(1)}⭐` : 'No employee ratings',
+              taskRating: taskRatingAvg > 0 ? `${taskRatingAvg.toFixed(1)}⭐` : 'No task ratings'
+            });
+            updatedCount++;
+          } else {
+            console.error(`❌ Failed to create ${userRecord.name}:`, insertError);
+            console.error('Record data that failed:', recordData);
+            skippedEmployees.push({
+              name: userRecord.name,
+              position: userRecord.position,
+              reason: `Database insertion failed: ${insertError.message}`,
+              error: insertError
+            });
           }
         } catch (userError) {
           console.error(`❌ Error processing ${userRecord.name}:`, userError);
+          skippedEmployees.push({
+            name: userRecord.name,
+            position: userRecord.position,
+            reason: `Processing error: ${userError.message}`,
+            error: userError
+          });
         }
       }
 
+      // Enhanced reporting with skip details
+      const skippedCount = processedCount - updatedCount;
+      
       if (updatedCount > 0) {
         toast.success(`✅ Successfully recalculated performance for ${updatedCount}/${processedCount} employees`);
-        // Refresh the dashboard
-      await fetchEmployeeData();
         console.log('🎯 Complete! All employee performance recalculated and manual edits overridden!');
+        
+        if (skippedCount > 0) {
+          console.warn(`⚠️ ${skippedCount} employees were skipped:`);
+          skippedEmployees.forEach((emp, index) => {
+            console.warn(`${index + 1}. ${emp.name} (${emp.position}): ${emp.reason}`);
+          });
+          toast.warning(`⚠️ ${skippedCount} employees were skipped - check console for details`);
+        }
       } else {
         toast.error('❌ No employees were successfully recalculated');
+        console.log('❌ Debug: No employees processed successfully. Check database permissions and schema.');
+        
+        if (skippedEmployees.length > 0) {
+          console.error('❌ All employees were skipped for these reasons:');
+          skippedEmployees.forEach((emp, index) => {
+            console.error(`${index + 1}. ${emp.name} (${emp.position}): ${emp.reason}`);
+          });
+        }
       }
       
     } catch (error) {
@@ -1121,7 +1476,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                                   </div>
                                 </>
                               )}
-                              {!isDiamond && index === 0 && (
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && (
                                 <>
                                   <div className="text-xs px-2 py-1 rounded-full bg-yellow-200 text-yellow-800 font-bold shadow border border-yellow-400">
                                     🏅 Elite
@@ -1131,12 +1486,12 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                                   </div>
                                 </>
                               )}
-                              {!isDiamond && index === 1 && (
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 1 && (
                                 <div className="text-xs px-2 py-1 rounded-full bg-slate-200 text-slate-800 font-bold shadow border border-slate-400">
                                   🏆 Runner-up
                                 </div>
                               )}
-                              {!isDiamond && index === 2 && (
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 2 && (
                                 <div className="text-xs px-2 py-1 rounded-full bg-amber-200 text-amber-800 font-bold shadow border border-amber-500">
                                   🥉 Third
                                 </div>
@@ -1364,11 +1719,15 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       ) : (
                         <Calculator className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                       )}
-                      📊 Recalculate for All
+                      Recalculate for All
               </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>📊 Complete performance recalculation for ALL employees - combines check-in data with tasks and reports</p>
+                    <p>Complete performance recalculation for ALL employees with rating system:<br/>
+                    • 5-star ratings: +15 bonus points<br/>
+                    • 4+ star ratings: +5-10 bonus points<br/>
+                    • Under 3 stars: -5 to -10 penalty points<br/>
+                    • Based on: Work completion (40%) + Punctuality (30%) + Break efficiency (20%) + Rating bonus (10%)</p>
                   </TooltipContent>
                 </Tooltip>
             </div>
@@ -1499,9 +1858,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className={`text-center p-3 rounded-lg border ${
-                        index === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
-                        index === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
-                        index === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        nonDiamondRank === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
+                        nonDiamondRank === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        nonDiamondRank === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
                         'bg-blue-50 dark:bg-blue-900/20 border-blue-200'
                       }`}>
                         <Calendar className={`h-5 w-5 text-blue-600 mx-auto mb-1`} />
@@ -1511,29 +1870,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
                             </div>
                       <div className={`text-center p-3 rounded-lg ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
-                        index === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
-                        index === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
+                        nonDiamondRank === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
+                        nonDiamondRank === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
+                        nonDiamondRank === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
                         'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
                         <TrendingUp className={`h-4 w-4 mx-auto mb-1 ${
-                          index === 0 ? 'text-orange-600' :
-                          index === 1 ? 'text-slate-600' :
-                          index === 2 ? 'text-amber-600' :
+                          nonDiamondRank === 0 ? 'text-orange-600' :
+                          nonDiamondRank === 1 ? 'text-slate-600' :
+                          nonDiamondRank === 2 ? 'text-amber-600' :
                           'text-purple-600'
                         }`} />
                         <div className={`text-lg font-bold ${
-                          index === 0 ? 'text-orange-700 dark:text-orange-300' :
-                          index === 1 ? 'text-slate-700 dark:text-slate-300' :
-                          index === 2 ? 'text-amber-700 dark:text-amber-300' :
+                          nonDiamondRank === 0 ? 'text-orange-700 dark:text-orange-300' :
+                          nonDiamondRank === 1 ? 'text-slate-700 dark:text-slate-300' :
+                          nonDiamondRank === 2 ? 'text-amber-700 dark:text-amber-300' :
                           'text-purple-700 dark:text-purple-300'
                         }`}>
                           {employee.performance.toFixed(1)}%
                           </div>
                         <div className={`text-xs ${
-                          index === 0 ? 'text-orange-600 dark:text-orange-400' :
-                          index === 1 ? 'text-slate-600 dark:text-slate-400' :
-                          index === 2 ? 'text-amber-600 dark:text-amber-400' :
+                          nonDiamondRank === 0 ? 'text-orange-600 dark:text-orange-400' :
+                          nonDiamondRank === 1 ? 'text-slate-600 dark:text-slate-400' :
+                          nonDiamondRank === 2 ? 'text-amber-600 dark:text-amber-400' :
                           'text-purple-600 dark:text-purple-400'
                         }`}>
                           Performance
@@ -1544,9 +1903,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Secondary Metrics */}
                     <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        index === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
-                        index === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
-                        index === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        nonDiamondRank === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
+                        nonDiamondRank === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        nonDiamondRank === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
                         'bg-red-50 dark:bg-red-900/20 border-red-200'
                       }`}>
                         <Clock className={`h-4 w-4 text-red-600`} />
@@ -1555,9 +1914,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </span>
                         </div>
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        index === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
-                        index === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
-                        index === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        nonDiamondRank === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
+                        nonDiamondRank === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        nonDiamondRank === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
                         'bg-green-50 dark:bg-green-900/20 border-green-200'
                       }`}>
                         <TrendingUp className={`h-4 w-4 text-green-600`} />

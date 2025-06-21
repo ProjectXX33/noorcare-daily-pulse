@@ -32,7 +32,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Crown,
-  CheckCircle2
+  CheckCircle2,
+  Download,
+  CalendarIcon
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -170,6 +172,14 @@ const StrategyPage: React.FC = () => {
   const [showFloatingDetails, setShowFloatingDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const productsPerPage = 30;
+  
+  // Best Sells Filter Range
+  const [bestSellsRange, setBestSellsRange] = useState(10); // Default top 10
+  
+  // Date Filter for Best Sells
+  const [bestSellsDateFilter, setBestSellsDateFilter] = useState('all'); // all, 7d, 30d, 90d, custom
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Access control
   React.useEffect(() => {
@@ -185,12 +195,132 @@ const StrategyPage: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Calculate best selling products (top 10)
+  // Calculate best selling products (dynamic range with date filtering)
   const bestSellingProducts = React.useMemo(() => {
-    return [...products]
+    let filteredProducts = [...products];
+    
+    // Apply date filtering if not 'all'
+    if (bestSellsDateFilter !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      let endDate = now;
+      
+      switch (bestSellsDateFilter) {
+        case '7d':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '90d':
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'custom':
+          if (customStartDate && customEndDate) {
+            startDate = new Date(customStartDate);
+            endDate = new Date(customEndDate);
+          } else {
+            startDate = new Date(0); // Default to all time if custom dates not set
+          }
+          break;
+        default:
+          startDate = new Date(0); // All time
+      }
+      
+      // Filter products based on order dates
+      const relevantOrders = orders.filter(order => {
+        const orderDate = new Date(order.date_completed);
+        return orderDate >= startDate && orderDate <= endDate;
+      });
+      
+      // Calculate sales for each product in the date range
+      const productSalesMap = new Map();
+      relevantOrders.forEach(order => {
+        order.line_items.forEach((item: any) => {
+          const productId = item.product_id;
+          const quantity = item.quantity || 1;
+          const currentSales = productSalesMap.get(productId) || 0;
+          productSalesMap.set(productId, currentSales + quantity);
+        });
+      });
+      
+      // Update products with filtered sales data
+      filteredProducts = products.map(product => ({
+        ...product,
+        total_sales: productSalesMap.get(product.id) || 0
+      })).filter(product => product.total_sales > 0); // Only show products with sales in the period
+    }
+    
+    return filteredProducts
       .sort((a, b) => b.total_sales - a.total_sales)
-      .slice(0, 10);
-  }, [products]);
+      .slice(0, bestSellsRange);
+  }, [products, orders, bestSellsRange, bestSellsDateFilter, customStartDate, customEndDate]);
+
+  // Excel Export Function with Arabic Support
+  const exportToExcel = () => {
+    try {
+      // Arabic and English headers
+      const headers = [
+        'الترتيب / Rank',
+        'اسم المنتج / Product Name', 
+        'الفئة / Category',
+        'المبيعات / Sales',
+        'الإيرادات (ريال) / Revenue (SAR)',
+        'التقييم / Rating',
+        'الأداء / Performance',
+        'معدل التحويل / Conversion Rate'
+      ];
+      
+      // Create CSV content with proper Arabic encoding
+      const csvRows = [
+        headers.join(','),
+        ...bestSellingProducts.map((product, index) => [
+          index + 1,
+          `"${product.name.replace(/"/g, '""')}"`, // Escape quotes in product name
+          `"${product.category.replace(/"/g, '""')}"`, // Escape quotes in category
+          product.total_sales,
+          product.revenue.toLocaleString('ar-SA'), // Arabic number formatting
+          product.rating,
+          product.campaign_performance,
+          `${product.conversion_rate}%`
+        ].join(','))
+      ];
+      
+      const csvContent = csvRows.join('\n');
+      
+      // Add BOM (Byte Order Mark) for proper UTF-8 encoding in Excel
+      const BOM = '\uFEFF';
+      const csvWithBOM = BOM + csvContent;
+      
+      // Create blob with proper UTF-8 encoding
+      const blob = new Blob([csvWithBOM], { 
+        type: 'text/csv;charset=utf-8;' 
+      });
+      
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      // Generate filename with Arabic support
+      const dateInfo = bestSellsDateFilter === 'all' ? 'AllTime' : 
+                      bestSellsDateFilter === 'custom' ? `${customStartDate}_to_${customEndDate}` :
+                      bestSellsDateFilter;
+      
+      // Use Arabic filename
+      const filename = `أفضل_المنتجات_مبيعاً_Top${bestSellsRange}_${dateInfo}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
+      
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`✅ تم تصدير أفضل ${bestSellsRange} منتج إلى ملف Excel / Exported top ${bestSellsRange} products to Excel file`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('❌ فشل في تصدير البيانات / Failed to export data');
+    }
+  };
 
   // Calculate monthly order completion stats using real order data
   const monthlyOrderStats = React.useMemo(() => {
@@ -742,15 +872,109 @@ const StrategyPage: React.FC = () => {
       >
         <Card className="border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
           <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <Crown className="h-6 w-6 text-yellow-600" />
-              Best Selling Products
-              <Badge className="bg-yellow-600 text-white">Top 10</Badge>
-            </CardTitle>
+            <div className="flex flex-col space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <CardTitle className="flex items-center gap-3">
+                  <Crown className="h-6 w-6 text-yellow-600" />
+                  Best Selling Products
+                  <Badge className="bg-yellow-600 text-white">Top {bestSellsRange}</Badge>
+                </CardTitle>
+                <Button 
+                  onClick={exportToExcel}
+                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+                  disabled={bestSellingProducts.length === 0}
+                >
+                  <Download className="h-4 w-4" />
+                 Export to Excel
+                </Button>
+              </div>
+              
+              {/* Filters Row */}
+              <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-yellow-700 font-medium">Show Top:</span>
+                  <Select value={bestSellsRange.toString()} onValueChange={(value) => setBestSellsRange(parseInt(value))}>
+                    <SelectTrigger className="w-24 bg-white border-yellow-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="15">15</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-yellow-700" />
+                  <span className="text-sm text-yellow-700 font-medium">Date Range:</span>
+                  <Select value={bestSellsDateFilter} onValueChange={setBestSellsDateFilter}>
+                    <SelectTrigger className="w-32 bg-white border-yellow-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="7d">Last 7 Days</SelectItem>
+                      <SelectItem value="30d">Last 30 Days</SelectItem>
+                      <SelectItem value="90d">Last 90 Days</SelectItem>
+                      <SelectItem value="custom">Custom Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {bestSellsDateFilter === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-36 bg-white border-yellow-300"
+                      placeholder="Start Date"
+                    />
+                    <span className="text-yellow-700">to</span>
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-36 bg-white border-yellow-300"
+                      placeholder="End Date"
+                    />
+                  </div>
+                )}
+                
+                {bestSellsDateFilter !== 'all' && (
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                    {bestSellsDateFilter === 'custom' && customStartDate && customEndDate 
+                      ? `${customStartDate} to ${customEndDate}`
+                      : bestSellsDateFilter === '7d' ? 'Last 7 Days'
+                      : bestSellsDateFilter === '30d' ? 'Last 30 Days' 
+                      : bestSellsDateFilter === '90d' ? 'Last 90 Days'
+                      : 'Filtered'
+                    }
+                  </Badge>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {bestSellingProducts.map((product, index) => (
+            {bestSellingProducts.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
+                <p className="text-yellow-700 font-medium">No products found</p>
+                <p className="text-yellow-600 text-sm">
+                  {bestSellsDateFilter !== 'all' 
+                    ? 'No sales found in the selected date range. Try adjusting your date filter or range.'
+                    : 'Try adjusting your range or wait for data to load'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {bestSellingProducts.map((product, index) => (
                 <Card 
                   key={product.id} 
                   className="border border-yellow-200 hover:shadow-md transition-shadow cursor-pointer bg-white"
@@ -778,7 +1002,8 @@ const StrategyPage: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

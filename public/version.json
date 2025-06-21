@@ -1,14 +1,13 @@
 {
-  "version": "3.0.1",
+  "version": "3.1.1",
   "buildTime": "2025-06-21T03:14:00.697Z",
   "buildTimestamp": "1750475640698",
   "buildDate": "6/21/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🚨 MAJOR: Fixed React hooks error that caused white screen after logout",
-    "🆕 NEW: Comprehensive break time tracking system for all employees",
-    "⚡ Performance optimizations for shift calculation and display"
+    "🚨 Fixed React hooks error that caused white screen after logout",
+    "🆕 NEW: Strategy Page"
   ],
   "minimumSupportedVersion": "1.0.0",
   "forceUpdate": false

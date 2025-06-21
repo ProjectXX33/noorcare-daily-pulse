@@ -63,6 +63,81 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
           const totalRegularHours = monthlyShifts.reduce((sum, shift) => sum + (shift.regular_hours || 0), 0);
           const totalBreakMinutes = monthlyShifts.reduce((sum, shift) => sum + (shift.total_break_minutes || 0), 0);
 
+          // 🌟 GET RATING DATA FOR BONUS/PENALTY CALCULATION
+          const [employeeRatings, employeeTasks] = await Promise.all([
+            // Get employee ratings for this month
+            supabase
+              .from('employee_ratings')
+              .select('rating, rated_at')
+              .eq('employee_id', userRecord.id)
+              .gte('rated_at', `${currentMonth}-01`)
+              .lt('rated_at', `${currentMonth}-31`),
+            
+            // Get user's tasks and their ratings for this month
+            supabase
+              .from('tasks')
+              .select(`
+                id,
+                task_ratings(rating, rated_at)
+              `)
+              .eq('assigned_to', userRecord.id)
+              .gte('created_at', `${currentMonth}-01`)
+              .lt('created_at', `${currentMonth}-31`)
+          ]);
+
+          // Calculate Rating Bonus/Penalty
+          let ratingBonus = 0;
+          let employeeRatingAvg = 0;
+          let taskRatingAvg = 0;
+          let totalRatingsCount = 0;
+
+          // Process Employee Ratings
+          if (employeeRatings.data && employeeRatings.data.length > 0) {
+            const ratings = employeeRatings.data.map(r => r.rating);
+            employeeRatingAvg = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+            totalRatingsCount += ratings.length;
+          }
+
+          // Process Task Ratings
+          if (employeeTasks.data && employeeTasks.data.length > 0) {
+            const taskRatings = employeeTasks.data
+              .flatMap(task => task.task_ratings || [])
+              .map(tr => tr.rating);
+            
+            if (taskRatings.length > 0) {
+              taskRatingAvg = taskRatings.reduce((sum, rating) => sum + rating, 0) / taskRatings.length;
+              totalRatingsCount += taskRatings.length;
+            }
+          }
+
+          // 🎯 RATING BONUS SYSTEM
+          if (totalRatingsCount > 0) {
+            const overallRatingAvg = ((employeeRatingAvg + taskRatingAvg) / (employeeRatingAvg > 0 ? 1 : 0 + taskRatingAvg > 0 ? 1 : 0)) || 
+                                   (employeeRatingAvg || taskRatingAvg);
+
+            if (overallRatingAvg >= 5.0) {
+              ratingBonus = 15; // 🌟 5-star bonus: +15 points
+            } else if (overallRatingAvg >= 4.5) {
+              ratingBonus = 10; // ⭐ 4.5+ bonus: +10 points
+            } else if (overallRatingAvg >= 4.0) {
+              ratingBonus = 5;  // 👍 4+ bonus: +5 points
+            } else if (overallRatingAvg >= 3.0) {
+              ratingBonus = 0;  // 😐 3+ neutral: no change
+            } else if (overallRatingAvg >= 2.0) {
+              ratingBonus = -5; // 😕 2+ penalty: -5 points
+            } else {
+              ratingBonus = -10; // 😞 <2 penalty: -10 points
+            }
+
+            console.log(`⭐ Rating analysis for ${userRecord.name}:`, {
+              employeeRatingAvg: employeeRatingAvg.toFixed(1),
+              taskRatingAvg: taskRatingAvg.toFixed(1),
+              overallRatingAvg: overallRatingAvg.toFixed(1),
+              ratingBonus,
+              totalRatingsCount
+            });
+          }
+
           // JUSTICE CALCULATION: Fair performance based on multiple factors
           let totalPerformanceScore = 0;
           let validShifts = 0;
@@ -121,14 +196,18 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
               const breakEfficiencyScore = shiftBreakMinutes <= expectedBreakMinutes ? 100 : 
                                           Math.max(0, 100 - ((shiftBreakMinutes - expectedBreakMinutes) / 5));
               
-              // 4. Overtime Bonus (10%)
-              const overtimeBonus = Math.min(10, (shift.overtime_hours || 0) * 2);
+              // 4. Overtime Bonus (8%)
+              const overtimeBonus = Math.min(8, (shift.overtime_hours || 0) * 2);
               
-              // Calculate weighted final score
+              // 5. Rating Bonus (12%) - NEW FEATURE
+              const shiftRatingBonus = (ratingBonus / validShifts) * 0.12; // Distribute rating bonus across shifts
+              
+              // Calculate weighted final score with rating bonus
               performanceScore = (workCompletionScore * 0.4) + 
                                (punctualityScore * 0.3) + 
                                (breakEfficiencyScore * 0.2) + 
-                               overtimeBonus;
+                               overtimeBonus + 
+                               shiftRatingBonus;
               
               totalPerformanceScore += performanceScore;
               validShifts++;
@@ -152,7 +231,7 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
             performanceStatus = 'Needs Improvement';
           }
 
-          // Update performance record
+          // Update performance record with rating data
           const { error: upsertError } = await supabase
             .from('admin_performance_dashboard')
             .upsert({
@@ -168,6 +247,11 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
               average_performance_score: Math.round(averagePerformanceScore * 100) / 100,
               punctuality_percentage: Math.round(punctualityPercentage * 100) / 100,
               performance_status: performanceStatus,
+              // NEW: Add rating data
+              employee_rating_avg: employeeRatingAvg > 0 ? Math.round(employeeRatingAvg * 100) / 100 : null,
+              task_rating_avg: taskRatingAvg > 0 ? Math.round(taskRatingAvg * 100) / 100 : null,
+              rating_bonus_points: ratingBonus,
+              total_ratings_count: totalRatingsCount,
               updated_at: new Date().toISOString()
             }, {
               onConflict: 'employee_id,month_year'
@@ -175,7 +259,11 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
 
           if (!upsertError) {
             updatedCount++;
-            console.log(`✅ Auto-updated performance for ${userRecord.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`);
+            console.log(`✅ Auto-updated performance for ${userRecord.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`, {
+              ratingBonus: ratingBonus > 0 ? `+${ratingBonus}` : ratingBonus < 0 ? ratingBonus : 'No rating bonus',
+              employeeRating: employeeRatingAvg > 0 ? `${employeeRatingAvg.toFixed(1)}⭐` : 'No employee ratings',
+              taskRating: taskRatingAvg > 0 ? `${taskRatingAvg.toFixed(1)}⭐` : 'No task ratings'
+            });
           }
 
         } catch (userError) {

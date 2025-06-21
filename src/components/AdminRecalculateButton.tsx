@@ -15,10 +15,17 @@ interface AdminRecalculateButtonProps {
 const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecalculationComplete }) => {
   const { user } = useAuth();
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isRecalculatingPerformance, setIsRecalculatingPerformance] = useState(false);
   const [lastRecalculation, setLastRecalculation] = useState<Date | null>(null);
+  const [lastPerformanceRecalculation, setLastPerformanceRecalculation] = useState<Date | null>(null);
   const [recalculationStats, setRecalculationStats] = useState<{
     totalRecords: number;
     updatedRecords: number;
+    errors: number;
+  } | null>(null);
+  const [performanceStats, setPerformanceStats] = useState<{
+    totalEmployees: number;
+    updatedEmployees: number;
     errors: number;
   } | null>(null);
 
@@ -281,8 +288,12 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
 
   // Function to recalculate performance data using new automatic logic
   const recalculatePerformanceData = async () => {
+    setIsRecalculatingPerformance(true);
+    setPerformanceStats(null);
+    
     try {
-      console.log('🔄 Starting performance data recalculation...');
+      console.log('🔄 Starting performance data recalculation with rating bonuses...');
+      toast.info('Starting performance recalculation with rating bonuses...');
       
       // Get current month
       const currentMonth = format(new Date(), 'yyyy-MM');
@@ -295,10 +306,14 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
 
       if (usersError) {
         console.error('❌ Error fetching users:', usersError);
+        toast.error('Failed to fetch users for recalculation');
         return;
       }
 
       console.log(`📊 Found ${users.length} users to recalculate performance for`);
+      
+      let updatedEmployees = 0;
+      let errors = 0;
       
       for (const user of users) {
         try {
@@ -357,12 +372,75 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             }
           }
 
-          const averagePerformanceScore = validShifts > 0 ? totalPerformanceScore / validShifts : 75;
+          let averagePerformanceScore = validShifts > 0 ? totalPerformanceScore / validShifts : 75;
           
           // Calculate punctuality percentage
           const punctualityPercentage = totalDelayHours >= 1 ? 0 : 
                                       totalDelayMinutes > 30 ? Math.max(0, 50 - (totalDelayMinutes * 2)) :
                                       totalDelayMinutes > 0 ? Math.max(0, 90 - (totalDelayMinutes * 3)) : 100;
+
+          // 🌟 GET RATING DATA FOR BONUS/PENALTY (same as AutomaticPerformanceCalculator)
+          const [employeeRatings, employeeTasks] = await Promise.all([
+            supabase
+              .from('employee_ratings')
+              .select('rating, rated_at')
+              .eq('employee_id', user.id)
+              .gte('rated_at', `${currentMonth}-01`)
+              .lt('rated_at', `${currentMonth}-31`),
+            
+            supabase
+              .from('tasks')
+              .select(`id, task_ratings(rating, rated_at)`)
+              .eq('assigned_to', user.id)
+              .gte('created_at', `${currentMonth}-01`)
+              .lt('created_at', `${currentMonth}-31`)
+          ]);
+
+          // Calculate Rating Bonus
+          let ratingBonus = 0;
+          let employeeRatingAvg = 0;
+          let taskRatingAvg = 0;
+          let totalRatingsCount = 0;
+
+          if (employeeRatings.data && employeeRatings.data.length > 0) {
+            const ratings = employeeRatings.data.map(r => r.rating);
+            employeeRatingAvg = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+            totalRatingsCount += ratings.length;
+          }
+
+          if (employeeTasks.data && employeeTasks.data.length > 0) {
+            const taskRatings = employeeTasks.data
+              .flatMap(task => task.task_ratings || [])
+              .map(tr => tr.rating);
+            
+            if (taskRatings.length > 0) {
+              taskRatingAvg = taskRatings.reduce((sum, rating) => sum + rating, 0) / taskRatings.length;
+              totalRatingsCount += taskRatings.length;
+            }
+          }
+
+          // Apply rating bonus to performance score
+          if (totalRatingsCount > 0) {
+            const overallRatingAvg = ((employeeRatingAvg + taskRatingAvg) / (employeeRatingAvg > 0 ? 1 : 0 + taskRatingAvg > 0 ? 1 : 0)) || 
+                                   (employeeRatingAvg || taskRatingAvg);
+
+            if (overallRatingAvg >= 5.0) {
+              ratingBonus = 15;
+            } else if (overallRatingAvg >= 4.5) {
+              ratingBonus = 10;
+            } else if (overallRatingAvg >= 4.0) {
+              ratingBonus = 5;
+            } else if (overallRatingAvg >= 3.0) {
+              ratingBonus = 0;
+            } else if (overallRatingAvg >= 2.0) {
+              ratingBonus = -5;
+            } else {
+              ratingBonus = -10;
+            }
+
+            // Apply rating bonus to average performance score
+            averagePerformanceScore = Math.min(100, Math.max(0, averagePerformanceScore + ratingBonus));
+          }
 
           // Determine performance status
           let performanceStatus = 'Poor';
@@ -389,6 +467,11 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
               average_performance_score: Math.round(averagePerformanceScore * 100) / 100,
               punctuality_percentage: Math.round(punctualityPercentage * 100) / 100,
               performance_status: performanceStatus,
+              // NEW: Add rating data to manual recalculation
+              employee_rating_avg: employeeRatingAvg > 0 ? Math.round(employeeRatingAvg * 100) / 100 : null,
+              task_rating_avg: taskRatingAvg > 0 ? Math.round(taskRatingAvg * 100) / 100 : null,
+              rating_bonus_points: ratingBonus,
+              total_ratings_count: totalRatingsCount,
               updated_at: new Date().toISOString()
             }, {
               onConflict: 'employee_id,month_year'
@@ -396,21 +479,45 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
 
           if (upsertError) {
             console.error(`❌ Error updating performance for ${user.name}:`, upsertError);
+            errors++;
           } else {
-            console.log(`✅ Updated performance for ${user.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`);
+            console.log(`✅ Updated performance for ${user.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`, {
+              ratingBonus: ratingBonus > 0 ? `+${ratingBonus}` : ratingBonus < 0 ? ratingBonus : 'No rating bonus',
+              employeeRating: employeeRatingAvg > 0 ? `${employeeRatingAvg.toFixed(1)}⭐` : 'No employee ratings',
+              taskRating: taskRatingAvg > 0 ? `${taskRatingAvg.toFixed(1)}⭐` : 'No task ratings'
+            });
+            updatedEmployees++;
           }
 
         } catch (userError) {
           console.error(`❌ Error processing ${user.name}:`, userError);
+          errors++;
         }
       }
       
-             console.log('✅ Performance data recalculation completed');
+      // Update stats and notifications
+      setPerformanceStats({
+        totalEmployees: users.length,
+        updatedEmployees,
+        errors
+      });
+      
+      setLastPerformanceRecalculation(new Date());
+      
+      console.log('✅ Performance data recalculation completed');
+      toast.success(`Performance recalculation completed! Updated ${updatedEmployees}/${users.length} employees with rating bonuses`);
+      
+      if (onRecalculationComplete) {
+        onRecalculationComplete();
+      }
        
-     } catch (error) {
-       console.error('❌ Performance recalculation failed:', error);
-     }
-   };
+    } catch (error) {
+      console.error('❌ Performance recalculation failed:', error);
+      toast.error('Performance recalculation failed');
+    } finally {
+      setIsRecalculatingPerformance(false);
+    }
+  };
 
   return (
     <Card className="border border-orange-200 bg-orange-50/50">
@@ -429,7 +536,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
           
           <Button
             onClick={recalculateDelayAndOvertime}
-            disabled={isRecalculating}
+            disabled={isRecalculating || isRecalculatingPerformance}
             className="bg-orange-600 hover:bg-orange-700 text-white"
           >
             {isRecalculating ? (
@@ -445,44 +552,57 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             )}
           </Button>
 
+
+
           {recalculationStats && (
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <Badge variant="outline" className="flex items-center justify-center gap-1 py-1">
-                <span>Total: {recalculationStats.totalRecords}</span>
-              </Badge>
-              <Badge variant="outline" className="flex items-center justify-center gap-1 py-1 bg-green-50 text-green-700 border-green-200">
-                <CheckCircle className="h-3 w-3" />
-                <span>Updated: {recalculationStats.updatedRecords}</span>
-              </Badge>
-              {recalculationStats.errors > 0 && (
-                <Badge variant="outline" className="flex items-center justify-center gap-1 py-1 bg-red-50 text-red-700 border-red-200">
-                  <AlertTriangle className="h-3 w-3" />
-                  <span>Errors: {recalculationStats.errors}</span>
+            <div className="space-y-2">
+              <div className="text-xs text-orange-600 font-medium">Delay & Overtime Recalculation:</div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <Badge variant="outline" className="flex items-center justify-center gap-1 py-1">
+                  <span>Total: {recalculationStats.totalRecords}</span>
                 </Badge>
-              )}
+                <Badge variant="outline" className="flex items-center justify-center gap-1 py-1 bg-green-50 text-green-700 border-green-200">
+                  <CheckCircle className="h-3 w-3" />
+                  <span>Updated: {recalculationStats.updatedRecords}</span>
+                </Badge>
+                {recalculationStats.errors > 0 && (
+                  <Badge variant="outline" className="flex items-center justify-center gap-1 py-1 bg-red-50 text-red-700 border-red-200">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>Errors: {recalculationStats.errors}</span>
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
 
-          {lastRecalculation && (
-            <div className="text-xs text-orange-600 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              <span>Last recalculation: {format(lastRecalculation, 'MMM dd, HH:mm')}</span>
-            </div>
-          )}
+
+
+          <div className="space-y-1">
+            {lastRecalculation && (
+              <div className="text-xs text-orange-600 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                <span>Last delay/overtime recalculation: {format(lastRecalculation, 'MMM dd, HH:mm')}</span>
+              </div>
+            )}
+
+          </div>
         </div>
 
-        <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded border">
-          <div className="font-semibold mb-1">🔥 NEW: Smart Delay Calculation:</div>
-          <ul className="space-y-1 text-orange-700">
-            <li>• <strong>🕐 Work Hours:</strong> Total time MINUS break time (work time freezes during breaks)</li>
-            <li>• <strong>⏰ Regular Hours:</strong> Calculated from actual work time (excluding breaks)</li>
-            <li>• <strong>🔥 Overtime Hours:</strong> Based on actual work time beyond standard hours</li>
-            <li>• <strong>📝 Smart Delay to Finish:</strong> Early checkout = Missing hours + delays, Overtime = Delays - overtime hours</li>
-            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with smart delay logic</li>
-          </ul>
-          <div className="mt-2 p-1 bg-emerald-50 rounded text-emerald-700 text-xs">
-            <strong>✨ Break Time Freezing:</strong> When employees take breaks, their regular work hours counter freezes - only actual working time counts!
+        <div className="space-y-3">
+          <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded border">
+            <div className="font-semibold mb-1">🔥 Delay & Overtime Recalculation:</div>
+            <ul className="space-y-1 text-orange-700">
+              <li>• <strong>🕐 Work Hours:</strong> Total time MINUS break time (work time freezes during breaks)</li>
+              <li>• <strong>⏰ Regular Hours:</strong> Calculated from actual work time (excluding breaks)</li>
+              <li>• <strong>🔥 Overtime Hours:</strong> Based on actual work time beyond standard hours</li>
+              <li>• <strong>📝 Smart Delay to Finish:</strong> Early checkout = Missing hours + delays, Overtime = Delays - overtime hours</li>
+            </ul>
+            <div className="mt-2 p-1 bg-emerald-50 rounded text-emerald-700 text-xs">
+              <strong>✨ Break Time Freezing:</strong> When employees take breaks, their regular work hours counter freezes - only actual working time counts!
+            </div>
           </div>
+
+
         </div>
       </CardContent>
     </Card>
