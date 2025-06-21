@@ -112,7 +112,7 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "2.8.1",
+  "version": "3.0.0",
   "edge_side_panel": {
     "preferred_width": 480
   },

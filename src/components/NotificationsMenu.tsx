@@ -81,22 +81,28 @@ const NotificationsMenu = () => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchNotifications();
-      subscribeToNotifications();
+      const unsubscribe = subscribeToNotifications();
       initializeNotifications();
+      
+      // Return cleanup function
+      return unsubscribe;
     }
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   const subscribeToNotifications = () => {
-    if (!user) return;
+    if (!user?.id) return () => {};
+
+    // Create unique channel name to avoid conflicts
+    const channelName = `notifications-menu-${user.id}`;
 
     const channel = supabase
-      .channel(`public:notifications:user_id=eq.${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, 
         payload => {
-          console.log('New notification received:', payload);
+          console.log('New notification received (menu):', payload);
           const newNotification = payload.new as Notification;
           
           // Add the new notification to the state
@@ -121,7 +127,9 @@ const NotificationsMenu = () => {
       .subscribe();
     
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        channel.unsubscribe();
+      }
     };
   };
 

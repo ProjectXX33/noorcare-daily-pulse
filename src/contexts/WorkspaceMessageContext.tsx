@@ -44,7 +44,7 @@ export const WorkspaceMessageProvider = ({ children }: WorkspaceMessageProviderP
     if (!user) return;
 
     const messagesChannel = supabase
-      .channel(`workspace_messages_count_${user.id}_${Date.now()}`)
+      .channel('workspace_messages_count')
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'workspace_messages' }, 
         (payload) => {
@@ -62,8 +62,7 @@ export const WorkspaceMessageProvider = ({ children }: WorkspaceMessageProviderP
       .subscribe();
 
     return () => {
-      console.log('🔌 Cleaning up workspace messages subscription');
-      supabase.removeChannel(messagesChannel);
+      messagesChannel.unsubscribe();
     };
   }, [user, unreadCount]);
 

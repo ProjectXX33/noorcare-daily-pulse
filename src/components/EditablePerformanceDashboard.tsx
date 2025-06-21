@@ -1499,10 +1499,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className={`text-center p-3 rounded-lg border ${
-                        employee.diamondRank ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 shadow-lg' :
-                        nonDiamondRank === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
-                        nonDiamondRank === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
-                        nonDiamondRank === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        index === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
+                        index === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        index === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
                         'bg-blue-50 dark:bg-blue-900/20 border-blue-200'
                       }`}>
                         <Calendar className={`h-5 w-5 text-blue-600 mx-auto mb-1`} />
@@ -1512,33 +1511,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
                             </div>
                       <div className={`text-center p-3 rounded-lg ${
-                        employee.diamondRank ? 'bg-gradient-to-br from-cyan-50 via-blue-50 to-purple-50 dark:from-cyan-900/20 dark:via-blue-900/20 dark:to-purple-900/20 border-2 border-cyan-400 shadow-lg' :
-                        nonDiamondRank === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
-                        nonDiamondRank === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
-                        nonDiamondRank === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
+                        index === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
+                        index === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
+                        index === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
                         'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
                         <TrendingUp className={`h-4 w-4 mx-auto mb-1 ${
-                          employee.diamondRank ? 'text-cyan-600' :
-                          nonDiamondRank === 0 ? 'text-orange-600' :
-                          nonDiamondRank === 1 ? 'text-slate-600' :
-                          nonDiamondRank === 2 ? 'text-amber-600' :
+                          index === 0 ? 'text-orange-600' :
+                          index === 1 ? 'text-slate-600' :
+                          index === 2 ? 'text-amber-600' :
                           'text-purple-600'
                         }`} />
                         <div className={`text-lg font-bold ${
-                          employee.diamondRank ? 'text-cyan-700 dark:text-cyan-300' :
-                          nonDiamondRank === 0 ? 'text-orange-700 dark:text-orange-300' :
-                          nonDiamondRank === 1 ? 'text-slate-700 dark:text-slate-300' :
-                          nonDiamondRank === 2 ? 'text-amber-700 dark:text-amber-300' :
+                          index === 0 ? 'text-orange-700 dark:text-orange-300' :
+                          index === 1 ? 'text-slate-700 dark:text-slate-300' :
+                          index === 2 ? 'text-amber-700 dark:text-amber-300' :
                           'text-purple-700 dark:text-purple-300'
                         }`}>
                           {employee.performance.toFixed(1)}%
                           </div>
                         <div className={`text-xs ${
-                          employee.diamondRank ? 'text-cyan-600 dark:text-cyan-400' :
-                          nonDiamondRank === 0 ? 'text-orange-600 dark:text-orange-400' :
-                          nonDiamondRank === 1 ? 'text-slate-600 dark:text-slate-400' :
-                          nonDiamondRank === 2 ? 'text-amber-600 dark:text-amber-400' :
+                          index === 0 ? 'text-orange-600 dark:text-orange-400' :
+                          index === 1 ? 'text-slate-600 dark:text-slate-400' :
+                          index === 2 ? 'text-amber-600 dark:text-amber-400' :
                           'text-purple-600 dark:text-purple-400'
                         }`}>
                           Performance
@@ -1549,10 +1544,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Secondary Metrics */}
                     <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        employee.diamondRank ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-lg' :
-                        nonDiamondRank === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
-                        nonDiamondRank === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
-                        nonDiamondRank === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        index === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
+                        index === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        index === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
                         'bg-red-50 dark:bg-red-900/20 border-red-200'
                       }`}>
                         <Clock className={`h-4 w-4 text-red-600`} />
@@ -1561,10 +1555,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </span>
                         </div>
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        employee.diamondRank ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-lg' :
-                        nonDiamondRank === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
-                        nonDiamondRank === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
-                        nonDiamondRank === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        index === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
+                        index === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        index === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
                         'bg-green-50 dark:bg-green-900/20 border-green-200'
                       }`}>
                         <TrendingUp className={`h-4 w-4 text-green-600`} />

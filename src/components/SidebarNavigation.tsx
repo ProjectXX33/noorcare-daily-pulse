@@ -733,11 +733,14 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    // Subscribe to notifications changes with unique channel name
+    // Create unique channel name per user to avoid conflicts
+    const channelName = `sidebar-notifications-${user.id}`;
+
+    // Subscribe to notifications changes
     const notificationsSubscription = supabase
-      .channel(`notifications_sidebar_${user.id}_${Date.now()}`)
+      .channel(channelName)
       .on('postgres_changes', 
         { 
           event: '*', 
@@ -746,7 +749,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           filter: `user_id=eq.${user.id}`
         }, 
         (payload) => {
-          console.log('Realtime notification:', payload);
+          console.log('Realtime notification (sidebar):', payload);
           // Handle the notification change
           if (payload.eventType === 'INSERT') {
             setNotifications(prev => [payload.new, ...prev]);
@@ -761,28 +764,33 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
 
     // Load initial notifications
     const loadNotifications = async () => {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-      if (error) {
-        console.error('Error loading notifications:', error);
-        return;
+        if (error) {
+          console.error('Error loading notifications:', error);
+          return;
+        }
+
+        setNotifications(data || []);
+      } catch (error) {
+        console.error('Error in loadNotifications:', error);
       }
-
-      setNotifications(data || []);
     };
 
     loadNotifications();
 
     return () => {
-      console.log('🔌 Cleaning up sidebar notifications subscription');
-      supabase.removeChannel(notificationsSubscription);
+      if (notificationsSubscription) {
+        notificationsSubscription.unsubscribe();
+      }
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   // Load initial scroll position on mount
   useEffect(() => {
