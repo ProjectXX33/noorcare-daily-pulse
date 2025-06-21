@@ -15,6 +15,7 @@
     "version:update": "node build-version.js",
     "deploy": "npm run build && node deploy-to-plesk.js",
     "deploy:staging": "npm run build && node deploy-to-plesk.js --env=staging",
+    "deploy:refresh": "node deploy-with-refresh.js",
     "quick-deploy": "node deploy-to-plesk.js",
     "zip-deploy": "node zip-for-plesk.js"
   },

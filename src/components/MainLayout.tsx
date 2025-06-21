@@ -1,6 +1,7 @@
 import React from 'react';
 import SidebarNavigation from './SidebarNavigation'; // Assuming this is your sidebar
 import AutomaticPerformanceCalculator from './AutomaticPerformanceCalculator';
+import AutoRefreshManager from './AutoRefreshManager';
 // import Header from './Header'; // If you have a Header component
 
 interface MainLayoutProps {
@@ -11,11 +12,12 @@ interface MainLayoutProps {
 const MainLayout = ({ children }: MainLayoutProps) => {
   return (
     <div className="flex w-full">
-      {/* Background service for automatic performance calculation */}
+      {/* Background services */}
       <AutomaticPerformanceCalculator 
         intervalMinutes={30} 
         enableAutoRecalculation={true}
       />
+      <AutoRefreshManager checkInterval={2 * 60 * 1000} />
       <SidebarNavigation />
       <div className="flex-1 flex flex-col">
         {/* Header with toggle button */}
