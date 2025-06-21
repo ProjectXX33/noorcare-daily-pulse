@@ -138,10 +138,13 @@ const AdminShiftManagement = () => {
 
   // Add real-time subscription for shift assignments
   useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (!user?.id || user.role !== 'admin') return;
+
+    // Create unique channel name to avoid conflicts
+    const channelName = `shift-assignments-${user.id}`;
 
     const subscription = supabase
-      .channel('shift_assignments_changes')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -158,9 +161,11 @@ const AdminShiftManagement = () => {
       .subscribe();
 
     return () => {
+      if (subscription) {
       subscription.unsubscribe();
+      }
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   const loadData = async () => {
     setIsLoading(true);
@@ -798,7 +803,7 @@ const AdminShiftManagement = () => {
               <CardHeader className="pb-3 sm:pb-4">
                 <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                       <div className="flex items-center gap-3">
-                      <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
+                  <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
                     </div>
                   
                   {/* Week navigation */}

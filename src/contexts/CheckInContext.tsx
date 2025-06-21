@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, CheckIn as CheckInType, WorkReport as WorkReportType, Shift } from '@/types';
 import { toast } from 'sonner';
@@ -94,6 +94,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     workDayEnd: Date;
   } | null>(null);
 
+  // Add ref to track active subscription
+  const activeSubscriptionRef = useRef<any>(null);
+
   // Initialize with stored data
   useEffect(() => {
     async function loadData() {
@@ -112,19 +115,10 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     loadData();
     
-    // Set up real-time listeners
-    const checkInsSubscription = supabase
-      .channel('public:check_ins')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'check_ins' }, 
-        () => {
-          fetchCheckIns();
-        }
-      )
-      .subscribe();
-      
+    // Set up real-time listeners with unique channel names
+    // Note: check_ins subscription is handled in user-specific useEffect to avoid conflicts
     const workReportsSubscription = supabase
-      .channel('public:work_reports')
+      .channel('checkin-context-global-reports')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'work_reports' }, 
         () => {
@@ -134,8 +128,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .subscribe();
     
     return () => {
-      checkInsSubscription.unsubscribe();
-      workReportsSubscription.unsubscribe();
+      if (workReportsSubscription) {
+        workReportsSubscription.unsubscribe();
+      }
     };
   }, []);
   
@@ -199,59 +194,64 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Subscribe to realtime check-in updates with enhanced debugging
+  // This handles BOTH global check-ins updates AND user-specific notifications
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    console.log('🔄 Setting up real-time check-in subscription for user:', user.name);
+    // Clean up any existing subscription first
+    if (activeSubscriptionRef.current) {
+      console.log('🧹 Cleaning up existing subscription before creating new one');
+      activeSubscriptionRef.current.unsubscribe();
+      activeSubscriptionRef.current = null;
+    }
 
-    const subscription = supabase
-      .channel('check-ins-realtime')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'check_ins'
-        }, 
-        (payload) => {
-          console.log('🔔 Real-time check-in update received:', payload);
-          
-          // Check if this is a checkout event for the current user
-          if (payload.eventType === 'UPDATE' && 
-              payload.new && 
-              payload.new.user_id === user.id && 
-              payload.new.checkout_time && 
-              !payload.old.checkout_time) {
-            
-            console.log('🏁 Manual checkout detected for current user!', {
-              userId: user.id,
-              userName: user.name,
-              checkoutTime: payload.new.checkout_time,
-              wasManualCheckout: true
-            });
-            
-            // Show immediate notification for manual checkout
-            toast.success('✅ You have been checked out. Workday complete!', {
-              duration: 5000,
-              style: {
-                background: '#10B981',
-                color: 'white',
-                fontSize: '16px',
-                fontWeight: 'bold'
-              }
-            });
+    console.log('🔄 Setting up consolidated real-time check-in subscription for user:', user.name, 'ID:', user.id);
+
+    // Create unique channel name to avoid conflicts
+    const channelName = `checkin-context-consolidated-${user.id}`;
+    
+    console.log('📡 Creating subscription with channel:', channelName);
+
+    // Add delay to stagger subscription creation and avoid conflicts
+    const subscriptionTimeout = setTimeout(() => {
+      // SIMPLIFIED SUBSCRIPTION - Back to basics approach
+      const subscription = supabase
+        .channel(`simple-checkin-${user.id}-${Date.now()}`) // Add timestamp to ensure uniqueness
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'check_ins'
+          }, 
+          () => {
+            // Simple refresh without complex logic
+            console.log('🔔 Simple check-in update - refreshing data');
+            setTimeout(fetchCheckIns, 200);
           }
-          
-          // Refresh check-ins immediately when any change occurs
-          refreshCheckIns();
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+
+      // Store the subscription in ref for cleanup
+      activeSubscriptionRef.current = subscription;
+      console.log('✅ Delayed subscription created successfully for channel:', channelName);
+    }, 1000); // 1 second delay to let other components initialize first
 
     return () => {
-      console.log('🔌 Unsubscribing from check-in updates');
-      subscription.unsubscribe();
+      console.log('🔌 Unsubscribing from consolidated check-in updates, channel:', channelName);
+      
+      // Clear the timeout if component unmounts before subscription is created
+      if (subscriptionTimeout) {
+        clearTimeout(subscriptionTimeout);
+      }
+      
+      // Unsubscribe if subscription exists
+      if (activeSubscriptionRef.current) {
+        activeSubscriptionRef.current.unsubscribe();
+        activeSubscriptionRef.current = null;
+        console.log('✅ Successfully unsubscribed from channel:', channelName);
+      }
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   // Enhanced user state tracking with real-time updates
   useEffect(() => {
@@ -1531,7 +1531,35 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         // Calculate total work time and expected hours
         const totalHoursWorked = regularHours + overtimeHours;
-        const expectedHours = shift.name.toLowerCase().includes('day') ? 7 : 8; // Day: 7h, Night: 8h
+
+        // Dynamically determine expected hours for the shift.
+        const getExpectedHours = (shiftObj: { name: string; start_time: string; end_time: string }): number => {
+          const nameLower = (shiftObj.name || '').toLowerCase();
+          if (nameLower.includes('day')) return 7;
+          if (nameLower.includes('night')) return 8;
+
+          // Custom shift: derive expected hours from start/end time strings (HH:MM)
+          try {
+            const [startH, startM] = shiftObj.start_time.split(':').map(Number);
+            const [endH, endM] = shiftObj.end_time.split(':').map(Number);
+
+            let durationMinutes: number;
+
+            // Handle overnight shift where end time is next day.
+            if (endH < startH || (endH === startH && endM < startM)) {
+              durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+            } else {
+              durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+            }
+
+            return durationMinutes / 60;
+          } catch (e) {
+            console.error('Error parsing custom shift hours, falling back to 7h', e);
+            return 7; // Safe fallback
+          }
+        };
+
+        const expectedHours = getExpectedHours(shift);
         
         // Calculate scheduled start time (used in both scenarios)
         const [startHour, startMin] = shift.start_time.split(':').map(Number);

@@ -174,12 +174,34 @@ export function calculateWorkHours(
   const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
   const totalHours = totalMinutes / 60;
   
-  // Standard work hours: Day shift: 7 hours, Night shift: 8 hours
-  let standardWorkHours = 8; // Default to 8 hours for night shift
-  if (shift.name.toLowerCase().includes('day')) {
-    standardWorkHours = 7; // Day shift is 7 hours
-  } else if (shift.name.toLowerCase().includes('night')) {
-    standardWorkHours = 8; // Night shift is 8 hours
+  let standardWorkHours: number;
+  
+  const nameLower = shift.name.toLowerCase();
+  
+  if (nameLower.includes('day')) {
+    standardWorkHours = 7;
+  } else if (nameLower.includes('night')) {
+    standardWorkHours = 8;
+  } else {
+    // Custom shift: derive duration from start/end time strings
+    try {
+      const [startH, startM] = shift.startTime.split(':').map(Number);
+      const [endH, endM] = shift.endTime.split(':').map(Number);
+
+      let durationMinutes: number;
+
+      // Handle overnight custom shift (crossing midnight)
+      if (endH < startH || (endH === startH && endM < startM)) {
+        durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+      } else {
+        durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+      }
+
+      standardWorkHours = durationMinutes / 60;
+    } catch {
+      // Fallback safe default
+      standardWorkHours = 7;
+    }
   }
   
   // Calculate overtime based on new rules:
@@ -494,54 +516,24 @@ export function determineShiftByTime(checkInTime: Date, shifts: Shift[]): Shift 
       endTotalMinutes += 24 * 60; // Add 24 hours
     }
     
-    console.log(`Checking shift: ${shift.name}`, {
-      startTime: shift.startTime,
-      endTime: shift.endTime,
+    console.log('Checking shift window', {
+      shiftName: shift.name,
       startTotalMinutes,
       endTotalMinutes,
       checkInTotalMinutes
     });
     
-    // Expanded tolerance and logic for shift detection
-    const tolerance = 120; // 2 hours tolerance before and after shift start
-    
-    // Check if check-in time falls within this shift's start window
-    if (checkInTotalMinutes >= (startTotalMinutes - tolerance) && 
-        checkInTotalMinutes <= (startTotalMinutes + tolerance)) {
-      console.log(`✅ Shift detected by time: ${shift.name} (within start window)`);
-      return shift;
-    }
-    
-    // For shifts that cross midnight, check if we're in the evening part
-    if (endTotalMinutes > 24 * 60 && checkInTotalMinutes >= startTotalMinutes) {
-      console.log(`✅ Shift detected by time: ${shift.name} (evening part of night shift)`);
-      return shift;
-    }
-    
-    // Alternative logic: if check-in is between shift start and end
-    if (endTotalMinutes <= 24 * 60 && 
-        checkInTotalMinutes >= startTotalMinutes && 
-        checkInTotalMinutes <= endTotalMinutes) {
-      console.log(`✅ Shift detected by time: ${shift.name} (within shift hours)`);
+    // Determine if check-in falls within shift window (handles overnight)
+    const inWindow = endTotalMinutes >= startTotalMinutes
+      ? checkInTotalMinutes >= startTotalMinutes && checkInTotalMinutes <= endTotalMinutes
+      : checkInTotalMinutes >= startTotalMinutes || checkInTotalMinutes <= endTotalMinutes;
+
+    if (inWindow) {
+      console.log('✅ Shift detected by time:', shift.name);
       return shift;
     }
   }
   
   console.warn('❌ No matching shift found for check-in time');
-  
-  // Fallback: return the closest shift based on start time
-  const closestShift = shifts.reduce((closest, shift) => {
-    const [startHour, startMin] = shift.startTime.split(':').map(Number);
-    const startTotalMinutes = startHour * 60 + startMin;
-    const currentDistance = Math.abs(checkInTotalMinutes - startTotalMinutes);
-    
-    const [closestStartHour, closestStartMin] = closest.startTime.split(':').map(Number);
-    const closestStartTotalMinutes = closestStartHour * 60 + closestStartMin;
-    const closestDistance = Math.abs(checkInTotalMinutes - closestStartTotalMinutes);
-    
-    return currentDistance < closestDistance ? shift : closest;
-  });
-  
-  console.log(`🔄 Using closest shift as fallback: ${closestShift.name}`);
-  return closestShift;
-} 
+  return null;
+}

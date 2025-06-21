@@ -115,22 +115,48 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
           let earlyCheckoutPenalty = 0;
 
           if (checkOutTime) {
-            // FIXED: Work timer already excludes break time (FREEZE MODE)
-            // No need to subtract break time again - that would be double-counting
+            // CORRECTED: Must subtract break time here for accurate historical recalculation.
+            // The live timer freezes, but this function works with raw check-in/out times.
             const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
-            const actualWorkHours = totalMinutes / 60;
+            const actualWorkMinutes = totalMinutes - breakTimeMinutes;
+            const actualWorkHours = actualWorkMinutes / 60;
             
-            console.log(`🕐 FIXED Hours Calculation (No Double Break Subtraction):`, {
+            console.log(`🕐 CORRECTED Hours Calculation (With Break Subtraction):`, {
               totalMinutes: totalMinutes.toFixed(1),
-              actualWorkHours: actualWorkHours.toFixed(2),
               breakTimeMinutes: breakTimeMinutes,
-              note: 'Work timer already excludes break time - no additional subtraction needed'
+              actualWorkMinutes: actualWorkMinutes.toFixed(1),
+              actualWorkHours: actualWorkHours.toFixed(2),
+              note: 'Subtracting break time from total duration for accurate recalculation.'
             });
             
             // Determine standard work hours based on shift type
-            let standardWorkHours = 8; // Default to night shift
+            let standardWorkHours = 8; // Default for night shift
             if (shift.name.toLowerCase().includes('day')) {
               standardWorkHours = 7; // Day shift is 7 hours
+            } else if (!shift.name.toLowerCase().includes('night')) {
+              // For custom shifts like "Test", calculate duration from start/end times
+              try {
+                const [startHour, startMin] = shift.start_time.split(':').map(Number);
+                const [endHour, endMin] = shift.end_time.split(':').map(Number);
+                
+                // Handle overnight shifts if end time is earlier than start time
+                let durationMinutes;
+                if (endHour < startHour || (endHour === startHour && endMin < startMin)) {
+                  // Overnight shift (e.g., 22:00 to 06:00)
+                  durationMinutes = (24 * 60 - (startHour * 60 + startMin)) + (endHour * 60 + endMin);
+                } else {
+                  // Same-day shift
+                  durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+                }
+                
+                standardWorkHours = durationMinutes / 60;
+                console.log(`🕒 Custom Shift "${shift.name}" detected. Calculated duration: ${standardWorkHours.toFixed(2)} hours`);
+                
+              } catch (e) {
+                console.error(`Error calculating duration for custom shift "${shift.name}":`, e);
+                // Fallback to default if times are invalid
+                standardWorkHours = 8;
+              }
             }
 
             // Calculate regular and overtime hours using ACTUAL WORK TIME (excluding breaks)

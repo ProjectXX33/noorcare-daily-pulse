@@ -161,35 +161,55 @@ const CheckInButton = () => {
 
 
   useEffect(() => {
+    if (!user?.id) return;
+
     checkShiftValidation();
     
     // Check every minute for real-time updates
     const interval = setInterval(checkShiftValidation, 60000);
     
+    // Create unique channel name to avoid conflicts
+    const channelName = `checkin-button-${user.id}`;
+    
     // Real-time subscription for shift assignment changes
-    const subscription = supabase
-      .channel(`shift_assignments_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shift_assignments',
-          filter: `employee_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('CheckInButton: Shift assignment changed, refreshing...', payload);
-          // Re-check shift validation when assignment changes
-          setTimeout(checkShiftValidation, 500); // Small delay to ensure DB is updated
-        }
-      )
-      .subscribe();
+    // Add delay to avoid subscription conflicts with other components
+    let subscription: any = null;
+    const subscriptionTimeout = setTimeout(() => {
+      subscription = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'shift_assignments',
+            filter: `employee_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('CheckInButton: Shift assignment changed, refreshing...', payload);
+            // Re-check shift validation when assignment changes
+            setTimeout(checkShiftValidation, 500); // Small delay to ensure DB is updated
+          }
+        )
+        .subscribe();
+      
+      console.log('✅ CheckInButton subscription created with delay');
+    }, 1500); // 1.5 second delay (after CheckInContext)
     
     return () => {
       clearInterval(interval);
-      subscription.unsubscribe();
+      
+      // Clear timeout if component unmounts before subscription is created
+      if (subscriptionTimeout) {
+        clearTimeout(subscriptionTimeout);
+      }
+      
+      // Unsubscribe if subscription exists
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   const alreadyCheckedIn = hasCheckedInToday(user.id);
   const currentTime = format(new Date(), 'h:mm a');

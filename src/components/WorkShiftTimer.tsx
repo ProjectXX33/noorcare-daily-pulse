@@ -210,98 +210,104 @@ const WorkShiftTimer: React.FC = () => {
     findActiveCheckIn();
   }, [user, checkIns]);
 
+  // Monitor changes in checkIns context data for break status updates
+  useEffect(() => {
+    if (!activeCheckIn || !checkIns.length) return;
+
+    // Find the current check-in in the updated context data
+    const updatedCheckIn = checkIns.find(ci => ci.id === activeCheckIn.id);
+    
+    if (updatedCheckIn) {
+      // Update break status from context data
+      const contextIsOnBreak = updatedCheckIn.isOnBreak || false;
+      const contextTotalBreakMinutes = updatedCheckIn.totalBreakMinutes || 0;
+      const contextBreakStartTime = updatedCheckIn.breakStartTime;
+
+      console.log('🔄 Break status updated from context:', {
+        checkInId: activeCheckIn.id,
+        wasOnBreak: isOnBreak,
+        nowOnBreak: contextIsOnBreak,
+        totalBreakMinutes: contextTotalBreakMinutes,
+        breakStartTime: contextBreakStartTime
+      });
+
+      // Update break state if it changed
+      if (isOnBreak !== contextIsOnBreak) {
+        setIsOnBreak(contextIsOnBreak);
+        
+        if (contextIsOnBreak && contextBreakStartTime) {
+          setCurrentBreakStartTime(new Date(contextBreakStartTime));
+        } else if (!contextIsOnBreak) {
+          setCurrentBreakStartTime(null);
+        }
+      }
+
+      // Update total break time
+      setTotalBreakTime(contextTotalBreakMinutes * 60); // Convert minutes to seconds
+    }
+  }, [checkIns, activeCheckIn?.id, isOnBreak]);
+
   // Subscribe to real-time changes in shift_assignments and check_ins for break tracking
   useEffect(() => {
     if (!user?.id) return;
 
-    const subscription = supabase
-      .channel('shift_assignments_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'shift_assignments',
-          filter: `employee_id=eq.${user.id}`
-        }, 
-        (payload) => {
-          // Trigger a re-fetch of shift info when assignments change
-          setTimeout(() => {
-            setShiftInfo(null);
-            window.location.reload();
-          }, 500);
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'monthly_shifts',
-          filter: `user_id=eq.${user.id}`
-        }, 
-        (payload) => {
-          // Also listen to monthly_shifts as fallback
-          setTimeout(() => {
-            setShiftInfo(null);
-            window.location.reload();
-          }, 500);
-        }
-      )
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'check_ins',
-          filter: `user_id=eq.${user.id}`
-        }, 
-        (payload) => {
-          // Listen for break status changes
-          console.log('📡 Real-time UPDATE received for check_ins:', payload);
-          
-          if (payload.new && activeCheckIn && payload.new.id === activeCheckIn.id) {
-            const newData = payload.new as any;
-            const wasOnBreak = isOnBreak;
-            const nowOnBreak = newData.is_on_break || false;
-            
-            console.log('🔄 Break status change detected:', {
-              checkInId: activeCheckIn.id,
-              wasOnBreak,
-              nowOnBreak,
-              breakStartTime: newData.break_start_time,
-              totalBreakMinutes: newData.total_break_minutes,
-              currentWorkTime: timeWorked
-            });
-            
-            // Break status changed - update break start time if break just started
-            if (!wasOnBreak && nowOnBreak && newData.break_start_time) {
-              setCurrentBreakStartTime(new Date(newData.break_start_time));
-            } else if (wasOnBreak && !nowOnBreak) {
-              setCurrentBreakStartTime(null);
-            }
-            
-            setIsOnBreak(nowOnBreak);
-            setTotalBreakTime((newData.total_break_minutes || 0) * 60);
-            
-            // Force timer re-calculation immediately
+    // Create unique channel name to avoid conflicts with AdminShiftManagement
+    const channelName = `work-shift-timer-${user.id}`;
+
+    // Add delay to avoid subscription conflicts with other components
+    let subscription: any = null;
+    const subscriptionTimeout = setTimeout(() => {
+      subscription = supabase
+        .channel(channelName)
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'shift_assignments',
+            filter: `employee_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            // Trigger a re-fetch of shift info when assignments change
             setTimeout(() => {
-              console.log('⚡ Forcing timer recalculation after break status change');
-            }, 100);
-          } else {
-            console.log('❌ Real-time update ignored:', {
-              hasPayloadNew: !!payload.new,
-              hasActiveCheckIn: !!activeCheckIn,
-              idsMatch: payload.new?.id === activeCheckIn?.id,
-              payloadId: payload.new?.id,
-              activeCheckInId: activeCheckIn?.id
-            });
+              setShiftInfo(null);
+              window.location.reload();
+            }, 500);
           }
-        }
-      )
-      .subscribe();
+        )
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'monthly_shifts',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          (payload) => {
+            // Also listen to monthly_shifts as fallback
+            setTimeout(() => {
+              setShiftInfo(null);
+              window.location.reload();
+            }, 500);
+          }
+        )
+        // Note: Removed check_ins subscription to avoid conflicts with CheckInContext
+        // Break status updates will be handled through CheckInContext data refresh
+        .subscribe();
+      
+      console.log('✅ WorkShiftTimer subscription created with delay');
+    }, 2000); // 2 second delay (after CheckInContext and CheckInButton)
 
     return () => {
-      subscription.unsubscribe();
+      // Clear timeout if component unmounts before subscription is created
+      if (subscriptionTimeout) {
+        clearTimeout(subscriptionTimeout);
+      }
+      
+      // Unsubscribe if subscription exists
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [user?.id, activeCheckIn?.id, isOnBreak, timeWorked]);
+  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
   // Real-time break timer - updates current break duration every second
   useEffect(() => {
@@ -336,32 +342,37 @@ const WorkShiftTimer: React.FC = () => {
         // Regular check-in tracking
         const checkInTime = new Date(activeCheckIn.timestamp);
         
-        // Calculate work time excluding break time (FREEZING MODE)
+        // FREEZE MODE: Work time calculation with proper break handling
         const totalElapsedTimeMs = now.getTime() - checkInTime.getTime();
         const totalElapsedSeconds = Math.floor(totalElapsedTimeMs / 1000);
         
-        // Calculate actual work time by subtracting break time
-        let actualWorkSeconds = totalElapsedSeconds - totalBreakTime;
+        let actualWorkSeconds;
         
-        // If currently on break, subtract the current break duration
-        if (isOnBreak && currentBreakStartTime) {
-          const currentBreakMs = now.getTime() - currentBreakStartTime.getTime();
-          const currentBreakSeconds = Math.floor(currentBreakMs / 1000);
-          actualWorkSeconds = totalElapsedSeconds - totalBreakTime - currentBreakSeconds;
+        if (isOnBreak) {
+          // FROZEN: When on break, work time stops counting
+          // Calculate work time up to the break start point
+          if (currentBreakStartTime) {
+            const workTimeBeforeBreak = Math.floor((currentBreakStartTime.getTime() - checkInTime.getTime()) / 1000);
+            actualWorkSeconds = Math.max(0, workTimeBeforeBreak - totalBreakTime);
+          } else {
+            // Fallback if no break start time
+            actualWorkSeconds = Math.max(0, totalElapsedSeconds - totalBreakTime);
+          }
+        } else {
+          // RUNNING: When working, subtract all completed break time from total elapsed
+          actualWorkSeconds = Math.max(0, totalElapsedSeconds - totalBreakTime);
         }
         
-        // Ensure work time doesn't go negative
-        actualWorkSeconds = Math.max(0, actualWorkSeconds);
-        
-        // FREEZE MODE: Work time freezes during breaks
+        // FREEZE MODE: Work time freezes during breaks, continues when resumed
         setTimeWorked(actualWorkSeconds);
         
         console.log('⏱️ FREEZE MODE: Work time calculation:', {
           totalElapsedSeconds,
           totalBreakTimeSeconds: totalBreakTime,
-          currentBreakSeconds: isOnBreak && currentBreakStartTime ? Math.floor((now.getTime() - currentBreakStartTime.getTime()) / 1000) : 0,
           actualWorkSeconds,
-          isOnBreak: isOnBreak ? '(FROZEN - on break)' : '(RUNNING - working)'
+          mode: isOnBreak ? '🟡 FROZEN (on break - timer stopped)' : '🟢 RUNNING (working - timer counting)',
+          breakStatus: isOnBreak ? 'Timer frozen at break start' : 'Timer running normally',
+          currentBreakStartTime: currentBreakStartTime?.toISOString()
         });
         
         // Determine shift type based on database assignment (shiftInfo) or fallback to check-in time
@@ -792,14 +803,14 @@ const WorkShiftTimer: React.FC = () => {
   let isClockActive = false; // Clock animation only when time is running low
   let animationType: 'normal' | 'warning' | 'urgent' = 'normal';
   
-  if (remainingSeconds <= 30 * 60) { // Last 30 minutes - URGENT
-    colorClass = 'from-orange-50 to-amber-50 text-orange-700 border-orange-400';
-    iconColor = 'text-orange-600';
-    progressColor = 'bg-orange-500';
-    progressBgColor = 'bg-orange-100/50';
+  if (remainingSeconds <= 30 * 60) { // Last 30 minutes - URGENT (RED/ORANGE)
+    colorClass = 'from-red-50 to-orange-50 text-red-700 border-red-400';
+    iconColor = 'text-red-600';
+    progressColor = 'bg-red-500';
+    progressBgColor = 'bg-red-100/50';
     isClockActive = true;
     animationType = 'urgent'; // Use 3minuts animation
-  } else if (remainingSeconds <= 50 * 60) { // Last 50 minutes - WARNING
+  } else if (remainingSeconds <= 60 * 60) { // Last 60 minutes - WARNING (YELLOW/AMBER)
     colorClass = 'from-yellow-50 to-amber-50 text-yellow-700 border-yellow-400';
     iconColor = 'text-yellow-600';
     progressColor = 'bg-yellow-500';
@@ -807,6 +818,7 @@ const WorkShiftTimer: React.FC = () => {
     isClockActive = true;
     animationType = 'warning'; // Use 1hour animation
   }
+  // ELSE: Normal work time stays GREEN (emerald) - the default colors above
 
   // Log clock animation state for debugging
   if (isClockActive) {

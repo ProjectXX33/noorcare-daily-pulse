@@ -82,15 +82,52 @@ const formatBreakTime = (totalMinutes: number): string => {
 };
 
 // Helper function to calculate "Delay to Finish" using Smart Logic
-const calculateDelayToFinish = (breakMinutes: number, delayMinutes: number, regularHours: number, overtimeHours: number, shiftName?: string): string => {
+const calculateDelayToFinish = (
+  breakMinutes: number,
+  delayMinutes: number,
+  regularHours: number,
+  overtimeHours: number,
+  shiftName?: string,
+  shiftStartTime?: string,
+  shiftEndTime?: string
+): string => {
   // NEW SMART LOGIC: Different calculation based on work completion
   
-  // Get expected hours based on shift type (Day = 7h, Night = 8h)
+  // Get expected hours based on shift type (Day = 7h, Night = 8h, Custom = duration)
   const getExpectedHours = (shiftName?: string): number => {
-    if (!shiftName) return 7; // Default to Day Shift
-    if (shiftName.toLowerCase().includes('day')) return 7;
-    if (shiftName.toLowerCase().includes('night')) return 8;
-    return 7; // Default fallback
+    // Default to Day Shift unless otherwise determined
+    if (!shiftName) return 7;
+
+    const nameLower = shiftName.toLowerCase();
+
+    if (nameLower.includes('day')) return 7;
+    if (nameLower.includes('night')) return 8;
+
+    // For custom shifts (anything else), attempt to calculate duration from
+    // provided start/end strings, e.g. "08:00" / "14:00". Fallback safely on error.
+    if (shiftStartTime && shiftEndTime) {
+      try {
+        const [startH, startM] = shiftStartTime.split(':').map(Number);
+        const [endH, endM] = shiftEndTime.split(':').map(Number);
+
+        let durationMinutes: number;
+
+        // Handle overnight custom shift where end time is on next day
+        if (endH < startH || (endH === startH && endM < startM)) {
+          durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+        } else {
+          durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+        }
+
+        return durationMinutes / 60;
+      } catch {
+        // If parsing fails, fallback to 7 hours
+        return 7;
+      }
+    }
+
+    // If no start/end info, fallback to 7 hours
+    return 7;
   };
   
   const expectedHours = getExpectedHours(shiftName);
@@ -503,13 +540,11 @@ const ShiftsPage = () => {
     const workingDays = monthlyShifts.filter(shift => shift.checkInTime).length;
     const averagePerDay = workingDays > 0 ? (totalRegular + actualOvertimeHours) / workingDays : 0;
     
-    // Calculate totals using simple formula: Break Time + Delay Minutes
     const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
-    const totalBreakMinutes = monthlyShifts.reduce((sum, shift) => sum + (shift.totalBreakMinutes || 0), 0);
-    
-    // Step 1: Calculate raw totals
-    const totalDelayAndBreakMinutes = totalBreakMinutes + totalDelayMinutes;
-    const rawDelayToFinishHours = totalDelayAndBreakMinutes / 60; // Convert to hours
+    // Break time should not affect "Delay to Finish" because work hours freeze during breaks.
+    // Keep break minutes for other displays but exclude from delay calculation.
+
+    const rawDelayToFinishHours = totalDelayMinutes / 60; // Only actual delay minutes
     
     // Step 2: Apply smart offsetting logic for EMPLOYEE VIEW: Total Overtime Hours - Delay to Finish
     let finalOvertimeHours = 0;
@@ -539,8 +574,8 @@ const ShiftsPage = () => {
     console.log('📊 Summary with Smart Offsetting Logic (Employee View):', {
       userRole: user?.role,
       totalDelayMinutes,
-      totalBreakMinutes,
-      totalDelayAndBreakMinutes,
+      totalBreakMinutes: 0,
+      totalDelayAndBreakMinutes: 0,
       rawDelayToFinishHours: rawDelayToFinishHours.toFixed(2),
       actualOvertimeHours: actualOvertimeHours.toFixed(2),
       finalOvertimeHours: finalOvertimeHours.toFixed(2),
@@ -1269,9 +1304,9 @@ const ShiftsPage = () => {
                           <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
                             </span>
                           </div>
                         </div>
@@ -1408,9 +1443,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
                           </TableCell>
                         </TableRow>
                       ))

@@ -44,36 +44,56 @@ export const updateEmployeeRating = async (ratingId: string, rating: number, com
 };
 
 export const getEmployeeRatings = async (employeeId: string): Promise<EmployeeRating[]> => {
-  const { data, error } = await supabase
-    .from('employee_ratings')
-    .select(`
-      *,
-      rated_by_user:users!employee_ratings_rated_by_fkey(name)
-    `)
-    .eq('employee_id', employeeId)
-    .order('rated_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('employee_ratings')
+      .select(`
+        *,
+        rated_by_user:users!employee_ratings_rated_by_fkey(name)
+      `)
+      .eq('employee_id', employeeId)
+      .order('rated_at', { ascending: false });
 
-  if (error) throw error;
-  return data.map(mapEmployeeRatingFromRecord);
+    if (error) {
+      console.error('Error fetching employee ratings:', error);
+      if (error.code === '406') return []; // Return empty array for 406 errors
+      throw error;
+    }
+
+    return (data || []).map(mapEmployeeRatingFromRecord);
+  } catch (error) {
+    console.error('Failed to fetch employee ratings:', error);
+    return []; // Return empty array instead of throwing to prevent app crashes
+  }
 };
 
 export const getLatestEmployeeRating = async (employeeId: string): Promise<EmployeeRating | null> => {
-  const { data, error } = await supabase
-    .from('employee_ratings')
-    .select(`
-      *,
-      rated_by_user:users!employee_ratings_rated_by_fkey(name)
-    `)
-    .eq('employee_id', employeeId)
-    .order('rated_at', { ascending: false })
-    .limit(1)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('employee_ratings')
+      .select(`
+        *,
+        rated_by_user:users!employee_ratings_rated_by_fkey(name)
+      `)
+      .eq('employee_id', employeeId)
+      .order('rated_at', { ascending: false })
+      .limit(1);
 
-  if (error) {
-    if (error.code === 'PGRST116') return null; // No data found
-    throw error;
+    if (error) {
+      console.error('Error fetching latest employee rating:', error);
+      if (error.code === 'PGRST116' || error.code === '406') return null; // No data found or not acceptable
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    return mapEmployeeRatingFromRecord(data[0]);
+  } catch (error) {
+    console.error('Failed to fetch latest employee rating:', error);
+    return null; // Return null instead of throwing to prevent app crashes
   }
-  return mapEmployeeRatingFromRecord(data);
 };
 
 export const getEmployeeAverageRating = async (employeeId: string): Promise<number> => {
