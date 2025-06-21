@@ -211,6 +211,10 @@ const CreateOrderPage: React.FC = () => {
   const [customDiscount, setCustomDiscount] = useState<CustomDiscount | null>(null);
   const [customerNote, setCustomerNote] = useState('');
   const [includeShipping, setIncludeShipping] = useState(true);
+  const [customShippingAmount, setCustomShippingAmount] = useState<number | null>(null);
+  const [isCustomShipping, setIsCustomShipping] = useState(false);
+  const [isCustomShippingDialogOpen, setIsCustomShippingDialogOpen] = useState(false);
+  const [tempShippingAmount, setTempShippingAmount] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
@@ -592,10 +596,41 @@ const CreateOrderPage: React.FC = () => {
 
   const calculateShipping = () => {
     if (!includeShipping) return 0;
+    
+    // Use custom shipping amount if set
+    if (isCustomShipping && customShippingAmount !== null) {
+      return customShippingAmount;
+    }
+    
+    // Default shipping logic
     const subtotal = calculateSubtotal();
     const discount = calculateDiscount();
     const totalAfterDiscount = subtotal - discount;
     return totalAfterDiscount < 200 ? 10 : 0;
+  };
+
+  const setCustomShipping = (amount: number) => {
+    setCustomShippingAmount(amount);
+    setIsCustomShipping(true);
+    setIncludeShipping(true); // Ensure shipping is enabled when setting custom amount
+    setIsCustomShippingDialogOpen(false);
+    setTempShippingAmount('');
+    toast.success(`Custom shipping amount set: ${amount.toFixed(2)} SAR`);
+  };
+
+  const resetToDefaultShipping = () => {
+    setCustomShippingAmount(null);
+    setIsCustomShipping(false);
+    toast.info('Shipping reset to default calculation');
+  };
+
+  const handleSetCustomShipping = () => {
+    const amount = parseFloat(tempShippingAmount);
+    if (!isNaN(amount) && amount >= 0) {
+      setCustomShipping(amount);
+    } else {
+      toast.error('Please enter a valid shipping amount');
+    }
   };
 
   const calculateTotal = () => {
@@ -767,6 +802,7 @@ const CreateOrderPage: React.FC = () => {
         custom_discount_reason: customDiscount?.reason,
         customer_note: customerNote,
         include_shipping: includeShipping,
+        custom_shipping_amount: isCustomShipping ? customShippingAmount : null,
         status: 'processing',
         payment_method: 'cod',
         payment_status: 'pending'
@@ -924,8 +960,10 @@ const CreateOrderPage: React.FC = () => {
       setAppliedCoupon(null);
       setCustomDiscount(null);
       setCouponCode('');
-      setCustomerNote('');
-      setIncludeShipping(true);
+              setCustomerNote('');
+        setIncludeShipping(true);
+        setCustomShippingAmount(null);
+        setIsCustomShipping(false);
       
     } catch (error) {
       console.error('Error creating order:', error);
@@ -1495,37 +1533,118 @@ const CreateOrderPage: React.FC = () => {
                       </div>
                     )}
                     
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span>Shipping:</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIncludeShipping(!includeShipping)}
-                          className="h-6 px-2 text-xs"
-                        >
-                          <Truck className="h-3 w-3 mr-1" />
-                          {includeShipping ? 'Remove' : 'Add'}
-                        </Button>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span>Shipping:</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIncludeShipping(!includeShipping)}
+                            className="h-6 px-2 text-xs"
+                          >
+                            <Truck className="h-3 w-3 mr-1" />
+                            {includeShipping ? 'Remove' : 'Add'}
+                          </Button>
+                        </div>
+                        <div className="text-right">
+                          {includeShipping ? (
+                            <div>
+                              <span className="flex items-center gap-1">
+                                <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="12" height="13.432" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
+                                  <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
+                                  <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
+                                </svg>
+                                {calculateShipping().toFixed(2)}
+                                {isCustomShipping && (
+                                  <Badge variant="secondary" className="ml-1 text-xs">Custom</Badge>
+                                )}
+                              </span>
+                              {!isCustomShipping && calculateShipping() === 0 && (
+                                <div className="text-xs text-emerald-600">Free shipping over 200 SAR</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">No shipping</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        {includeShipping ? (
-                          <div>
-                            <span className="flex items-center gap-1">
-                              <svg className="riyal-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1124.14 1256.39" width="12" height="13.432" style={{display:'inline-block',verticalAlign:'-0.125em'}}>
-                                <path fill="currentColor" d="M699.62,1113.02h0c-20.06,44.48-33.32,92.75-38.4,143.37l424.51-90.24c20.06-44.47,33.31-92.75,38.4-143.37l-424.51,90.24Z"></path>
-                                <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
-                              </svg>
-                              {calculateShipping().toFixed(2)}
-                            </span>
-                            {calculateShipping() === 0 && (
-                              <div className="text-xs text-emerald-600">Free shipping over 200 SAR</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">No shipping</span>
-                        )}
-                      </div>
+                      
+                      {/* Custom Shipping Amount Controls */}
+                      {includeShipping && (
+                        <div className="flex items-center gap-2 text-xs">
+                          {!isCustomShipping ? (
+                            <Dialog open={isCustomShippingDialogOpen} onOpenChange={setIsCustomShippingDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+                                  <Tag className="h-3 w-3 mr-1" />
+                                  Set Custom Amount
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center gap-2">
+                                    <Truck className="h-4 w-4" />
+                                    Custom Shipping Amount
+                                  </DialogTitle>
+                                  <DialogDescription>
+                                    Set a custom shipping amount for this order
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label htmlFor="custom-shipping">Shipping Amount (SAR)</Label>
+                                    <Input
+                                      id="custom-shipping"
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      value={tempShippingAmount}
+                                      onChange={(e) => setTempShippingAmount(e.target.value)}
+                                      onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleSetCustomShipping();
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      onClick={handleSetCustomShipping}
+                                      className="flex-1"
+                                    >
+                                      Set Amount
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setIsCustomShippingDialogOpen(false);
+                                        setTempShippingAmount('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">Custom: {customShippingAmount?.toFixed(2)} SAR</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={resetToDefaultShipping}
+                                className="h-5 px-1 text-xs"
+                              >
+                                <X className="h-3 w-3" />
+                                Reset
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

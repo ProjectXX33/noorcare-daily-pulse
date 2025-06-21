@@ -10,6 +10,9 @@ export type User = {
   preferences?: UserPreferences;
   latestRating?: EmployeeRating;
   averageRating?: number;
+  diamondRank?: boolean;
+  diamondRankAssignedBy?: string;
+  diamondRankAssignedAt?: Date;
 };
 
 export type Department = 'Engineering' | 'Medical' | 'General' | 'Management';
@@ -203,6 +206,9 @@ export type UserRecord = {
   last_checkin: string | null;
   created_at: string;
   updated_at: string;
+  diamond_rank?: boolean;
+  diamond_rank_assigned_by?: string;
+  diamond_rank_assigned_at?: string;
 };
 
 export type CheckInRecord = {

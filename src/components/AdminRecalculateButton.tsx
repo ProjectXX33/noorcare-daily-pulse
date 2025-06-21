@@ -104,7 +104,9 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
           const dateKey = format(new Date(record.work_date), 'yyyy-MM-dd');
           const breakKey = `${record.user_id}-${dateKey}`;
           const breakData = breakTimeMap.get(breakKey) || { totalBreakMinutes: 0, breakSessions: [] };
-          const breakTimeMinutes = breakData.totalBreakMinutes;
+          // Re-enable break time calculation (auto-refresh issue fixed)
+          // Break time is now properly included in UI after fixing CheckInContext refresh
+          const breakTimeMinutes = breakData.totalBreakMinutes || 0;
 
           // Calculate work hours and overtime (only if checked out)
           let regularHours = record.regular_hours || 0;
@@ -113,19 +115,16 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
           let earlyCheckoutPenalty = 0;
 
           if (checkOutTime) {
-            // NEW BREAK-TIME-AWARE CALCULATION
+            // FIXED: Work timer already excludes break time (FREEZE MODE)
+            // No need to subtract break time again - that would be double-counting
             const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
-            const totalHours = totalMinutes / 60;
+            const actualWorkHours = totalMinutes / 60;
             
-            // Subtract break time to get actual work time
-            const breakHours = breakTimeMinutes / 60;
-            const actualWorkHours = Math.max(0, totalHours - breakHours);
-            
-            console.log(`🕐 Break-Time-Aware Hours Calculation:`, {
-              totalHours: totalHours.toFixed(2),
-              breakHours: breakHours.toFixed(2),
+            console.log(`🕐 FIXED Hours Calculation (No Double Break Subtraction):`, {
+              totalMinutes: totalMinutes.toFixed(1),
               actualWorkHours: actualWorkHours.toFixed(2),
-              breakTimeMinutes: breakTimeMinutes
+              breakTimeMinutes: breakTimeMinutes,
+              note: 'Work timer already excludes break time - no additional subtraction needed'
             });
             
             // Determine standard work hours based on shift type
@@ -138,24 +137,38 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             regularHours = Math.min(actualWorkHours, standardWorkHours);
             overtimeHours = Math.max(0, actualWorkHours - standardWorkHours);
             
-            // Calculate delay: Check-in delay + Break time
+            // NEW SMART DELAY CALCULATION
             const [startHour, startMin] = shift.start_time.split(':').map(Number);
             const scheduledStart = new Date(checkInTime);
             scheduledStart.setHours(startHour, startMin, 0, 0);
             const rawDelayMs = checkInTime.getTime() - scheduledStart.getTime();
             const checkInDelayMinutes = Math.max(0, rawDelayMs / (1000 * 60));
             
-            // NEW FORMULA: Check-in Delay + Break Time = Total Delay to Finish
-            delayMinutes = checkInDelayMinutes + breakTimeMinutes;
+            // SIMPLIFIED LOGIC: Only calculate missing work time (ignore late check-in)
+            if (actualWorkHours < standardWorkHours) {
+              // EARLY CHECKOUT: Only show missing hours as delay
+              const hoursShort = standardWorkHours - actualWorkHours;
+              const hoursShortMinutes = hoursShort * 60;
+              
+              // NEW: Only count missing work time, ignore check-in delay
+              delayMinutes = hoursShortMinutes;
+            } else {
+              // FULL/OVERTIME WORK: No delay if completed required hours
+              delayMinutes = 0; // All clear if worked required hours or more
+            }
             
-            console.log(`🧮 ${shift.name} - NEW Break-Time-Aware Formula:`, {
+            console.log(`🧮 ${shift.name} - NEW Smart Delay Formula:`, {
               actualWorkHours: actualWorkHours.toFixed(2),
+              standardWorkHours,
               regularHours: regularHours.toFixed(2),
               overtimeHours: overtimeHours.toFixed(2),
               checkInDelayMinutes: checkInDelayMinutes.toFixed(1),
               breakTimeMinutes: breakTimeMinutes.toFixed(1),
               totalDelayMinutes: delayMinutes.toFixed(1),
-              formula: `${checkInDelayMinutes.toFixed(1)}min (check-in delay) + ${breakTimeMinutes.toFixed(1)}min (break time) = ${delayMinutes.toFixed(1)}min total delay`
+              logic: actualWorkHours < standardWorkHours ? 'MISSING_WORK_ONLY' : 'COMPLETED_WORK',
+              formula: actualWorkHours < standardWorkHours 
+                ? `Missing Work Only: ${((standardWorkHours - actualWorkHours) * 60).toFixed(1)}min short = ${delayMinutes.toFixed(1)}min (check-in delay ignored)`
+                : `Completed Work: No delay (worked ${actualWorkHours.toFixed(2)}h >= ${standardWorkHours}h required)`
             });
             
             // Track early checkout penalty (based on actual work hours)
@@ -433,13 +446,13 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         </div>
 
         <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded border">
-          <div className="font-semibold mb-1">🔥 NEW: Break-Time-Aware Calculation:</div>
+          <div className="font-semibold mb-1">🔥 NEW: Smart Delay Calculation:</div>
           <ul className="space-y-1 text-orange-700">
             <li>• <strong>🕐 Work Hours:</strong> Total time MINUS break time (work time freezes during breaks)</li>
             <li>• <strong>⏰ Regular Hours:</strong> Calculated from actual work time (excluding breaks)</li>
             <li>• <strong>🔥 Overtime Hours:</strong> Based on actual work time beyond standard hours</li>
-            <li>• <strong>📝 Delay to Finish:</strong> Check-in delay + Break time</li>
-            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with break-aware logic</li>
+            <li>• <strong>📝 Smart Delay to Finish:</strong> Early checkout = Missing hours + delays, Overtime = Delays - overtime hours</li>
+            <li>• <strong>📊 Performance Data:</strong> Updates admin dashboard with smart delay logic</li>
           </ul>
           <div className="mt-2 p-1 bg-emerald-50 rounded text-emerald-700 text-xs">
             <strong>✨ Break Time Freezing:</strong> When employees take breaks, their regular work hours counter freezes - only actual working time counts!

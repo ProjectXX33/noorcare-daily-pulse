@@ -81,22 +81,54 @@ const formatBreakTime = (totalMinutes: number): string => {
   }
 };
 
-// Helper function to calculate "Delay to Finish" = Break Time + Delay Minutes (Simple Addition)
-const calculateDelayToFinish = (breakMinutes: number, delayMinutes: number, regularHours: number, overtimeHours: number): string => {
-  // SIMPLE FORMULA: Break Time + Delay Minutes
-  const totalDelayMinutes = breakMinutes + delayMinutes;
+// Helper function to calculate "Delay to Finish" using Smart Logic
+const calculateDelayToFinish = (breakMinutes: number, delayMinutes: number, regularHours: number, overtimeHours: number, shiftName?: string): string => {
+  // NEW SMART LOGIC: Different calculation based on work completion
   
-  console.log('🧮 Simple Delay to Finish Calculation:', {
+  // Get expected hours based on shift type (Day = 7h, Night = 8h)
+  const getExpectedHours = (shiftName?: string): number => {
+    if (!shiftName) return 7; // Default to Day Shift
+    if (shiftName.toLowerCase().includes('day')) return 7;
+    if (shiftName.toLowerCase().includes('night')) return 8;
+    return 7; // Default fallback
+  };
+  
+  const expectedHours = getExpectedHours(shiftName);
+  const workedHours = regularHours; // Total hours actually worked
+  
+  let finalDelayMinutes = 0;
+  let calculationLogic = '';
+  
+  if (workedHours < expectedHours) {
+    // SIMPLIFIED LOGIC: Only show missing work hours (ignore check-in delay)
+    const hoursShort = expectedHours - workedHours;
+    const hoursShortMinutes = hoursShort * 60;
+    
+    // NEW: Only count missing work time
+    finalDelayMinutes = hoursShortMinutes;
+    calculationLogic = `Missing Work Only: ${hoursShort.toFixed(2)}h short = ${hoursShortMinutes.toFixed(0)}min (check-in delay ignored)`;
+  } else {
+    // COMPLETED WORK: No delay if worked required hours or more
+    finalDelayMinutes = 0;
+    calculationLogic = `Completed Work: No delay (worked ${workedHours.toFixed(2)}h >= ${expectedHours}h required)`;
+  }
+  
+  console.log('🧮 Smart Delay to Finish Calculation:', {
+    expectedHours,
+    workedHours,
+    regularHours,
+    overtimeHours,
     breakMinutes,
     delayMinutes,
-    totalDelayMinutes,
-    formula: `${breakMinutes}min + ${delayMinutes}min = ${totalDelayMinutes}min`
+    finalDelayMinutes,
+    calculationLogic,
+    logic: workedHours < expectedHours ? 'EARLY_CHECKOUT' : 'FULL_OVERTIME_WORK'
   });
   
-  if (totalDelayMinutes <= 0) return 'All Clear';
+  if (finalDelayMinutes <= 0) return 'All Clear';
   
-  const hours = Math.floor(totalDelayMinutes / 60);
-  const minutes = Math.round(totalDelayMinutes % 60);
+  const hours = Math.floor(finalDelayMinutes / 60);
+  const minutes = Math.round(finalDelayMinutes % 60);
   
   if (hours === 0) {
     return `${minutes}min`;
@@ -1237,9 +1269,9 @@ const ShiftsPage = () => {
                           <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName)}
                             </span>
                           </div>
                         </div>
@@ -1376,9 +1408,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName)}
                           </TableCell>
                         </TableRow>
                       ))

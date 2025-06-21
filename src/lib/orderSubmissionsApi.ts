@@ -56,6 +56,7 @@ export interface OrderSubmission {
   customer_note?: string;
   internal_notes?: string;
   include_shipping?: boolean;
+  custom_shipping_amount?: number;
   
   // Order Status
   status?: string;

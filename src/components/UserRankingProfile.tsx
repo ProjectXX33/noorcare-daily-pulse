@@ -9,6 +9,7 @@ interface UserRanking {
   employee_name: string;
   average_performance_score: number;
   position: number;
+  isDiamond?: boolean;
 }
 
 interface UserRankingProfileProps {
@@ -16,7 +17,7 @@ interface UserRankingProfileProps {
 }
 
 // Global cache for user ranking data to persist across page navigation
-const rankingCache = new Map<string, { data: UserRanking | null; timestamp: number; theme: 'gold' | 'silver' | 'bronze' | 'default' }>();
+const rankingCache = new Map<string, { data: UserRanking | null; timestamp: number; theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default' }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Custom hook to get user ranking data
@@ -45,6 +46,34 @@ export const useUserRanking = () => {
       }
 
       try {
+        // First check if user has Diamond rank
+        const { data: userDiamondData, error: diamondError } = await supabase
+          .from('users')
+          .select('diamond_rank')
+          .eq('id', user.id)
+          .single();
+
+        if (diamondError) {
+          console.error('Error checking Diamond rank:', diamondError);
+        }
+
+        const isDiamond = userDiamondData?.diamond_rank || false;
+
+        if (isDiamond) {
+          // Diamond rank overrides all performance rankings
+          const diamondResult: UserRanking = {
+            employee_id: user.id,
+            employee_name: user.name,
+            average_performance_score: 100,
+            position: 0, // Diamond is position 0 (above all)
+            isDiamond: true
+          };
+          
+          rankingCache.set(cacheKey, { data: diamondResult, timestamp: Date.now(), theme: 'diamond' });
+          setUserRanking(diamondResult);
+          return;
+        }
+
         const currentMonth = format(new Date(), 'yyyy-MM');
         
         // Get all performance data for current month
@@ -75,12 +104,13 @@ export const useUserRanking = () => {
             employee_id: user.id,
             employee_name: user.name,
             average_performance_score: performanceData[userPosition].average_performance_score,
-            position: userPosition + 1 // 1-based ranking
+            position: userPosition + 1, // 1-based ranking
+            isDiamond: false
           };
         }
 
         // Determine theme
-        let theme: 'gold' | 'silver' | 'bronze' | 'default' = 'default';
+        let theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default' = 'default';
         if (result?.position === 1) theme = 'gold';
         else if (result?.position === 2) theme = 'silver';
         else if (result?.position === 3) theme = 'bronze';
@@ -111,7 +141,11 @@ const UserRankingProfile: React.FC<UserRankingProfileProps> = ({ className = '' 
   if (userRanking.position > 10) return null;
 
   // Get gradient style based on ranking position
-  const getRankingGradient = (position: number) => {
+  const getRankingGradient = (position: number, isDiamond: boolean = false) => {
+    if (isDiamond) {
+      return "bg-gradient-to-br from-cyan-300 via-blue-400 to-purple-500 shadow-lg shadow-cyan-500/50"; // Diamond
+    }
+    
     switch (position) {
       case 1:
         return "bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600"; // Gold
@@ -138,14 +172,19 @@ const UserRankingProfile: React.FC<UserRankingProfileProps> = ({ className = '' 
     }
   };
 
+  const displayText = userRanking.isDiamond ? '💎' : userRanking.position.toString();
+
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <div className="relative">
         <div 
-          className={`w-8 h-8 rounded-full ${getRankingGradient(userRanking.position)} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white ring-2 ring-white/20`}
+          className={`w-8 h-8 rounded-full ${getRankingGradient(userRanking.position, userRanking.isDiamond)} flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white ring-2 ring-white/20`}
         >
-          {userRanking.position}
+          {displayText}
         </div>
+        {userRanking.isDiamond && (
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-300 to-purple-400 rounded-full opacity-20 animate-pulse -z-10"></div>
+        )}
       </div>
     </div>
   );
@@ -154,7 +193,7 @@ const UserRankingProfile: React.FC<UserRankingProfileProps> = ({ className = '' 
 // Hook to get user's ranking theme color for styling header/navbar
 export const useUserRankingTheme = () => {
   const { user } = useAuth();
-  const [themeColor, setThemeColor] = useState<'gold' | 'silver' | 'bronze' | 'default'>('default');
+  const [themeColor, setThemeColor] = useState<'diamond' | 'gold' | 'silver' | 'bronze' | 'default'>('default');
 
   useEffect(() => {
     const fetchRankingTheme = async () => {
@@ -170,6 +209,25 @@ export const useUserRankingTheme = () => {
       }
 
       try {
+        // First check if user has Diamond rank
+        const { data: userDiamondData, error: diamondError } = await supabase
+          .from('users')
+          .select('diamond_rank')
+          .eq('id', user.id)
+          .single();
+
+        if (!diamondError && userDiamondData?.diamond_rank) {
+          // Diamond rank overrides all performance rankings
+          const existingCache = rankingCache.get(cacheKey);
+          if (existingCache) {
+            existingCache.theme = 'diamond';
+          } else {
+            rankingCache.set(cacheKey, { data: null, timestamp: Date.now(), theme: 'diamond' });
+          }
+          setThemeColor('diamond');
+          return;
+        }
+
         const currentMonth = format(new Date(), 'yyyy-MM');
         
         const { data: performanceData, error } = await supabase
@@ -183,7 +241,7 @@ export const useUserRankingTheme = () => {
 
         const userPosition = performanceData.findIndex(p => p.employee_id === user.id);
         
-        let theme: 'gold' | 'silver' | 'bronze' | 'default' = 'default';
+        let theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default' = 'default';
         if (userPosition === 0) {
           theme = 'gold';
         } else if (userPosition === 1) {

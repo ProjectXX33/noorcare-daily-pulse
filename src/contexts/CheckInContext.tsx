@@ -1081,7 +1081,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 work_report_id: newReport.id,
                 file_name: fileName,
                 file_path: filePath,
-                file_size: fileAttachment.size
+                file_size: fileAttachment.size,
+                file_type: fileAttachment.type || 'application/octet-stream'
               }]);
               
             if (attachmentError) {
@@ -1265,7 +1266,16 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Use the same logic as fetchCheckIns but with enhanced debugging
       const { data: checkInsData, error: checkInsError } = await supabase
         .from('check_ins')
-        .select('*, users:user_id(name, department, position)')
+        .select(`
+          *, 
+          users:user_id(name, department, position),
+          break_sessions,
+          break_start_time,
+          break_end_time,
+          total_break_minutes,
+          is_on_break,
+          current_break_reason
+        `)
         .order('timestamp', { ascending: false });
         
       if (checkInsError) {
@@ -1290,6 +1300,28 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       const formattedCheckIns: CheckIn[] = checkInsData.map(item => {
         const userInfo = usersMap[item.user_id] || {};
+        
+        // Parse break sessions from JSONB (same as fetchCheckIns)
+        let breakSessions: BreakSession[] = [];
+        try {
+          if (item.break_sessions && Array.isArray(item.break_sessions)) {
+            breakSessions = item.break_sessions;
+          } else if (typeof item.break_sessions === 'string') {
+            breakSessions = JSON.parse(item.break_sessions);
+          }
+        } catch (error) {
+          console.warn('Error parsing break sessions during refresh for check-in:', item.id, error);
+          breakSessions = [];
+        }
+        
+        console.log('🔄 Refresh - Check-in break data for', userInfo.name || 'Unknown', ':', {
+          id: item.id,
+          totalBreakMinutes: item.total_break_minutes,
+          isOnBreak: item.is_on_break,
+          breakSessions: breakSessions,
+          currentBreakReason: item.current_break_reason
+        });
+        
         return {
           id: item.id,
           userId: item.user_id,
@@ -1299,6 +1331,13 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           userName: userInfo.name || 'Unknown User',
           department: userInfo.department || 'Unknown',
           position: userInfo.position || 'Unknown',
+          // Break time fields (same as fetchCheckIns)
+          breakStartTime: item.break_start_time ? new Date(item.break_start_time) : null,
+          breakEndTime: item.break_end_time ? new Date(item.break_end_time) : null,
+          totalBreakMinutes: item.total_break_minutes || 0,
+          isOnBreak: item.is_on_break || false,
+          currentBreakReason: item.current_break_reason || '',
+          breakSessions: breakSessions,
         };
       });
       

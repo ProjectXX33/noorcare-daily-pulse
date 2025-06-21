@@ -33,7 +33,8 @@ import {
   DatabaseIcon,
   Target,
   Medal,
-  Award
+  Award,
+  Gem
 } from 'lucide-react';
 import { GrowthStrategyIcon } from './GrowthStrategyIcon';
 import { 
@@ -93,7 +94,7 @@ interface SidebarNavigationProps {
 const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
   if (effectType === 'none') return null;
 
-  // Add custom CSS for static flashing effects
+  // Add custom CSS for ULTRA-PREMIUM Diamond effects
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -113,9 +114,310 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
         50% { opacity: 0.8; }
       }
       
+      /* PREMIUM Diamond Animations */
+      @keyframes diamondShimmer {
+        0% { 
+          opacity: 0.6; 
+          transform: scale(0.9) rotate(0deg); 
+          filter: brightness(1) saturate(1.2); 
+        }
+        25% { 
+          opacity: 1; 
+          transform: scale(1.1) rotate(90deg); 
+          filter: brightness(1.3) saturate(1.5); 
+        }
+        50% { 
+          opacity: 0.8; 
+          transform: scale(1.2) rotate(180deg); 
+          filter: brightness(1.5) saturate(1.8); 
+        }
+        75% { 
+          opacity: 1; 
+          transform: scale(1.1) rotate(270deg); 
+          filter: brightness(1.3) saturate(1.5); 
+        }
+        100% { 
+          opacity: 0.6; 
+          transform: scale(0.9) rotate(360deg); 
+          filter: brightness(1) saturate(1.2); 
+        }
+      }
+      
+      @keyframes diamondFloat {
+        0%, 100% { 
+          transform: translateY(0px) translateX(0px) scale(1); 
+          opacity: 0.7; 
+        }
+        25% { 
+          transform: translateY(-3px) translateX(2px) scale(1.1); 
+          opacity: 1; 
+        }
+        50% { 
+          transform: translateY(-6px) translateX(0px) scale(1.2); 
+          opacity: 0.8; 
+        }
+        75% { 
+          transform: translateY(-3px) translateX(-2px) scale(1.1); 
+          opacity: 1; 
+        }
+      }
+      
+      @keyframes diamondPulse {
+        0%, 100% { 
+          box-shadow: 0 0 10px rgba(34, 211, 238, 0.4), 0 0 20px rgba(147, 51, 234, 0.3), 0 0 30px rgba(59, 130, 246, 0.2);
+          transform: scale(1);
+        }
+        50% { 
+          box-shadow: 0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(147, 51, 234, 0.6), 0 0 60px rgba(59, 130, 246, 0.4);
+          transform: scale(1.05);
+        }
+      }
+      
+      @keyframes diamondSparkle {
+        0% { 
+          opacity: 0; 
+          transform: scale(0) rotate(0deg); 
+        }
+        20% { 
+          opacity: 1; 
+          transform: scale(1.2) rotate(72deg); 
+        }
+        40% { 
+          opacity: 0.8; 
+          transform: scale(0.8) rotate(144deg); 
+        }
+        60% { 
+          opacity: 1; 
+          transform: scale(1.1) rotate(216deg); 
+        }
+        80% { 
+          opacity: 0.6; 
+          transform: scale(0.9) rotate(288deg); 
+        }
+        100% { 
+          opacity: 0; 
+          transform: scale(0) rotate(360deg); 
+        }
+      }
+      
+      @keyframes diamondRainbow {
+        0% { filter: hue-rotate(0deg) brightness(1.2) saturate(1.5); }
+        16.66% { filter: hue-rotate(60deg) brightness(1.3) saturate(1.6); }
+        33.33% { filter: hue-rotate(120deg) brightness(1.4) saturate(1.7); }
+        50% { filter: hue-rotate(180deg) brightness(1.5) saturate(1.8); }
+        66.66% { filter: hue-rotate(240deg) brightness(1.4) saturate(1.7); }
+        83.33% { filter: hue-rotate(300deg) brightness(1.3) saturate(1.6); }
+        100% { filter: hue-rotate(360deg) brightness(1.2) saturate(1.5); }
+      }
+      
+      /* 🚀 NEW ULTRA-PREMIUM DIAMOND ANIMATIONS - NEXT LEVEL LUXURY */
+      
+      @keyframes diamond3dRotate {
+        0% { 
+          transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1); 
+          filter: brightness(1) saturate(1.2); 
+        }
+        25% { 
+          transform: rotateX(90deg) rotateY(90deg) rotateZ(90deg) scale(1.1); 
+          filter: brightness(1.3) saturate(1.5); 
+        }
+        50% { 
+          transform: rotateX(180deg) rotateY(180deg) rotateZ(180deg) scale(1.2); 
+          filter: brightness(1.5) saturate(1.8); 
+        }
+        75% { 
+          transform: rotateX(270deg) rotateY(270deg) rotateZ(270deg) scale(1.1); 
+          filter: brightness(1.3) saturate(1.5); 
+        }
+        100% { 
+          transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg) scale(1); 
+          filter: brightness(1) saturate(1.2); 
+        }
+      }
+      
+      @keyframes diamondLightning {
+        0%, 90%, 100% { opacity: 0; transform: scaleX(0); }
+        5%, 15% { opacity: 1; transform: scaleX(1); }
+        10% { opacity: 0.8; transform: scaleX(1.2); }
+      }
+      
+      @keyframes diamondWave {
+        0% { 
+          transform: translateX(-100%) scaleY(1); 
+          opacity: 0; 
+        }
+        50% { 
+          transform: translateX(0%) scaleY(1.5); 
+          opacity: 1; 
+        }
+        100% { 
+          transform: translateX(100%) scaleY(1); 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes diamondParticle1 {
+        0% { 
+          transform: translateY(0px) translateX(0px) scale(0); 
+          opacity: 0; 
+        }
+        25% { 
+          transform: translateY(-10px) translateX(5px) scale(1.2); 
+          opacity: 1; 
+        }
+        50% { 
+          transform: translateY(-20px) translateX(0px) scale(1); 
+          opacity: 0.8; 
+        }
+        75% { 
+          transform: translateY(-10px) translateX(-5px) scale(1.1); 
+          opacity: 0.6; 
+        }
+        100% { 
+          transform: translateY(0px) translateX(0px) scale(0); 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes diamondParticle2 {
+        0% { 
+          transform: translateY(0px) translateX(0px) rotate(0deg) scale(0); 
+          opacity: 0; 
+        }
+        30% { 
+          transform: translateY(-15px) translateX(-8px) rotate(120deg) scale(1.3); 
+          opacity: 1; 
+        }
+        60% { 
+          transform: translateY(-25px) translateX(3px) rotate(240deg) scale(0.9); 
+          opacity: 0.7; 
+        }
+        100% { 
+          transform: translateY(-5px) translateX(8px) rotate(360deg) scale(0); 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes diamondParticle3 {
+        0% { 
+          transform: translateY(0px) translateX(0px) rotate(0deg) scale(0); 
+          opacity: 0; 
+        }
+        20% { 
+          transform: translateY(-8px) translateX(12px) rotate(90deg) scale(1.4); 
+          opacity: 1; 
+        }
+        40% { 
+          transform: translateY(-18px) translateX(-5px) rotate(180deg) scale(1.1); 
+          opacity: 0.9; 
+        }
+        70% { 
+          transform: translateY(-12px) translateX(8px) rotate(270deg) scale(0.8); 
+          opacity: 0.5; 
+        }
+        100% { 
+          transform: translateY(2px) translateX(-3px) rotate(360deg) scale(0); 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes diamondFire {
+        0% { 
+          transform: scaleY(1) scaleX(1); 
+          opacity: 0.3; 
+        }
+        25% { 
+          transform: scaleY(1.5) scaleX(0.8); 
+          opacity: 0.7; 
+        }
+        50% { 
+          transform: scaleY(2) scaleX(0.6); 
+          opacity: 1; 
+        }
+        75% { 
+          transform: scaleY(1.8) scaleX(0.7); 
+          opacity: 0.8; 
+        }
+        100% { 
+          transform: scaleY(1) scaleX(1); 
+          opacity: 0.3; 
+        }
+      }
+      
+      @keyframes diamondSupernova {
+        0% { 
+          transform: scale(0) rotate(0deg); 
+          opacity: 0; 
+        }
+        10% { 
+          transform: scale(0.5) rotate(36deg); 
+          opacity: 0.8; 
+        }
+        20% { 
+          transform: scale(1.2) rotate(72deg); 
+          opacity: 1; 
+        }
+        40% { 
+          transform: scale(2) rotate(144deg); 
+          opacity: 0.6; 
+        }
+        60% { 
+          transform: scale(2.5) rotate(216deg); 
+          opacity: 0.3; 
+        }
+        80% { 
+          transform: scale(3) rotate(288deg); 
+          opacity: 0.1; 
+        }
+        100% { 
+          transform: scale(3.5) rotate(360deg); 
+          opacity: 0; 
+        }
+      }
+      
+      @keyframes disappearingPulse {
+        0% { 
+          opacity: 0; 
+          transform: scale(0.8); 
+        }
+        25% { 
+          opacity: 0.6; 
+          transform: scale(1.1); 
+        }
+        50% { 
+          opacity: 1; 
+          transform: scale(1); 
+        }
+        75% { 
+          opacity: 0.8; 
+          transform: scale(1.05); 
+        }
+        100% { 
+          opacity: 0; 
+          transform: scale(0.9); 
+        }
+      }
+      
       .animate-flash-pulse { animation: flashPulse 2s ease-in-out infinite; }
       .animate-color-shift { animation: colorShift 4s ease-in-out infinite; }
       .animate-gentle-glow { animation: gentleGlow 3s ease-in-out infinite; }
+      
+      /* PREMIUM Diamond Classes */
+      .animate-diamond-shimmer { animation: diamondShimmer 3s ease-in-out infinite; }
+      .animate-diamond-float { animation: diamondFloat 4s ease-in-out infinite; }
+      .animate-diamond-pulse { animation: diamondPulse 2.5s ease-in-out infinite; }
+      .animate-diamond-sparkle { animation: diamondSparkle 2s ease-in-out infinite; }
+      .animate-diamond-rainbow { animation: diamondRainbow 5s linear infinite; }
+      
+      /* 🚀 NEW ULTRA-PREMIUM Diamond Classes - NEXT LEVEL LUXURY */
+      .animate-diamond-3d-rotate { animation: diamond3dRotate 6s ease-in-out infinite; }
+      .animate-diamond-lightning { animation: diamondLightning 3s ease-in-out infinite; }
+      .animate-diamond-wave { animation: diamondWave 4s ease-in-out infinite; }
+      .animate-diamond-particle-1 { animation: diamondParticle1 3s ease-in-out infinite; }
+      .animate-diamond-particle-2 { animation: diamondParticle2 3.5s ease-in-out infinite; }
+      .animate-diamond-particle-3 { animation: diamondParticle3 4s ease-in-out infinite; }
+      .animate-diamond-fire { animation: diamondFire 2s ease-in-out infinite; }
+      .animate-diamond-supernova { animation: diamondSupernova 4s ease-in-out infinite; }
       
       .animation-delay-200 { animation-delay: 0.2s; }
       .animation-delay-400 { animation-delay: 0.4s; }
@@ -265,6 +567,112 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
         
         {/* Brown Atmosphere */}
         <div className="absolute inset-0 bg-gradient-to-r from-amber-900/15 via-orange-900/25 to-amber-900/15 animate-gentle-glow animation-delay-1400 opacity-70"></div>
+      </>
+    );
+  }
+
+  if (effectType === 'diamond') {
+    return (
+      <>
+        {/* 💎 SPECTACULAR SVG GEM ICONS - SAME SIZE + RANDOM LOCATIONS + DISAPPEARING PULSE! 💎 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          
+          {/* 💎 CREATIVE STRATEGIC STAR PLACEMENT - MAXIMUM VISUAL IMPACT! 💎 */}
+          
+          {/* ⭐ CORNER STARS - FRAME THE HEADER */}
+          <svg className="absolute opacity-0 blur-sm" style={{top: '5%', left: '3%', animation: 'disappearingPulse 3s ease-in-out infinite', animationDelay: '0s', filter: 'blur(1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad1)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400"/>
+            <defs><linearGradient id="grad1"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '5%', right: '3%', animation: 'disappearingPulse 3.2s ease-in-out infinite', animationDelay: '0.5s', filter: 'blur(1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad2)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-purple-400"/>
+            <defs><linearGradient id="grad2"><stop offset="0%" stopColor="#a855f7" /><stop offset="100%" stopColor="#67e8f9" /></linearGradient></defs>
+          </svg>
+          
+  
+          
+          <svg className="absolute opacity-0 blur-sm" style={{bottom: '5%', right: '3%', animation: 'disappearingPulse 3.5s ease-in-out infinite', animationDelay: '1.5s', filter: 'blur(1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad4)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400"/>
+            <defs><linearGradient id="grad4"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs>
+          </svg>
+          
+
+          
+          {/* ⭐ SUBTLE DIAMOND CONSTELLATION - MINIMAL & ELEGANT */}
+          
+          {/* 💎 PRIMARY DIAMOND STARS - DESKTOP & MOBILE RESPONSIVE */}
+          <svg className="absolute opacity-0 blur-sm hidden md:block" style={{top: '35%', left: '25%', animation: 'disappearingPulse 8s ease-in-out infinite', animationDelay: '2s', filter: 'blur(1px)'}} width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad15)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400/60"/>
+            <defs><linearGradient id="grad15"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#c084fc" /></linearGradient></defs>
+          </svg>
+          
+
+          
+          <svg className="absolute opacity-0 blur-sm hidden md:block" style={{top: '65%', left: '75%', animation: 'disappearingPulse 9s ease-in-out infinite', animationDelay: '6s', filter: 'blur(1.2px)'}} width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad17)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-purple-400/60"/>
+            <defs><linearGradient id="grad17"><stop offset="0%" stopColor="#a855f7" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient></defs>
+          </svg>
+          
+          {/* 🌟 MOBILE-ONLY MINIMAL STARS */}
+          <svg className="absolute opacity-0 blur-sm md:hidden" style={{top: '40%', left: '30%', animation: 'disappearingPulse 6s ease-in-out infinite', animationDelay: '1s', filter: 'blur(0.9px)'}} width="14" height="14" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad18)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400/50"/>
+            <defs><linearGradient id="grad18"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm md:hidden" style={{top: '60%', left: '70%', animation: 'disappearingPulse 7s ease-in-out infinite', animationDelay: '3s', filter: 'blur(1px)'}} width="12" height="12" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad19)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-blue-400/50"/>
+            <defs><linearGradient id="grad19"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#c084fc" /></linearGradient></defs>
+          </svg>
+          
+          {/* ✨ FLOWING EDGE STARS - CREATE MOVEMENT */}
+          <svg className="absolute opacity-0 blur-sm" style={{top: '20%', left: '8%', animation: 'disappearingPulse 2.9s ease-in-out infinite', animationDelay: '2.5s', filter: 'blur(1.2px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad6)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-blue-400"/>
+            <defs><linearGradient id="grad6"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#67e8f9" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '35%', left: '15%', animation: 'disappearingPulse 3.3s ease-in-out infinite', animationDelay: '3s', filter: 'blur(1.1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad7)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400"/>
+            <defs><linearGradient id="grad7"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#c084fc" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '65%', left: '12%', animation: 'disappearingPulse 3.4s ease-in-out infinite', animationDelay: '3.5s', filter: 'blur(1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad8)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-purple-400"/>
+            <defs><linearGradient id="grad8"><stop offset="0%" stopColor="#a855f7" /><stop offset="100%" stopColor="#67e8f9" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '80%', left: '20%', animation: 'disappearingPulse 2.7s ease-in-out infinite', animationDelay: '4s', filter: 'blur(1.3px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad9)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-blue-400"/>
+            <defs><linearGradient id="grad9"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#a855f7" /></linearGradient></defs>
+          </svg>
+          
+          {/* 💫 RIGHT SIDE FLOWING PATTERN */}
+          <svg className="absolute opacity-0 blur-sm" style={{top: '15%', right: '12%', animation: 'disappearingPulse 3.6s ease-in-out infinite', animationDelay: '4.5s', filter: 'blur(1.1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad10)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-cyan-400"/>
+            <defs><linearGradient id="grad10"><stop offset="0%" stopColor="#67e8f9" /><stop offset="100%" stopColor="#3b82f6" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '40%', right: '8%', animation: 'disappearingPulse 3.2s ease-in-out infinite', animationDelay: '5s', filter: 'blur(1.2px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad11)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-purple-400"/>
+            <defs><linearGradient id="grad11"><stop offset="0%" stopColor="#c084fc" /><stop offset="100%" stopColor="#67e8f9" /></linearGradient></defs>
+          </svg>
+          
+          <svg className="absolute opacity-0 blur-sm" style={{top: '70%', right: '15%', animation: 'disappearingPulse 2.8s ease-in-out infinite', animationDelay: '5.5s', filter: 'blur(1px)'}} width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path fill="url(#grad12)" d="M12 .5L16 8l7.5 4l-7.5 4l-4 7.5L8 16L.5 12L8 8l4-7.5Z" className="text-blue-400"/>
+            <defs><linearGradient id="grad12"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#c084fc" /></linearGradient></defs>
+          </svg>
+          
+          {/* 🌟 TOP & BOTTO`M CENTER ACCENTS */}
+
+          
+
+          
+        </div>
+        
+        {/* 🌟 DIAMOND ATMOSPHERE - SUBTLE BACKGROUND */}
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-50/20 via-blue-50/30 via-purple-50/25 to-cyan-50/15 animate-pulse opacity-60"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-cyan-100/10 via-blue-100/15 to-transparent animate-bounce animation-delay-1000 opacity-40"></div>
+        
       </>
     );
   }
@@ -500,35 +908,43 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   ];
 
   // Get theme colors based on user ranking
-  const getThemeColors = (theme: 'gold' | 'silver' | 'bronze' | 'default') => {
+  const getThemeColors = (theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default') => {
     switch (theme) {
+      case 'diamond':
+        return {
+          header: 'bg-gradient-to-r/90 from-cyan-50/80 via-blue-50/80 to-purple-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-cyan-50/60 border-cyan-200 relative overflow-hidden',
+          sidebar: 'bg-background',
+          text: 'text-foreground',
+          accent: 'text-muted-foreground',
+          effects: 'diamond'
+        };
       case 'gold':
         return {
-          header: 'bg-gradient-to-r from-yellow-50/80 to-amber-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-yellow-50/60 border-yellow-200 relative overflow-hidden',
-          sidebar: 'bg-background', // Normal sidebar color
-          text: 'text-yellow-800',
-          accent: 'text-yellow-600',
+          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          sidebar: 'bg-background',
+          text: 'text-foreground',
+          accent: 'text-muted-foreground',
           effects: 'gold'
         };
       case 'silver':
         return {
-          header: 'bg-gradient-to-r from-gray-50/80 to-slate-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-gray-50/60 border-gray-200 relative overflow-hidden',
-          sidebar: 'bg-background', // Normal sidebar color
-          text: 'text-gray-800',
-          accent: 'text-gray-600',
+          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          sidebar: 'bg-background',
+          text: 'text-foreground',
+          accent: 'text-muted-foreground',
           effects: 'silver'
         };
       case 'bronze':
         return {
-          header: 'bg-gradient-to-r from-amber-900/10 to-orange-900/10 backdrop-blur-md supports-[backdrop-filter]:bg-amber-900/5 border-amber-700/30 relative overflow-hidden',
-          sidebar: 'bg-background', // Normal sidebar color
-          text: 'text-amber-900',
-          accent: 'text-amber-700',
+          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          sidebar: 'bg-background',
+          text: 'text-foreground',
+          accent: 'text-muted-foreground',
           effects: 'bronze'
         };
       default:
         return {
-          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          header: 'bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-border',
           sidebar: 'bg-background',
           text: 'text-foreground',
           accent: 'text-muted-foreground',
@@ -669,7 +1085,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     <SidebarProvider>
       <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
-          className="bg-background transition-all duration-500 ease-in-out"
+          className="bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-500 ease-in-out"
           side={language === 'ar' ? 'right' : 'left'}
         >
           <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
@@ -801,24 +1217,38 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                       </Avatar>
                       
                       {/* Enhanced ranking icons with performance dashboard styling */}
-                      {userRanking?.position === 1 && (
+                      {userRanking?.isDiamond && (
+                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-gradient-to-br from-cyan-300 via-blue-400 to-purple-500 shadow-xl border border-cyan-200/50">
+                          <Gem className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                      {userRanking?.position === 1 && !userRanking?.isDiamond && (
                         <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
                           <Crown className="h-3 w-3 text-yellow-600" />
                         </div>
                       )}
-                      {userRanking?.position === 2 && (
+                      {userRanking?.position === 2 && !userRanking?.isDiamond && (
                         <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
                           <Medal className="h-3 w-3 text-slate-600" />
                         </div>
                       )}
-                      {userRanking?.position === 3 && (
+                      {userRanking?.position === 3 && !userRanking?.isDiamond && (
                         <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
                           <Award className="h-3 w-3 text-amber-800" />
                         </div>
                       )}
                       
-                      {/* Special effects for gold ranking - removed sparkles */}
-                      {userRanking?.position === 1 && (
+                      {/* Special effects for ranking */}
+                      {userRanking?.isDiamond && (
+                        <>
+                          {/* ENHANCED Premium Diamond glow effect - Multi-layered shining */}
+                          <div className="absolute -inset-2 bg-gradient-to-r from-cyan-300 via-blue-400 via-purple-500 to-cyan-400 rounded-full opacity-25 animate-pulse -z-10 blur-sm"></div>
+                          <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse -z-10"></div>
+                          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-200 via-blue-300 to-purple-400 rounded-full opacity-15 -z-10"></div>
+                          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-100 to-purple-300 rounded-full opacity-10 -z-10"></div>
+                        </>
+                      )}
+                      {userRanking?.position === 1 && !userRanking?.isDiamond && (
                         <>
                           {/* Subtle pulsing golden background */}
                           <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-10 -z-10"></div>

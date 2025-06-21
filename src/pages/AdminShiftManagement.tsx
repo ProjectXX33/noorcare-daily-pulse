@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -21,7 +24,9 @@ import {
   Coffee,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  Plus,
+  Save
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,6 +63,25 @@ const AdminShiftManagement = () => {
   const [error, setError] = useState<string | null>(null);
   const [language] = useState('en');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+  
+  // Custom shift creation state
+  const [isCustomShiftDialogOpen, setIsCustomShiftDialogOpen] = useState(false);
+  const [customShiftData, setCustomShiftData] = useState({
+    name: '',
+    startTime: '',
+    endTime: '',
+    position: 'Customer Service' as 'Customer Service' | 'Designer'
+  });
+
+  // Add shift editing state
+  const [isEditShiftDialogOpen, setIsEditShiftDialogOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [editShiftData, setEditShiftData] = useState({
+    name: '',
+    startTime: '',
+    endTime: '',
+    position: 'Customer Service' as 'Customer Service' | 'Designer'
+  });
 
   const translations = {
     en: {
@@ -69,7 +93,7 @@ const AdminShiftManagement = () => {
       monday: "Mon", tuesday: "Tue", wednesday: "Wed", 
       thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun",
       dayShift: "Day Shift", nightShift: "Night Shift", dayOff: "Day Off",
-      save: "Save", cancel: "Cancel", loading: "Loading...",
+      save: "Save", loading: "Loading...",
       assignmentsUpdated: "Shift assignments updated successfully!",
       performanceScore: "Performance Score",
       delayHours: "Delay Hours",
@@ -86,7 +110,20 @@ const AdminShiftManagement = () => {
       previousWeek: "Previous",
       nextWeek: "Next",
       notAssigned: "Not Assigned",
-      viewEmployee: "View Employee"
+      viewEmployee: "View Employee",
+      createCustomShift: "Create Custom Shift",
+      customShift: "Custom",
+      shiftName: "Shift Name",
+      startTime: "Start Time",
+      endTime: "End Time",
+      position: "Position",
+      createShift: "Create Shift",
+      cancel: "Cancel",
+      editShift: "Edit Shift",
+      updateShift: "Update Shift",
+      deleteShift: "Delete Shift",
+      currentShifts: "Current Shifts",
+      createNewShift: "Create New Shift"
     }
   };
 
@@ -317,8 +354,153 @@ const AdminShiftManagement = () => {
     switch (shiftName) {
       case 'Day Shift': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800';
       case 'Night Shift': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200';
+      default: return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800';
     }
+  };
+
+  // Custom shift creation function
+  const createCustomShift = async () => {
+    if (!customShiftData.name || !customShiftData.startTime || !customShiftData.endTime) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('shifts')
+        .insert({
+          name: customShiftData.name,
+          start_time: customShiftData.startTime,
+          end_time: customShiftData.endTime,
+          position: customShiftData.position,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local state
+      setShifts(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        position: data.position,
+        isActive: data.is_active,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at)
+      }]);
+
+      toast.success(`Custom shift "${customShiftData.name}" created successfully!`);
+      
+      // Reset form and close dialog
+      setCustomShiftData({
+        name: '',
+        startTime: '',
+        endTime: '',
+        position: 'Customer Service'
+      });
+      setIsCustomShiftDialogOpen(false);
+
+    } catch (error) {
+      console.error('Error creating custom shift:', error);
+      toast.error('Failed to create custom shift');
+    }
+  };
+
+  // Edit shift function
+  const editShift = async () => {
+    if (!editShiftData.name || !editShiftData.startTime || !editShiftData.endTime || !editingShift) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('shifts')
+        .update({
+          name: editShiftData.name,
+          start_time: editShiftData.startTime,
+          end_time: editShiftData.endTime,
+          position: editShiftData.position,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingShift.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      setShifts(prev => prev.map(shift => 
+        shift.id === editingShift.id 
+          ? {
+              ...shift,
+              name: data.name,
+              startTime: data.start_time,
+              endTime: data.end_time,
+              position: data.position,
+              updatedAt: new Date(data.updated_at)
+            }
+          : shift
+      ));
+
+      toast.success(`Shift "${editShiftData.name}" updated successfully!`);
+      
+      // Reset form and close dialog
+      setEditingShift(null);
+      setEditShiftData({
+        name: '',
+        startTime: '',
+        endTime: '',
+        position: 'Customer Service'
+      });
+      setIsEditShiftDialogOpen(false);
+
+    } catch (error) {
+      console.error('Error updating shift:', error);
+      toast.error('Failed to update shift');
+    }
+  };
+
+  // Delete shift function
+  const deleteShift = async (shiftId: string, shiftName: string) => {
+    if (!confirm(`Are you sure you want to delete "${shiftName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('shifts')
+        .update({ is_active: false })
+        .eq('id', shiftId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setShifts(prev => prev.filter(shift => shift.id !== shiftId));
+
+      toast.success(`Shift "${shiftName}" deleted successfully!`);
+
+    } catch (error) {
+      console.error('Error deleting shift:', error);
+      toast.error('Failed to delete shift');
+    }
+  };
+
+  // Open edit dialog
+  const openEditDialog = (shift: Shift) => {
+    setEditingShift(shift);
+    setEditShiftData({
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      position: shift.position as 'Customer Service' | 'Designer'
+    });
+    setIsEditShiftDialogOpen(true);
   };
 
   const filteredEmployees = selectedEmployee === 'all' 
@@ -389,6 +571,205 @@ const AdminShiftManagement = () => {
       </div>
 
       <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
+        {/* Current Shifts Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Current Shifts</span>
+              <Dialog open={isCustomShiftDialogOpen} onOpenChange={setIsCustomShiftDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create New Shift
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create Custom Shift</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="shift-name">Shift Name *</Label>
+                      <Input
+                        id="shift-name"
+                        placeholder="e.g., Evening Shift, Custom Day Shift"
+                        value={customShiftData.name}
+                        onChange={(e) => setCustomShiftData(prev => ({...prev, name: e.target.value}))}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="start-time">Start Time *</Label>
+                        <Input
+                          id="start-time"
+                          type="time"
+                          value={customShiftData.startTime}
+                          onChange={(e) => setCustomShiftData(prev => ({...prev, startTime: e.target.value}))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="end-time">End Time *</Label>
+                        <Input
+                          id="end-time"
+                          type="time"
+                          value={customShiftData.endTime}
+                          onChange={(e) => setCustomShiftData(prev => ({...prev, endTime: e.target.value}))}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Position</Label>
+                      <Select
+                        value={customShiftData.position}
+                        onValueChange={(value: 'Customer Service' | 'Designer') => 
+                          setCustomShiftData(prev => ({...prev, position: value}))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Customer Service">Customer Service</SelectItem>
+                          <SelectItem value="Designer">Designer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex gap-2 pt-4">
+                      <Button 
+                        onClick={createCustomShift}
+                        className="flex-1 gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Create Shift
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsCustomShiftDialogOpen(false)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4">
+              {shifts.map((shift) => (
+                <div key={shift.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <div className="font-medium">{shift.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {shift.startTime} - {shift.endTime} • {shift.position}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(shift)}
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteShift(shift.id, shift.name)}
+                      className="gap-2 text-red-600 hover:text-red-700"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Edit Shift Dialog */}
+        <Dialog open={isEditShiftDialogOpen} onOpenChange={setIsEditShiftDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Shift</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-shift-name">Shift Name *</Label>
+                <Input
+                  id="edit-shift-name"
+                  placeholder="e.g., Evening Shift, Custom Day Shift"
+                  value={editShiftData.name}
+                  onChange={(e) => setEditShiftData(prev => ({...prev, name: e.target.value}))}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start-time">Start Time *</Label>
+                  <Input
+                    id="edit-start-time"
+                    type="time"
+                    value={editShiftData.startTime}
+                    onChange={(e) => setEditShiftData(prev => ({...prev, startTime: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-end-time">End Time *</Label>
+                  <Input
+                    id="edit-end-time"
+                    type="time"
+                    value={editShiftData.endTime}
+                    onChange={(e) => setEditShiftData(prev => ({...prev, endTime: e.target.value}))}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Position</Label>
+                <Select
+                  value={editShiftData.position}
+                  onValueChange={(value: 'Customer Service' | 'Designer') => 
+                    setEditShiftData(prev => ({...prev, position: value}))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Customer Service">Customer Service</SelectItem>
+                    <SelectItem value="Designer">Designer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  onClick={editShift}
+                  className="flex-1 gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Update Shift
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditShiftDialogOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Shift assignments content */}
         <div className="space-y-4 mt-4 md:mt-6">
             {/* Mobile employee filter */}
@@ -416,7 +797,9 @@ const AdminShiftManagement = () => {
             <Card>
               <CardHeader className="pb-3 sm:pb-4">
                 <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
+                                      <div className="flex items-center gap-3">
+                      <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
+                    </div>
                   
                   {/* Week navigation */}
                   <div className="flex items-center gap-2">

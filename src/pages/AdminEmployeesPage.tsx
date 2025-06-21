@@ -27,10 +27,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
-import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword } from '@/lib/employeesApi';
+import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword, assignDiamondRank, removeDiamondRank } from '@/lib/employeesApi';
 import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus, Star, Plus, Circle, CheckCircle } from 'lucide-react';
+import { UserPlus, Star, Plus, Circle, CheckCircle, Crown } from 'lucide-react';
 import RateEmployeeModal from '@/components/RateEmployeeModal';
 import StarRating from '@/components/StarRating';
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,12 @@ const AdminEmployeesPage = () => {
       employee: "Employee",
       noRating: "No rating",
       employeeManagement: "Employee Management",
-      manageAllEmployees: "Manage all employees and their access"
+      manageAllEmployees: "Manage all employees and their access",
+      assignDiamondRank: "💎 Assign Diamond Rank",
+      removeDiamondRank: "Remove Diamond Rank",
+      diamondRank: "Diamond",
+      diamondRankAssigned: "Diamond rank assigned successfully!",
+      diamondRankRemoved: "Diamond rank removed successfully!"
     },
     ar: {
       employees: "الموظفين",
@@ -133,7 +138,12 @@ const AdminEmployeesPage = () => {
       employee: "موظف",
       noRating: "لا يوجد تقييم",
       employeeManagement: "إدارة الموظفين",
-      manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول"
+      manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول",
+      assignDiamondRank: "💎 تعيين رتبة الماس",
+      removeDiamondRank: "إزالة رتبة الماس",
+      diamondRank: "الماس",
+      diamondRankAssigned: "تم تعيين رتبة الماس بنجاح!",
+      diamondRankRemoved: "تم إزالة رتبة الماس بنجاح!"
     }
   };
 
@@ -278,7 +288,7 @@ const AdminEmployeesPage = () => {
       await updateEmployee(selectedEmployee.id, selectedEmployee);
       
       if (showEditPassword && editPassword) {
-        await resetEmployeePassword(selectedEmployee.email);
+        await resetEmployeePassword(selectedEmployee.email, editPassword);
         toast.success(`${t.passwordReset}: ${selectedEmployee.name}`);
       }
       
@@ -304,7 +314,7 @@ const AdminEmployeesPage = () => {
 
     setIsLoading(true);
     try {
-      await resetEmployeePassword(selectedEmployee.email);
+      await resetEmployeePassword(selectedEmployee.email, newPassword);
       setIsResetPasswordOpen(false);
       toast.success(`${t.passwordReset}: ${selectedEmployee.name}`);
       setNewPassword('');
@@ -335,6 +345,32 @@ const AdminEmployeesPage = () => {
 
   const handleRatingSubmitted = () => {
     loadEmployees(); // Refresh employee data to show updated ratings
+  };
+
+  const handleAssignDiamondRank = async (employee: User) => {
+    if (!user?.id) return;
+    
+    try {
+      await assignDiamondRank(employee.id, user.id);
+      await loadEmployees(); // Refresh employee list
+      toast.success(`💎 ${t.diamondRankAssigned} (${employee.name})`);
+    } catch (error: any) {
+      console.error('Error assigning Diamond rank:', error);
+      toast.error(`Failed to assign Diamond rank: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleRemoveDiamondRank = async (employee: User) => {
+    if (!user?.id) return;
+    
+    try {
+      await removeDiamondRank(employee.id, user.id);
+      await loadEmployees(); // Refresh employee list
+      toast.success(`${t.diamondRankRemoved} (${employee.name})`);
+    } catch (error: any) {
+      console.error('Error removing Diamond rank:', error);
+      toast.error(`Failed to remove Diamond rank: ${error.message || 'Unknown error'}`);
+    }
   };
 
   const handleEmployeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,25 +522,53 @@ const AdminEmployeesPage = () => {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
-                                  {t.actions}
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(employee)}>
-                                  {t.edit}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
-                                  {t.resetPassword}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openRateEmployeeDialog(employee)}>
-                                  <Star className="mr-2 h-4 w-4" />
-                                  {t.rateEmployee}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center gap-2 justify-end">
+                              {/* Diamond Rank Indicator */}
+                              {employee.diamondRank && (
+                                <Badge variant="outline" className="bg-gradient-to-r from-cyan-100 to-purple-100 border-cyan-300 text-cyan-800 text-xs font-bold">
+                                  💎 Diamond
+                                </Badge>
+                              )}
+                              
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
+                                    {t.actions}
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditDialog(employee)}>
+                                    {t.edit}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openResetPasswordDialog(employee)}>
+                                    {t.resetPassword}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openRateEmployeeDialog(employee)}>
+                                    <Star className="mr-2 h-4 w-4" />
+                                    {t.rateEmployee}
+                                  </DropdownMenuItem>
+                                  
+                                  {/* Diamond Rank Actions */}
+                                  {employee.diamondRank ? (
+                                    <DropdownMenuItem 
+                                      onClick={() => handleRemoveDiamondRank(employee)}
+                                      className="text-orange-600 hover:text-orange-700"
+                                    >
+                                      <Crown className="mr-2 h-4 w-4" />
+                                      {t.removeDiamondRank}
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem 
+                                      onClick={() => handleAssignDiamondRank(employee)}
+                                      className="text-cyan-600 hover:text-cyan-700 font-semibold"
+                                    >
+                                      <Crown className="mr-2 h-4 w-4" />
+                                      {t.assignDiamondRank}
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))

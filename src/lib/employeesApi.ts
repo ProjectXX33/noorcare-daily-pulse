@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { User, Department, Position } from '@/types';
 
@@ -21,7 +20,10 @@ export async function fetchEmployees(): Promise<User[]> {
       role: user.role,
       department: user.department,
       position: user.position,
-      lastCheckin: user.last_checkin ? new Date(user.last_checkin) : undefined
+      lastCheckin: user.last_checkin ? new Date(user.last_checkin) : undefined,
+      diamondRank: user.diamond_rank || false,
+      diamondRankAssignedBy: user.diamond_rank_assigned_by,
+      diamondRankAssignedAt: user.diamond_rank_assigned_at ? new Date(user.diamond_rank_assigned_at) : undefined
     }));
   } catch (error) {
     console.error('Error fetching employees:', error);
@@ -149,15 +151,153 @@ export async function updateEmployee(id: string, updates: Partial<User>): Promis
   }
 }
 
-export async function resetEmployeePassword(email: string): Promise<void> {
+export async function resetEmployeePassword(email: string, newPassword?: string): Promise<void> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
-    });
-    
-    if (error) throw error;
+    if (newPassword) {
+      // Admin direct password reset using RPC function
+      console.log(`🔐 Attempting to reset password for: ${email}`);
+      
+      // Try the improved RPC function first
+      const { data, error } = await supabase.rpc('simple_admin_password_reset_v2', {
+        target_email: email,
+        new_password: newPassword
+      });
+      
+      if (error) {
+        console.error('V2 RPC error:', error);
+        // Fallback to improved complex function
+        try {
+          const { data: improvedData, error: improvedError } = await supabase.rpc('admin_reset_password_improved', {
+            target_email: email,
+            new_password: newPassword
+          });
+          
+          if (improvedError) {
+            console.error('Improved RPC error:', improvedError);
+            // Fallback to original functions
+            try {
+              const { data: originalData, error: originalError } = await supabase.rpc('admin_update_user_password', {
+                user_email: email,
+                new_password: newPassword
+              });
+              
+              if (originalError) {
+                console.error('Original RPC error:', originalError);
+                throw new Error(`All RPC methods failed. Last error: ${originalError.message}`);
+              } else {
+                console.log(`✅ Password updated via original RPC for: ${email}`);
+              }
+            } catch (originalError) {
+              throw originalError;
+            }
+          } else {
+            console.log(`✅ Password updated via improved RPC for: ${email} - Result:`, improvedData);
+          }
+        } catch (fallbackError) {
+          throw fallbackError;
+        }
+      } else {
+        // Check if the result indicates success
+        if (data && data.success) {
+          console.log(`✅ Password updated via V2 RPC for: ${email} - Result:`, data);
+        } else {
+          console.log(`⚠️ V2 RPC returned false/error for: ${email} - Result:`, data);
+          // Try the improved function as fallback
+          const { data: improvedData, error: improvedError } = await supabase.rpc('admin_reset_password_improved', {
+            target_email: email,
+            new_password: newPassword
+          });
+          
+          if (improvedError || !improvedData?.success) {
+            throw new Error(`Password reset failed. User may not exist in auth system. Email: ${email}`);
+          } else {
+            console.log(`✅ Password updated via improved fallback for: ${email} - Result:`, improvedData);
+          }
+        }
+      }
+    } else {
+      // Fallback to email reset if no password provided
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      
+      if (error) throw error;
+      
+      console.log(`📧 Password reset email sent to: ${email}`);
+    }
   } catch (error) {
     console.error('Error resetting password:', error);
+    throw error;
+  }
+}
+
+// Diamond Rank Functions
+export async function assignDiamondRank(employeeId: string, adminId: string): Promise<void> {
+  try {
+    console.log(`💎 Assigning Diamond rank to employee: ${employeeId} by admin: ${adminId}`);
+    
+    const { data, error } = await supabase.rpc('assign_diamond_rank', {
+      target_employee_id: employeeId,
+      admin_id: adminId
+    });
+
+    if (error) {
+      console.error('Error assigning Diamond rank:', error);
+      throw error;
+    }
+
+    // Send notification
+    await supabase.rpc('notify_diamond_rank_assignment', {
+      employee_id: employeeId,
+      admin_id: adminId,
+      action: 'assigned'
+    });
+
+    console.log('✅ Diamond rank assigned successfully');
+  } catch (error) {
+    console.error('Error assigning Diamond rank:', error);
+    throw error;
+  }
+}
+
+export async function removeDiamondRank(employeeId: string, adminId: string): Promise<void> {
+  try {
+    console.log(`💎 Removing Diamond rank from employee: ${employeeId} by admin: ${adminId}`);
+    
+    const { data, error } = await supabase.rpc('remove_diamond_rank', {
+      target_employee_id: employeeId,
+      admin_id: adminId
+    });
+
+    if (error) {
+      console.error('Error removing Diamond rank:', error);
+      throw error;
+    }
+
+    // Send notification
+    await supabase.rpc('notify_diamond_rank_assignment', {
+      employee_id: employeeId,
+      admin_id: adminId,
+      action: 'removed'
+    });
+
+    console.log('✅ Diamond rank removed successfully');
+  } catch (error) {
+    console.error('Error removing Diamond rank:', error);
+    throw error;
+  }
+}
+
+export async function getDiamondEmployees(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('diamond_employees')
+      .select('*');
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching Diamond employees:', error);
     throw error;
   }
 }

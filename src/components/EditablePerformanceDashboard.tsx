@@ -58,6 +58,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from '@/contexts/AuthContext';
+import { assignDiamondRank, removeDiamondRank } from '@/lib/employeesApi';
+
+// Diamond Icon Component
+const DiamondIcon: React.FC<{ className?: string }> = ({ className = "h-4 w-4" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 3h12l4 6-10 13L2 9Z"></path>
+    <path d="M11 3 8 9l4 13 4-13-3-6"></path>
+    <path d="M2 9h20"></path>
+  </svg>
+);
 
 // Helper function to format delay in hours and minutes
 const formatDelayHoursAndMinutes = (totalMinutes: number): string => {
@@ -122,6 +132,10 @@ interface PerformanceData {
     total: number;
     completionRate: number;
   };
+  // Diamond rank fields
+  diamondRank?: boolean;
+  diamondRankAssignedBy?: string;
+  diamondRankAssignedAt?: string;
 }
 
 interface EditablePerformanceDashboardProps {
@@ -270,7 +284,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       // Fetch ALL employees (not just Customer Service and Designers)
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('id, name, department, position, role')
+        .select('id, name, department, position, role, diamond_rank, diamond_rank_assigned_by, diamond_rank_assigned_at')
         .eq('role', 'employee'); // Include ALL employee positions
 
       if (usersError) throw usersError;
@@ -497,7 +511,11 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             submitted: employeeReports.length,
             total: expectedReports,
             completionRate: reportCompletionRate
-          }
+          },
+          // Diamond rank fields
+          diamondRank: employee.diamond_rank || false,
+          diamondRankAssignedBy: employee.diamond_rank_assigned_by,
+          diamondRankAssignedAt: employee.diamond_rank_assigned_at
         });
 
         console.log(`✅ ${employee.name} processed:`, {
@@ -511,8 +529,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         });
       }
 
-      // Sort by performance score
-      processedEmployees.sort((a, b) => b.performance - a.performance);
+      // Sort by Diamond rank first, then by performance score
+      processedEmployees.sort((a, b) => {
+        // Diamond rank employees go first
+        if (a.diamondRank && !b.diamondRank) return -1;
+        if (!a.diamondRank && b.diamondRank) return 1;
+        // Then sort by performance score
+        return b.performance - a.performance;
+      });
       
       setEmployees(processedEmployees);
       console.log('📊 Final processed employees:', processedEmployees.length);
@@ -633,6 +657,42 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     } catch (error) {
       console.error('Error deleting employee:', error);
       toast.error('Failed to delete employee');
+    }
+  };
+
+  const handleAssignDiamondRank = async (employeeId: string, employeeName: string) => {
+    if (!user?.id) {
+      toast.error('Admin authentication required');
+      return;
+    }
+
+    try {
+      await assignDiamondRank(employeeId, user.id);
+      toast.success(`💎 Diamond rank assigned to ${employeeName}!`);
+      await fetchEmployeeData(); // Refresh data
+    } catch (error) {
+      console.error('Error assigning Diamond rank:', error);
+      toast.error(`Failed to assign Diamond rank: ${error.message}`);
+    }
+  };
+
+  const handleRemoveDiamondRank = async (employeeId: string, employeeName: string) => {
+    if (!user?.id) {
+      toast.error('Admin authentication required');
+      return;
+    }
+
+    if (!confirm(`Remove Diamond rank from ${employeeName}?`)) {
+      return;
+    }
+
+    try {
+      await removeDiamondRank(employeeId, user.id);
+      toast.success(`Diamond rank removed from ${employeeName}`);
+      await fetchEmployeeData(); // Refresh data
+    } catch (error) {
+      console.error('Error removing Diamond rank:', error);
+      toast.error(`Failed to remove Diamond rank: ${error.message}`);
     }
   };
 
@@ -869,6 +929,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   // Get the top 3 performers automatically based on performance ranking
   const topPerformers = employees.slice(0, 3);
   const bestEmployee = employees.length > 0 ? employees[0] : null;
+  
+  // Get Diamond employees first, then fill remaining slots with top performers
+  const diamondEmployees = employees.filter(emp => emp.diamondRank);
+  const nonDiamondEmployees = employees.filter(emp => !emp.diamondRank);
+  const remainingSlots = Math.max(0, 4 - diamondEmployees.length);
+  const nonDiamondTopPerformers = nonDiamondEmployees.slice(0, remainingSlots);
+  const championsToShow = [...diamondEmployees, ...nonDiamondTopPerformers];
 
   return (
     <TooltipProvider>
@@ -902,8 +969,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         `}
       </style>
       <div className="space-y-4 sm:space-y-6">
-        {/* Top 3 Performers Podium */}
-        {topPerformers.length > 0 && (
+        {/* Top 4 Performance Champions */}
+        {championsToShow.length > 0 && (
         <Card className="mb-8 border-0 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-800 dark:via-indigo-900 dark:to-purple-900 shadow-2xl overflow-hidden relative">
           {/* Animated Background Elements */}
           <div className="absolute inset-0 bg-gradient-to-r from-yellow-100/10 via-transparent to-orange-100/10"></div>
@@ -918,243 +985,261 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               <p className="text-gray-600 dark:text-gray-300 font-medium">Top performers of {format(new Date(currentMonth), 'MMMM yyyy')}</p>
             </div>
 
-            {/* Desktop: ENHANCED CHAMPIONS LIST - COMPACT */}
+            {/* Desktop: ENHANCED CHAMPIONS LIST - COMPACT with Diamond Support */}
             <div className="hidden lg:block">
               <div className="space-y-4 w-full">
-                {topPerformers.slice(0, 3).map((employee, index) => {
-                  const titles = ['GOLDEN CHAMPION', 'SILVER MEDAL', 'BRONZE MEDAL'];
-                  const colors = [
-                    'from-yellow-400 via-orange-500 to-red-600',
-                    'from-slate-400 via-gray-500 to-slate-600',
-                    'from-amber-600 via-orange-700 to-amber-800'
-                  ];
-                  const bgColors = [
-                    'from-yellow-50 via-orange-50 to-red-50',
-                    'from-slate-100 via-gray-100 to-slate-200',
-                    'from-amber-100 via-orange-100 to-amber-200'
-                  ];
-                  const borderColors = [
-                    'border-yellow-400',
-                    'border-slate-400',
-                    'border-amber-600'
-                  ];
-                  const textColors = [
-                    'text-yellow-800',
-                    'text-slate-700',
-                    'text-amber-800'
-                  ];
-                  const glowColors = [
-                    'shadow-yellow-500/50',
-                    'shadow-slate-500/30',
-                    'shadow-amber-500/40'
-                  ];
-                  
-                  return (
-                    <div key={employee.id} className={`relative group`}>
-                      {/* Outer Glow Ring */}
-                      <div className={`absolute -inset-1 bg-gradient-to-r ${colors[index]} rounded-xl blur-sm opacity-15 group-hover:opacity-30 transition-all duration-300`}></div>
+                {championsToShow.map((employee, index) => {
+                    // Determine titles and styling based on Diamond rank or position
+                    const isDiamond = employee.diamondRank;
+                    let title: string, colors: string, bgColor: string, borderColor: string, textColor: string, glowColor: string, displayPosition: string, icon: JSX.Element;
+                    
+                    if (isDiamond) {
+                      // Diamond rank styling (Position 0)
+                      title = 'DIAMOND CHAMPION';
+                      colors = 'from-cyan-400 via-blue-500 to-purple-600';
+                      bgColor = 'from-cyan-50 via-blue-50 to-purple-50';
+                      borderColor = 'border-cyan-400';
+                      textColor = 'text-cyan-800';
+                      glowColor = 'shadow-cyan-500/60';
+                      displayPosition = 'Diamond';
+                      icon = <DiamondIcon className="h-5 w-5 text-cyan-600" />;
+                    } else {
+                      // Regular performance-based styling - find position among non-diamond employees
+                      const nonDiamondIndex = nonDiamondEmployees.findIndex(emp => emp.id === employee.id);
+                      const titles = ['GOLDEN CHAMPION', 'SILVER MEDAL', 'BRONZE MEDAL'];
+                      const colorsArray = [
+                        'from-yellow-400 via-orange-500 to-red-600',
+                        'from-slate-400 via-gray-500 to-slate-600',
+                        'from-amber-600 via-orange-700 to-amber-800'
+                      ];
+                      const bgArray = [
+                        'from-yellow-50 via-orange-50 to-red-50',
+                        'from-slate-100 via-gray-100 to-slate-200',
+                        'from-amber-100 via-orange-100 to-amber-200'
+                      ];
+                      const borderArray = ['border-yellow-400', 'border-slate-400', 'border-amber-600'];
+                      const textArray = ['text-yellow-800', 'text-slate-700', 'text-amber-800'];
+                      const glowArray = ['shadow-yellow-500/50', 'shadow-slate-500/30', 'shadow-amber-500/40'];
+                      const iconsArray = [
+                        <Crown className="h-5 w-5 text-yellow-600" />,
+                        <Medal className="h-5 w-5 text-slate-600" />,
+                        <Award className="h-5 w-5 text-amber-700" />
+                      ];
                       
-                      {/* Main Card */}
-                      <div className={`relative flex items-center gap-5 p-5 rounded-xl bg-gradient-to-r ${bgColors[index]} border-3 ${borderColors[index]} shadow-xl ${glowColors[index]} group-hover:shadow-2xl transition-all duration-300 group-hover:scale-102 transform`}>
+                      title = titles[nonDiamondIndex] || 'TOP PERFORMER';
+                      colors = colorsArray[nonDiamondIndex] || 'from-purple-400 via-blue-500 to-indigo-600';
+                      bgColor = bgArray[nonDiamondIndex] || 'from-purple-50 via-blue-50 to-indigo-50';
+                      borderColor = borderArray[nonDiamondIndex] || 'border-purple-400';
+                      textColor = textArray[nonDiamondIndex] || 'text-purple-800';
+                      glowColor = glowArray[nonDiamondIndex] || 'shadow-purple-500/40';
+                      displayPosition = `#${nonDiamondIndex + 1} Place`;
+                      icon = iconsArray[nonDiamondIndex] || <Star className="h-5 w-5 text-purple-600" />;
+                    }
+                  
+                    return (
+                      <div key={employee.id} className="relative group">
+                        {/* Outer Glow Ring */}
+                        <div className={`absolute -inset-1 bg-gradient-to-r ${colors} rounded-xl blur-sm opacity-15 group-hover:opacity-30 transition-all duration-300`}></div>
                         
-                        {/* Sparkle Effect for Winner */}
-                        {index === 0 && (
-                          <>
-                            <div className="absolute top-2 right-3 text-yellow-400 animate-bounce delay-100 text-sm">✨</div>
-                            <div className="absolute bottom-2 right-8 text-orange-400 animate-bounce delay-300 text-sm">⭐</div>
-                          </>
-                        )}
-                        
-                        {/* Enhanced Avatar */}
-                        <div className="relative flex-shrink-0">
-                          {/* Pulsing Background */}
-                          {index === 0 && (
-                            <div className="absolute -inset-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-15 animate-pulse"></div>
+                        {/* Main Card */}
+                        <div className={`relative flex items-center gap-5 p-5 rounded-xl bg-gradient-to-r ${bgColor} border-3 ${borderColor} shadow-xl ${glowColor} group-hover:shadow-2xl transition-all duration-300 group-hover:scale-102 transform`}>
+                          
+                          {/* Sparkle Effects - Reduced animation */}
+                          {isDiamond && (
+                            <>
+                              <div className="absolute top-2 right-3 text-cyan-400">
+                                <DiamondIcon className="h-4 w-4" />
+                              </div>
+                              <div className="absolute bottom-2 right-8 text-blue-400 text-sm">✨</div>
+                            </>
+                          )}
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && (
+                            <>
+                              <div className="absolute top-2 right-3 text-yellow-400 text-sm">✨</div>
+                              <div className="absolute bottom-2 right-8 text-orange-400 text-sm">⭐</div>
+                            </>
                           )}
                           
-                          {/* Performance Ring - Lower Z-Index */}
-                          <div className="absolute -inset-1 z-0">
-                            <svg className="w-18 h-18 transform -rotate-90" viewBox="0 0 100 100">
-                              <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="6" fill="none" className="text-white/40"/>
-                              <circle 
-                                cx="50" 
-                                cy="50" 
-                                r="45" 
-                                stroke="currentColor" 
-                                strokeWidth="6" 
-                                fill="none" 
-                                strokeDasharray={`${employee.performance * 2.83} 283`}
-                                className={index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-500' : 'text-amber-500'}
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                          </div>
-                          
-                          {/* Main Avatar - Higher Z-Index */}
-                          <div className={`relative z-10 w-16 h-16 rounded-full bg-gradient-to-br ${colors[index]} flex items-center justify-center font-black text-xl text-white shadow-xl border-3 border-white ring-4 ring-white/30 transform group-hover:rotate-6 transition-all duration-300`}>
-                            {employee.name.charAt(0).toUpperCase()}
-                          </div>
-                          
-                          {/* Enhanced Icons - Highest Z-Index */}
-                          <div className={`absolute -top-1.5 -right-1.5 z-20 p-1.5 rounded-full bg-white shadow-xl ${index === 0 ? 'animate-bounce' : 'group-hover:scale-110'} transition-all duration-300`}>
-                            {index === 0 && <Crown className="h-5 w-5 text-yellow-600" />}
-                            {index === 1 && <Medal className="h-5 w-5 text-slate-600" />}
-                            {index === 2 && <Award className="h-5 w-5 text-amber-700" />}
-                          </div>
-                        </div>
-                        
-                        {/* Enhanced Content */}
-                        <div className="flex-1 space-y-2 min-w-0">
-                          {/* Name and Title */}
-                          <div className="flex items-center gap-3 mb-2">
-                            {index === 0 && <Flame className="h-4 w-4 text-orange-500 animate-pulse flex-shrink-0" />}
-                            {index === 1 && <Star className="h-4 w-4 text-slate-600 flex-shrink-0" />}
-                            {index === 2 && <Trophy className="h-4 w-4 text-amber-700 flex-shrink-0" />}
+                          {/* Enhanced Avatar */}
+                          <div className="relative flex-shrink-0">
+                            {/* Main Avatar */}
+                            <div className={`relative z-10 w-16 h-16 rounded-full bg-gradient-to-br ${colors} flex items-center justify-center font-black text-xl text-white shadow-xl border-3 border-white ring-4 ring-white/30 transform group-hover:rotate-6 transition-all duration-300`}>
+                              {employee.name.charAt(0).toUpperCase()}
+                            </div>
                             
-                            <h4 className={`font-black text-xl ${textColors[index]} group-hover:scale-105 transition-transform duration-300 truncate`}>
-                              {employee.name}
-                            </h4>
-                            
-                            <Badge className={`bg-gradient-to-r ${colors[index]} text-white text-sm font-black px-3 py-1.5 shadow-lg transform group-hover:scale-105 transition-all duration-300 flex-shrink-0`}>
-                              {titles[index]}
-                            </Badge>
+                            {/* Enhanced Icons */}
+                            <div className={`absolute -top-1.5 -right-1.5 z-20 p-1.5 rounded-full bg-white shadow-xl group-hover:scale-110 transition-all duration-300`}>
+                              {icon}
+                            </div>
                           </div>
                           
-                          {/* Position and Performance */}
-                          <div className="flex items-center gap-4 flex-wrap">
-                            <p className={`text-base ${textColors[index]} font-bold`}>
-                              {employee.position}
-                            </p>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className={`h-4 w-4 ${textColors[index]}`} />
-                              <span className={`text-lg font-black ${textColors[index]}`}>
-                                {employee.performance.toFixed(1)}%
-                    </span>
-              </div>
-            </div>
-                          
-                          {/* Enhanced Badges */}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <div className={`text-xs px-2 py-1 rounded-full bg-white/90 ${textColors[index]} font-bold shadow border-2 ${borderColors[index]}`}>
-                              #{index + 1} Place
-                    </div>
+                          {/* Enhanced Content */}
+                          <div className="flex-1 space-y-2 min-w-0">
+                            {/* Name and Title */}
+                            <div className="flex items-center gap-3 mb-2">
+                              {isDiamond && <DiamondIcon className="h-5 w-5 text-cyan-500 flex-shrink-0" />}
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && <Flame className="h-4 w-4 text-orange-500 flex-shrink-0" />}
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 1 && <Star className="h-4 w-4 text-slate-600 flex-shrink-0" />}
+                              {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 2 && <Trophy className="h-4 w-4 text-amber-700 flex-shrink-0" />}
+                              
+                              <h4 className={`font-black text-xl ${textColor} group-hover:scale-105 transition-transform duration-300 truncate`}>
+                                {employee.name}
+                              </h4>
+                              
+                              <Badge className={`bg-gradient-to-r ${colors} text-white text-sm font-black px-3 py-1.5 shadow-lg transform group-hover:scale-105 transition-all duration-300 flex-shrink-0`}>
+                                {title}
+                              </Badge>
+                            </div>
                             
-                            {index === 0 && (
-                              <>
-                                <div className="text-xs px-2 py-1 rounded-full bg-yellow-200 text-yellow-800 font-bold shadow border border-yellow-400">
-                                  🏅 Elite
-                  </div>
-                                <div className="text-xs px-2 py-1 rounded-full bg-orange-200 text-orange-800 font-bold shadow border border-orange-400">
-                                  🔥 Star
+                            {/* Position and Performance */}
+                            <div className="flex items-center gap-4 flex-wrap">
+                              <p className={`text-base ${textColor} font-bold`}>
+                                {employee.position}
+                              </p>
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className={`h-4 w-4 ${textColor}`} />
+                                <span className={`text-lg font-black ${textColor}`}>
+                                  {employee.performance.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* Enhanced Badges */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className={`text-xs px-2 py-1 rounded-full bg-white/90 ${textColor} font-bold shadow border-2 ${borderColor}`}>
+                                {displayPosition}
+                              </div>
+                              
+                              {isDiamond && (
+                                <>
+                                  <div className="text-xs px-2 py-1 rounded-full bg-cyan-200 text-cyan-800 font-bold shadow border border-cyan-400 flex items-center gap-1">
+                                    <DiamondIcon className="h-3 w-3" />
+                                    Exclusive
+                                  </div>
+                                  <div className="text-xs px-2 py-1 rounded-full bg-blue-200 text-blue-800 font-bold shadow border border-blue-400">
+                                    ⭐ Premium
+                                  </div>
+                                </>
+                              )}
+                              {!isDiamond && index === 0 && (
+                                <>
+                                  <div className="text-xs px-2 py-1 rounded-full bg-yellow-200 text-yellow-800 font-bold shadow border border-yellow-400">
+                                    🏅 Elite
+                                  </div>
+                                  <div className="text-xs px-2 py-1 rounded-full bg-orange-200 text-orange-800 font-bold shadow border border-orange-400">
+                                    🔥 Star
+                                  </div>
+                                </>
+                              )}
+                              {!isDiamond && index === 1 && (
+                                <div className="text-xs px-2 py-1 rounded-full bg-slate-200 text-slate-800 font-bold shadow border border-slate-400">
+                                  🏆 Runner-up
                                 </div>
-                              </>
-                            )}
-                            {index === 1 && (
-                              <div className="text-xs px-2 py-1 rounded-full bg-slate-200 text-slate-800 font-bold shadow border border-slate-400">
-                                🏆 Runner-up
-                              </div>
-                            )}
-                            {index === 2 && (
-                              <div className="text-xs px-2 py-1 rounded-full bg-amber-200 text-amber-800 font-bold shadow border border-amber-500">
-                                🥉 Third
-                              </div>
-                            )}
+                              )}
+                              {!isDiamond && index === 2 && (
+                                <div className="text-xs px-2 py-1 rounded-full bg-amber-200 text-amber-800 font-bold shadow border border-amber-500">
+                                  🥉 Third
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        
-                        {/* Performance Percentage Badge */}
-                        <div className={`flex flex-col items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br ${colors[index]} text-white shadow-xl transform group-hover:scale-110 transition-all duration-300 flex-shrink-0`}>
-                          <span className="text-sm font-black">{Math.round(employee.performance)}%</span>
-                          <span className="text-xs font-semibold">SCORE</span>
+                          
+                          {/* Performance Percentage Badge */}
+                          <div className={`flex flex-col items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br ${colors} text-white shadow-xl transform group-hover:scale-110 transition-all duration-300 flex-shrink-0`}>
+                            <span className="text-sm font-black">{Math.round(employee.performance)}%</span>
+                            <span className="text-xs font-semibold">SCORE</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
+                                          );
                 })}
               </div>
             </div>
                   
-            {/* Mobile: ENHANCED CHAMPIONS LIST - COMPACT */}
+            {/* Mobile: ENHANCED CHAMPIONS LIST - COMPACT with Diamond Support */}
             <div className="lg:hidden space-y-3">
-              {topPerformers.slice(0, 3).map((employee, index) => {
-                const titles = ['CHAMPION', 'SILVER', 'BRONZE'];
-                const colors = [
-                  'from-yellow-400 via-orange-500 to-red-600',
-                  'from-slate-400 via-gray-500 to-slate-600',
-                  'from-amber-600 via-orange-700 to-amber-800'
-                ];
-                const bgColors = [
-                  'from-yellow-50 via-orange-50 to-red-50',
-                  'from-slate-100 via-gray-100 to-slate-200',
-                  'from-amber-100 via-orange-100 to-amber-200'
-                ];
-                const borderColors = [
-                  'border-yellow-400',
-                  'border-slate-400',
-                  'border-amber-600'
-                ];
-                const textColors = [
-                  'text-yellow-800',
-                  'text-slate-700',
-                  'text-amber-800'
-                ];
-                const glowColors = [
-                  'shadow-yellow-500/50',
-                  'shadow-slate-500/30',
-                  'shadow-amber-500/40'
-                ];
+              {championsToShow.map((employee, index) => {
+                // Mobile responsive styling for Diamond + Top 3
+                const isDiamond = employee.diamondRank;
+                let title: string, colors: string, bgColor: string, borderColor: string, textColor: string, glowColor: string, displayPosition: string, icon: JSX.Element;
+                
+                if (isDiamond) {
+                  // Diamond rank styling for mobile
+                  title = 'DIAMOND';
+                  colors = 'from-cyan-400 via-blue-500 to-purple-600';
+                  bgColor = 'from-cyan-50 via-blue-50 to-purple-50';
+                  borderColor = 'border-cyan-400';
+                  textColor = 'text-cyan-800';
+                  glowColor = 'shadow-cyan-500/50';
+                  displayPosition = 'Diamond';
+                  icon = <DiamondIcon className="h-3 w-3 text-cyan-600" />;
+                } else {
+                  // Regular performance-based styling for mobile
+                  const nonDiamondIndex = nonDiamondTopPerformers.findIndex(emp => emp.id === employee.id);
+                  const titles = ['CHAMPION', 'SILVER', 'BRONZE'];
+                  const colorsArray = [
+                    'from-yellow-400 via-orange-500 to-red-600',
+                    'from-slate-400 via-gray-500 to-slate-600',
+                    'from-amber-600 via-orange-700 to-amber-800'
+                  ];
+                  const bgArray = [
+                    'from-yellow-50 via-orange-50 to-red-50',
+                    'from-slate-100 via-gray-100 to-slate-200',
+                    'from-amber-100 via-orange-100 to-amber-200'
+                  ];
+                  const borderArray = ['border-yellow-400', 'border-slate-400', 'border-amber-600'];
+                  const textArray = ['text-yellow-800', 'text-slate-700', 'text-amber-800'];
+                  const glowArray = ['shadow-yellow-500/50', 'shadow-slate-500/30', 'shadow-amber-500/40'];
+                  const iconsArray = [
+                    <Crown className="h-3 w-3 text-yellow-600" />,
+                    <Medal className="h-3 w-3 text-slate-600" />,
+                    <Award className="h-3 w-3 text-amber-700" />
+                  ];
+                  
+                  title = titles[nonDiamondIndex] || 'TOP';
+                  colors = colorsArray[nonDiamondIndex] || 'from-purple-400 via-blue-500 to-indigo-600';
+                  bgColor = bgArray[nonDiamondIndex] || 'from-purple-50 via-blue-50 to-indigo-50';
+                  borderColor = borderArray[nonDiamondIndex] || 'border-purple-400';
+                  textColor = textArray[nonDiamondIndex] || 'text-purple-800';
+                  glowColor = glowArray[nonDiamondIndex] || 'shadow-purple-500/40';
+                  displayPosition = `#${nonDiamondIndex + 1}`;
+                  icon = iconsArray[nonDiamondIndex] || <Star className="h-3 w-3 text-purple-600" />;
+                }
                 
                 return (
-                  <div key={employee.id} className={`relative group`}>
+                  <div key={employee.id} className="relative group">
                     {/* Outer Glow Ring */}
-                    <div className={`absolute -inset-0.5 bg-gradient-to-r ${colors[index]} rounded-lg blur-sm opacity-10 group-active:opacity-25 transition-all duration-300`}></div>
+                    <div className={`absolute -inset-0.5 bg-gradient-to-r ${colors} rounded-lg blur-sm opacity-10 group-active:opacity-25 transition-all duration-300`}></div>
                     
                     {/* Main Card */}
-                    <div className={`relative flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r ${bgColors[index]} border-2 ${borderColors[index]} shadow-lg ${glowColors[index]} group-active:shadow-xl transition-all duration-300 group-active:scale-101 transform`}>
+                    <div className={`relative flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r ${bgColor} border-2 ${borderColor} shadow-lg ${glowColor} group-active:shadow-xl transition-all duration-300 group-active:scale-101 transform`}>
                       
-                      {/* Sparkle Effect for Winner */}
-                      {index === 0 && (
+                      {/* Sparkle Effects - Reduced animation */}
+                      {isDiamond && (
                         <>
-                          <div className="absolute top-1 right-2 text-yellow-400 animate-bounce delay-100 text-xs">✨</div>
-                          <div className="absolute bottom-1 right-6 text-orange-400 animate-bounce delay-300 text-xs">⭐</div>
+                          <div className="absolute top-1 right-2 text-cyan-400">
+                            <DiamondIcon className="h-3 w-3" />
+                          </div>
+                          <div className="absolute bottom-1 right-6 text-blue-400 text-xs">✨</div>
+                        </>
+                      )}
+                      {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && (
+                        <>
+                          <div className="absolute top-1 right-2 text-yellow-400 text-xs">✨</div>
+                          <div className="absolute bottom-1 right-6 text-orange-400 text-xs">⭐</div>
                         </>
                       )}
                       
                       {/* Enhanced Avatar */}
                       <div className="relative flex-shrink-0">
-                        {/* Pulsing Background */}
-                        {index === 0 && (
-                          <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-10 animate-pulse"></div>
-                        )}
-                        
-                        {/* Performance Mini Ring - Lower Z-Index */}
-                        <div className="absolute -inset-0.5 z-0">
-                          <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="8" fill="none" className="text-white/40"/>
-                            <circle 
-                              cx="50" 
-                              cy="50" 
-                              r="45" 
-                              stroke="currentColor" 
-                              strokeWidth="8" 
-                              fill="none" 
-                              strokeDasharray={`${employee.performance * 2.83} 283`}
-                              className={index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-500' : 'text-amber-500'}
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </div>
-                        
-                        {/* Main Avatar - Higher Z-Index */}
-                        <div className={`relative z-10 w-12 h-12 rounded-full bg-gradient-to-br ${colors[index]} flex items-center justify-center font-black text-base text-white shadow-lg border-2 border-white ring-2 ring-white/30 transform group-active:rotate-3 transition-all duration-300`}>
+                        {/* Main Avatar */}
+                        <div className={`relative z-10 w-12 h-12 rounded-full bg-gradient-to-br ${colors} flex items-center justify-center font-black text-base text-white shadow-lg border-2 border-white ring-2 ring-white/30 transform group-active:rotate-3 transition-all duration-300`}>
                           {employee.name.charAt(0).toUpperCase()}
                         </div>
                         
-                        {/* Enhanced Icons - Highest Z-Index */}
-                        <div className={`absolute -top-1 -right-1 z-20 p-1 rounded-full bg-white shadow-md ${index === 0 ? 'animate-bounce' : 'group-active:scale-110'} transition-all duration-300`}>
-                          {index === 0 && <Crown className="h-3 w-3 text-yellow-600" />}
-                          {index === 1 && <Medal className="h-3 w-3 text-slate-600" />}
-                          {index === 2 && <Award className="h-3 w-3 text-amber-700" />}
+                        {/* Enhanced Icons */}
+                        <div className={`absolute -top-1 -right-1 z-20 p-1 rounded-full bg-white shadow-md group-active:scale-110 transition-all duration-300`}>
+                          {icon}
                         </div>
                       </div>
                       
@@ -1162,69 +1247,81 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       <div className="flex-1 min-w-0 space-y-1">
                         {/* Name and Icon */}
                         <div className="flex items-center gap-2">
-                          {index === 0 && <Flame className="h-3 w-3 text-orange-500 animate-pulse flex-shrink-0" />}
-                          {index === 1 && <Star className="h-3 w-3 text-slate-600 flex-shrink-0" />}
-                          {index === 2 && <Trophy className="h-3 w-3 text-amber-700 flex-shrink-0" />}
+                          {isDiamond && <DiamondIcon className="h-4 w-4 text-cyan-500 flex-shrink-0" />}
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && <Flame className="h-3 w-3 text-orange-500 flex-shrink-0" />}
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 1 && <Star className="h-3 w-3 text-slate-600 flex-shrink-0" />}
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 2 && <Trophy className="h-3 w-3 text-amber-700 flex-shrink-0" />}
                           
-                          <h4 className={`font-black text-base ${textColors[index]} truncate`}>
+                          <h4 className={`font-black text-base ${textColor} truncate`}>
                             {employee.name}
                           </h4>
                         </div>
                         
                         {/* Title Badge */}
-                        <Badge className={`bg-gradient-to-r ${colors[index]} text-white text-xs font-black px-1.5 py-0.5 shadow-md w-fit`}>
-                          {titles[index]}
-                      </Badge>
+                        <Badge className={`bg-gradient-to-r ${colors} text-white text-xs font-black px-1.5 py-0.5 shadow-md w-fit`}>
+                          {title}
+                        </Badge>
                         
                         {/* Position and Performance */}
                         <div className="space-y-0.5">
-                          <p className={`text-xs ${textColors[index]} font-bold truncate`}>
+                          <p className={`text-xs ${textColor} font-bold truncate`}>
                             {employee.position}
                           </p>
                           <div className="flex items-center gap-1">
-                            <TrendingUp className={`h-3 w-3 ${textColors[index]} flex-shrink-0`} />
-                            <span className={`text-sm font-black ${textColors[index]}`}>
+                            <TrendingUp className={`h-3 w-3 ${textColor} flex-shrink-0`} />
+                            <span className={`text-sm font-black ${textColor}`}>
                               {employee.performance.toFixed(1)}%
                             </span>
-                    </div>
-                  </div>
+                          </div>
+                        </div>
                         
                         {/* Enhanced Badges */}
                         <div className="flex flex-wrap items-center gap-1">
-                          <div className={`text-xs px-1.5 py-0.5 rounded-full bg-white/90 ${textColors[index]} font-bold shadow border ${borderColors[index]}`}>
-                            #{index + 1}
-                </div>
-                
-                          {index === 0 && (
+                          <div className={`text-xs px-1.5 py-0.5 rounded-full bg-white/90 ${textColor} font-bold shadow border ${borderColor}`}>
+                            {displayPosition}
+                          </div>
+                          
+                          {isDiamond && (
+                            <>
+                              <div className="text-xs px-1.5 py-0.5 rounded-full bg-cyan-200 text-cyan-800 font-bold shadow border border-cyan-400 flex items-center gap-1">
+                                <DiamondIcon className="h-2 w-2" />
+                                VIP
+                              </div>
+                              <div className="text-xs px-1.5 py-0.5 rounded-full bg-blue-200 text-blue-800 font-bold shadow border border-blue-400">
+                                ⭐ Premium
+                              </div>
+                            </>
+                          )}
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 0 && (
                             <>
                               <div className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-200 text-yellow-800 font-bold shadow border border-yellow-400">
                                 🏅 Elite
-              </div>
+                              </div>
                               <div className="text-xs px-1.5 py-0.5 rounded-full bg-orange-200 text-orange-800 font-bold shadow border border-orange-400">
                                 🔥 Star
-            </div>
+                              </div>
                             </>
                           )}
-                          {index === 1 && (
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 1 && (
                             <div className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold shadow border border-slate-400">
                               🏆 2nd
-                    </div>
+                            </div>
                           )}
-                          {index === 2 && (
+                          {!isDiamond && nonDiamondEmployees.findIndex(emp => emp.id === employee.id) === 2 && (
                             <div className="text-xs px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 font-bold shadow border border-amber-500">
                               🥉 3rd
                             </div>
                           )}
-                    </div>
-                  </div>
-                  
+                        </div>
+                      </div>
+                      
                       {/* Performance Score */}
-                      <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br ${colors[index]} text-white shadow-lg transform group-active:scale-110 transition-all duration-300 flex-shrink-0`}>
+                      <div className={`flex flex-col items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br ${colors} text-white shadow-lg transform group-active:scale-110 transition-all duration-300 flex-shrink-0`}>
                         <span className="text-xs font-black">{Math.round(employee.performance)}%</span>
                         <span className="text-xs font-semibold">SCORE</span>
-              </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
                 );
               })}
             </div>
@@ -1281,8 +1378,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             {/* Mobile Card View */}
             <div className="block lg:hidden space-y-4">
               {employees.map((employee, index) => {
-                // Enhanced medal styling for top 3 with special effects
-                const getMedalStyling = (rank: number) => {
+                // Calculate the actual performance rank (excluding Diamond rank holders)
+                const nonDiamondEmployees = employees.filter(emp => !emp.diamondRank);
+                const nonDiamondRank = nonDiamondEmployees.findIndex(emp => emp.id === employee.id);
+                
+                // Enhanced medal styling for top 3 with special effects + Diamond rank
+                const getMedalStyling = (rank: number, isDiamond: boolean = false) => {
+                  // Diamond rank overrides all other rankings
+                  if (isDiamond) {
+                    return {
+                      border: 'border-4 border-cyan-400 shadow-2xl shadow-cyan-500/60',
+                      bg: 'bg-gradient-to-br from-cyan-100 via-blue-100 to-purple-100 dark:from-cyan-950/50 dark:via-blue-950/50 dark:to-purple-950/50 relative overflow-hidden',
+                      avatar: 'bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 shadow-xl border-4 border-cyan-300',
+                      icon: <DiamondIcon className="h-6 w-6 text-cyan-100" />,
+                      iconBg: 'bg-gradient-to-br from-cyan-600 to-purple-600',
+                      specialEffect: 'before:absolute before:inset-0 before:bg-gradient-to-r before:from-cyan-400/20 before:via-blue-400/20 before:to-purple-400/20',
+                      nameIcon: <DiamondIcon className="h-5 w-5 text-cyan-600" />,
+                      badge: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-white font-bold shadow-lg',
+                      nameStyle: 'text-cyan-700 dark:text-cyan-300 font-bold text-lg',
+                      positionStyle: 'text-cyan-600 dark:text-cyan-400 font-semibold',
+                      cardHover: 'hover:shadow-2xl hover:shadow-cyan-500/70'
+                    };
+                  }
+                  
                   switch(rank) {
                     case 0: return {
                       border: 'border-4 border-yellow-400 shadow-2xl shadow-yellow-500/50',
@@ -1339,7 +1457,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   }
                 };
                 
-                const styling = getMedalStyling(index);
+                const styling = getMedalStyling(nonDiamondRank, employee.diamondRank);
                 
                 return (
                 <Card key={employee.id} className={`
@@ -1363,9 +1481,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <div className="flex items-center gap-2">
                           {styling.nameIcon && styling.nameIcon}
                           <h3 className={styling.nameStyle || "font-semibold text-gray-900 dark:text-gray-100"}>{employee.name}</h3>
-                          {index <= 2 && (
+                          {employee.diamondRank ? (
                             <Badge className={`${styling.badge} text-xs px-2 py-1 font-bold`}>
-                              #{index + 1}
+                              💎 Diamond
+                            </Badge>
+                          ) : nonDiamondRank <= 2 && nonDiamondRank >= 0 && (
+                            <Badge className={`${styling.badge} text-xs px-2 py-1 font-bold`}>
+                              #{nonDiamondRank + 1}
                             </Badge>
                           )}
                           </div>
@@ -1377,9 +1499,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className={`text-center p-3 rounded-lg border ${
-                        index === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
-                        index === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
-                        index === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        employee.diamondRank ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 shadow-lg' :
+                        nonDiamondRank === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
+                        nonDiamondRank === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        nonDiamondRank === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
                         'bg-blue-50 dark:bg-blue-900/20 border-blue-200'
                       }`}>
                         <Calendar className={`h-5 w-5 text-blue-600 mx-auto mb-1`} />
@@ -1389,29 +1512,33 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
                             </div>
                       <div className={`text-center p-3 rounded-lg ${
-                        index === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
-                        index === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
-                        index === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
+                        employee.diamondRank ? 'bg-gradient-to-br from-cyan-50 via-blue-50 to-purple-50 dark:from-cyan-900/20 dark:via-blue-900/20 dark:to-purple-900/20 border-2 border-cyan-400 shadow-lg' :
+                        nonDiamondRank === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
+                        nonDiamondRank === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
+                        nonDiamondRank === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
                         'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
                         <TrendingUp className={`h-4 w-4 mx-auto mb-1 ${
-                          index === 0 ? 'text-orange-600' :
-                          index === 1 ? 'text-slate-600' :
-                          index === 2 ? 'text-amber-600' :
+                          employee.diamondRank ? 'text-cyan-600' :
+                          nonDiamondRank === 0 ? 'text-orange-600' :
+                          nonDiamondRank === 1 ? 'text-slate-600' :
+                          nonDiamondRank === 2 ? 'text-amber-600' :
                           'text-purple-600'
                         }`} />
                         <div className={`text-lg font-bold ${
-                          index === 0 ? 'text-orange-700 dark:text-orange-300' :
-                          index === 1 ? 'text-slate-700 dark:text-slate-300' :
-                          index === 2 ? 'text-amber-700 dark:text-amber-300' :
+                          employee.diamondRank ? 'text-cyan-700 dark:text-cyan-300' :
+                          nonDiamondRank === 0 ? 'text-orange-700 dark:text-orange-300' :
+                          nonDiamondRank === 1 ? 'text-slate-700 dark:text-slate-300' :
+                          nonDiamondRank === 2 ? 'text-amber-700 dark:text-amber-300' :
                           'text-purple-700 dark:text-purple-300'
                         }`}>
                           {employee.performance.toFixed(1)}%
                           </div>
                         <div className={`text-xs ${
-                          index === 0 ? 'text-orange-600 dark:text-orange-400' :
-                          index === 1 ? 'text-slate-600 dark:text-slate-400' :
-                          index === 2 ? 'text-amber-600 dark:text-amber-400' :
+                          employee.diamondRank ? 'text-cyan-600 dark:text-cyan-400' :
+                          nonDiamondRank === 0 ? 'text-orange-600 dark:text-orange-400' :
+                          nonDiamondRank === 1 ? 'text-slate-600 dark:text-slate-400' :
+                          nonDiamondRank === 2 ? 'text-amber-600 dark:text-amber-400' :
                           'text-purple-600 dark:text-purple-400'
                         }`}>
                           Performance
@@ -1422,9 +1549,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Secondary Metrics */}
                     <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        index === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
-                        index === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
-                        index === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        employee.diamondRank ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-lg' :
+                        nonDiamondRank === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
+                        nonDiamondRank === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        nonDiamondRank === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
                         'bg-red-50 dark:bg-red-900/20 border-red-200'
                       }`}>
                         <Clock className={`h-4 w-4 text-red-600`} />
@@ -1433,9 +1561,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </span>
                         </div>
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        index === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
-                        index === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
-                        index === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        employee.diamondRank ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-lg' :
+                        nonDiamondRank === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
+                        nonDiamondRank === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        nonDiamondRank === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
                         'bg-green-50 dark:bg-green-900/20 border-green-200'
                       }`}>
                         <TrendingUp className={`h-4 w-4 text-green-600`} />
@@ -1476,17 +1605,36 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         >
                           <Edit3 className="h-4 w-4 mr-1" />
                           Edit
-                                  </Button>
+                        </Button>
+                        {employee.diamondRank ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-cyan-600 border-cyan-200 hover:bg-cyan-50"
+                            onClick={() => handleRemoveDiamondRank(employee.id, employee.name)}
+                          >
+                            <Gem className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-cyan-600 border-cyan-200 hover:bg-cyan-50"
+                            onClick={() => handleAssignDiamondRank(employee.id, employee.name)}
+                          >
+                            💎
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm" 
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDeleteEmployee(employee.id, employee.name)}
                         >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              )}
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 );
@@ -1515,13 +1663,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     </thead>
               <tbody>
                 {employees.map((employee, index) => {
-                  // Medal styling for desktop table
-                  const getTableStyling = (rank: number) => {
+                  // Calculate the actual performance rank (excluding Diamond rank holders)
+                  const nonDiamondEmployees = employees.filter(emp => !emp.diamondRank);
+                  
+                  // Medal styling for desktop table + Diamond rank
+                  const getTableStyling = (rank: number, isDiamond: boolean = false) => {
+                    // Diamond rank overrides all other rankings
+                    if (isDiamond) {
+                      return {
+                        row: 'bg-gradient-to-r from-cyan-100 via-blue-100 to-purple-100 dark:from-cyan-950/50 dark:via-blue-950/50 dark:to-purple-950/50 border-4 border-cyan-400 shadow-2xl shadow-cyan-500/60',
+                        avatar: 'bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 border-4 border-cyan-300 shadow-xl',
+                        icon: <DiamondIcon className="h-4 w-4 text-cyan-100" />,
+                        iconBg: 'bg-gradient-to-br from-cyan-600 to-purple-600',
+                        nameIcon: <DiamondIcon className="h-3 w-3 text-cyan-600" />,
+                        performance: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-white shadow-xl font-bold',
+                        badge: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-white font-bold'
+                      };
+                    }
+                    
                     switch(rank) {
                       case 0: return {
                         row: 'bg-gradient-to-r from-yellow-100 via-orange-100 to-red-100 dark:from-yellow-950/40 dark:via-orange-950/40 dark:to-red-950/40 border-4 border-yellow-400 shadow-2xl shadow-yellow-500/50',
                         avatar: 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500 border-4 border-yellow-300 shadow-xl',
-                        icon: <Crown className="h-4 w-4 text-yellow-100 animate-bounce" />,
+                        icon: <Crown className="h-4 w-4 text-yellow-100" />,
                         iconBg: 'bg-gradient-to-br from-yellow-600 to-orange-600',
                         nameIcon: <Flame className="h-3 w-3 text-orange-500" />,
                         performance: 'bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white shadow-xl font-bold',
@@ -1557,7 +1721,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     }
                   };
                   
-                  const tableStyling = getTableStyling(index);
+                  const nonDiamondRank = nonDiamondEmployees.findIndex(emp => emp.id === employee.id);
+                  const tableStyling = getTableStyling(nonDiamondRank, employee.diamondRank);
                   
                   return (
                   <tr key={employee.id} className={`
@@ -1580,9 +1745,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                             <div className="flex items-center gap-2">
                               {tableStyling.nameIcon && tableStyling.nameIcon}
                               <span className="font-bold text-gray-900 dark:text-gray-100 text-sm truncate">{employee.name}</span>
-                              {index <= 2 && (
+                              {employee.diamondRank ? (
+                                <Badge className={`${tableStyling.badge} text-xs px-2 py-0.5 flex-shrink-0 font-bold flex items-center gap-1`}>
+                                  <DiamondIcon className="h-3 w-3" />
+                                  Diamond
+                                </Badge>
+                              ) : nonDiamondRank !== -1 && nonDiamondRank <= 2 && (
                                 <Badge className={`${tableStyling.badge} text-xs px-2 py-0.5 flex-shrink-0 font-bold`}>
-                                  #{index + 1}
+                                  #{nonDiamondRank + 1}
                                 </Badge>
                               )}
                               </div>
@@ -1710,6 +1880,27 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           >
                             <Edit3 className="h-3 w-3 text-blue-600" />
                           </Button>
+                          {employee.diamondRank ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hover:bg-cyan-50 dark:hover:bg-cyan-900/30 border-cyan-200 dark:border-cyan-700 px-1 py-1 h-6 w-6"
+                              onClick={() => handleRemoveDiamondRank(employee.id, employee.name)}
+                              title="Remove Diamond Rank"
+                            >
+                              <DiamondIcon className="h-3 w-3 text-cyan-600" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="hover:bg-cyan-50 dark:hover:bg-cyan-900/30 border-cyan-200 dark:border-cyan-700 px-1 py-1 h-6 w-6"
+                              onClick={() => handleAssignDiamondRank(employee.id, employee.name)}
+                              title="Assign Diamond Rank"
+                            >
+                              <DiamondIcon className="h-3 w-3 text-cyan-600" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -1718,7 +1909,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           >
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
-                                  </div>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1743,175 +1934,101 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </CardContent>
                       </Card>
 
-    {/* Edit Employee Sheet */}
+    {/* Edit Employee Sheet - Simplified Performance Only */}
     <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
+      <SheetContent className="w-[400px] sm:w-[450px]">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <Edit3 className="h-5 w-5" />
-            Quick Edit Performance
+            <TrendingUp className="h-5 w-5" />
+            Edit Performance Score
           </SheetTitle>
         </SheetHeader>
         
-        <div className="mt-6 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
-            <Input
-              value={editForm.name}
-              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-              placeholder="Employee name"
-            />
-              </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Department</label>
-            <Select 
-              value={editForm.department} 
-              onValueChange={(value) => setEditForm({ ...editForm, department: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Customer Service">Customer Service</SelectItem>
-                <SelectItem value="Design">Design</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Content">Content</SelectItem>
-                <SelectItem value="Development">Development</SelectItem>
-                <SelectItem value="Management">Management</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Position</label>
-                        <Select
-              value={editForm.position} 
-              onValueChange={(value) => setEditForm({ ...editForm, position: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select position" />
-                          </SelectTrigger>
-                          <SelectContent>
-                <SelectItem value="Customer Service">Customer Service</SelectItem>
-                <SelectItem value="Designer">Designer</SelectItem>
-                <SelectItem value="Media Buyer">Media Buyer</SelectItem>
-                <SelectItem value="Copy Writing">Copy Writing</SelectItem>
-                <SelectItem value="Content Creator">Content Creator</SelectItem>
-                <SelectItem value="Social Media Manager">Social Media Manager</SelectItem>
-                <SelectItem value="Developer">Developer</SelectItem>
-                <SelectItem value="Manager">Manager</SelectItem>
-                          </SelectContent>
-                        </Select>
+        <div className="mt-6 space-y-6">
+          {/* Employee Info - Read Only */}
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-blue-900 mb-2">Employee Details</h4>
+            <div className="space-y-1 text-sm text-blue-800">
+              <div><strong>Name:</strong> {editingEmployee?.name}</div>
+              <div><strong>Position:</strong> {editingEmployee?.position}</div>
+              <div><strong>Current Score:</strong> {editingEmployee?.performance.toFixed(1)}%</div>
+            </div>
           </div>
           
-          {/* Quick Edit - Status & Performance Only */}
-          <div className="border-t pt-4 space-y-4">
-            <h4 className="font-medium text-gray-900 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Quick Performance Edit
-            </h4>
-            
-            <div className="space-y-4">
-          <div className="space-y-2">
-                <label className="text-sm font-medium">Performance Score (%)</label>
-                        <Input
-                          type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              value={editForm.performance}
-              onChange={(e) => setEditForm({ ...editForm, performance: parseFloat(e.target.value) || 0 })}
-              placeholder="Performance percentage"
-                  className="text-lg font-semibold"
-                />
-                <p className="text-xs text-gray-500">Adjust the employee's performance score</p>
-              </div>
+          {/* Performance Score Edit */}
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <label className="text-lg font-semibold text-gray-900">Performance Score (%)</label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={editForm.performance}
+                onChange={(e) => setEditForm({ ...editForm, performance: parseFloat(e.target.value) || 0 })}
+                placeholder="Enter performance percentage"
+                className="text-2xl font-bold text-center h-16 text-blue-600"
+              />
+              <p className="text-sm text-gray-600 text-center">Enter a value between 0 and 100</p>
+            </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
-                <Select 
-                  value={editForm.status} 
-                  onValueChange={(value) => setEditForm({ ...editForm, status: value as any })}
-                >
-                  <SelectTrigger className="text-base">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Excellent">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        Excellent
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Good">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        Good
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Average">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                        Average
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="Poor">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        Poor
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">Set the employee's overall performance status</p>
+            {/* Performance Preview */}
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <h5 className="text-sm font-medium text-gray-700 mb-3">Performance Preview</h5>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">New Score:</span>
+                <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                  editForm.performance >= 90 ? 'bg-green-100 text-green-800' :
+                  editForm.performance >= 75 ? 'bg-blue-100 text-blue-800' :
+                  editForm.performance >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {editForm.performance.toFixed(1)}%
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-gray-600">Status:</span>
+                <span className={`text-sm font-medium ${
+                  editForm.performance >= 90 ? 'text-green-600' :
+                  editForm.performance >= 75 ? 'text-blue-600' :
+                  editForm.performance >= 60 ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {editForm.performance >= 90 ? 'Excellent' :
+                   editForm.performance >= 75 ? 'Good' :
+                   editForm.performance >= 60 ? 'Average' : 'Poor'}
+                </span>
               </div>
             </div>
 
-            {/* Read-only info */}
+            {/* Current Metrics - Compact */}
             <div className="bg-gray-50 p-3 rounded-lg border">
-              <h5 className="text-sm font-medium text-gray-700 mb-2">Current Metrics (Read-only)</h5>
-              <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+              <h5 className="text-sm font-medium text-gray-700 mb-2">Current Metrics</h5>
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                 <div>Days: {editingEmployee?.days === -1 ? 'No Track' : editingEmployee?.days || 0}</div>
+                <div>Tasks: {editingEmployee?.tasks.completed || 0}/{editingEmployee?.tasks.total || 0}</div>
                 <div>Delay: {editingEmployee?.delay === -1 ? 'No Track' : formatHoursAndMinutes(editingEmployee?.delay || 0)}</div>
                 <div>Overtime: {editingEmployee?.overtime === -1 ? 'No Track' : formatHoursAndMinutes(editingEmployee?.overtime || 0)}</div>
-                <div>Tasks: {editingEmployee?.tasks.completed || 0}/{editingEmployee?.tasks.total || 0}</div>
               </div>
             </div>
-                        </div>
+          </div>
           
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Status Override</label>
-            <Select 
-              value={editForm.status} 
-              onValueChange={(value) => setEditForm({ ...editForm, status: value as any })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Excellent">Excellent</SelectItem>
-                <SelectItem value="Good">Good</SelectItem>
-                <SelectItem value="Average">Average</SelectItem>
-                <SelectItem value="Poor">Poor</SelectItem>
-              </SelectContent>
-            </Select>
-                            </div>
-          
-          <div className="flex gap-2 pt-4">
-            <Button onClick={handleSaveEdit} className="flex-1">
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-                              </Button>
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-4">
+            <Button onClick={handleSaveEdit} className="flex-1 h-12 text-lg font-semibold">
+              <Save className="h-5 w-5 mr-2" />
+              Save Performance
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => setIsEditSheetOpen(false)}
+              className="h-12 px-6"
             >
               <X className="h-4 w-4 mr-2" />
               Cancel
-                              </Button>
-                            </div>
-                </div>
+            </Button>
+          </div>
+        </div>
       </SheetContent>
     </Sheet>
             </div>
