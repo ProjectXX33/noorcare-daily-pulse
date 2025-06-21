@@ -733,15 +733,17 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   };
 
   useEffect(() => {
-    // Subscribe to notifications changes
+    if (!user) return;
+
+    // Subscribe to notifications changes with unique channel name
     const notificationsSubscription = supabase
-      .channel('notifications')
+      .channel(`notifications_sidebar_${user.id}_${Date.now()}`)
       .on('postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
           table: 'notifications',
-          filter: `user_id=eq.${user?.id}`
+          filter: `user_id=eq.${user.id}`
         }, 
         (payload) => {
           console.log('Realtime notification:', payload);
@@ -759,8 +761,6 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
 
     // Load initial notifications
     const loadNotifications = async () => {
-      if (!user) return;
-      
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -779,7 +779,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     loadNotifications();
 
     return () => {
-      notificationsSubscription.unsubscribe();
+      console.log('🔌 Cleaning up sidebar notifications subscription');
+      supabase.removeChannel(notificationsSubscription);
     };
   }, [user]);
 

@@ -112,9 +112,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     loadData();
     
-    // Set up real-time listeners
+    // Set up real-time listeners with unique channel names
     const checkInsSubscription = supabase
-      .channel('public:check_ins')
+      .channel('check_ins_main_listener')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'check_ins' }, 
         () => {
@@ -124,7 +124,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .subscribe();
       
     const workReportsSubscription = supabase
-      .channel('public:work_reports')
+      .channel('work_reports_main_listener')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'work_reports' }, 
         () => {
@@ -134,8 +134,9 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .subscribe();
     
     return () => {
-      checkInsSubscription.unsubscribe();
-      workReportsSubscription.unsubscribe();
+      console.log('🔌 Cleaning up main subscriptions');
+      supabase.removeChannel(checkInsSubscription);
+      supabase.removeChannel(workReportsSubscription);
     };
   }, []);
   
@@ -205,7 +206,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
     console.log('🔄 Setting up real-time check-in subscription for user:', user.name);
 
     const subscription = supabase
-      .channel('check-ins-realtime')
+      .channel(`check_ins_user_${user.id}_${Date.now()}`) // Unique channel name
       .on('postgres_changes', 
         { 
           event: '*', 
@@ -248,8 +249,8 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .subscribe();
 
     return () => {
-      console.log('🔌 Unsubscribing from check-in updates');
-      subscription.unsubscribe();
+      console.log('🔌 Unsubscribing from user-specific check-in updates');
+      supabase.removeChannel(subscription);
     };
   }, [user]);
 
