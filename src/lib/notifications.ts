@@ -14,23 +14,31 @@ export const playNotificationSound = () => {
   }
 };
 
-// Function to maintain notification limit
-export const maintainNotificationLimit = async (userId: string) => {
+// Enhanced function to maintain notification limit (10 notifications max per user)
+export const maintainNotificationLimit = async (userId: string, maxNotifications: number = 10) => {
   try {
-    // Get all notifications for the user, ordered by creation date
+    console.log(`🔄 Checking notification limit for user ${userId} (max: ${maxNotifications})`);
+    
+    // Get all notifications for the user, ordered by creation date (oldest first)
     const { data: notifications, error: fetchError } = await supabase
       .from('notifications')
-      .select('id')
+      .select('id, created_at, title')
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
     if (fetchError) throw fetchError;
 
-    // If we have more than 9 notifications, delete the oldest ones
-    if (notifications && notifications.length >= 10) {
-      // Get IDs of notifications to delete (all except the 9 newest ones)
-      const notificationsToDelete = notifications.slice(0, notifications.length - 9);
+    console.log(`📊 User has ${notifications?.length || 0} notifications`);
+
+    // If we have reached or exceeded the limit, delete the oldest ones
+    if (notifications && notifications.length >= maxNotifications) {
+      // Calculate how many to delete (keep only the newest (maxNotifications - 1))
+      const notificationsToDelete = notifications.slice(0, notifications.length - (maxNotifications - 1));
       const idsToDelete = notificationsToDelete.map(n => n.id);
+
+      console.log(`🗑️ Deleting ${notificationsToDelete.length} oldest notifications:`, 
+        notificationsToDelete.map(n => ({ id: n.id, title: n.title, date: n.created_at }))
+      );
 
       // Delete the old notifications
       const { error: deleteError } = await supabase
@@ -39,13 +47,18 @@ export const maintainNotificationLimit = async (userId: string) => {
         .in('id', idsToDelete);
 
       if (deleteError) throw deleteError;
+
+      console.log(`✅ Successfully deleted ${notificationsToDelete.length} old notifications`);
+    } else {
+      console.log(`✅ Notification count within limit (${notifications?.length || 0}/${maxNotifications})`);
     }
   } catch (error) {
-    console.error('Error maintaining notification limit:', error);
+    console.error('❌ Error maintaining notification limit:', error);
+    throw error; // Re-throw to handle in calling function
   }
 };
 
-// Function to create a notification
+// Enhanced function to create a notification with automatic limit enforcement
 export const createNotification = async (notification: {
   user_id: string;
   title: string;
@@ -55,10 +68,10 @@ export const createNotification = async (notification: {
   created_by?: string;
 }) => {
   try {
-    console.log('Creating notification:', notification);
+    console.log('📝 Creating notification for user:', notification.user_id, '| Title:', notification.title);
     
-    // First maintain the notification limit
-    await maintainNotificationLimit(notification.user_id);
+    // FIRST: Maintain the notification limit (delete old ones if needed)
+    await maintainNotificationLimit(notification.user_id, 10);
 
     // Get current user as fallback for created_by
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -75,9 +88,12 @@ export const createNotification = async (notification: {
       created_at: new Date().toISOString()
     };
 
-    console.log('Inserting notification data:', notificationData);
+    console.log('📤 Inserting notification data:', {
+      ...notificationData,
+      message: notificationData.message.substring(0, 50) + '...' // Truncate for logging
+    });
 
-    // Then create the new notification
+    // Create the new notification
     const { data, error } = await supabase
       .from('notifications')
       .insert([notificationData])
@@ -85,14 +101,54 @@ export const createNotification = async (notification: {
       .single();
 
     if (error) {
-      console.error('Supabase error creating notification:', error);
+      console.error('❌ Supabase error creating notification:', error);
       throw error;
     }
 
-    console.log('Notification created successfully:', data);
+    console.log('✅ Notification created successfully:', {
+      id: data.id,
+      title: data.title,
+      user_id: data.user_id
+    });
+    
     return data;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error creating notification:', error);
+    throw error;
+  }
+};
+
+// Helper function to create notifications for multiple users (e.g., all admins)
+export const createNotificationForMultipleUsers = async (
+  userIds: string[],
+  notification: {
+    title: string;
+    message: string;
+    related_to?: string;
+    related_id?: string;
+    created_by?: string;
+  }
+) => {
+  try {
+    console.log(`📢 Creating notifications for ${userIds.length} users:`, notification.title);
+    
+    const results = [];
+    for (const userId of userIds) {
+      try {
+        const result = await createNotification({
+          user_id: userId,
+          ...notification
+        });
+        results.push(result);
+      } catch (error) {
+        console.error(`❌ Failed to create notification for user ${userId}:`, error);
+      }
+    }
+    
+    console.log(`✅ Successfully created ${results.length}/${userIds.length} notifications`);
+    return results;
+  } catch (error) {
+    console.error('❌ Error creating notifications for multiple users:', error);
     throw error;
   }
 }; 

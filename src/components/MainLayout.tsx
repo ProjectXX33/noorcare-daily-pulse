@@ -1,5 +1,6 @@
 import React from 'react';
 import SidebarNavigation from './SidebarNavigation'; // Assuming this is your sidebar
+import AutomaticPerformanceCalculator from './AutomaticPerformanceCalculator';
 // import Header from './Header'; // If you have a Header component
 
 interface MainLayoutProps {
@@ -10,6 +11,11 @@ interface MainLayoutProps {
 const MainLayout = ({ children }: MainLayoutProps) => {
   return (
     <div className="flex w-full">
+      {/* Background service for automatic performance calculation */}
+      <AutomaticPerformanceCalculator 
+        intervalMinutes={30} 
+        enableAutoRecalculation={true}
+      />
       <SidebarNavigation />
       <div className="flex-1 flex flex-col">
         {/* Header with toggle button */}

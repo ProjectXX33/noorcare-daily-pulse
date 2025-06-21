@@ -375,29 +375,73 @@ const WorkShiftTimer: React.FC = () => {
           currentBreakStartTime: currentBreakStartTime?.toISOString()
         });
         
-        // Determine shift type based on database assignment (shiftInfo) or fallback to check-in time
+        // Enhanced shift type detection with CUSTOM SHIFT support
         const checkInHour = checkInTime.getHours();
         let shiftType = 'night'; // Default to night shift
+        let isCustomShift = false;
+        let customShiftDuration = 8; // Default duration for custom shifts
         
         // Use database shift assignment if available
-        console.log('🔍 Shift Info Debug:', {
+        console.log('🔍 Enhanced Shift Info Debug:', {
           shiftInfo: shiftInfo,
           shiftInfoName: shiftInfo?.name,
           hasShiftInfo: !!shiftInfo,
-          activeCheckInId: activeCheckIn?.id
+          activeCheckInId: activeCheckIn?.id,
+          startTime: shiftInfo?.start_time,
+          endTime: shiftInfo?.end_time
         });
         
         if (shiftInfo && shiftInfo.name) {
-          if (shiftInfo.name.toLowerCase().includes('day')) {
+          const shiftNameLower = shiftInfo.name.toLowerCase();
+          
+          if (shiftNameLower.includes('day')) {
             shiftType = 'day';
-          } else if (shiftInfo.name.toLowerCase().includes('night')) {
+            isCustomShift = false;
+          } else if (shiftNameLower.includes('night')) {
             shiftType = 'night';
+            isCustomShift = false;
+          } else {
+            // CUSTOM SHIFT DETECTED
+            shiftType = 'custom';
+            isCustomShift = true;
+            
+            // Calculate custom shift duration from start/end times
+            if (shiftInfo.start_time && shiftInfo.end_time) {
+              try {
+                const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
+                const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
+                
+                let durationMinutes;
+                if (endH < startH || (endH === startH && endM < startM)) {
+                  // Overnight custom shift
+                  durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+                } else {
+                  // Same-day custom shift
+                  durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                }
+                
+                customShiftDuration = durationMinutes / 60;
+                console.log(`🎯 CUSTOM SHIFT "${shiftInfo.name}" detected:`, {
+                  startTime: shiftInfo.start_time,
+                  endTime: shiftInfo.end_time,
+                  calculatedDuration: `${customShiftDuration.toFixed(1)} hours`,
+                  type: endH < startH ? 'overnight' : 'same-day'
+                });
+              } catch (error) {
+                console.error('Error calculating custom shift duration:', error);
+                customShiftDuration = 8; // Fallback
+              }
+            }
           }
-          console.log('✅ Using database shift assignment:', shiftInfo.name, '→', shiftType);
+          
+          console.log('✅ Using database shift assignment:', {
+            name: shiftInfo.name,
+            type: shiftType,
+            isCustom: isCustomShift,
+            duration: isCustomShift ? `${customShiftDuration.toFixed(1)}h` : (shiftType === 'day' ? '7h' : '8h')
+          });
         } else {
           // Fallback to check-in time based detection
-          // Day shift: 8:30AM to 4PM (check-in window: 8:30AM+, shift: 9AM-4PM)
-          // Night shift: 3:30PM to 12AM (check-in window: 3:30PM+, shift: 4PM-12AM)
           if (checkInHour >= 8 && checkInHour < 16) {
             shiftType = 'day';
           } else {
@@ -434,9 +478,16 @@ const WorkShiftTimer: React.FC = () => {
           }
         }
         
-        // NEW OVERTIME LOGIC: Overtime starts ONLY after completing required shift hours
-        // Not based on time-of-day, but on hours worked (counter-based)
-        const minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day shift: 7 hours, Night shift: 8 hours
+        // ENHANCED OVERTIME LOGIC: Works with Day, Night, and Custom shifts
+        // Counter-based overtime calculation with custom shift support
+        let minimumHoursForOvertime;
+        
+        if (isCustomShift) {
+          minimumHoursForOvertime = customShiftDuration; // Custom shift uses calculated duration
+        } else {
+          minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day: 7h, Night: 8h
+        }
+        
         const hoursWorked = actualWorkSeconds / 3600; // Convert actual work seconds (excluding breaks) to hours
         
         // Check if overtime should start (based on hours worked, not time-of-day)
@@ -447,24 +498,26 @@ const WorkShiftTimer: React.FC = () => {
           const overtimeMinutesCalc = Math.floor(overtimeSeconds / 60);
           setOvertimeMinutes(overtimeMinutesCalc);
           
-          console.log('🔥 OVERTIME ACTIVATED (Counter-based):', {
-            shiftType,
-            minimumHoursRequired: minimumHoursForOvertime,
+          console.log('🔥 OVERTIME ACTIVATED (Enhanced Counter-based):', {
+            shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
+            isCustomShift,
+            minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
             hoursWorked: hoursWorked.toFixed(2),
             overtimeHours: (overtimeSeconds / 3600).toFixed(2),
-            logic: 'Overtime starts after completing ' + minimumHoursForOvertime + ' hours'
+            logic: `Overtime starts after completing ${minimumHoursForOvertime.toFixed(1)} hours`
           });
         } else {
           // Still working on required hours - no overtime yet
           setIsOvertime(false);
           setOvertimeMinutes(0);
           
-          console.log('⏱️ REGULAR TIME (Counter-based):', {
-            shiftType,
-            minimumHoursRequired: minimumHoursForOvertime,
+          console.log('⏱️ REGULAR TIME (Enhanced Counter-based):', {
+            shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
+            isCustomShift,
+            minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
             hoursWorked: hoursWorked.toFixed(2),
             remainingHours: (minimumHoursForOvertime - hoursWorked).toFixed(2),
-            logic: 'Need to complete ' + minimumHoursForOvertime + ' hours before overtime'
+            logic: `Need to complete ${minimumHoursForOvertime.toFixed(1)} hours before overtime`
           });
         }
         
@@ -670,40 +723,98 @@ const WorkShiftTimer: React.FC = () => {
   const sessionStartTime = new Date(activeCheckIn.timestamp);
   const sessionStartHour = sessionStartTime.getHours();
   
-  // Determine shift type and end time
+  // Enhanced shift type and end time calculation (including custom shifts)
   let currentShiftType = 'day';
   let shiftEndTime = new Date(sessionStartTime);
+  let isCurrentCustomShift = false;
+  let currentShiftDuration = 7; // Default day shift duration
   
   if (shiftInfo && shiftInfo.name) {
-    if (shiftInfo.name.toLowerCase().includes('day')) {
+    const shiftNameLower = shiftInfo.name.toLowerCase();
+    
+    if (shiftNameLower.includes('day')) {
       currentShiftType = 'day';
+      currentShiftDuration = 7;
       shiftEndTime.setHours(16, 0, 0, 0); // 4PM
-    } else if (shiftInfo.name.toLowerCase().includes('night')) {
+      isCurrentCustomShift = false;
+    } else if (shiftNameLower.includes('night')) {
       currentShiftType = 'night';
+      currentShiftDuration = 8;
       if (sessionStartHour >= 15) {
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day (not midnight)
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day
       } else {
-        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day (not midnight)
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day
+      }
+      isCurrentCustomShift = false;
+    } else {
+      // CUSTOM SHIFT - calculate end time from start + duration
+      currentShiftType = 'custom';
+      isCurrentCustomShift = true;
+      
+      // Calculate custom shift duration and end time
+      if (shiftInfo.start_time && shiftInfo.end_time) {
+        try {
+          const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
+          const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
+          
+          // Set shift end time directly from end_time
+          shiftEndTime = new Date(sessionStartTime);
+          shiftEndTime.setHours(endH, endM, 0, 0);
+          
+          // If end time is before start time, it's overnight
+          if (endH < startH || (endH === startH && endM < startM)) {
+            shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+          }
+          
+          // Calculate duration for overtime logic
+          let durationMinutes;
+          if (endH < startH || (endH === startH && endM < startM)) {
+            durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+          } else {
+            durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+          }
+          currentShiftDuration = durationMinutes / 60;
+          
+          console.log(`🎯 Custom shift extended work check: "${shiftInfo.name}"`, {
+            startTime: shiftInfo.start_time,
+            endTime: shiftInfo.end_time,
+            calculatedEndTime: shiftEndTime.toISOString(),
+            duration: currentShiftDuration.toFixed(1) + 'h'
+          });
+        } catch (error) {
+          console.error('Error calculating custom shift end time:', error);
+          // Fallback: end time = start time + 8 hours
+          shiftEndTime = new Date(sessionStartTime);
+          shiftEndTime.setHours(shiftEndTime.getHours() + 8);
+          currentShiftDuration = 8;
+        }
+      } else {
+        // Fallback for custom shifts without time info
+        shiftEndTime = new Date(sessionStartTime);
+        shiftEndTime.setHours(shiftEndTime.getHours() + 8);
+        currentShiftDuration = 8;
       }
     }
   } else {
     // Fallback detection
     if (sessionStartHour >= 8 && sessionStartHour < 16) {
       currentShiftType = 'day';
+      currentShiftDuration = 7;
       shiftEndTime.setHours(16, 0, 0, 0); // 4PM
     } else {
       currentShiftType = 'night';
+      currentShiftDuration = 8;
       if (sessionStartHour >= 15) {
         shiftEndTime.setDate(shiftEndTime.getDate() + 1);
-        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day (not midnight)
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM next day
       } else {
-        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day (not midnight)
+        shiftEndTime.setHours(4, 0, 0, 0); // 4AM current day
       }
     }
   }
 
-  const minimumHoursForOvertime = currentShiftType === 'day' ? 7 : 8;
+  const minimumHoursForOvertime = currentShiftDuration;
   const hoursWorked = timeWorked / 3600;
   
   // Show "Extended Work" state when past shift hours but haven't reached minimum overtime hours
@@ -747,18 +858,52 @@ const WorkShiftTimer: React.FC = () => {
   const checkInTime = new Date(activeCheckIn.timestamp);
   const checkInHour = checkInTime.getHours();
   
-  // Determine shift type and duration
+  // Enhanced shift type and duration detection (including custom shifts)
   let shiftType = 'day'; // Default
   let shiftDurationHours = 7; // Default day shift duration
+  let isCustomShiftDisplay = false;
   
   // Use database shift assignment if available
   if (shiftInfo && shiftInfo.name) {
-    if (shiftInfo.name.toLowerCase().includes('day')) {
+    const shiftNameLower = shiftInfo.name.toLowerCase();
+    
+    if (shiftNameLower.includes('day')) {
       shiftType = 'day';
       shiftDurationHours = 7; // Day shift = 7 hours
-    } else if (shiftInfo.name.toLowerCase().includes('night')) {
+      isCustomShiftDisplay = false;
+    } else if (shiftNameLower.includes('night')) {
       shiftType = 'night';
       shiftDurationHours = 8; // Night shift = 8 hours
+      isCustomShiftDisplay = false;
+    } else {
+      // CUSTOM SHIFT DETECTED - treat as normal shift for display
+      shiftType = 'custom';
+      isCustomShiftDisplay = true;
+      
+      // Calculate custom shift duration from start/end times
+      if (shiftInfo.start_time && shiftInfo.end_time) {
+        try {
+          const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
+          const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
+          
+          let durationMinutes;
+          if (endH < startH || (endH === startH && endM < startM)) {
+            // Overnight custom shift
+            durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+          } else {
+            // Same-day custom shift
+            durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+          }
+          
+          shiftDurationHours = durationMinutes / 60;
+          console.log(`🎯 Custom shift timer display: "${shiftInfo.name}" = ${shiftDurationHours.toFixed(1)} hours`);
+        } catch (error) {
+          console.error('Error calculating custom shift duration for display:', error);
+          shiftDurationHours = 8; // Fallback
+        }
+      } else {
+        shiftDurationHours = 8; // Fallback for custom shifts without time info
+      }
     }
   } else {
     // Fallback to check-in time based detection
@@ -778,18 +923,17 @@ const WorkShiftTimer: React.FC = () => {
   // Remaining time = Full shift duration - actual work time (this freezes during breaks)
   const remainingSeconds = Math.max(0, shiftDurationSeconds - timeWorked);
   
-  // Debug logging
-  console.log('⏰ Timer Debug (FREEZE MODE):', {
-    shiftType,
-    shiftDurationHours,
+  // Enhanced debug logging with custom shift info
+  console.log('⏰ Enhanced Timer Debug (FREEZE MODE):', {
+    shiftType: isCustomShiftDisplay ? `custom (${shiftInfo?.name})` : shiftType,
+    isCustomShift: isCustomShiftDisplay,
+    shiftDurationHours: shiftDurationHours.toFixed(1) + 'h',
     shiftDurationSeconds,
-    timeWorked: timeWorked + 's',
-    timeWorkedMinutes: Math.floor(timeWorked / 60),
-    remainingSeconds,
-    remainingMinutes: Math.floor(remainingSeconds / 60),
-    isOnBreak: isOnBreak ? '(FROZEN - on break)' : '(RUNNING)',
+    timeWorked: timeWorked + 's (' + Math.floor(timeWorked / 60) + 'm)',
+    remainingSeconds: remainingSeconds + 's (' + Math.floor(remainingSeconds / 60) + 'm)',
+    breakStatus: isOnBreak ? '🟡 FROZEN (on break)' : '🟢 RUNNING',
     checkInTime: checkInTime.toISOString(),
-    shiftInfo: shiftInfo?.name
+    shiftName: shiftInfo?.name || 'fallback detection'
   });
   
   // Progress calculation (FREEZE MODE: Use actual work time)
