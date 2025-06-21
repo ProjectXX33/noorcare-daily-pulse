@@ -30,7 +30,7 @@ if [ $? -eq 0 ]; then
         echo "$(date +%s)" > public/update-trigger.txt
         
         # Update service worker version
-        node update-sw-version.js
+        node update-sw-version.cjs
         
         # Send notification to all connected clients (if notification system is available)
         curl -X POST "https://noorreport.nooralqmar.com/api/admin/broadcast-update" \
