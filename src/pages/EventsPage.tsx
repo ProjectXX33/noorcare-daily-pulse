@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Edit, Trash2, Clock, User, AlertCircle, Eye, Grid, CalendarDays, MapPin, Filter, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, Edit, Trash2, Clock, User, AlertCircle, Eye, Grid, CalendarDays, MapPin, Filter, Search, ChevronLeft, ChevronRight, Check, X as XIcon, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Calendar imports
 import FullCalendar from '@fullcalendar/react';
@@ -33,12 +34,26 @@ const EventsPage = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'ongoing' | 'past'>('all');
   const [isMobile, setIsMobile] = useState(false);
 
+  const getStatusBadgeClass = (status: 'active' | 'paused' | 'finished' | undefined) => {
+    switch (status) {
+      case 'active':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300';
+      case 'paused':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300';
+      case 'finished':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 border-gray-300';
+    }
+  };
+
   // Event form state
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
     start: new Date().toISOString().slice(0, 16),
-    end: ''
+    end: '',
+    status: 'active'
   });
 
   // Only Admins and Media Buyers can edit events - all other employees are view-only
@@ -91,8 +106,14 @@ const EventsPage = () => {
       });
     }
     
+    // 🛡️ For regular employees, only show active events
+    const isAdminOrMediaBuyer = user && (user.role === 'admin' || user.position === 'Media Buyer');
+    if (!isAdminOrMediaBuyer) {
+      filtered = filtered.filter(ev => ev.status === 'active');
+    }
+    
     return filtered;
-  }, [events, searchQuery, filterStatus]);
+  }, [events, searchQuery, filterStatus, user]);
 
   // Debug logging
   useEffect(() => {
@@ -129,7 +150,8 @@ const EventsPage = () => {
         title: event.title,
         description: event.description || '',
         start: new Date(event.start).toISOString().slice(0, 16),
-        end: event.end ? new Date(event.end).toISOString().slice(0, 16) : ''
+        end: event.end ? new Date(event.end).toISOString().slice(0, 16) : '',
+        status: event.status || 'active'
       });
       
       // BULLETPROOF: Force view-only mode for non-privileged users
@@ -176,7 +198,8 @@ const EventsPage = () => {
       title: '',
       description: '',
       start: info.dateStr + 'T09:00',
-      end: ''
+      end: '',
+      status: 'active'
     });
     setIsViewOnly(false);
     setIsEventDialogOpen(true);
@@ -212,6 +235,7 @@ const EventsPage = () => {
         // Update existing event
         const updatedEvent = await eventService.updateEvent(selectedEvent.id, {
           ...eventForm,
+          status: eventForm.status as 'active' | 'paused' | 'finished',
           created_by: user.id,
         });
         setEvents(prev => prev.map(event => 
@@ -221,9 +245,13 @@ const EventsPage = () => {
       } else {
         // Create new event
         const newEvent = await eventService.createEvent({
-          ...eventForm,
+          title: eventForm.title,
+          description: eventForm.description,
+          start: eventForm.start,
+          end: eventForm.end,
+          status: eventForm.status as 'active' | 'paused' | 'finished',
           created_by: user.id,
-        } as Event);
+        });
         setEvents(prev => [...prev, newEvent]);
         toast.success('Event created successfully');
       }
@@ -270,7 +298,8 @@ const EventsPage = () => {
       title: '',
       description: '',
       start: new Date().toISOString().slice(0, 16),
-      end: ''
+      end: '',
+      status: 'active'
     });
     setSelectedEvent(null);
   };
@@ -288,8 +317,12 @@ const EventsPage = () => {
     }
   };
 
+  const handleStatusChange = (value: 'active' | 'paused' | 'finished') => {
+    setEventForm(prev => ({ ...prev, status: value }));
+  };
+
   // Prevent any form changes for non-privileged users
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: any) => {
     console.log('⌨️ Input Change Attempt:', {
       field,
       canEditEvents,
@@ -303,9 +336,54 @@ const EventsPage = () => {
       console.log('❌ Input change blocked');
       return;
     }
-    
-    setEventForm(prev => ({ ...prev, [field]: value }));
+
+    if (field === 'status') {
+      handleStatusChange(value as 'active' | 'paused' | 'finished');
+    } else {
+      setEventForm(prev => ({ ...prev, [field]: value }));
+    }
   };
+
+  const handleEventDidMount = (info: { event: any; el: HTMLElement }) => {
+    // Add tooltip
+    if (info.event.title) {
+      info.el.setAttribute('title', `${info.event.title}\n${info.event.start?.toLocaleString()}`);
+    }
+
+    // Apply custom class based on event status
+    const status = info.event.extendedProps.status || 'active';
+    info.el.classList.add(`event-status-${status}`);
+  };
+
+  const renderEventContent = (eventInfo: any) => {
+    const status = eventInfo.event.extendedProps.status || 'active';
+    return (
+      <div className="flex items-center justify-between w-full overflow-hidden p-1">
+        <span className="truncate flex-grow" style={{ color: '#1f2937' }}>{eventInfo.event.title}</span>
+        <Badge 
+          className={`capitalize text-xs ml-2 shrink-0 border ${
+            status === 'active' ? 'bg-blue-200 text-blue-800 border-blue-300' :
+            status === 'paused' ? 'bg-red-200 text-red-800 border-red-300' :
+            'bg-green-200 text-green-800 border-green-300'
+          }`}
+        >
+          {status}
+        </Badge>
+      </div>
+    );
+  };
+
+  const calendarEvents = useMemo(() => {
+    return filteredEvents.map(event => ({
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end || event.start,
+      extendedProps: {
+        status: event.status || 'active'
+      }
+    }));
+  }, [filteredEvents]);
 
   // Check if user has any access (all authenticated users can view)
   if (!user) {
@@ -795,20 +873,40 @@ const EventsPage = () => {
                       margin-right: 20px !important;
                     }
                   }
+
+                  .event-status-active .fc-event-main {
+                    background-color: #EFF6FF !important; /* blue-50 */
+                    color: #1f2937 !important; /* dark gray */
+                  }
+                  .event-status-active {
+                    border-color: #3B82F6 !important; /* blue-500 */
+                    border-left-width: 4px !important;
+                  }
+                  .event-status-paused .fc-event-main {
+                    background-color: #FEF2F2 !important; /* red-50 */
+                    color: #1f2937 !important;
+                  }
+                  .event-status-paused {
+                    border-color: #EF4444 !important; /* red-500 */
+                    border-left-width: 4px !important;
+                  }
+                  .event-status-finished .fc-event-main {
+                    background-color: #F0FDF4 !important; /* green-50 */
+                    color: #1f2937 !important;
+                  }
+                  .event-status-finished {
+                    border-color: #22C55E !important; /* green-500 */
+                    border-left-width: 4px !important;
+                  }
+                  .fc-event-main {
+                    padding: 4px;
+                  }
                 `}</style>
                 <FullCalendar
                   key={`calendar-${isMobile ? 'mobile' : 'desktop'}-${viewMode}`}
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView="dayGridMonth"
-                  events={filteredEvents.map(event => ({
-                    id: event.id,
-                    title: event.title,
-                    start: event.start,
-                    end: event.end || event.start,
-                    backgroundColor: '#3b82f6',
-                    borderColor: '#1d4ed8',
-                    classNames: ['custom-event']
-                  }))}
+                  events={calendarEvents}
                   eventClick={handleEventClick}
                   dateClick={canEditEvents ? handleDateClick : undefined}
                   height={isMobile ? "auto" : "auto"}
@@ -840,12 +938,8 @@ const EventsPage = () => {
                     minute: '2-digit',
                     meridiem: 'short'
                   }}
-                  eventDidMount={(info) => {
-                    // Add tooltip on hover for desktop
-                    if (!isMobile) {
-                      info.el.setAttribute('title', `${info.event.title}\n${info.event.start?.toLocaleString()}`);
-                    }
-                  }}
+                  eventDidMount={handleEventDidMount}
+                  eventContent={renderEventContent}
                 />
               </div>
               
@@ -976,21 +1070,16 @@ const EventsPage = () => {
                         )}
                       </div>
                       
-                      {/* Status Badge */}
+                      {/* Activity / Status Badges */}
                       <div className="flex justify-start">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium w-fit ${
-                          new Date(event.start) > new Date() 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                            : new Date(event.end || event.start) > new Date()
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold w-fit ${
+                          event.status === 'active'
                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+                            : event.status === 'finished'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                         }`}>
-                          {new Date(event.start) > new Date() 
-                            ? 'Upcoming'
-                            : new Date(event.end || event.start) > new Date()
-                            ? 'Ongoing'
-                            : 'Past'
-                          }
+                          {event.status === 'active' ? 'Active' : event.status === 'finished' ? 'Finished' : 'Paused'}
                         </span>
                       </div>
                     </CardHeader>
@@ -1330,6 +1419,31 @@ const EventsPage = () => {
                   />
                 </div>
               </div>
+
+              {/* Active Toggle (Admin/Media Buyer only) */}
+              {!isViewOnly && canEditEvents && (
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="text-sm font-medium">Status</Label>
+                  <div className="flex items-center gap-3">
+                    <Select
+                      value={eventForm.status}
+                      onValueChange={(value) => handleInputChange('status', value as 'active' | 'paused' | 'finished')}
+                    >
+                      <SelectTrigger className="w-full capitalize">
+                        <SelectValue placeholder="Select a status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="paused">Paused</SelectItem>
+                        <SelectItem value="finished">Finished</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Badge className={`${getStatusBadgeClass(eventForm.status)} capitalize shrink-0`}>
+                      {eventForm.status}
+                    </Badge>
+                  </div>
+                </div>
+              )}
 
               {/* Q&A Section for Edit Mode */}
               {selectedEvent && canEditQA && (

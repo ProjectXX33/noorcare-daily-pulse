@@ -10,6 +10,7 @@ export interface Event {
   created_by: string | null;
   created_at: string;
   qa?: EventQA[];
+  status: 'active' | 'paused' | 'finished';
 }
 
 export interface EventQA {
@@ -76,7 +77,7 @@ export const eventService = {
   async getEvents(includeQA: boolean = false) {
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description, start_date, end_date, created_by, created_at')
+      .select('id, title, description, start_date, end_date, created_by, created_at, status')
       .order('start_date', { ascending: true });
 
     if (error) throw error;
@@ -89,7 +90,8 @@ export const eventService = {
       start: event.start_date,
       end: event.end_date,
       created_by: event.created_by,
-      created_at: event.created_at
+      created_at: event.created_at,
+      status: (event.status as any) || 'active'
     })) as Event[];
 
     // If Q&A is requested, fetch Q&A for all events
@@ -111,7 +113,7 @@ export const eventService = {
   async getEvent(id: string, includeQA: boolean = true) {
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description, start_date, end_date, created_by, created_at')
+      .select('id, title, description, start_date, end_date, created_by, created_at, status')
       .eq('id', id)
       .single();
 
@@ -124,7 +126,8 @@ export const eventService = {
       start: data.start_date,
       end: data.end_date,
       created_by: data.created_by,
-      created_at: data.created_at
+      created_at: data.created_at,
+      status: (data.status as any) || 'active'
     } as Event;
 
     if (includeQA) {
@@ -135,7 +138,14 @@ export const eventService = {
   },
 
   // Create a new event
-  async createEvent(event: Omit<Event, 'id' | 'created_at'>) {
+  async createEvent(event: { 
+    title: string; 
+    description: string | null; 
+    start: string; 
+    end: string | null; 
+    status: 'active' | 'paused' | 'finished';
+    created_by: string | null;
+  }) {
     const { data, error } = await supabase
       .from('events')
       .insert([{
@@ -143,9 +153,10 @@ export const eventService = {
         description: event.description,
         start_date: event.start,
         end_date: event.end,
-        created_by: event.created_by
+        created_by: event.created_by,
+        status: (event.status as any) || 'active'
       }])
-      .select('id, title, description, start_date, end_date, created_by, created_at')
+      .select('id, title, description, start_date, end_date, created_by, created_at, status')
       .single();
 
     if (error) throw error;
@@ -158,7 +169,8 @@ export const eventService = {
       start: data.start_date,
       end: data.end_date,
       created_by: data.created_by,
-      created_at: data.created_at
+      created_at: data.created_at,
+      status: (data.status as any) || 'active'
     } as Event;
 
     // Create notifications for all users
@@ -175,12 +187,13 @@ export const eventService = {
     if (event.start !== undefined) updateData.start_date = event.start;
     if (event.end !== undefined) updateData.end_date = event.end;
     if (event.created_by !== undefined) updateData.created_by = event.created_by;
+    if (event.status !== undefined) updateData.status = event.status;
 
     const { data, error } = await supabase
       .from('events')
       .update(updateData)
       .eq('id', id)
-      .select('id, title, description, start_date, end_date, created_by, created_at')
+      .select('id, title, description, start_date, end_date, created_by, created_at, status')
       .single();
 
     if (error) throw error;
@@ -193,7 +206,8 @@ export const eventService = {
       start: data.start_date,
       end: data.end_date,
       created_by: data.created_by,
-      created_at: data.created_at
+      created_at: data.created_at,
+      status: (data.status as any) || 'active'
     } as Event;
   },
 
