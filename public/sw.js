@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '3.2.3'; // Enhanced overtime timer with fire emoji and flexible work system
+const APP_VERSION = '3.2.4'; // Enhanced cache clearing with auth preservation
 const CACHE_NAME = `noorhub-v${APP_VERSION}-${Date.now()}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 
@@ -64,55 +64,65 @@ self.addEventListener('activate', event => {
   
   event.waitUntil(
     Promise.all([
-      // Clear all old caches
-      caches.keys().then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cacheName => {
-            if (cacheName !== CACHE_NAME) {
-              console.log(`[SW] Deleting old cache: ${cacheName}`);
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      }),
-      // Clear all stored data for fresh start
-      clearStorageData(),
-      // Take control of all clients
+      // Clear ALL caches - no exceptions
+      clearAllCaches(),
+      // Clear storage data while preserving auth
+      clearStorageDataPreserveAuth(),
+      // Take control of all clients immediately
       self.clients.claim(),
-      // Notify clients about update
-      notifyClientsOfUpdate()
+      // Notify clients about update and cache clearing
+      notifyClientsOfCacheUpdate()
     ])
   );
 });
 
-// Clear storage data for fresh app state
-async function clearStorageData() {
+// Enhanced cache clearing - removes ALL caches
+async function clearAllCaches() {
   try {
-    // Clear all localStorage data related to the app (except user preferences and auth data)
-    const clients = await self.clients.matchAll();
-    clients.forEach(client => {
-      client.postMessage({
-        type: 'CLEAR_STORAGE',
-        version: APP_VERSION,
-        preserveKeys: [
-          'theme', 
-          'language', 
-          'chatSoundEnabled',
-          'preferredLanguage',
-          'notificationPreferences',
-          'chatPreferences'
-        ] // Keep user preferences and let AppUpdateManager handle auth preservation
-      });
+    const cacheNames = await caches.keys();
+    console.log(`[SW] Found ${cacheNames.length} caches to delete:`, cacheNames);
+    
+    // Delete ALL caches without exception
+    const deletePromises = cacheNames.map(cacheName => {
+      console.log(`[SW] Deleting cache: ${cacheName}`);
+      return caches.delete(cacheName);
     });
     
-    console.log('[SW] Storage data clearing initiated');
+    await Promise.all(deletePromises);
+    console.log('[SW] ALL caches cleared successfully');
+    
+    // Create fresh cache with new assets
+    const newCache = await caches.open(CACHE_NAME);
+    await newCache.addAll(urlsToCache);
+    console.log(`[SW] New cache created: ${CACHE_NAME}`);
+    
   } catch (error) {
-    console.error('[SW] Error clearing storage:', error);
+    console.error('[SW] Error clearing caches:', error);
   }
 }
 
-// Notify all clients about the update
-async function notifyClientsOfUpdate() {
+// Clear storage data while preserving authentication
+async function clearStorageDataPreserveAuth() {
+  try {
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'FORCE_CACHE_CLEAR',
+        version: APP_VERSION,
+        timestamp: Date.now(),
+        preserveAuth: true,
+        message: 'Cache cleared - updates will show immediately'
+      });
+    });
+    
+    console.log('[SW] Cache clear command sent to all clients');
+  } catch (error) {
+    console.error('[SW] Error sending cache clear command:', error);
+  }
+}
+
+// Notify all clients about the cache update
+async function notifyClientsOfCacheUpdate() {
   try {
     // Fetch version info with release notes
     let versionInfo = null;
@@ -128,18 +138,20 @@ async function notifyClientsOfUpdate() {
     const clients = await self.clients.matchAll();
     clients.forEach(client => {
       client.postMessage({
-        type: 'APP_UPDATED',
+        type: 'APP_UPDATED_CACHE_CLEARED',
         version: APP_VERSION,
-        message: 'App has been updated! Refresh to get the latest version.',
+        message: 'App updated! Cache cleared - you will see the latest version.',
+        cacheCleared: true,
+        timestamp: Date.now(),
         releaseNotes: versionInfo?.releaseNotes || [
-          'Fixed critical Service Worker errors causing app startup issues',
-          'Improved PWA reliability with proper service worker lifecycle management',
-          'Enhanced app update system with better conflict resolution'
+          'Cache automatically cleared for fresh updates',
+          'Login session preserved',
+          'Latest features and fixes applied'
         ]
       });
     });
     
-    console.log('[SW] Update notification sent to all clients');
+    console.log('[SW] Cache update notification sent to all clients');
   } catch (error) {
     console.error('[SW] Error notifying clients:', error);
   }

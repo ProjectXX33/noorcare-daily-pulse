@@ -119,9 +119,18 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
     const { data } = event;
     
     switch (data.type) {
+      case 'APP_UPDATED_CACHE_CLEARED':
+        console.log('[UpdateManager] App updated with cache cleared:', data);
+        handleCacheClearedUpdate(data);
+        break;
+        
+      case 'FORCE_CACHE_CLEAR':
+        console.log('[UpdateManager] Force cache clear received:', data);
+        handleForceCacheClear(data);
+        break;
+        
       case 'APP_UPDATED':
         console.log('[UpdateManager] App update detected:', data);
-        // Auto-update in background without showing prompts
         handleAutoUpdate(data);
         break;
         
@@ -136,6 +145,124 @@ const AppUpdateManager: React.FC<AppUpdateManagerProps> = ({
           window.location.href = data.url;
         }
         break;
+    }
+  };
+
+  const handleCacheClearedUpdate = async (updateData: any) => {
+    try {
+      console.log('[UpdateManager] Processing cache-cleared update:', updateData);
+      
+      // Clear application storage while preserving authentication
+      await clearAppStoragePreserveAuth();
+      
+      // Update version tracking
+      if (updateData.version) {
+        localStorage.setItem('app-version', updateData.version);
+        localStorage.setItem('last-update-check', updateData.timestamp?.toString() || Date.now().toString());
+        localStorage.setItem('cache-cleared-version', updateData.version);
+      }
+      
+      // Show success notification
+      toast.success('App updated! Cache cleared successfully 🎉', {
+        description: 'You now have the latest version with all updates visible.',
+        duration: 3000,
+      });
+      
+      console.log('[UpdateManager] Cache-cleared update completed, refreshing...');
+      
+      // Auto-refresh to show the new version immediately
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('[UpdateManager] Cache-cleared update failed:', error);
+    }
+  };
+
+  const handleForceCacheClear = async (clearData: any) => {
+    try {
+      console.log('[UpdateManager] Processing force cache clear:', clearData);
+      
+      // Clear all application cache while preserving auth
+      await clearAppStoragePreserveAuth();
+      
+      // Show notification
+      toast.info('Cache cleared for fresh updates! 🔄', {
+        description: clearData.message || 'Updates will now show immediately.',
+        duration: 2000,
+      });
+      
+      console.log('[UpdateManager] Force cache clear completed');
+      
+    } catch (error) {
+      console.error('[UpdateManager] Force cache clear failed:', error);
+    }
+  };
+
+  const clearAppStoragePreserveAuth = async () => {
+    try {
+      console.log('[UpdateManager] Clearing app storage while preserving authentication...');
+      
+      // Get all localStorage keys
+      const allKeys = Object.keys(localStorage);
+      
+      // Auto-detect authentication and essential keys to preserve
+      const preserveKeys = allKeys.filter(key => 
+        // Supabase authentication keys
+        key.includes('sb-') ||
+        key.includes('supabase') ||
+        // General authentication keys
+        key.includes('auth') ||
+        key.includes('session') ||
+        key.includes('user') ||
+        key.includes('token') ||
+        // User preferences
+        key === 'theme' ||
+        key === 'language' ||
+        key === 'chatSoundEnabled' ||
+        key === 'preferredLanguage' ||
+        // Version tracking (keep for update management)
+        key === 'app-version' ||
+        key === 'last-update-check' ||
+        key === 'cache-cleared-version'
+      );
+      
+      // Save values to preserve
+      const preserved: Record<string, string> = {};
+      preserveKeys.forEach(key => {
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+          preserved[key] = value;
+        }
+      });
+      
+      console.log('[UpdateManager] Preserving keys:', preserveKeys);
+      
+      // Clear all localStorage
+      localStorage.clear();
+      
+      // Restore preserved values
+      Object.entries(preserved).forEach(([key, value]) => {
+        localStorage.setItem(key, value);
+      });
+      
+      // Clear sessionStorage but preserve auth-related data
+      const sessionKeys = Object.keys(sessionStorage);
+      sessionKeys.forEach(key => {
+        if (!key.includes('sb-') && !key.includes('supabase') && !key.includes('auth')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+      
+      // Use cache manager to clear browser caches
+      await cacheManager.clearAllCaches();
+      
+      console.log('[UpdateManager] App storage cleared while preserving authentication');
+      
+    } catch (error) {
+      console.error('[UpdateManager] Error clearing app storage:', error);
+      throw error;
     }
   };
 

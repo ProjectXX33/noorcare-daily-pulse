@@ -1,7 +1,7 @@
 {
   "name": "noorhub-daily-pulse",
   "private": true,
-  "version": "3.2.3",
+  "version": "3.2.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,9 @@
     "deploy": "npm run build && node deploy-to-plesk.js",
     "deploy:staging": "npm run build && node deploy-to-plesk.js --env=staging",
     "deploy:refresh": "node deploy-with-refresh.cjs",
+    "deploy:ci": "npm ci && npm run build && node deploy-to-plesk.js",
+    "deploy:ci-staging": "npm ci && npm run build && node deploy-to-plesk.js --env=staging",
+    "deploy:fresh": "rm -rf node_modules package-lock.json && npm ci && npm run build && node deploy-to-plesk.js",
     "test:update-system": "node test-update-system.cjs",
     "quick-deploy": "node deploy-to-plesk.js",
     "zip-deploy": "node zip-for-plesk.js"

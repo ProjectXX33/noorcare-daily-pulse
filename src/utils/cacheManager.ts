@@ -35,60 +35,160 @@ export class CacheManager {
   // Clear all application caches
   async clearAllCaches(): Promise<boolean> {
     try {
-      console.log('[CacheManager] Starting cache clearing process...');
+      console.log('[CacheManager] Starting comprehensive cache clearing process...');
       
-      // Clear browser caches
+      // Clear ALL browser caches without exception
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         console.log('[CacheManager] Found caches:', cacheNames);
         
-        const deletePromises = cacheNames.map(cacheName => {
-          console.log(`[CacheManager] Deleting cache: ${cacheName}`);
-          return caches.delete(cacheName);
-        });
-        
-        await Promise.all(deletePromises);
-        console.log('[CacheManager] All caches deleted successfully');
+        if (cacheNames.length > 0) {
+          const deletePromises = cacheNames.map(cacheName => {
+            console.log(`[CacheManager] Deleting cache: ${cacheName}`);
+            return caches.delete(cacheName);
+          });
+          
+          await Promise.all(deletePromises);
+          console.log('[CacheManager] ALL browser caches deleted successfully');
+        } else {
+          console.log('[CacheManager] No browser caches found to delete');
+        }
       }
 
-      // Clear localStorage (except user preferences and auth data)
+      // Clear localStorage (except authentication and essential data)
       const preserveKeys = [
+        // Authentication keys (auto-detected)
+        ...this.getAuthenticationKeys(),
+        // User preferences
         'theme', 
         'language', 
         'chatSoundEnabled',
+        'preferredLanguage',
+        // Version tracking
         'app-version',
+        'last-update-check',
+        'cache-cleared-version',
         'dismissed-update-version',
         'dismissed-update-time',
-        'last-update-check',
         'update-completed',
         'update-completed-time'
       ];
       
-      // Preserve all authentication keys
-      const allKeys = Object.keys(localStorage);
-      const authKeys = allKeys.filter(key => 
-        key.includes('sb-') ||
-        key.includes('supabase') ||
-        key.includes('auth') ||
-        key.includes('session') ||
-        key.includes('user')
-      );
-      
-      preserveKeys.push(...authKeys);
       this.clearLocalStorage(preserveKeys);
 
-      // Clear sessionStorage
-      sessionStorage.clear();
-      console.log('[CacheManager] Session storage cleared');
+      // Clear sessionStorage (except auth data)
+      this.clearSessionStorage();
+      console.log('[CacheManager] Session storage cleared (preserving auth)');
 
       // Clear IndexedDB if used
       await this.clearIndexedDB();
 
+      // Force clear any remaining app-specific caches
+      await this.clearApplicationSpecificCaches();
+
+      console.log('[CacheManager] Complete cache clearing finished successfully');
       return true;
     } catch (error) {
       console.error('[CacheManager] Error clearing caches:', error);
       return false;
     }
+  }
+
+  // Get all authentication-related keys
+  private getAuthenticationKeys(): string[] {
+    const allKeys = Object.keys(localStorage);
+    return allKeys.filter(key => 
+      key.includes('sb-') ||
+      key.includes('supabase') ||
+      key.includes('auth') ||
+      key.includes('session') ||
+      key.includes('user') ||
+      key.includes('token')
+    );
+  }
+
+  // Clear sessionStorage while preserving auth data
+  private clearSessionStorage(): void {
+    try {
+      const sessionKeys = Object.keys(sessionStorage);
+      const authKeys = sessionKeys.filter(key => 
+        key.includes('sb-') ||
+        key.includes('supabase') ||
+        key.includes('auth')
+      );
+
+      // Save auth data
+      const authData: Record<string, string> = {};
+      authKeys.forEach(key => {
+        const value = sessionStorage.getItem(key);
+        if (value) authData[key] = value;
+      });
+
+      // Clear all sessionStorage
+      sessionStorage.clear();
+
+      // Restore auth data
+      Object.entries(authData).forEach(([key, value]) => {
+        sessionStorage.setItem(key, value);
+      });
+
+      console.log('[CacheManager] SessionStorage cleared (preserved auth keys:', authKeys, ')');
+    } catch (error) {
+      console.error('[CacheManager] Error clearing sessionStorage:', error);
+    }
+  }
+
+  // Clear application-specific caches
+  private async clearApplicationSpecificCaches(): Promise<void> {
+    try {
+      // Clear any app-specific cache storage
+      if ('caches' in window) {
+        // Force delete any caches that might have been missed
+        const remainingCaches = await caches.keys();
+        if (remainingCaches.length > 0) {
+          console.log('[CacheManager] Found remaining caches, force deleting:', remainingCaches);
+          await Promise.all(remainingCaches.map(name => caches.delete(name)));
+        }
+      }
+
+      // Clear any web storage that might hold cached data
+      if (window.localStorage) {
+        const cacheKeys = Object.keys(localStorage).filter(key => 
+          key.includes('cache') || 
+          key.includes('data-') || 
+          key.includes('temp-') ||
+          key.includes('cached-')
+        );
+        
+        cacheKeys.forEach(key => {
+          if (!this.isAuthenticationKey(key)) {
+            localStorage.removeItem(key);
+            console.log(`[CacheManager] Removed cached data key: ${key}`);
+          }
+        });
+      }
+
+      console.log('[CacheManager] Application-specific caches cleared');
+    } catch (error) {
+      console.error('[CacheManager] Error clearing application-specific caches:', error);
+    }
+  }
+
+  // Check if a key is authentication-related
+  private isAuthenticationKey(key: string): boolean {
+    return key.includes('sb-') ||
+           key.includes('supabase') ||
+           key.includes('auth') ||
+           key.includes('session') ||
+           key.includes('user') ||
+           key.includes('token') ||
+           key === 'theme' ||
+           key === 'language' ||
+           key === 'chatSoundEnabled' ||
+           key === 'preferredLanguage' ||
+           key === 'app-version' ||
+           key === 'last-update-check' ||
+           key === 'cache-cleared-version';
   }
 
   // Clear localStorage with preserved keys
@@ -256,6 +356,52 @@ export class CacheManager {
       localStorage.setItem('app-build-time', buildTime);
     }
     localStorage.setItem('last-update-check', Date.now().toString());
+  }
+
+  // Manual cache clear function - can be called from anywhere
+  async forceCacheClearKeepAuth(): Promise<boolean> {
+    try {
+      console.log('[CacheManager] Manual cache clear initiated - preserving authentication...');
+      
+      // Clear all caches
+      const success = await this.clearAllCaches();
+      
+      if (success) {
+        console.log('[CacheManager] Manual cache clear completed successfully');
+        
+        // Show success message if in browser environment
+        if (typeof window !== 'undefined' && window.alert) {
+          setTimeout(() => {
+            alert('✅ Cache cleared successfully! Your login session is preserved. The page will refresh to show updates.');
+            window.location.reload();
+          }, 500);
+        }
+      } else {
+        console.error('[CacheManager] Manual cache clear failed');
+        if (typeof window !== 'undefined' && window.alert) {
+          alert('❌ Cache clear failed. Please try refreshing the page manually.');
+        }
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('[CacheManager] Error in manual cache clear:', error);
+      if (typeof window !== 'undefined' && window.alert) {
+        alert('❌ Cache clear error. Please try refreshing the page manually.');
+      }
+      return false;
+    }
+  }
+
+  // Make this available globally for console access
+  static exposeGlobalCacheClear(): void {
+    if (typeof window !== 'undefined') {
+      (window as any).clearCacheKeepAuth = () => {
+        const manager = CacheManager.getInstance();
+        return manager.forceCacheClearKeepAuth();
+      };
+      console.log('[CacheManager] Global cache clear function available: clearCacheKeepAuth()');
+    }
   }
 }
 

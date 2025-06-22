@@ -151,4 +151,61 @@ export const createNotificationForMultipleUsers = async (
     console.error('❌ Error creating notifications for multiple users:', error);
     throw error;
   }
+};
+
+// Function to clean up old notifications for all users (admin utility)
+export const cleanupOldNotificationsForAllUsers = async () => {
+  try {
+    console.log('🧹 Starting cleanup of old notifications for all users...');
+    
+    // Get all unique user IDs from notifications
+    const { data: userIds, error: userError } = await supabase
+      .from('notifications')
+      .select('user_id')
+      .not('user_id', 'is', null);
+
+    if (userError) throw userError;
+
+    // Get unique user IDs
+    const uniqueUserIds = [...new Set(userIds?.map(row => row.user_id) || [])];
+    
+    console.log(`🔍 Found ${uniqueUserIds.length} users with notifications`);
+    
+    let totalCleaned = 0;
+    
+    // Clean up notifications for each user
+    for (const userId of uniqueUserIds) {
+      try {
+        const beforeCount = await getNotificationCount(userId);
+        await maintainNotificationLimit(userId, 10);
+        const afterCount = await getNotificationCount(userId);
+        const cleaned = beforeCount - afterCount;
+        totalCleaned += cleaned;
+        
+        if (cleaned > 0) {
+          console.log(`🗑️ Cleaned ${cleaned} notifications for user ${userId}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error cleaning notifications for user ${userId}:`, error);
+      }
+    }
+    
+    console.log(`✅ Cleanup completed! Removed ${totalCleaned} old notifications across all users`);
+    return { success: true, totalCleaned, usersProcessed: uniqueUserIds.length };
+    
+  } catch (error) {
+    console.error('❌ Error during notification cleanup:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Helper function to get notification count for a user
+const getNotificationCount = async (userId: string): Promise<number> => {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId);
+    
+  if (error) throw error;
+  return count || 0;
 }; 
