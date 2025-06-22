@@ -76,7 +76,7 @@ export const useUserRanking = () => {
 
         const currentMonth = format(new Date(), 'yyyy-MM');
         
-        // Get all performance data for current month
+        // Fetch all performance records for the month
         const { data: performanceData, error } = await supabase
           .from('admin_performance_dashboard')
           .select('employee_id, employee_name, average_performance_score')
@@ -95,16 +95,31 @@ export const useUserRanking = () => {
           return;
         }
 
-        // Find user's position in ranking
-        const userPosition = performanceData.findIndex(p => p.employee_id === user.id);
+        // Get all Diamond employee IDs to exclude them from regular ranking
+        const { data: diamondEmployees, error: diamondListError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('diamond_rank', true);
+
+        if (diamondListError) {
+          console.error('Error fetching Diamond employees list:', diamondListError);
+        }
+
+        const diamondIds = diamondEmployees?.map(d => d.id) || [];
+
+        // Filter out Diamond employees for regular ranking
+        const regularPerformanceData = performanceData.filter(p => !diamondIds.includes(p.employee_id));
+
+        // Find user's position in regular ranking data
+        const userPosition = regularPerformanceData.findIndex(p => p.employee_id === user.id);
         
         let result: UserRanking | null = null;
         if (userPosition !== -1) {
           result = {
             employee_id: user.id,
             employee_name: user.name,
-            average_performance_score: performanceData[userPosition].average_performance_score,
-            position: userPosition + 1, // 1-based ranking
+            average_performance_score: regularPerformanceData[userPosition].average_performance_score,
+            position: userPosition + 1, // 1-based ranking among non-diamond employees
             isDiamond: false
           };
         }
@@ -230,24 +245,39 @@ export const useUserRankingTheme = () => {
 
         const currentMonth = format(new Date(), 'yyyy-MM');
         
+        // Fetch all performance for the month
         const { data: performanceData, error } = await supabase
           .from('admin_performance_dashboard')
           .select('employee_id, average_performance_score')
           .eq('month_year', currentMonth)
-          .order('average_performance_score', { ascending: false })
-          .limit(3);
+          .order('average_performance_score', { ascending: false });
 
         if (error || !performanceData) return;
 
-        const userPosition = performanceData.findIndex(p => p.employee_id === user.id);
-        
+        // Get Diamond IDs
+        const { data: diamondList, error: diamondError2 } = await supabase
+          .from('users')
+          .select('id')
+          .eq('diamond_rank', true);
+
+        if (diamondError2) {
+          console.error('Error fetching Diamond ids for theme:', diamondError2);
+        }
+
+        const diamondIds2 = diamondList?.map(d => d.id) || [];
+
+        const regularPerf = performanceData.filter(p => !diamondIds2.includes(p.employee_id));
+
+        const userPosition = regularPerf.findIndex(p => p.employee_id === user.id);
+
+        // Only need top3 for theme check
+        const top3Regular = regularPerf.slice(0, 3);
+
         let theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default' = 'default';
-        if (userPosition === 0) {
-          theme = 'gold';
-        } else if (userPosition === 1) {
-          theme = 'silver';
-        } else if (userPosition === 2) {
-          theme = 'bronze';
+        if (userPosition !== -1) {
+          if (userPosition === 0) theme = 'gold';
+          else if (userPosition === 1) theme = 'silver';
+          else if (userPosition === 2) theme = 'bronze';
         }
 
         // Update cache with theme

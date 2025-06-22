@@ -544,16 +544,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         });
       }
 
-      // Sort by Diamond rank first, then by performance score
-      processedEmployees.sort((a, b) => {
-        // Diamond rank employees go first
-        if (a.diamondRank && !b.diamondRank) return -1;
-        if (!a.diamondRank && b.diamondRank) return 1;
-        // Then sort by performance score
-        return b.performance - a.performance;
-      });
+      // Separate Diamond and regular employees, then sort each group by performance
+      const diamondEmployees = processedEmployees.filter(emp => emp.diamondRank).sort((a, b) => b.performance - a.performance);
+      const regularEmployees = processedEmployees.filter(emp => !emp.diamondRank).sort((a, b) => b.performance - a.performance);
       
-      setEmployees(processedEmployees);
+      // Combine: Diamond employees first, then regular employees
+      const sortedEmployees = [...diamondEmployees, ...regularEmployees];
+      
+      setEmployees(sortedEmployees);
       console.log('📊 Final processed employees:', processedEmployees.length);
 
     } catch (error) {
@@ -723,6 +721,21 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       console.log('🔧 Starting complete performance recalculation for ALL employees...');
       toast.info('📊 Recalculating performance for all employees...');
       
+      // Check if admin_performance_dashboard table exists and is accessible
+      console.log('🔍 Checking admin_performance_dashboard table...');
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('admin_performance_dashboard')
+        .select('*')
+        .limit(1);
+      
+      if (tableError) {
+        console.error('❌ admin_performance_dashboard table error:', tableError);
+        toast.error('Database table not accessible. Please check permissions.');
+        return;
+      }
+      
+      console.log('✅ admin_performance_dashboard table is accessible');
+      
       // Get all employees - try broader query first
       console.log('🔍 Fetching employees...');
       const { data: users, error: usersError } = await supabase
@@ -798,7 +811,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           
           if (performanceData) {
               // Prepare record data for remote workers
-              const recordData = {
+              const recordData: any = {
                 employee_id: userRecord.id,
                 employee_name: userRecord.name,
                 month_year: monthYear,
@@ -809,11 +822,6 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                 average_performance_score: performanceData.average_performance_score,
                 punctuality_percentage: performanceData.punctuality_percentage,
                 performance_status: performanceData.performance_status,
-                // Rating data (will be null for remote workers without ratings)
-                employee_rating_avg: null,
-                task_rating_avg: null,
-                rating_bonus_points: 0,
-                total_ratings_count: 0,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               };
@@ -1054,8 +1062,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             console.warn(`⚠️ Could not delete existing record for ${userRecord.name}:`, deleteError);
           }
 
-          // Prepare record data
-          const recordData = {
+          // Prepare record data (only include columns that exist in the database)
+          const recordData: any = {
                 employee_id: userRecord.id,
                 employee_name: userRecord.name,
                 month_year: monthYear,
@@ -1063,22 +1071,28 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             total_delay_minutes: totalDelayMinutes,
             total_delay_hours: Math.round(totalDelayHours * 100) / 100,
             total_overtime_hours: Math.round(totalOvertimeHours * 100) / 100,
-            // NOTE: Removed total_regular_hours and total_break_minutes as they don't exist in the database schema
             average_performance_score: Math.round(averagePerformanceScore * 100) / 100,
             punctuality_percentage: Math.round(punctualityPercentage * 100) / 100,
             performance_status: performanceStatus,
-            // NEW: Add rating data
-            employee_rating_avg: employeeRatingAvg > 0 ? Math.round(employeeRatingAvg * 100) / 100 : null,
-            task_rating_avg: taskRatingAvg > 0 ? Math.round(taskRatingAvg * 100) / 100 : null,
-            rating_bonus_points: ratingBonus,
-            total_ratings_count: totalRatingsCount,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
           };
 
+          // Add rating columns only if they exist in the database
+          try {
+            if (employeeRatingAvg > 0) recordData.employee_rating_avg = Math.round(employeeRatingAvg * 100) / 100;
+            if (taskRatingAvg > 0) recordData.task_rating_avg = Math.round(taskRatingAvg * 100) / 100;
+            if (ratingBonus !== 0) recordData.rating_bonus_points = ratingBonus;
+            if (totalRatingsCount > 0) recordData.total_ratings_count = totalRatingsCount;
+          } catch (e) {
+            console.warn(`⚠️ Rating columns may not exist in database for ${userRecord.name}, proceeding without them`);
+          }
+
           console.log(`💾 Inserting record for ${userRecord.name}:`, recordData);
 
           // Create new record with calculated data including rating bonuses
+          console.log(`💾 Attempting to insert record for ${userRecord.name}:`, recordData);
+          
           const { error: insertError } = await supabase
             .from('admin_performance_dashboard')
             .insert(recordData);
@@ -1093,6 +1107,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           } else {
               console.error(`❌ Failed to create ${userRecord.name}:`, insertError);
             console.error('Record data that failed:', recordData);
+            console.error('Full error details:', JSON.stringify(insertError, null, 2));
             skippedEmployees.push({
               name: userRecord.name,
               position: userRecord.position,
@@ -1117,6 +1132,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       if (updatedCount > 0) {
         toast.success(`✅ Successfully recalculated performance for ${updatedCount}/${processedCount} employees`);
         console.log('🎯 Complete! All employee performance recalculated and manual edits overridden!');
+        
+        // Refresh the employee data to show updated performance
+        await fetchEmployeeData();
         
         if (skippedCount > 0) {
           console.warn(`⚠️ ${skippedCount} employees were skipped:`);
@@ -1737,12 +1755,16 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             {/* Mobile Card View */}
             <div className="block lg:hidden space-y-4">
               {employees.map((employee, index) => {
-                // Calculate the actual performance rank (excluding Diamond rank holders)
-                const nonDiamondEmployees = employees.filter(emp => !emp.diamondRank);
-                const nonDiamondRank = nonDiamondEmployees.findIndex(emp => emp.id === employee.id);
+                // Calculate positions correctly - Diamond employees don't count in regular ranking
+                const diamondCount = employees.filter(emp => emp.diamondRank).length;
+                const regularPosition = employee.diamondRank ? 0 : index - diamondCount; // Diamond gets 0, regular employees get their actual position
                 
-                // Enhanced medal styling for top 3 with special effects + Diamond rank
-                const getMedalStyling = (rank: number, isDiamond: boolean = false) => {
+                // Use regular position for both badge and medal effects
+                // For Diamond employees, use special position that doesn't affect medals
+                const medalPosition = employee.diamondRank ? -1 : regularPosition;
+                
+                // Enhanced medal styling for top 3 OVERALL positions + Diamond rank
+                const getMedalStyling = (overallPos: number, isDiamond: boolean = false) => {
                   // Diamond rank overrides all other rankings
                   if (isDiamond) {
                     return {
@@ -1760,8 +1782,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     };
                   }
                   
-                  switch(rank) {
-                    case 0: return {
+                  // FIX: Medal assignment based on OVERALL position
+                  // overallPos 0 = 1st overall, overallPos 1 = 2nd overall, etc.
+                  switch(overallPos) {
+                    case 0: return { // 1st overall = Gold 🥇
                       border: 'border-4 border-yellow-400 shadow-2xl shadow-yellow-500/50',
                       bg: 'bg-gradient-to-br from-yellow-100 via-orange-100 to-red-100 dark:from-yellow-950/40 dark:via-orange-950/40 dark:to-red-950/40 relative overflow-hidden',
                       avatar: 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500 shadow-xl border-4 border-yellow-300',
@@ -1774,7 +1798,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       positionStyle: 'text-orange-600 dark:text-orange-400 font-semibold',
                       cardHover: 'hover:shadow-2xl hover:shadow-yellow-500/60'
                     };
-                    case 1: return {
+                    case 1: return { // 2nd overall = Silver 🥈
                       border: 'border-4 border-slate-400 shadow-xl shadow-slate-500/30',
                       bg: 'bg-gradient-to-br from-slate-100 via-gray-100 to-slate-200 dark:from-slate-950/40 dark:via-gray-950/40 dark:to-slate-950/40',
                       avatar: 'bg-gradient-to-br from-slate-500 via-gray-600 to-slate-700 shadow-lg border-4 border-slate-300',
@@ -1787,7 +1811,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       positionStyle: 'text-slate-600 dark:text-slate-400 font-semibold',
                       cardHover: 'hover:shadow-xl hover:shadow-slate-500/40'
                     };
-                    case 2: return {
+                    case 2: return { // 3rd overall = Bronze 🥉
                       border: 'border-4 border-amber-600 shadow-xl shadow-amber-500/40',
                       bg: 'bg-gradient-to-br from-amber-200 via-orange-200 to-amber-300 dark:from-amber-900/50 dark:via-orange-900/50 dark:to-amber-900/50',
                       avatar: 'bg-gradient-to-br from-amber-700 via-amber-800 to-orange-900 shadow-lg border-4 border-amber-600',
@@ -1800,7 +1824,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       positionStyle: 'text-amber-600 dark:text-amber-400 font-semibold',
                       cardHover: 'hover:shadow-xl hover:shadow-amber-500/50'
                     };
-                    default: return {
+                    default: return { // 4th+ overall = No medal 📊
                       border: 'border-2 border-gray-200 dark:border-gray-700',
                       bg: 'bg-white dark:bg-gray-800',
                       avatar: 'bg-gradient-to-br from-blue-500 to-purple-500',
@@ -1816,7 +1840,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                   }
                 };
                 
-                const styling = getMedalStyling(nonDiamondRank, employee.diamondRank);
+                const styling = getMedalStyling(medalPosition, employee.diamondRank);
                 
                 return (
                 <Card key={employee.id} className={`
@@ -1841,12 +1865,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                           {styling.nameIcon && styling.nameIcon}
                           <h3 className={styling.nameStyle || "font-semibold text-gray-900 dark:text-gray-100"}>{employee.name}</h3>
                           {employee.diamondRank ? (
-                            <Badge className={`${styling.badge} text-xs px-2 py-1 font-bold`}>
-                              💎 Diamond
+                            <Badge className={`${styling.badge} text-xs px-2 py-1 font-bold flex items-center gap-1`}>
+                              <span>#0</span>
+                              <span role="img" aria-label="diamond">💎</span> Diamond
                             </Badge>
-                          ) : nonDiamondRank <= 2 && nonDiamondRank >= 0 && (
+                          ) : (
                             <Badge className={`${styling.badge} text-xs px-2 py-1 font-bold`}>
-                              #{nonDiamondRank + 1}
+                              #{regularPosition + 1}
                             </Badge>
                           )}
                           </div>
@@ -1858,9 +1883,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Key Metrics Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className={`text-center p-3 rounded-lg border ${
-                        nonDiamondRank === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
-                        nonDiamondRank === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
-                        nonDiamondRank === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        medalPosition === 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-lg' :
+                        medalPosition === 1 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
+                        medalPosition === 2 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 shadow-md' :
                         'bg-blue-50 dark:bg-blue-900/20 border-blue-200'
                       }`}>
                         <Calendar className={`h-5 w-5 text-blue-600 mx-auto mb-1`} />
@@ -1870,29 +1895,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         <div className="text-xs text-blue-600 dark:text-blue-400">Working Days</div>
                             </div>
                       <div className={`text-center p-3 rounded-lg ${
-                        nonDiamondRank === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
-                        nonDiamondRank === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
-                        nonDiamondRank === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
+                        medalPosition === 0 ? 'bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-yellow-900/20 dark:via-orange-900/20 dark:to-red-900/20 border-2 border-yellow-400 shadow-lg' :
+                        medalPosition === 1 ? 'bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-900/20 dark:via-gray-900/20 dark:to-slate-900/20 border-2 border-slate-400 shadow-md' :
+                        medalPosition === 2 ? 'bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-amber-900/20 border-2 border-amber-500 shadow-md' :
                         'bg-purple-50 dark:bg-purple-900/20'
                       }`}>
                         <TrendingUp className={`h-4 w-4 mx-auto mb-1 ${
-                          nonDiamondRank === 0 ? 'text-orange-600' :
-                          nonDiamondRank === 1 ? 'text-slate-600' :
-                          nonDiamondRank === 2 ? 'text-amber-600' :
+                          medalPosition === 0 ? 'text-orange-600' :
+                          medalPosition === 1 ? 'text-slate-600' :
+                          medalPosition === 2 ? 'text-amber-600' :
                           'text-purple-600'
                         }`} />
                         <div className={`text-lg font-bold ${
-                          nonDiamondRank === 0 ? 'text-orange-700 dark:text-orange-300' :
-                          nonDiamondRank === 1 ? 'text-slate-700 dark:text-slate-300' :
-                          nonDiamondRank === 2 ? 'text-amber-700 dark:text-amber-300' :
+                          medalPosition === 0 ? 'text-orange-700 dark:text-orange-300' :
+                          medalPosition === 1 ? 'text-slate-700 dark:text-slate-300' :
+                          medalPosition === 2 ? 'text-amber-700 dark:text-amber-300' :
                           'text-purple-700 dark:text-purple-300'
                         }`}>
                           {employee.performance.toFixed(1)}%
                           </div>
                         <div className={`text-xs ${
-                          nonDiamondRank === 0 ? 'text-orange-600 dark:text-orange-400' :
-                          nonDiamondRank === 1 ? 'text-slate-600 dark:text-slate-400' :
-                          nonDiamondRank === 2 ? 'text-amber-600 dark:text-amber-400' :
+                          medalPosition === 0 ? 'text-orange-600 dark:text-orange-400' :
+                          medalPosition === 1 ? 'text-slate-600 dark:text-slate-400' :
+                          medalPosition === 2 ? 'text-amber-600 dark:text-amber-400' :
                           'text-purple-600 dark:text-purple-400'
                         }`}>
                           Performance
@@ -1903,9 +1928,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     {/* Secondary Metrics */}
                     <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        nonDiamondRank === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
-                        nonDiamondRank === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
-                        nonDiamondRank === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        medalPosition === 0 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-md' :
+                        medalPosition === 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
+                        medalPosition === 2 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 shadow-sm' :
                         'bg-red-50 dark:bg-red-900/20 border-red-200'
                       }`}>
                         <Clock className={`h-4 w-4 text-red-600`} />
@@ -1914,9 +1939,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </span>
                         </div>
                       <div className={`flex items-center gap-2 p-3 rounded-lg border ${
-                        nonDiamondRank === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
-                        nonDiamondRank === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
-                        nonDiamondRank === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        medalPosition === 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-md' :
+                        medalPosition === 1 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
+                        medalPosition === 2 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 shadow-sm' :
                         'bg-green-50 dark:bg-green-900/20 border-green-200'
                       }`}>
                         <TrendingUp className={`h-4 w-4 text-green-600`} />
@@ -2015,12 +2040,93 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     </thead>
               <tbody>
                 {employees.map((employee, index) => {
-                  // Calculate the actual performance rank (excluding Diamond rank holders)
-                  const nonDiamondEmployees = employees.filter(emp => !emp.diamondRank);
+                  // Calculate positions correctly - Diamond employees don't count in regular ranking
+                  const diamondCount = employees.filter(emp => emp.diamondRank).length;
+                  const regularPosition = employee.diamondRank ? 0 : index - diamondCount; // Diamond gets 0, regular employees get their actual position
                   
-                  // Medal styling for desktop table + Diamond rank
-                  const getTableStyling = (rank: number, isDiamond: boolean = false) => {
+                  // Use regular position for both badge and medal effects
+                  // For Diamond employees, use special position that doesn't affect medals
+                  const medalPosition = employee.diamondRank ? -1 : regularPosition;
+                  
+                  // Enhanced medal styling for top 3 OVERALL positions + Diamond rank
+                  const getMedalStyling = (overallPos: number, isDiamond: boolean = false) => {
                     // Diamond rank overrides all other rankings
+                    if (isDiamond) {
+                      return {
+                        border: 'border-4 border-cyan-400 shadow-2xl shadow-cyan-500/60',
+                        bg: 'bg-gradient-to-br from-cyan-100 via-blue-100 to-purple-100 dark:from-cyan-950/50 dark:via-blue-950/50 dark:to-purple-950/50 relative overflow-hidden',
+                        avatar: 'bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 shadow-xl border-4 border-cyan-300',
+                        icon: <DiamondIcon className="h-6 w-6 text-cyan-100" />,
+                        iconBg: 'bg-gradient-to-br from-cyan-600 to-purple-600',
+                        specialEffect: 'before:absolute before:inset-0 before:bg-gradient-to-r before:from-cyan-400/20 before:via-blue-400/20 before:to-purple-400/20',
+                        nameIcon: <DiamondIcon className="h-5 w-5 text-cyan-600" />,
+                        badge: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-white font-bold shadow-lg',
+                        nameStyle: 'text-cyan-700 dark:text-cyan-300 font-bold text-lg',
+                        positionStyle: 'text-cyan-600 dark:text-cyan-400 font-semibold',
+                        cardHover: 'hover:shadow-2xl hover:shadow-cyan-500/70'
+                      };
+                    }
+                    
+                    // FIX: Medal assignment based on OVERALL position
+                    // overallPos 0 = 1st overall, overallPos 1 = 2nd overall, etc.
+                    switch(overallPos) {
+                      case 0: return { // 1st overall = Gold 🥇
+                        border: 'border-4 border-yellow-400 shadow-2xl shadow-yellow-500/50',
+                        bg: 'bg-gradient-to-br from-yellow-100 via-orange-100 to-red-100 dark:from-yellow-950/40 dark:via-orange-950/40 dark:to-red-950/40 relative overflow-hidden',
+                        avatar: 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500 shadow-xl border-4 border-yellow-300',
+                        icon: <Crown className="h-6 w-6 text-yellow-100 animate-bounce" />,
+                        iconBg: 'bg-gradient-to-br from-yellow-600 to-orange-600',
+                        specialEffect: '',
+                        nameIcon: <Flame className="h-5 w-5 text-orange-500" />,
+                        badge: 'bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white font-bold shadow-lg',
+                        nameStyle: 'text-orange-700 dark:text-orange-300 font-bold text-lg',
+                        positionStyle: 'text-orange-600 dark:text-orange-400 font-semibold',
+                        cardHover: 'hover:shadow-2xl hover:shadow-yellow-500/60'
+                      };
+                      case 1: return { // 2nd overall = Silver 🥈
+                        border: 'border-4 border-slate-400 shadow-xl shadow-slate-500/30',
+                        bg: 'bg-gradient-to-br from-slate-100 via-gray-100 to-slate-200 dark:from-slate-950/40 dark:via-gray-950/40 dark:to-slate-950/40',
+                        avatar: 'bg-gradient-to-br from-slate-500 via-gray-600 to-slate-700 shadow-lg border-4 border-slate-300',
+                        icon: <Medal className="h-6 w-6 text-slate-100" />,
+                        iconBg: 'bg-gradient-to-br from-slate-600 to-gray-700',
+                        specialEffect: '',
+                        nameIcon: <Star className="h-5 w-5 text-slate-600" />,
+                        badge: 'bg-gradient-to-r from-slate-500 via-gray-600 to-slate-700 text-white font-bold shadow-lg',
+                        nameStyle: 'text-slate-700 dark:text-slate-300 font-bold text-lg',
+                        positionStyle: 'text-slate-600 dark:text-slate-400 font-semibold',
+                        cardHover: 'hover:shadow-xl hover:shadow-slate-500/40'
+                      };
+                      case 2: return { // 3rd overall = Bronze 🥉
+                        border: 'border-4 border-amber-600 shadow-xl shadow-amber-500/40',
+                        bg: 'bg-gradient-to-br from-amber-200 via-orange-200 to-amber-300 dark:from-amber-900/50 dark:via-orange-900/50 dark:to-amber-900/50',
+                        avatar: 'bg-gradient-to-br from-amber-700 via-amber-800 to-orange-900 shadow-lg border-4 border-amber-600',
+                        icon: <Award className="h-6 w-6 text-amber-100" />,
+                        iconBg: 'bg-gradient-to-br from-amber-700 to-orange-900',
+                        specialEffect: '',
+                        nameIcon: <Trophy className="h-5 w-5 text-amber-700" />,
+                        badge: 'bg-gradient-to-r from-amber-700 via-amber-800 to-orange-900 text-white font-bold shadow-lg',
+                        nameStyle: 'text-amber-700 dark:text-amber-300 font-bold text-lg',
+                        positionStyle: 'text-amber-600 dark:text-amber-400 font-semibold',
+                        cardHover: 'hover:shadow-xl hover:shadow-amber-500/50'
+                      };
+                      default: return { // 4th+ overall = No medal 📊
+                        border: 'border-2 border-gray-200 dark:border-gray-700',
+                        bg: 'bg-white dark:bg-gray-800',
+                        avatar: 'bg-gradient-to-br from-blue-500 to-purple-500',
+                        icon: null,
+                        iconBg: '',
+                        specialEffect: '',
+                        nameIcon: null,
+                        badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                        nameStyle: 'text-gray-900 dark:text-gray-100 font-semibold',
+                        positionStyle: 'text-gray-600 dark:text-gray-400',
+                        cardHover: 'hover:shadow-lg'
+                      };
+                    }
+                  };
+                  
+                   // Medal styling for desktop table + Diamond rank
+                   const getTableStyling = (overallPos: number, isDiamond: boolean = false) => {
                     if (isDiamond) {
                       return {
                         row: 'bg-gradient-to-r from-cyan-100 via-blue-100 to-purple-100 dark:from-cyan-950/50 dark:via-blue-950/50 dark:to-purple-950/50 border-4 border-cyan-400 shadow-2xl shadow-cyan-500/60',
@@ -2033,8 +2139,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                       };
                     }
                     
-                    switch(rank) {
-                      case 0: return {
+                     switch(overallPos) {
+                       case 0: return { // 1st overall = Gold 🥇
                         row: 'bg-gradient-to-r from-yellow-100 via-orange-100 to-red-100 dark:from-yellow-950/40 dark:via-orange-950/40 dark:to-red-950/40 border-4 border-yellow-400 shadow-2xl shadow-yellow-500/50',
                         avatar: 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500 border-4 border-yellow-300 shadow-xl',
                         icon: <Crown className="h-4 w-4 text-yellow-100" />,
@@ -2043,25 +2149,25 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         performance: 'bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white shadow-xl font-bold',
                         badge: 'bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white font-bold'
                       };
-                      case 1: return {
+                       case 1: return { // 2nd overall = Silver 🥈
                         row: 'bg-gradient-to-r from-slate-100 via-gray-100 to-slate-200 dark:from-slate-950/40 dark:via-gray-950/40 dark:to-slate-950/40 border-4 border-slate-400 shadow-xl shadow-slate-500/30',
-                        avatar: 'bg-gradient-to-br from-slate-500 via-gray-600 to-slate-700 border-4 border-slate-300 shadow-lg',
+                         avatar: 'bg-gradient-to-br from-slate-500 via-gray-600 to-slate-700 shadow-lg border-4 border-slate-300',
                         icon: <Medal className="h-4 w-4 text-slate-100" />,
                         iconBg: 'bg-gradient-to-br from-slate-600 to-gray-700',
                         nameIcon: <Star className="h-3 w-3 text-slate-600" />,
                         performance: 'bg-gradient-to-r from-slate-500 via-gray-600 to-slate-700 text-white shadow-lg font-bold',
                         badge: 'bg-gradient-to-r from-slate-500 via-gray-600 to-slate-700 text-white font-bold'
                       };
-                                              case 2: return {
+                       case 2: return { // 3rd overall = Bronze 🥉
                           row: 'bg-gradient-to-r from-amber-200 via-orange-200 to-amber-300 dark:from-amber-900/50 dark:via-orange-900/50 dark:to-amber-900/50 border-4 border-amber-600 shadow-xl shadow-amber-500/40',
-                          avatar: 'bg-gradient-to-br from-amber-700 via-amber-800 to-orange-900 border-4 border-amber-600 shadow-lg',
+                         avatar: 'bg-gradient-to-br from-amber-700 via-amber-800 to-orange-900 shadow-lg border-4 border-amber-600',
                           icon: <Award className="h-4 w-4 text-amber-100" />,
                           iconBg: 'bg-gradient-to-br from-amber-700 to-orange-900',
                           nameIcon: <Trophy className="h-3 w-3 text-amber-700" />,
                           performance: 'bg-gradient-to-r from-amber-700 via-amber-800 to-orange-900 text-white shadow-lg font-bold',
                           badge: 'bg-gradient-to-r from-amber-700 via-amber-800 to-orange-900 text-white font-bold'
                         };
-                      default: return {
+                       default: return { // 4th+ overall = No medal 📊
                         row: 'hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors',
                         avatar: 'bg-gradient-to-br from-blue-500 to-purple-500',
                         icon: null,
@@ -2073,8 +2179,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     }
                   };
                   
-                  const nonDiamondRank = nonDiamondEmployees.findIndex(emp => emp.id === employee.id);
-                  const tableStyling = getTableStyling(nonDiamondRank, employee.diamondRank);
+                   const tableStyling = getTableStyling(medalPosition, employee.diamondRank);
                   
                   return (
                   <tr key={employee.id} className={`
@@ -2099,12 +2204,13 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                               <span className="font-bold text-gray-900 dark:text-gray-100 text-sm truncate">{employee.name}</span>
                               {employee.diamondRank ? (
                                 <Badge className={`${tableStyling.badge} text-xs px-2 py-0.5 flex-shrink-0 font-bold flex items-center gap-1`}>
+                                  #0
                                   <DiamondIcon className="h-3 w-3" />
                                   Diamond
                                 </Badge>
-                              ) : nonDiamondRank !== -1 && nonDiamondRank <= 2 && (
+                              ) : (
                                 <Badge className={`${tableStyling.badge} text-xs px-2 py-0.5 flex-shrink-0 font-bold`}>
-                                  #{nonDiamondRank + 1}
+                                  #{regularPosition + 1}
                                 </Badge>
                               )}
                               </div>
