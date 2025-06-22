@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { useLoyalCustomers } from '@/contexts/LoyalCustomersContext';
+import { exportToExcelWithArabicSupport, COMMON_HEADERS } from '@/lib/arabicExportUtils';
 
 // Saudi Riyal SVG Icon Component
 const RiyalIcon = ({ className }: { className?: string }) => (
@@ -102,36 +103,38 @@ const LoyalCustomersPage = () => {
   const exportToExcel = () => {
     try {
       if (filteredCustomers.length === 0) {
-        toast.error('No customers to export');
+        toast.error('لا يوجد عملاء للتصدير / No customers to export');
         return;
       }
 
       const exportData = filteredCustomers.map((customer, index) => ({
-        'Rank': index + 1,
-        'Customer Name': customer.name,
-        'Email': customer.email,
-        'Phone': customer.phone || 'N/A',
-        'Address': customer.address || 'N/A',
-        'Total Spent (SAR)': customer.total_spent,
-        'Orders Count': customer.orders_count,
-        'Average Order Value (SAR)': customer.avg_order_value,
-        'Loyalty Tier': customer.loyalty_tier,
-        'First Order Date': customer.first_order_date,
-        'Last Order Date': customer.last_order_date,
-        'Customer ID': customer.id
+        rank: index + 1,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone || 'N/A',
+        address: customer.address || 'N/A',
+        total_spent: customer.total_spent,
+        orders_count: customer.orders_count,
+        avg_order_value: customer.avg_order_value,
+        loyalty_tier: customer.loyalty_tier,
+        first_order_date: customer.first_order_date,
+        last_order_date: customer.last_order_date,
+        id: customer.id
       }));
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Top 100 Loyal Customers');
+      exportToExcelWithArabicSupport({
+        filename: 'أفضل_100_عميل_مخلص_Top_100_Loyal_Customers',
+        sheetName: 'Top 100 Loyal Customers / أفضل 100 عميل مخلص',
+        data: exportData,
+        headers: COMMON_HEADERS.CUSTOMERS,
+        includeEnglishHeaders: true,
+        dateFormat: 'both',
+        numberFormat: 'both'
+      });
 
-      const fileName = `top_100_loyal_customers_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-
-      toast.success(`Successfully exported ${exportData.length} customers to Excel!`);
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('Failed to export data to Excel');
+      toast.error('فشل في تصدير العملاء / Failed to export customers');
     }
   };
 
@@ -281,7 +284,7 @@ const LoyalCustomersPage = () => {
             disabled={filteredCustomers.length === 0}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            تصدير Excel / Export Excel
           </Button>
         </div>
       </motion.div>

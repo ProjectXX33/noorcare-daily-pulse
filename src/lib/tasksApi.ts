@@ -3,6 +3,14 @@ import { Task, User } from '@/types';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { createNotification } from '@/lib/notifications';
+import { 
+  getUserLanguage, 
+  createTaskAssignmentNotification,
+  createTaskStatusNotification,
+  createTaskCompletionNotification,
+  createCommentNotification,
+  createTaskUpdateNotification
+} from '@/lib/multilingualNotifications';
 
 // Fetch all tasks
 export const fetchTasks = async (): Promise<Task[]> => {
@@ -181,14 +189,17 @@ export const createTask = async (
     
     // Create task notification for assigned user
     if (data.assigned_to.id !== task.createdBy) {
-      await createTaskNotification(
-        data.assigned_to.id, 
-        data.id, 
-        data.title, 
-        'assigned',
-        data.status,
-        data.created_by.id
-      );
+      const userLanguage = getUserLanguage(data.assigned_to.id);
+      const notification = createTaskAssignmentNotification(data.title, userLanguage);
+      
+      await createNotification({
+        user_id: data.assigned_to.id,
+        title: notification.title,
+        message: notification.message,
+        related_to: 'task',
+        related_id: data.id,
+        created_by: data.created_by.id
+      });
     }
     
     // Map the data to match our Task interface
@@ -310,28 +321,38 @@ export const updateTask = async (
     
     // Create task notification if assignment changed
     if (updates.assignedTo && currentTask && currentTask.assigned_to !== updates.assignedTo) {
-      await createTaskNotification(
-        updates.assignedTo, 
-        taskId, 
-        data.title, 
-        'assigned',
-        data.status,
-        data.created_by.id
-      );
+      const userLanguage = getUserLanguage(updates.assignedTo);
+      const notification = createTaskAssignmentNotification(data.title, userLanguage);
+      
+      await createNotification({
+        user_id: updates.assignedTo,
+        title: notification.title,
+        message: notification.message,
+        related_to: 'task',
+        related_id: taskId,
+        created_by: data.created_by.id
+      });
     }
     
     // Create status update notification
     if (updates.progressPercentage !== undefined && currentTask && currentTask.progress_percentage !== updates.progressPercentage) {
       // Notify assignee if status updated by someone else (not admin)
       if (currentUserId !== data.assigned_to.id && data.assigned_to.id !== data.created_by.id) {
-        await createTaskNotification(
-          data.assigned_to.id, 
-          taskId, 
+        const userLanguage = getUserLanguage(data.assigned_to.id);
+        const notification = createTaskStatusNotification(
           data.title, 
-          'status_update', 
-          dbUpdates.status,
-          data.created_by.id
+          dbUpdates.status || data.status, 
+          userLanguage
         );
+        
+        await createNotification({
+          user_id: data.assigned_to.id,
+          title: notification.title,
+          message: notification.message,
+          related_to: 'task',
+          related_id: taskId,
+          created_by: data.created_by.id
+        });
       }
       // Do NOT send status update notification to admins (only send generic 'Task Updated' below)
     }
@@ -346,10 +367,18 @@ export const updateTask = async (
     } else if (admins && admins.length > 0) {
       for (const admin of admins) {
         if (admin.id !== currentUserId) { // Exclude the admin who made the update
+          const userLanguage = getUserLanguage(admin.id);
+          const notification = createTaskUpdateNotification(
+            data.title,
+            dbUpdates.status || data.status,
+            dbUpdates.progress_percentage ?? data.progress_percentage,
+            userLanguage
+          );
+          
           await createNotification({
             user_id: admin.id,
-            title: 'Task Updated',
-            message: `Task "${data.title}" was updated. Status: ${dbUpdates.status || data.status}, Progress: ${dbUpdates.progress_percentage ?? data.progress_percentage}%`,
+            title: notification.title,
+            message: notification.message,
             related_to: 'task',
             related_id: taskId,
             created_by: data.created_by.id
@@ -519,19 +548,26 @@ export const addTaskComment = async (
       // Case 1: Admin commented on any task - notify the assigned employee
       if (commenterRole === 'admin' && userId !== taskData.assigned_to) {
         console.log('🔔 Admin commented, notifying assigned employee');
-        const notificationTitle = 'Admin Comment on Your Task';
-        const notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
+        const userLanguage = getUserLanguage(taskData.assigned_to);
+        const notification = createCommentNotification(
+          userName,
+          comment,
+          taskData.title,
+          commenterRole,
+          commenterPosition,
+          userLanguage
+        );
         
         console.log('📤 Sending admin comment notification to assignee:', {
-          title: notificationTitle,
+          title: notification.title,
           recipientId: taskData.assigned_to,
-          message: notificationMessage.substring(0, 100) + '...'
+          message: notification.message.substring(0, 100) + '...'
         });
         
         await createNotification({
           user_id: taskData.assigned_to,
-          title: notificationTitle,
-          message: notificationMessage,
+          title: notification.title,
+          message: notification.message,
           related_to: 'task',
           related_id: taskId,
           created_by: userId
@@ -542,27 +578,26 @@ export const addTaskComment = async (
       // Case 2: Task creator (Admin/Media Buyer) commented, notify assigned employee
       else if (userId === taskData.created_by && userId !== taskData.assigned_to) {
         console.log('🔔 Creator commented, notifying assignee');
-        let notificationTitle = 'New Comment on Task';
-        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        
-        if (creatorPosition === 'Media Buyer') {
-          notificationTitle = 'Media Buyer Comment';
-          notificationMessage = `Media Buyer commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        } else if (commenterRole === 'admin') {
-          notificationTitle = 'Admin Comment on Your Task';
-          notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        }
+        const userLanguage = getUserLanguage(taskData.assigned_to);
+        const notification = createCommentNotification(
+          userName,
+          comment,
+          taskData.title,
+          commenterRole,
+          commenterPosition,
+          userLanguage
+        );
         
         console.log('📤 Sending notification to assignee:', {
-          title: notificationTitle,
+          title: notification.title,
           recipientId: taskData.assigned_to,
-          message: notificationMessage.substring(0, 100) + '...'
+          message: notification.message.substring(0, 100) + '...'
         });
         
         await createNotification({
           user_id: taskData.assigned_to,
-          title: notificationTitle,
-          message: notificationMessage,
+          title: notification.title,
+          message: notification.message,
           related_to: 'task',
           related_id: taskId,
           created_by: userId
@@ -573,25 +608,26 @@ export const addTaskComment = async (
       // Case 3: Assigned employee commented, notify task creator (and admin if different)
       else if (userId === taskData.assigned_to && taskData.created_by) {
         console.log('🔔 Assignee commented, notifying creator');
-        let notificationTitle = 'New Comment on Task';
-        let notificationMessage = `${userName} commented on your assigned task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        
-        // Special handling for Designer commenting on Media Buyer's task
-        if (assigneePosition === 'Designer' && creatorPosition === 'Media Buyer') {
-          notificationTitle = 'Designer Update';
-          notificationMessage = `Designer ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        }
+        const userLanguage = getUserLanguage(taskData.created_by);
+        const notification = createCommentNotification(
+          userName,
+          comment,
+          taskData.title,
+          commenterRole,
+          commenterPosition,
+          userLanguage
+        );
         
         console.log('📤 Sending notification to creator:', {
-          title: notificationTitle,
+          title: notification.title,
           recipientId: taskData.created_by,
-          message: notificationMessage.substring(0, 100) + '...'
+          message: notification.message.substring(0, 100) + '...'
         });
         
         await createNotification({
           user_id: taskData.created_by,
-          title: notificationTitle,
-          message: notificationMessage,
+          title: notification.title,
+          message: notification.message,
           related_to: 'task',
           related_id: taskId,
           created_by: userId
@@ -602,28 +638,26 @@ export const addTaskComment = async (
       // Case 4: Someone else (e.g., another admin, other employee) commented - notify assigned employee
       else if (userId !== taskData.assigned_to && userId !== taskData.created_by) {
         console.log('🔔 Other user commented, notifying assigned employee');
-        let notificationTitle = 'New Comment on Your Task';
-        let notificationMessage = `${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        
-        // Special titles based on commenter role
-        if (commenterRole === 'admin') {
-          notificationTitle = 'Admin Comment on Your Task';
-          notificationMessage = `Admin ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        } else if (commenterPosition === 'Media Buyer') {
-          notificationTitle = 'Media Buyer Comment';
-          notificationMessage = `Media Buyer ${userName} commented on your task: "${comment.substring(0, 50)}${comment.length > 50 ? '...' : ''}" on "${taskData.title}"`;
-        }
+        const userLanguage = getUserLanguage(taskData.assigned_to);
+        const notification = createCommentNotification(
+          userName,
+          comment,
+          taskData.title,
+          commenterRole,
+          commenterPosition,
+          userLanguage
+        );
         
         console.log('📤 Sending notification to assigned employee:', {
-          title: notificationTitle,
+          title: notification.title,
           recipientId: taskData.assigned_to,
-          message: notificationMessage.substring(0, 100) + '...'
+          message: notification.message.substring(0, 100) + '...'
         });
         
         await createNotification({
           user_id: taskData.assigned_to,
-          title: notificationTitle,
-          message: notificationMessage,
+          title: notification.title,
+          message: notification.message,
           related_to: 'task',
           related_id: taskId,
           created_by: userId
@@ -645,7 +679,7 @@ export const addTaskComment = async (
   }
 };
 
-// Create a notification for task-related events
+// Create a notification for task-related events (DEPRECATED - use multilingual functions instead)
 const createTaskNotification = async (
   userId: string, 
   taskId: string, 
@@ -655,21 +689,18 @@ const createTaskNotification = async (
   createdBy?: string
 ): Promise<void> => {
   try {
-    let title = '';
-    let message = '';
+    const userLanguage = getUserLanguage(userId);
+    let notification: { title: string; message: string };
     
     switch (type) {
       case 'assigned':
-        title = 'New Task Assigned';
-        message = `You've been assigned a new task: ${taskTitle}`;
+        notification = createTaskAssignmentNotification(taskTitle, userLanguage);
         break;
       case 'status_update':
-        title = 'Task Status Updated';
-        message = `Task "${taskTitle}" status has been updated to ${status}`;
+        notification = createTaskStatusNotification(taskTitle, status || 'Unknown', userLanguage);
         break;
       case 'completed':
-        title = 'Task Completed';
-        message = `Task "${taskTitle}" has been marked as complete`;
+        notification = createTaskCompletionNotification(taskTitle, userLanguage);
         break;
     }
     
@@ -678,8 +709,8 @@ const createTaskNotification = async (
     
     await createNotification({
       user_id: userId,
-      title,
-      message,
+      title: notification.title,
+      message: notification.message,
       related_to: 'task',
       related_id: taskId,
       created_by: createdBy || currentUser?.id
@@ -689,7 +720,7 @@ const createTaskNotification = async (
   }
 };
 
-// Send notification to users
+// Send notification to users (supports multilingual notifications)
 export const sendNotification = async (params: {
   userId?: string;
   title: string;
@@ -714,7 +745,8 @@ export const sendNotification = async (params: {
         throw userError;
       }
       
-      // Create notifications for all users
+      // Create notifications for all users (currently using same title/message for all)
+      // TODO: In future, could translate based on each user's language preference
       if (users && users.length > 0) {
         for (const user of users) {
           await createNotification({

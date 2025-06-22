@@ -794,9 +794,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             console.log(`⚠️ No shifts found for ${userRecord.name} - treating as remote worker`);
             
             // Calculate performance for remote workers based on tasks and reports
-            const performanceData = await calculateUserPerformanceFromTasksAndReports(userRecord, monthYear);
-            
-            if (performanceData) {
+          const performanceData = await calculateUserPerformanceFromTasksAndReports(userRecord, monthYear);
+          
+          if (performanceData) {
               // Prepare record data for remote workers
               const recordData = {
                 employee_id: userRecord.id,
@@ -819,14 +819,14 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
               };
 
               // Delete existing record and insert new one
-              await supabase
-                .from('admin_performance_dashboard')
-                .delete()
-                .eq('employee_id', userRecord.id)
-                .eq('month_year', monthYear);
+            await supabase
+              .from('admin_performance_dashboard')
+              .delete()
+              .eq('employee_id', userRecord.id)
+              .eq('month_year', monthYear);
 
-              const { error: insertError } = await supabase
-                .from('admin_performance_dashboard')
+            const { error: insertError } = await supabase
+              .from('admin_performance_dashboard')
                 .insert(recordData);
 
               if (!insertError) {
@@ -1056,9 +1056,9 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
           // Prepare record data
           const recordData = {
-            employee_id: userRecord.id,
-            employee_name: userRecord.name,
-            month_year: monthYear,
+                employee_id: userRecord.id,
+                employee_name: userRecord.name,
+                month_year: monthYear,
             total_working_days: totalWorkingDays,
             total_delay_minutes: totalDelayMinutes,
             total_delay_hours: Math.round(totalDelayHours * 100) / 100,
@@ -1072,8 +1072,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             task_rating_avg: taskRatingAvg > 0 ? Math.round(taskRatingAvg * 100) / 100 : null,
             rating_bonus_points: ratingBonus,
             total_ratings_count: totalRatingsCount,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
           };
 
           console.log(`💾 Inserting record for ${userRecord.name}:`, recordData);
@@ -1083,15 +1083,15 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             .from('admin_performance_dashboard')
             .insert(recordData);
 
-          if (!insertError) {
+            if (!insertError) {
             console.log(`✅ Recalculated ${userRecord.name}: ${performanceStatus} (${averagePerformanceScore.toFixed(1)}%)`, {
               ratingBonus: ratingBonus > 0 ? `+${ratingBonus}` : ratingBonus < 0 ? ratingBonus : 'No rating bonus',
               employeeRating: employeeRatingAvg > 0 ? `${employeeRatingAvg.toFixed(1)}⭐` : 'No employee ratings',
               taskRating: taskRatingAvg > 0 ? `${taskRatingAvg.toFixed(1)}⭐` : 'No task ratings'
             });
-            updatedCount++;
+              updatedCount++;
           } else {
-            console.error(`❌ Failed to create ${userRecord.name}:`, insertError);
+              console.error(`❌ Failed to create ${userRecord.name}:`, insertError);
             console.error('Record data that failed:', recordData);
             skippedEmployees.push({
               name: userRecord.name,
@@ -1113,7 +1113,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
       // Enhanced reporting with skip details
       const skippedCount = processedCount - updatedCount;
-      
+
       if (updatedCount > 0) {
         toast.success(`✅ Successfully recalculated performance for ${updatedCount}/${processedCount} employees`);
         console.log('🎯 Complete! All employee performance recalculated and manual edits overridden!');

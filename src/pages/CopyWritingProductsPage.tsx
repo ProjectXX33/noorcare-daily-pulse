@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Package, Star, Tag, Zap, TrendingUp, Search, Eye, ExternalLink, Copy, Edit3, ShoppingCart, Upload, Globe, RefreshCcw, Plus, Trash2, X, Grid3X3, List, Table } from 'lucide-react';
+import { Download, Package, Star, Tag, Zap, TrendingUp, Search, Eye, ExternalLink, Copy, Edit3, ShoppingCart, Upload, Globe, RefreshCcw, Plus, Trash2, X, Grid3X3, List, Table, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { useCopyWritingProducts, CopyWritingProduct } from '@/contexts/CopyWritingProductsContext';
+import { exportToExcelWithArabicSupport } from '@/lib/arabicExportUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProductEditModal } from '@/components/ProductEditModal';
 import { AddProductModal } from '@/components/AddProductModal';
+import Lottie from 'lottie-react';
 
 
 // Flag components
@@ -109,9 +111,19 @@ const CopyWritingProductsPage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
-
+  
+  // Lottie animation state
+  const [copywriteAnimation, setCopywriteAnimation] = useState(null);
   
   const productsPerPage = 50;
+
+  // Load the Lottie animation
+  React.useEffect(() => {
+    fetch('/animation/copywrite.json')
+      .then(response => response.json())
+      .then(data => setCopywriteAnimation(data))
+      .catch(error => console.error('Failed to load copywrite animation:', error));
+  }, []);
 
   // Enhanced helper function to detect Arabic content with better English detection
   const detectLanguage = React.useCallback((product: CopyWritingProduct): 'ar' | 'en' => {
@@ -251,43 +263,67 @@ const CopyWritingProductsPage = () => {
   const exportToExcel = () => {
     try {
       if (filteredProducts.length === 0) {
-        toast.error('No products to export');
+        toast.error('لا توجد منتجات للتصدير / No products to export');
         return;
       }
 
       const exportData = filteredProducts.map(product => ({
-        'Product ID': product.id,
-        'Product Name': product.name,
-        'SKU': product.sku || 'N/A',
-        'Price (SAR)': product.price,
-        'Regular Price (SAR)': product.regular_price,
-        'Sale Price (SAR)': product.sale_price || 'N/A',
-        'On Sale': product.on_sale ? 'Yes' : 'No',
-        'Stock Status': product.stock_status,
-        'Total Sales': product.total_sales,
-        'Featured': product.featured ? 'Yes' : 'No',
-        'Average Rating': product.average_rating,
-        'Rating Count': product.rating_count,
-        'Categories': product.categories.map(cat => cat.name).join(', '),
-        'Tags': product.tags.map(tag => tag.name).join(', '),
-        'Language': detectLanguage(product),
-        'Short Description': product.short_description.replace(/<[^>]*>/g, ''), // Remove HTML tags
-        'Date Created': product.date_created.split('T')[0],
-        'Date Modified': product.date_modified.split('T')[0],
-        'Permalink': product.permalink
+        id: product.id,
+        name: product.name,
+        sku: product.sku || 'N/A',
+        price: product.price,
+        regular_price: product.regular_price,
+        sale_price: product.sale_price || 'N/A',
+        on_sale: product.on_sale ? 'نعم / Yes' : 'لا / No',
+        stock_status: product.stock_status,
+        total_sales: product.total_sales,
+        featured: product.featured ? 'نعم / Yes' : 'لا / No',
+        average_rating: product.average_rating,
+        rating_count: product.rating_count,
+        categories: product.categories.map(cat => cat.name).join(', '),
+        tags: product.tags.map(tag => tag.name).join(', '),
+        language: detectLanguage(product) === 'ar' ? 'عربي / Arabic' : 'إنجليزي / English',
+        short_description: product.short_description.replace(/<[^>]*>/g, ''), // Remove HTML tags
+        date_created: product.date_created.split('T')[0],
+        date_modified: product.date_modified.split('T')[0],
+        permalink: product.permalink
       }));
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Copy Writing Products');
+      const headers = {
+        'id': 'معرف المنتج / Product ID',
+        'name': 'اسم المنتج / Product Name',
+        'sku': 'رمز المنتج / SKU',
+        'price': 'السعر (ريال) / Price (SAR)',
+        'regular_price': 'السعر العادي (ريال) / Regular Price (SAR)',
+        'sale_price': 'سعر التخفيض (ريال) / Sale Price (SAR)',
+        'on_sale': 'في التخفيضات / On Sale',
+        'stock_status': 'حالة المخزون / Stock Status',
+        'total_sales': 'إجمالي المبيعات / Total Sales',
+        'featured': 'مميز / Featured',
+        'average_rating': 'متوسط التقييم / Average Rating',
+        'rating_count': 'عدد التقييمات / Rating Count',
+        'categories': 'الفئات / Categories',
+        'tags': 'العلامات / Tags',
+        'language': 'اللغة / Language',
+        'short_description': 'الوصف المختصر / Short Description',
+        'date_created': 'تاريخ الإنشاء / Date Created',
+        'date_modified': 'تاريخ التعديل / Date Modified',
+        'permalink': 'الرابط الدائم / Permalink'
+      };
 
-      const fileName = `copy_writing_products_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
+      exportToExcelWithArabicSupport({
+        filename: 'منتجات_كتابة_المحتوى_Copy_Writing_Products',
+        sheetName: 'Copy Writing Products / منتجات كتابة المحتوى',
+        data: exportData,
+        headers: headers,
+        includeEnglishHeaders: true,
+        dateFormat: 'both',
+        numberFormat: 'both'
+      });
 
-      toast.success(`Successfully exported ${exportData.length} products to Excel!`);
     } catch (error) {
       console.error('Error exporting products:', error);
-      toast.error('Failed to export products');
+      toast.error('فشل في تصدير المنتجات / Failed to export products');
     }
   };
 
@@ -386,143 +422,277 @@ const CopyWritingProductsPage = () => {
 
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
-      {/* Header */}
+    <div className="p-2 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 max-w-full overflow-hidden">
+      {/* Enhanced Header with Lottie Animation */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4"
+                  className="relative overflow-hidden bg-gradient-to-r from-blue-50 via-purple-50 to-indigo-50 border border-blue-200/50 rounded-2xl lg:rounded-3xl p-3 sm:p-4 lg:p-6 shadow-xl"
       >
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Edit3 className="text-blue-500" />
-            Copy Writing Products
-          </h1>
-          <p className="text-gray-600 mt-1">
-            All products from WooCommerce • Perfect for creating compelling copy • Arabic & English Support
-          </p>
-        </div>
-        
-        <div className="flex flex-col gap-2">
-          {loading && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 rounded-lg">
-              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-blue-700">Loading...</span>
+        {/* Animated Background Pattern */}
+        <motion.div
+          animate={{ 
+            background: [
+              "linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%)",
+              "linear-gradient(135deg, rgba(147, 51, 234, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%)",
+              "linear-gradient(135deg, rgba(236, 72, 153, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)"
+            ]
+          }}
+          transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 rounded-3xl"
+        />
+
+        <div className="relative flex flex-col md:flex-row md:items-center lg:justify-between gap-3 lg:gap-4">
+          {/* Left Side - Title with Lottie Animation */}
+          <div className="flex items-center gap-4">
+            {/* Static Pencil Icon */}
+            <div className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl lg:rounded-2xl shadow-lg flex items-center justify-center">
+              <Edit3 className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-white" />
             </div>
-          )}
-          
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={handleQuickSync} 
-              variant="outline" 
-              size="sm"
-              disabled={loading}
-              className="border-amber-200 text-amber-700 hover:bg-amber-50"
-            >
-              <Zap className="w-4 h-4 mr-2" />
-              {loading ? 'Syncing...' : 'Quick Sync'}
-            </Button>
 
-            <Button 
-              onClick={() => {
-                console.log('🔄 Force Refresh clicked - will fetch fresh data from WooCommerce');
-                toast.info('🔄 Force refreshing from WooCommerce...');
-                syncProducts();
-              }} 
-              variant="outline" 
-              size="sm"
-              disabled={loading}
-              className="border-purple-200 text-purple-700 hover:bg-purple-50"
-            >
-              <RefreshCcw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Refreshing...' : 'Force Refresh'}
-            </Button>
+            {/* Title and Description */}
+            <div>
+                              <motion.h1 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="text-xl sm:text-2xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent"
+              >
+                Copy Writing Products
+              </motion.h1>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex flex-wrap items-center gap-1 sm:gap-2 mt-2"
+              >
+                <div className="flex items-center gap-1 sm:gap-2 bg-white/60 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 border border-blue-200/50">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">WooCommerce Connected</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 bg-white/60 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 border border-purple-200/50">
+                  <Globe className="w-3 h-3 text-purple-600" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">Arabic & English</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 bg-white/60 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 border border-indigo-200/50">
+                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-700">AI-Ready Copy</span>
+                </div>
+              </motion.div>
+                         </div>
+           </div>
 
-            <div className="flex items-center gap-2">
+          {/* Right Side - Action Bar */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl lg:rounded-2xl p-2 sm:p-3 lg:p-4 shadow-lg"
+          >
+                      <div className="flex flex-col md:flex-row gap-2 lg:gap-4 items-start md:items-center justify-between">
+            {/* Left Side - Primary Actions */}
+                          <div className="flex flex-col sm:flex-row gap-2 lg:gap-3 w-full md:w-auto">
+              <Button 
+                onClick={() => {
+                  console.log('🔄 Force Refresh clicked - will fetch fresh data from WooCommerce');
+                  toast.info('🔄 Force refreshing from WooCommerce...');
+                  syncProducts();
+                }} 
+                variant="outline" 
+                size="default"
+                disabled={loading}
+                className="flex-1 sm:flex-none border-purple-300 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-800 hover:from-purple-100 hover:to-indigo-100 font-semibold shadow-md transition-all duration-300 hover:shadow-lg hover:scale-105 disabled:hover:scale-100 disabled:opacity-60"
+              >
+                <RefreshCcw className={`w-5 h-5 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Refreshing...' : 'Force Refresh'}
+              </Button>
+            </div>
+
+            {/* Right Side - View Controls & Add Product */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-stretch sm:items-center">
               {/* View Toggle */}
-              <div className="flex items-center border rounded-lg p-1">
+              <div className="flex items-center bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-300 rounded-xl p-1.5 shadow-sm">
                 <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setViewMode('table')}
-                  className="h-8 px-3"
+                  className={`flex-1 sm:flex-none h-9 px-4 font-medium transition-all duration-300 ${
+                    viewMode === 'table' 
+                      ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600 scale-105' 
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-sm'
+                  }`}
                 >
-                  <Table className="w-4 h-4 mr-1" />
+                  <Table className="w-4 h-4 mr-2" />
                   Table
                 </Button>
                 <Button
-                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setViewMode('cards')}
-                  className="h-8 px-3"
+                  className={`flex-1 sm:flex-none h-9 px-4 font-medium transition-all duration-300 ${
+                    viewMode === 'cards' 
+                      ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600 scale-105' 
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-sm'
+                  }`}
                 >
-                  <Grid3X3 className="w-4 h-4 mr-1" />
+                  <Grid3X3 className="w-4 h-4 mr-2" />
                   Cards
                 </Button>
               </div>
 
               <Button 
                 onClick={() => setShowAddModal(true)} 
-                className="bg-emerald-600 hover:bg-emerald-700"
-                size="sm"
+                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold shadow-md transition-all duration-300 hover:shadow-lg hover:scale-105"
+                size="default"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5 mr-2" />
                 Add Product
               </Button>
             </div>
-
-
-            
-            <Button 
-              onClick={exportToExcel} 
-              className="bg-green-600 hover:bg-green-700"
-              disabled={filteredProducts.length === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export Excel
-            </Button>
-
-
           </div>
+          </motion.div>
         </div>
       </motion.div>
 
 
 
-      {/* Real-Time Loading Progress */}
+      {/* Enhanced Real-Time Loading Progress */}
       {loading && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg p-6"
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 border border-blue-200/50 rounded-xl lg:rounded-2xl p-3 sm:p-4 lg:p-6 shadow-lg backdrop-blur-sm"
         >
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+          {/* Animated Background */}
+          <motion.div
+            animate={{ 
+              background: [
+                "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)",
+                "linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)",
+                "linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)"
+              ]
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            className="absolute inset-0 rounded-2xl"
+          />
+
+          <div className="relative space-y-3 sm:space-y-4 lg:space-y-6">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {/* Static Icon - No Loading Circle */}
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <Edit3 className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg sm:text-xl text-gray-900 flex items-center gap-2">
+                    LIVE Real-Time Streaming
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">{details}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-red-900 flex items-center gap-2">
-                  🔴 LIVE {stage}
-                </h3>
-                <p className="text-sm text-red-700">{details}</p>
+              
+              <div className="text-right">
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+                >
+                  {Math.round(progress)}%
+                </motion.div>
+                <p className="text-xs text-gray-500">Complete</p>
               </div>
             </div>
-            <Progress value={progress} className="w-full" />
-            <div className="flex justify-between text-xs text-red-600">
-              <span>{progress}% Complete</span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                Real-time streaming active
-              </span>
+
+            {/* Enhanced Progress Bar */}
+            <div className="space-y-3">
+              <div className="relative h-4 bg-gray-200/50 rounded-full overflow-hidden shadow-inner">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-lg"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+                <motion.div
+                  animate={{ x: ["0%", "100%"] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                  className="absolute top-0 left-0 w-8 h-full bg-white/30 rounded-full blur-sm"
+                />
+              </div>
+              
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600 font-medium">{progress.toFixed(1)}% Complete</span>
+                <div className="flex items-center gap-2">
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                    className="w-2 h-2 bg-green-500 rounded-full"
+                  />
+                  <span className="text-green-600 font-medium">Real-time streaming active</span>
+                </div>
+              </div>
             </div>
+
+            {/* Products Counter */}
             {products.length > 0 && (
-              <div className="bg-white bg-opacity-50 rounded-lg p-3 border border-red-200">
-                <p className="text-sm text-red-800 font-medium">
-                  📊 {products.length} products loaded so far - Products appearing below in real-time!
-                </p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-white/40 shadow-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      {/* Pencil Animation */}
+                      <motion.div
+                        animate={{ 
+                          rotate: [0, 15, -15, 0],
+                          scale: [1, 1.1, 1]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg"
+                      >
+                        <Edit3 className="w-4 h-4 text-white" />
+                      </motion.div>
+                      
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="text-2xl"
+                      >
+                        📊
+                      </motion.div>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {products.length} products loaded so far
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Products appearing below in real-time!
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(3)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ y: [0, -5, 0] }}
+                        transition={{ 
+                          duration: 1.5, 
+                          repeat: Infinity, 
+                          delay: i * 0.2 
+                        }}
+                        className="w-2 h-6 bg-gradient-to-t from-blue-400 to-purple-400 rounded-full"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
             )}
           </div>
         </motion.div>
@@ -547,15 +717,13 @@ const CopyWritingProductsPage = () => {
                   <p className="text-2xl font-bold">
                     {totalProducts}
                     {products.length >= 500 && <span className="text-green-600 ml-2">🚀</span>}
-                    {products.length >= 361 && products.length < 500 && <span className="text-blue-600 ml-2">✓</span>}
-                    {products.length >= 300 && products.length < 361 && <span className="text-yellow-600 ml-2">⚠</span>}
-                    {products.length < 300 && <span className="text-red-600 ml-2">⚡</span>}
+                    {products.length >= 300 && products.length < 500 && <span className="text-blue-600 ml-2">✓</span>}
+                    {products.length < 300 && <span className="text-yellow-600 ml-2">⚡</span>}
                   </p>
                   <p className="text-xs text-gray-500">
                     {products.length >= 500 ? 'Massive inventory loaded! 🎉' : 
-                     products.length >= 361 ? 'Full product catalog loaded!' : 
-                     products.length >= 300 ? `Loading... (${((products.length / 361) * 100).toFixed(1)}% of expected)` :
-                     'Partial load - consider refreshing'}
+                     products.length >= 300 ? 'All products loaded successfully!' : 
+                     'Loading products...'}
                   </p>
                 </div>
               </div>
@@ -733,6 +901,19 @@ const CopyWritingProductsPage = () => {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Export Excel Button - Right Aligned */}
+          <div className="flex justify-end pt-2">
+            <Button 
+              onClick={exportToExcel} 
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-md transition-all duration-300 hover:shadow-lg hover:scale-105 disabled:hover:scale-100 disabled:opacity-60"
+              size="default"
+              disabled={filteredProducts.length === 0}
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Export Excel ({filteredProducts.length} products)
+            </Button>
           </div>
 
           {/* Filter Summary */}
@@ -1225,6 +1406,7 @@ const CopyWritingProductsPage = () => {
         categories={categories}
         uploadProductImage={uploadProductImage}
       />
+
 
 
     </div>

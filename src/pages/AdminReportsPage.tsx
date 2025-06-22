@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCheckIn } from '@/contexts/CheckInContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { exportToCSVWithArabicSupport, exportToExcelWithArabicSupport, COMMON_HEADERS } from '@/lib/arabicExportUtils';
 
 const AdminReportsPage = () => {
   const { user } = useAuth();
@@ -160,28 +161,26 @@ const AdminReportsPage = () => {
   };
 
   const exportReports = () => {
-    // In a real app, this would generate a CSV or PDF with the filtered reports
-    // For now, we'll create a simple CSV string
-    let csvContent = "Date,Employee,Department,Position,Tasks Done,Issues Faced,Plans for Tomorrow\n";
-    
-    sortedReports.forEach(report => {
-      csvContent += `${format(new Date(report.date), 'yyyy-MM-dd')},`;
-      csvContent += `"${report.userName}",`;
-      csvContent += `"${report.department}",`;
-      csvContent += `"${report.position}",`;
-      csvContent += `"${report.tasksDone.replace(/"/g, '""')}",`;
-      csvContent += `"${report.issuesFaced ? report.issuesFaced.replace(/"/g, '""') : ''}",`;
-      csvContent += `"${report.plansForTomorrow.replace(/"/g, '""')}"\n`;
+    exportToCSVWithArabicSupport({
+      filename: 'تقارير_العمل_Work_Reports',
+      data: sortedReports,
+      headers: COMMON_HEADERS.REPORTS,
+      includeEnglishHeaders: true,
+      dateFormat: 'both',
+      numberFormat: 'both'
     });
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `reports_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  };
+
+  const exportReportsExcel = () => {
+    exportToExcelWithArabicSupport({
+      filename: 'تقارير_العمل_Work_Reports',
+      sheetName: 'Work Reports / تقارير العمل',
+      data: sortedReports,
+      headers: COMMON_HEADERS.REPORTS,
+      includeEnglishHeaders: true,
+      dateFormat: 'both',
+      numberFormat: 'both'
+    });
   };
 
   const handleDeleteReport = async (reportId: string) => {
@@ -276,14 +275,25 @@ const AdminReportsPage = () => {
                 onClick={clearFilters}
                 className="h-9 min-h-[44px] text-xs sm:text-sm"
               >
-                Clear Filters
+                مسح المرشحات / Clear Filters
+              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  className="bg-green-600 hover:bg-green-700 text-white h-9 min-h-[44px] text-xs sm:text-sm"
+                  onClick={exportReportsExcel}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  تصدير Excel / Export Excel
               </Button>
               <Button 
                 className="bg-primary hover:bg-primary/90 h-9 min-h-[44px] text-xs sm:text-sm"
                 onClick={exportReports}
               >
-                Export Reports
+                  <Download className="h-4 w-4 mr-2" />
+                  تصدير CSV / Export CSV
               </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

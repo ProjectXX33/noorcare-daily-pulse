@@ -44,6 +44,9 @@ const EventsPage = () => {
   // Only Admins and Media Buyers can edit events - all other employees are view-only
   const canEditEvents = user && (user.role === 'admin' || user.position === 'Media Buyer');
   
+  // Copy Writing employees can access Q&A functionality
+  const canAccessQA = user && (user.role === 'admin' || user.position === 'Media Buyer' || user.position === 'Copy Writing');
+  
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
@@ -1133,14 +1136,30 @@ const EventsPage = () => {
               </div>
 
               {/* Q&A Section for View-Only */}
-              {selectedEvent && (
+              {selectedEvent && canAccessQA && (
                 <div className="border-t pt-6">
+                  <div className="mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      💬 Event Q&A
+                      {user?.position === 'Copy Writing' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Copy Writing Access
+                        </Badge>
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {user?.position === 'Copy Writing' 
+                        ? 'You can add questions and answers to help with event content creation'
+                        : 'Ask questions and provide answers about this event'
+                      }
+                    </p>
+                  </div>
                   <EventQAComponent
                     eventId={selectedEvent.id}
                     eventTitle={selectedEvent.title}
                     qa={selectedEvent.qa || []}
                     onQAUpdate={handleQAUpdate}
-                    isViewOnly={isViewOnly}
+                    isViewOnly={false} // Allow CopyWriting users to interact with Q&A
                   />
                 </div>
               )}
@@ -1312,8 +1331,24 @@ const EventsPage = () => {
               </div>
 
               {/* Q&A Section for Edit Mode */}
-              {selectedEvent && (
+              {selectedEvent && canAccessQA && (
                 <div className="border-t pt-6">
+                  <div className="mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      💬 Event Q&A
+                      {user?.position === 'Copy Writing' && (
+                        <Badge variant="secondary" className="text-xs">
+                          Copy Writing Access
+                        </Badge>
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {user?.position === 'Copy Writing' 
+                        ? 'You can add questions and answers to help with event content creation'
+                        : 'Ask questions and provide answers about this event'
+                      }
+                    </p>
+                  </div>
                   <EventQAComponent
                     eventId={selectedEvent.id}
                     eventTitle={selectedEvent.title}

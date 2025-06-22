@@ -62,7 +62,7 @@ const EventQAComponent: React.FC<EventQAComponentProps> = ({
   }, [qa]);
 
   // Check permissions
-  const canEditQA = user && (user.role === 'admin' || user.position === 'Media Buyer');
+  const canEditQA = user && (user.role === 'admin' || user.position === 'Media Buyer' || user.position === 'Copy Writing');
   const canCreateQuestion = user && !isViewOnly;
 
   // Toggle question expansion
@@ -95,6 +95,7 @@ const EventQAComponent: React.FC<EventQAComponentProps> = ({
     // Check if user can edit this Q&A
     const canEdit = user.role === 'admin' || 
                    user.position === 'Media Buyer' || 
+                   user.position === 'Copy Writing' ||
                    (qaItem.created_by === user.id && !qaItem.answer);
 
     if (!canEdit) {
@@ -224,6 +225,8 @@ const EventQAComponent: React.FC<EventQAComponentProps> = ({
     }
     
     const canDelete = user.role === 'admin' || 
+                     user.position === 'Media Buyer' ||
+                     user.position === 'Copy Writing' ||
                      (qaItem.created_by === user.id && !qaItem.answer);
 
     if (!canDelete) {
@@ -370,6 +373,7 @@ const EventQAComponent: React.FC<EventQAComponentProps> = ({
                             <>
                               {(user.role === 'admin' || 
                                 user.position === 'Media Buyer' || 
+                                user.position === 'Copy Writing' ||
                                 (qaItem.created_by === user.id && !qaItem.answer)) && (
                                 <Button
                                   type="button"
@@ -388,6 +392,8 @@ const EventQAComponent: React.FC<EventQAComponentProps> = ({
                               )}
                               
                               {(user.role === 'admin' || 
+                                user.position === 'Media Buyer' ||
+                                user.position === 'Copy Writing' ||
                                 (qaItem.created_by === user.id && !qaItem.answer)) && (
                                 <Button
                                   type="button"

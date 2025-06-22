@@ -973,6 +973,64 @@ class WooCommerceAPI {
     }
   }
 
+  // NEW: Fetch categories from WooCommerce
+  async fetchCategories(params: {
+    per_page?: number;
+    page?: number;
+    hide_empty?: boolean;
+    orderby?: string;
+    order?: string;
+    search?: string;
+  } = {}): Promise<Array<{ id: number; name: string; slug: string; count: number; }>> {
+    try {
+      console.log('📂 Fetching categories from WooCommerce...');
+      
+      const url = `${WOOCOMMERCE_CONFIG.url}wp-json/${WOOCOMMERCE_CONFIG.version}/products/categories`;
+      const queryParams = new URLSearchParams({
+        consumer_key: WOOCOMMERCE_CONFIG.consumerKey,
+        consumer_secret: WOOCOMMERCE_CONFIG.consumerSecret,
+        per_page: (params.per_page || 100).toString(),
+        page: (params.page || 1).toString(),
+        hide_empty: (params.hide_empty !== undefined ? params.hide_empty : false).toString(),
+        orderby: params.orderby || 'name',
+        order: params.order || 'asc',
+        ...(params.search && { search: params.search })
+      });
+
+      console.log(`📂 Making request to: ${url}?${queryParams}`);
+      
+      const response = await fetch(`${url}?${queryParams}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Categories fetch error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const categories = await response.json();
+      
+      console.log(`✅ Fetched ${categories.length} categories successfully`);
+      
+      // Return in the expected format
+      return categories.map((category: any) => ({
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        count: category.count || 0
+      }));
+      
+    } catch (error: any) {
+      console.error('💥 Error fetching categories:', error);
+      throw new Error(`Failed to fetch categories: ${error.message}`);
+    }
+  }
+
   // Create a new order in WooCommerce
   async createOrder(orderData: WooCommerceOrderData): Promise<WooCommerceOrder> {
     const url = `${API_CONFIG.baseURL}/orders`;

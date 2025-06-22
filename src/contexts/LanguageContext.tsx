@@ -80,6 +80,26 @@ interface TranslationType {
   save: string;
   close: string;
   confirmDelete: string;
+
+  // Task Notifications
+  newTaskAssigned: string;
+  taskStatusUpdated: string;
+  taskCompleted: string;
+  taskUpdated: string;
+  adminCommentOnTask: string;
+  newCommentOnTask: string;
+  mediaBuyerComment: string;
+  designerUpdate: string;
+  newCommentOnYourTask: string;
+  youveBeenAssignedTask: string;
+  taskStatusUpdatedTo: string;
+  taskMarkedComplete: string;
+  adminCommentedOnTask: string;
+  commentedOnYourTask: string;
+  mediaBuyerCommentedOnTask: string;
+  designerCommentedOnTask: string;
+  commentedOnAssignedTask: string;
+  on: string;
 }
 
 interface LanguageContextType {
@@ -166,7 +186,27 @@ const translations = {
     delete: "Delete",
     save: "Save",
     close: "Close",
-    confirmDelete: "Are you sure you want to delete this event?"
+    confirmDelete: "Are you sure you want to delete this event?",
+
+    // Task Notifications
+    newTaskAssigned: "New Task Assigned",
+    taskStatusUpdated: "Task Status Updated",
+    taskCompleted: "Task Completed",
+    taskUpdated: "Task Updated",
+    adminCommentOnTask: "Admin Comment on Your Task",
+    newCommentOnTask: "New Comment on Task",
+    mediaBuyerComment: "Media Buyer Comment",
+    designerUpdate: "Designer Update",
+    newCommentOnYourTask: "New Comment on Your Task",
+    youveBeenAssignedTask: "You've been assigned a new task:",
+    taskStatusUpdatedTo: "status has been updated to",
+    taskMarkedComplete: "has been marked as complete",
+    adminCommentedOnTask: "commented on your task:",
+    commentedOnYourTask: "commented on your task:",
+    mediaBuyerCommentedOnTask: "commented on your task:",
+    designerCommentedOnTask: "commented on your task:",
+    commentedOnAssignedTask: "commented on your assigned task:",
+    on: "on"
   },
   ar: {
     // Navigation
@@ -245,7 +285,27 @@ const translations = {
     delete: "حذف",
     save: "حفظ",
     close: "إغلاق",
-    confirmDelete: "هل أنت متأكد من رغبتك في حذف هذا الحدث؟"
+    confirmDelete: "هل أنت متأكد من رغبتك في حذف هذا الحدث؟",
+
+    // Task Notifications
+    newTaskAssigned: "مهمة جديدة مُكلفة",
+    taskStatusUpdated: "تم تحديث حالة المهمة",
+    taskCompleted: "تم إكمال المهمة",
+    taskUpdated: "تم تحديث المهمة",
+    adminCommentOnTask: "تعليق المشرف على مهمتك",
+    newCommentOnTask: "تعليق جديد على المهمة",
+    mediaBuyerComment: "تعليق مشتري الإعلانات",
+    designerUpdate: "تحديث المصمم",
+    newCommentOnYourTask: "تعليق جديد على مهمتك",
+    youveBeenAssignedTask: "تم تكليفك بمهمة جديدة:",
+    taskStatusUpdatedTo: "تم تحديث الحالة إلى",
+    taskMarkedComplete: "تم تمييزها كمكتملة",
+    adminCommentedOnTask: "علق المشرف على مهمتك:",
+    commentedOnYourTask: "علق على مهمتك:",
+    mediaBuyerCommentedOnTask: "علق مشتري الإعلانات على مهمتك:",
+    designerCommentedOnTask: "علق المصمم على مهمتك:",
+    commentedOnAssignedTask: "علق على مهمتك المُكلفة:",
+    on: "على"
   }
 };
 

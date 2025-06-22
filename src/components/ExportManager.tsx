@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { CheckIn, WorkReport, User } from '@/types';
+import { exportToCSVWithArabicSupport, exportToExcelWithArabicSupport, COMMON_HEADERS } from '@/lib/arabicExportUtils';
 
 interface ExportManagerProps {
   data: {
@@ -358,11 +359,7 @@ const ExportManager: React.FC<ExportManagerProps> = ({ data, dateRange, departme
   };
 
   const exportCheckInsCSV = () => {
-    const csvData = [
-      ['Date', 'Check-in Time', 'Check-out Time', 'User Name', 'Department', 'Duration (hours)']
-    ];
-
-    data.checkIns.forEach(checkIn => {
+    const checkInsData = data.checkIns.map(checkIn => {
       const user = data.users.find(u => u.id === checkIn.userId);
       const checkInTime = new Date(checkIn.timestamp);
       const checkOutTime = checkIn.checkOutTime ? new Date(checkIn.checkOutTime) : null;
@@ -370,41 +367,45 @@ const ExportManager: React.FC<ExportManagerProps> = ({ data, dateRange, departme
         ? Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60) * 100) / 100
         : 0;
 
-      csvData.push([
-        format(checkInTime, 'yyyy-MM-dd'),
-        format(checkInTime, 'HH:mm:ss'),
-        checkOutTime ? format(checkOutTime, 'HH:mm:ss') : '',
-        user?.name || 'Unknown',
-        user?.department || '',
-        duration.toString()
-      ]);
+      return {
+        date: format(checkInTime, 'yyyy-MM-dd'),
+        checkInTime: format(checkInTime, 'HH:mm:ss'),
+        checkOutTime: checkOutTime ? format(checkOutTime, 'HH:mm:ss') : '',
+        userName: user?.name || 'Unknown',
+        department: user?.department || '',
+        duration: duration.toString()
+      };
     });
 
-    const csvContent = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `noorcare-checkins-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    saveAs(blob, fileName);
+    exportToCSVWithArabicSupport({
+      filename: 'تسجيلات_الحضور_NoorCare_CheckIns',
+      data: checkInsData,
+      headers: COMMON_HEADERS.CHECKINS,
+      includeEnglishHeaders: true,
+      dateFormat: 'both',
+      numberFormat: 'both'
+    });
   };
 
   const exportUsersCSV = () => {
-    const csvData = [
-      ['Name', 'Email', 'Department', 'Position', 'Role']
-    ];
+    const usersData = data.users.map(user => ({
+      name: user.name,
+      email: user.email,
+      department: user.department,
+      position: user.position,
+      role: user.role,
+      averageRating: user.averageRating || 'N/A',
+      lastCheckin: user.lastCheckin || 'Never'
+    }));
 
-    data.users.forEach(user => {
-      csvData.push([
-        user.name,
-        user.email,
-        user.department,
-        user.position,
-        user.role
-      ]);
+    exportToCSVWithArabicSupport({
+      filename: 'موظفي_نور_كير_NoorCare_Employees',
+      data: usersData,
+      headers: COMMON_HEADERS.EMPLOYEES,
+      includeEnglishHeaders: true,
+      dateFormat: 'both',
+      numberFormat: 'both'
     });
-
-    const csvContent = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const fileName = `noorcare-users-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    saveAs(blob, fileName);
   };
 
   return (
@@ -419,26 +420,26 @@ const ExportManager: React.FC<ExportManagerProps> = ({ data, dateRange, departme
           Export
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Complete Reports</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>تقارير شاملة / Complete Reports</DropdownMenuLabel>
         <DropdownMenuItem onClick={generatePDFReport} disabled={isExporting}>
           <FileText className="h-4 w-4 mr-2" />
-          Export as PDF
+          تصدير PDF / Export as PDF
         </DropdownMenuItem>
         <DropdownMenuItem onClick={generateExcelReport} disabled={isExporting}>
           <File className="h-4 w-4 mr-2" />
-          Export as Excel
+          تصدير Excel / Export as Excel
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Quick Exports (CSV)</DropdownMenuLabel>
+        <DropdownMenuLabel>تصدير سريع (CSV) / Quick Exports (CSV)</DropdownMenuLabel>
         <DropdownMenuItem onClick={exportCheckInsCSV} disabled={isExporting}>
           <Download className="h-4 w-4 mr-2" />
-          Check-ins Data
+          بيانات الحضور / Check-ins Data
         </DropdownMenuItem>
         <DropdownMenuItem onClick={exportUsersCSV} disabled={isExporting}>
           <Download className="h-4 w-4 mr-2" />
-          Users Data
+          بيانات الموظفين / Users Data
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

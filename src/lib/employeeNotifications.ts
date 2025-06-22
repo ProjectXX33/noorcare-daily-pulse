@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { createNotification } from '@/lib/notifications';
 import { format } from 'date-fns';
+import { getUserLanguage, createTaskAssignmentNotification } from '@/lib/multilingualNotifications';
 
 // Types for different notification scenarios
 interface PerformanceNotification {
@@ -138,7 +139,9 @@ export async function notifyEmployeeTaskAssignment(data: TaskAssignmentNotificat
   try {
     console.log('📋 Sending task assignment notification to:', data.employeeName);
 
-    // Priority emoji and urgency
+    const userLanguage = getUserLanguage(data.employeeId);
+    
+    // Priority emoji and urgency messages (multilingual)
     const priorityEmoji = {
       'Low': '🟢',
       'Medium': '🟡', 
@@ -146,28 +149,58 @@ export async function notifyEmployeeTaskAssignment(data: TaskAssignmentNotificat
       'Urgent': '🔴'
     };
 
-    const urgencyMessage = {
+    const urgencyMessages = {
+      en: {
       'Low': 'Take your time with this one',
       'Medium': 'Please complete when convenient',
       'High': 'Please prioritize this task',
       'Urgent': 'URGENT: Immediate attention required!'
+      },
+      ar: {
+        'Low': 'خذ وقتك في هذه المهمة',
+        'Medium': 'يرجى الإكمال عند الملاءمة',
+        'High': 'يرجى إعطاء الأولوية لهذه المهمة',
+        'Urgent': 'عاجل: مطلوب اهتمام فوري!'
+      }
     };
 
-    let message = `📋 New Task Assigned!\n\n`;
-    message += `${priorityEmoji[data.priority]} Priority: ${data.priority}\n`;
-    message += `📝 Task: ${data.taskTitle}\n`;
-    message += `📄 Description: ${data.taskDescription}\n`;
+    const labels = {
+      en: {
+        newTaskAssigned: 'New Task Assigned!',
+        priority: 'Priority',
+        task: 'Task',
+        description: 'Description',
+        due: 'Due',
+        assignedBy: 'Assigned by'
+      },
+      ar: {
+        newTaskAssigned: 'مهمة جديدة مُكلفة!',
+        priority: 'الأولوية',
+        task: 'المهمة',
+        description: 'الوصف',
+        due: 'الموعد النهائي',
+        assignedBy: 'مُكلف من'
+      }
+    };
+
+    const t = labels[userLanguage] || labels.en;
+    const urgencyT = urgencyMessages[userLanguage] || urgencyMessages.en;
+
+    let message = `📋 ${t.newTaskAssigned}\n\n`;
+    message += `${priorityEmoji[data.priority]} ${t.priority}: ${data.priority}\n`;
+    message += `📝 ${t.task}: ${data.taskTitle}\n`;
+    message += `📄 ${t.description}: ${data.taskDescription}\n`;
     
     if (data.dueDate) {
-      message += `📅 Due: ${format(data.dueDate, 'PPP')}\n`;
+      message += `📅 ${t.due}: ${format(data.dueDate, 'PPP')}\n`;
     }
     
-    message += `👤 Assigned by: ${data.assignedByName}\n\n`;
-    message += `💬 ${urgencyMessage[data.priority]}`;
+    message += `👤 ${t.assignedBy}: ${data.assignedByName}\n\n`;
+    message += `💬 ${urgencyT[data.priority]}`;
 
     await createNotification({
       user_id: data.employeeId,
-      title: `${priorityEmoji[data.priority]} New Task: ${data.taskTitle}`,
+      title: `${priorityEmoji[data.priority]} ${userLanguage === 'ar' ? 'مهمة جديدة' : 'New Task'}: ${data.taskTitle}`,
       message: message,
       related_to: 'task',
       related_id: data.employeeId,

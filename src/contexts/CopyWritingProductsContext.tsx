@@ -50,6 +50,7 @@ export interface CopyWritingProduct {
 interface CopyWritingProductsContextType {
   products: CopyWritingProduct[];
   loading: boolean;
+  isBackgroundProcessing: boolean;
   error: string | null;
   progress: number;
   stage: string;
@@ -80,6 +81,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 export const CopyWritingProductsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<CopyWritingProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isBackgroundProcessing, setIsBackgroundProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState('');
@@ -153,6 +155,7 @@ export const CopyWritingProductsProvider: React.FC<{ children: React.ReactNode }
       console.log('🔄 fetchAllProducts called - Enhanced with REAL-TIME loading');
       
       setLoading(true);
+      setIsBackgroundProcessing(true);
       setError(null);
       setProgress(0);
       setIsFromCache(false);
@@ -161,6 +164,7 @@ export const CopyWritingProductsProvider: React.FC<{ children: React.ReactNode }
       if (!forceRefresh && products.length > 0) {
         console.log('📦 Using existing cached products');
         setLoading(false);
+        setIsBackgroundProcessing(false);
         return;
       }
 
@@ -510,6 +514,7 @@ export const CopyWritingProductsProvider: React.FC<{ children: React.ReactNode }
       setProgress(0);
     } finally {
       setLoading(false);
+      setIsBackgroundProcessing(false);
     }
   };
 
@@ -830,6 +835,7 @@ export const CopyWritingProductsProvider: React.FC<{ children: React.ReactNode }
   const value = {
     products,
     loading,
+    isBackgroundProcessing,
     error,
     progress,
     stage,
