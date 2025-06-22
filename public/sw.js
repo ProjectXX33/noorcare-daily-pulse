@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '3.1.2'; // Enhanced overtime timer with fire emoji and flexible work system
+const APP_VERSION = '3.2.3'; // Enhanced overtime timer with fire emoji and flexible work system
 const CACHE_NAME = `noorhub-v${APP_VERSION}-${Date.now()}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 

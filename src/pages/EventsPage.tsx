@@ -48,7 +48,13 @@ const EventsPage = () => {
   };
 
   // Event form state
-  const [eventForm, setEventForm] = useState({
+  const [eventForm, setEventForm] = useState<{
+    title: string;
+    description: string;
+    start: string;
+    end: string;
+    status: 'active' | 'paused' | 'finished';
+  }>({
     title: '',
     description: '',
     start: new Date().toISOString().slice(0, 16),
@@ -106,11 +112,8 @@ const EventsPage = () => {
       });
     }
     
-    // 🛡️ For regular employees, only show active events
-    const isAdminOrMediaBuyer = user && (user.role === 'admin' || user.position === 'Media Buyer');
-    if (!isAdminOrMediaBuyer) {
-      filtered = filtered.filter(ev => ev.status === 'active');
-    }
+    // ✅ All employees can now see all events regardless of status
+    // Removed the restriction that only showed active events to regular employees
     
     return filtered;
   }, [events, searchQuery, filterStatus, user]);
@@ -322,7 +325,7 @@ const EventsPage = () => {
   };
 
   // Prevent any form changes for non-privileged users
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     console.log('⌨️ Input Change Attempt:', {
       field,
       canEditEvents,
@@ -338,7 +341,9 @@ const EventsPage = () => {
     }
 
     if (field === 'status') {
-      handleStatusChange(value as 'active' | 'paused' | 'finished');
+      if (value === 'active' || value === 'paused' || value === 'finished') {
+        handleStatusChange(value as 'active' | 'paused' | 'finished');
+      }
     } else {
       setEventForm(prev => ({ ...prev, [field]: value }));
     }
@@ -524,7 +529,14 @@ const EventsPage = () => {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-                    {events.filter(e => new Date(e.start) >= new Date()).length}
+                    {events.filter(e => {
+                      const eventDate = new Date(e.start);
+                      const today = new Date();
+                      // Compare dates only (start of day)
+                      const eventStartOfDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                      const todayStartOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                      return eventStartOfDay >= todayStartOfDay;
+                    }).length}
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">Upcoming</div>
                 </div>
@@ -1427,7 +1439,11 @@ const EventsPage = () => {
                   <div className="flex items-center gap-3">
                     <Select
                       value={eventForm.status}
-                      onValueChange={(value) => handleInputChange('status', value as 'active' | 'paused' | 'finished')}
+                      onValueChange={(value) => {
+                        if (value === 'active' || value === 'paused' || value === 'finished') {
+                          handleStatusChange(value as 'active' | 'paused' | 'finished');
+                        }
+                      }}
                     >
                       <SelectTrigger className="w-full capitalize">
                         <SelectValue placeholder="Select a status" />
