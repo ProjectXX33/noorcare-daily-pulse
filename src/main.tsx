@@ -14,10 +14,16 @@ if (typeof window !== 'undefined') {
   // Make notification cleanup available globally
   (window as any).cleanupNotifications = cleanupOldNotificationsForAllUsers
   
-  console.log('🔧 Global functions available:')
-  console.log('  • clearCacheKeepAuth() - Clear cache while keeping login')
+  // Make cache clearing available globally (preserves auth)
+  (window as any).clearCacheKeepAuth = async () => {
+    const cacheManager = new CacheManager()
+    return await cacheManager.forceCacheClearKeepAuth()
+  }
+
+  console.log('🌟 Global utilities available:')
   console.log('  • recalculateOvertime() - Recalculate overtime hours')
-  console.log('  • cleanupNotifications() - Clean old notifications (keep max 10 per user)')
+  console.log('  • cleanupNotifications() - Clean old notifications for all users')  
+  console.log('  • clearCacheKeepAuth() - Clear all caches while preserving login')
 }
 
 // Expose cache clearing function globally

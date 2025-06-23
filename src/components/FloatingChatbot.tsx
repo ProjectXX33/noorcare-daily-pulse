@@ -1,5 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Bot, Send, Minimize2, Maximize2, X, ShoppingCart, Plus, FileText, Palette, TrendingUp, Users, Settings, Package, User, Phone, MapPin, CreditCard, Search, Zap } from 'lucide-react';
+import { 
+  Bot,
+  MessageCircle,
+  X,
+  Minimize2,
+  Maximize2,
+  Send,
+  Plus,
+  FileText,
+  TrendingUp,
+  Package,
+  Palette,
+  CreditCard,
+  Settings,
+  Users,
+  Search,
+  ShoppingCart,
+  Phone,
+  MapPin,
+  Shrink,
+  Expand,
+  Zap,
+  Minus,
+  User
+} from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +38,7 @@ import { createOrderSubmission, OrderSubmission, OrderItem } from '@/lib/orderSu
 import wooCommerceAPI, { WooCommerceProduct } from '@/lib/woocommerceApi';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface RoleColors {
   gradient: string;
@@ -31,7 +56,7 @@ interface Message {
   content: string;
   isUser: boolean;
   timestamp: Date;
-  type?: 'text' | 'action' | 'order' | 'form' | 'product_search' | 'product_selection' | 'complaint_search' | 'quick_actions';
+  type?: 'text' | 'action' | 'order' | 'form' | 'product_search' | 'product_selection' | 'complaint_search' | 'quick_actions' | 'product_search_results' | 'product_info';
   actionData?: any;
   formData?: any;
   productData?: any;
@@ -51,10 +76,22 @@ interface OrderFormData {
 }
 
 const FloatingChatbot: React.FC = () => {
-  const [isHovered, setIsHovered] = useState(false);
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const location = useLocation();
+  
+  // Early return before any other hooks to prevent hook count mismatch
+  if (isAuthLoading || !user || location.pathname === '/login' || location.pathname === '/') {
+    return null;
+  }
+  
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [isShrinking, setIsShrinking] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
@@ -76,42 +113,141 @@ const FloatingChatbot: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<WooCommerceProduct | null>(null);
   const [isHandlingComplaint, setIsHandlingComplaint] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const { user } = useAuth();
+  const [isInProductSearchMode, setIsInProductSearchMode] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Hide chatbot on login screen
-  if (location.pathname === '/login' || location.pathname === '/') {
-    return null;
-  }
+  // Add custom CSS for animations
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .animate-shimmer {
+        animation: shimmer 2s infinite;
+      }
+      .animate-smooth-bounce {
+        animation: smooth-bounce 2s ease-in-out infinite;
+      }
+      @keyframes smooth-bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+            @keyframes expand-scale {
+        0% {
+          transform: scale(0.3);
+          opacity: 0.4;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      @keyframes shrink-scale {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(0.3);
+          opacity: 0.4;
+        }
+      }
+      .animate-expand-scale {
+        animation: expand-scale 0.25s ease-out;
+      }
+      .animate-shrink-scale {
+        animation: shrink-scale 0.25s ease-in;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
-  // Temporary: Chatbot disabled for v2.8.0 - Coming Soon
-  return (
-    <TooltipProvider>
-      <div className="fixed bottom-4 right-4 z-50">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              disabled
-              className="h-14 w-14 rounded-full bg-gray-400 shadow-lg cursor-not-allowed opacity-50"
-            >
-              <MessageCircle className="h-6 w-6 text-white" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-center">
-              <p className="font-semibold">AI Assistant</p>
-              <p className="text-sm text-muted-foreground">Coming Soon in v2.8.0</p>
-              <p className="text-xs text-muted-foreground mt-1">Enhanced features in development</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
-  );
+  // Initialize audio
+  useEffect(() => {
+    audioRef.current = new Audio('/chatbot.mp3');
+    audioRef.current.volume = 0.3; // Set volume to 30%
+  }, []);
+
+  // Play sound for bot messages
+  const playBotSound = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0; // Reset to start
+      audioRef.current.play().catch(error => {
+        console.log('Could not play audio:', error);
+      });
+    }
+  };
+
+  // Log chatbot availability on component mount
+  useEffect(() => {
+    console.log('🤖 FloatingChatbot: AI Assistant is now available!');
+    console.log('🎯 Features available: Role-based assistance, Order creation, Product search, Quick actions');
+  }, []);
 
   // Role-based color configurations with enhanced functionality
+  // Helper function to format prices consistently
+  const formatProductPrice = (product: any, hasArabicContent: boolean) => {
+    console.log('🔄 Re-formatting price for:', product.name, {
+      price: product.price,
+      regular_price: product.regular_price,
+      sale_price: product.sale_price,
+    });
+
+    const currency = hasArabicContent ? 'ريال' : 'SAR';
+    
+    const regularPrice = product.regular_price;
+    const activePrice = product.price;
+
+    // A product is on sale if regular_price exists, is not empty, and is greater than the active price.
+    const isOnSale = regularPrice && regularPrice !== '' && parseFloat(regularPrice) > parseFloat(activePrice);
+    
+    if (isOnSale) {
+      if (hasArabicContent) {
+        return (
+          <div className="space-y-1 text-base font-bold text-right">
+            <div className="opacity-75">
+              <span>السعر الأصلي: </span>
+              <span className="line-through">{regularPrice} {currency}</span>
+            </div>
+            <div className="text-red-500">
+              <span>سعر العرض: </span>
+              <span>{activePrice} {currency}</span>
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div className="space-y-1 text-base font-bold">
+            <div className="opacity-75">
+              <span>Original Price: </span>
+              <span className="line-through">{regularPrice} {currency}</span>
+            </div>
+            <div className="text-red-500">
+              <span>Offer Price: </span>
+              <span>{activePrice} {currency}</span>
+            </div>
+          </div>
+        );
+      }
+    }
+    
+    // Default: show the single, active price.
+    if (hasArabicContent) {
+        return <div className="font-bold text-base text-right">السعر: {activePrice} {currency}</div>;
+    } else {
+        return <div className="font-bold text-base">Price: {activePrice} {currency}</div>;
+    }
+  };
+
   const getRoleColors = (): RoleColors => {
     if (user?.role === 'admin') {
       return {
@@ -195,6 +331,7 @@ const FloatingChatbot: React.FC = () => {
   // Initialize with welcome message
   useEffect(() => {
     if (isOpen && messages.length === 0) {
+      console.log('🤖 FloatingChatbot: Initializing chatbot for user:', user?.name, '| Position:', user?.position);
       setTimeout(() => {
         const welcomeMessage: Message = {
           id: 'welcome',
@@ -204,9 +341,28 @@ const FloatingChatbot: React.FC = () => {
           type: 'text'
         };
         setMessages([welcomeMessage]);
+        // Play sound for welcome message
+        setTimeout(() => playBotSound(), 200);
       }, 500);
     }
   }, [isOpen, user?.position]);
+
+  // Add a separate effect to show quick actions after the welcome message
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id === 'welcome') {
+      const quickActionsMessage: Message = {
+        id: 'quick-actions-initial',
+        content: '', // No text content needed for this type
+        isUser: false,
+        timestamp: new Date(),
+        type: 'quick_actions'
+      };
+      setTimeout(() => {
+        setMessages(prev => [...prev, quickActionsMessage]);
+        playBotSound();
+      }, 800); // Delay slightly after welcome
+    }
+  }, [messages]);
 
   const getWelcomeMessage = (): string => {
     const greeting = `👋 Hello ${user?.name || 'there'}! I'm your ${roleColors.name}.`;
@@ -229,10 +385,11 @@ const FloatingChatbot: React.FC = () => {
     switch (user?.position) {
       case 'Customer Service':
         return [
-          { label: ' Create New Order', action: 'create_order', icon: ShoppingCart },
-          { label: ' View Recent Orders', action: 'view_orders', icon: Package },
-          { label: ' Customer Support Tips', action: 'support_tips', icon: Users },
-          { label: ' Handle Complaints', action: 'complaint_help', icon: Phone }
+          { icon: ShoppingCart, label: 'Create New Order', action: 'create_order' },
+          { icon: Search, label: 'Search Products', action: 'search_products' },
+          { icon: User, label: 'Customer Support', action: 'customer_support' },
+          { icon: MapPin, label: 'Go to CRM', action: 'navigate_crm' },
+          { icon: Users, label: 'Loyal Customers', action: 'navigate_loyal' }
         ];
       case 'Copy Writing':
         return [
@@ -275,27 +432,257 @@ const FloatingChatbot: React.FC = () => {
     { field: 'notes', label: 'Order Notes (Optional)', icon: FileText, placeholder: 'Any special notes...' }
   ];
 
+  // Enhanced WooCommerce product search with keyword support
   const searchProducts = async (query: string): Promise<WooCommerceProduct[]> => {
     try {
       setIsSearchingProducts(true);
-      console.log('Searching products for:', query);
+      console.log('🔍 Searching WooCommerce products for:', query);
       
+      // Enhanced search parameters for better keyword matching
       const results = await wooCommerceAPI.fetchProducts({
         search: query,
-        per_page: 10,
+        per_page: 12, // Increased to show more results
         status: 'publish',
-        stock_status: 'instock'
+        stock_status: 'instock',
+        orderby: 'title', // Use valid orderby parameter
+        order: 'asc'
       });
       
-      console.log('Product search results:', results);
+      console.log(`✅ Found ${results.length} products for "${query}"`);
       return results;
     } catch (error) {
-      console.error('Error searching products:', error);
+      console.error('❌ Error searching products:', error);
       toast.error('Failed to search products');
       return [];
     } finally {
       setIsSearchingProducts(false);
     }
+  };
+
+  // Enhanced product search handler for information purposes only
+  const handleProductSearch = async (query: string) => {
+    setIsSearchingProducts(true);
+    
+    try {
+      const results = await searchProducts(query);
+      
+      // Debug: Log product data to see price structure
+      if (results.length > 0) {
+        console.log('🔍 Product data:', results[0]);
+        console.log('💰 Price info:', {
+          price: results[0].price,
+          sale_price: results[0].sale_price,
+          regular_price: results[0].regular_price
+        });
+      }
+      
+      if (results.length === 0) {
+        const noResultsMessage: Message = {
+          id: Date.now().toString(),
+          content: `🔍 **No products found for "${query}"**\n\nTry different keywords like:\n• Product categories (vitamins, supplements, omega)\n• Brand names (NQ, Noor)\n• Health benefits (immunity, energy, joints)\n• Ingredients (iron, calcium, vitamin D)`,
+          isUser: false,
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, noResultsMessage]);
+        // Play sound for bot message
+        setTimeout(() => playBotSound(), 100);
+      } else {
+        // Check if this is a "what is" question to provide direct answer
+        const isWhatIsQuestion = /^(ما هو|ما هي|what is|what are)\s+/i.test(query);
+        
+        if (isWhatIsQuestion && results.length > 0) {
+          // Get the first/best match product
+          const product = results[0];
+          const isArabic = /[\u0600-\u06FF]/.test(product.name);
+          
+          // Create a direct answer from product information
+          let answer = '';
+          
+          if (isArabic) {
+            answer = `✨ **${product.name}**\n\n`;
+            
+            const regularPrice = product.regular_price;
+            const activePrice = product.price;
+            const isOnSale = regularPrice && regularPrice !== '' && parseFloat(regularPrice) > parseFloat(activePrice);
+
+            if (isOnSale) {
+              answer += `**السعر الأصلي:** ~~${regularPrice} ريال~~\n`;
+              answer += `**سعر العرض:** **${activePrice} ريال**\n\n`;
+            } else {
+              answer += `**السعر:** **${activePrice} ريال**\n\n`;
+            }
+            
+            if (product.short_description) {
+              const cleanDesc = product.short_description.replace(/<[^>]*>/g, '').trim();
+              if (cleanDesc) {
+                answer += `📝 **الوصف:** ${cleanDesc}\n\n`;
+              }
+            }
+            
+            if (product.description) {
+              const cleanDesc = product.description.replace(/<[^>]*>/g, '').trim();
+              if (cleanDesc && cleanDesc.length > 0) {
+                const truncatedDesc = cleanDesc.length > 300 ? cleanDesc.substring(0, 300) + '...' : cleanDesc;
+                answer += `📖 **التفاصيل:** ${truncatedDesc}\n\n`;
+              }
+            }
+            
+            answer += `📦 **رمز المنتج:** ${product.sku || 'غير متوفر'}\n`;
+            answer += `📊 **المخزون:** ${product.stock_status === 'instock' ? '✅ متوفر' : '❌ غير متوفر'}\n\n`;
+            answer += `🔗 لمزيد من التفاصيل، انقر على "عرض التفاصيل" أدناه`;
+          } else {
+            answer = `✨ **${product.name}**\n\n`;
+
+            const regularPrice = product.regular_price;
+            const activePrice = product.price;
+            const isOnSale = regularPrice && regularPrice !== '' && parseFloat(regularPrice) > parseFloat(activePrice);
+
+            if (isOnSale) {
+              answer += `**Original Price:** ~~${regularPrice} SAR~~\n`;
+              answer += `**Offer Price:** **${activePrice} SAR**\n\n`;
+            } else {
+              answer += `**Price:** **${activePrice} SAR**\n\n`;
+            }
+            
+            if (product.short_description) {
+              const cleanDesc = product.short_description.replace(/<[^>]*>/g, '').trim();
+              if (cleanDesc) {
+                answer += `📝 **Description:** ${cleanDesc}\n\n`;
+              }
+            }
+            
+            if (product.description) {
+              const cleanDesc = product.description.replace(/<[^>]*>/g, '').trim();
+              if (cleanDesc && cleanDesc.length > 0) {
+                const truncatedDesc = cleanDesc.length > 300 ? cleanDesc.substring(0, 300) + '...' : cleanDesc;
+                answer += `📖 **Details:** ${truncatedDesc}\n\n`;
+              }
+            }
+            
+            answer += `📦 **SKU:** ${product.sku || 'N/A'}\n`;
+            answer += `📊 **Stock:** ${product.stock_status === 'instock' ? '✅ Available' : '❌ Out of Stock'}\n\n`;
+            answer += `🔗 For more details, click "View Details" below`;
+          }
+          
+          const directAnswerMessage: Message = {
+            id: Date.now().toString(),
+            content: answer,
+            isUser: false,
+            timestamp: new Date(),
+            type: 'text'
+          };
+          setMessages(prev => [...prev, directAnswerMessage]);
+          
+          // Also show the product card for more details
+          const productInfoMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            content: '',
+            isUser: false,
+            timestamp: new Date(),
+            type: 'product_info',
+            productData: { product }
+          };
+          setMessages(prev => [...prev, productInfoMessage]);
+          
+        } else {
+          // Regular search results
+          const resultsMessage: Message = {
+            id: Date.now().toString(),
+            content: `🎯 **Found ${results.length} products for "${query}":**\n\nClick "View Details" to see complete product information:`,
+            isUser: false,
+            timestamp: new Date(),
+            type: 'product_search_results',
+            productData: { products: results }
+          };
+          setMessages(prev => [...prev, resultsMessage]);
+          setSearchResults(results);
+        }
+        
+        // Play sound for bot message
+        setTimeout(() => playBotSound(), 100);
+      }
+    } catch (error) {
+      console.error('❌ Error searching products:', error);
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: '❌ Error searching products. Please try again or contact support.',
+        isUser: false,
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      // Play sound for bot message
+      setTimeout(() => playBotSound(), 100);
+    } finally {
+      setIsSearchingProducts(false);
+    }
+  };
+
+  // Handle product information display with full details in card only
+  const handleProductInfo = (product: WooCommerceProduct) => {
+    const infoMessage: Message = {
+      id: Date.now().toString(),
+      content: '', // Empty content - all info will be in the product card
+      isUser: false,
+      timestamp: new Date(),
+      type: 'product_info',
+      productData: { product: product }
+    };
+    setMessages(prev => [...prev, infoMessage]);
+    // Play sound for bot message
+    setTimeout(() => playBotSound(), 100);
+  };
+
+  const performWebSearch = async (query: string): Promise<any> => {
+    // Simulate web search functionality for customer service
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          results: [
+            {
+              title: "Customer Service Best Practices",
+              snippet: "When dealing with upset customers, always listen actively, acknowledge their feelings, and provide clear solutions. Stay calm and professional."
+            }
+          ]
+        });
+      }, 1000);
+    });
+  };
+
+  const formatWebSearchResponse = (originalQuery: string, searchResults: any): string => {
+    // Check if query is in Arabic
+    const isArabicQuery = /[\u0600-\u06FF]/.test(originalQuery);
+    
+    if (isArabicQuery) {
+      return `🔍 **دليل شامل للتعامل مع العملاء - "${originalQuery}"**
+
+📋 **أسئلة شائعة من العملاء (مع نماذج ردود محترفة)**
+
+**1️⃣ "المنتج لم يصل بعد!"**
+💬 **الرد المثالي:**
+"نعتذر بصدق عن التأخير. سنتحقق مع فريق الشحن فورًا ونرسل لك تحديثًا خلال ساعة. كتعويض، نقدم لك خصم 15% على طلبك القادم."
+
+**2️⃣ "المكمل الغذائي لم يعطِ النتائج المتوقعة!"**
+💬 **الرد المثالي:**
+"نقدر ملاحظتك الصادقة. نوصي باستشارة أخصائي تغذية لضمان استخدام المنتج المناسب لاحتياجاتك. نقدم لك استبدالًا بمنتج آخر أو استردادًا كاملًا."
+
+🔄 **اكتب "بحث جديد" للبحث عن موضوع آخر**`;
+    }
+    
+    return `🔍 **Customer Service Guide - "${originalQuery}"**
+
+📋 **Common Customer Issues (with Response Templates)**
+
+**1️⃣ "My order hasn't arrived yet!"**
+💬 **Response:**
+"I sincerely apologize for the delay. I'll check with our shipping team immediately and send you an update within the hour. As compensation, I'd like to offer you a 15% discount on your next order."
+
+**2️⃣ "The supplement didn't work as expected!"**
+💬 **Response:**
+"I appreciate your feedback. I recommend consulting with a nutritionist to ensure you're using the right product for your needs. We can offer you either an exchange or a full refund."
+
+🔄 **Type "new search" to search for another topic**`;
   };
 
   const handleOrderFormSubmit = async (value: string) => {
@@ -689,6 +1076,27 @@ Type your question below (in English or Arabic):`,
           }, 1500);
           break;
 
+        case 'search_products':
+          if (user?.position === 'Customer Service') {
+            setIsInProductSearchMode(true);
+            botResponse = {
+              id: Date.now().toString(),
+              content: '🔍 **WooCommerce Product Search**\n\nPlease enter the product name or keywords you want to search for in WooCommerce:',
+              isUser: false,
+              timestamp: new Date(),
+              type: 'product_search'
+            };
+          } else {
+            botResponse = {
+              id: Date.now().toString(),
+              content: '❌ Product search is only available for Customer Service users.',
+              isUser: false,
+              timestamp: new Date(),
+              type: 'text'
+            };
+          }
+          break;
+
         default:
           botResponse = {
             id: (Date.now() + 1).toString(),
@@ -701,6 +1109,8 @@ Type your question below (in English or Arabic):`,
 
       setMessages(prev => [...prev, botResponse]);
       setIsTyping(false);
+      // Play sound for bot message
+      setTimeout(() => playBotSound(), 100);
       
       // Remove action from pending set if not creating order
       if (action !== 'create_order') {
@@ -715,196 +1125,24 @@ Type your question below (in English or Arabic):`,
 
   const handleProductSelection = (product: WooCommerceProduct) => {
     setSelectedProduct(product);
-    
-    const newOrderForm = { 
-      ...orderForm, 
+    setOrderForm(prev => ({
+      ...prev,
       productId: product.id,
       productName: product.name,
-      price: product.sale_price || product.price,
-      currentStep: orderForm.currentStep + 1
-    };
-    setOrderForm(newOrderForm);
+      price: product.sale_price || product.price
+    }));
 
-    const nextStep = createOrderSteps[newOrderForm.currentStep];
-    const botMessage: Message = {
+    const confirmationMessage: Message = {
       id: Date.now().toString(),
-      content: `✅ Selected: ${product.name} (${product.sale_price || product.price} SAR)\n\nNow please provide the ${nextStep.label.toLowerCase()}:`,
+      content: `✅ **Product Selected!**\n\n**${product.name}**\nPrice: ${product.sale_price || product.price} SAR\n\nNow let's continue with the order details. What's the customer's name?`,
       isUser: false,
       timestamp: new Date(),
-      type: 'form',
-      formData: { step: newOrderForm.currentStep, field: nextStep.field }
+      type: 'form'
     };
-    setMessages(prev => [...prev, botMessage]);
-  };
-
-  const performWebSearch = async (query: string): Promise<any> => {
-    // In a real implementation, this would call a web search API
-    // For now, we'll simulate the search functionality
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          results: [
-            {
-              title: "Customer Service Best Practices",
-              snippet: "When dealing with angry customers, always listen actively, acknowledge their feelings, and provide clear solutions. Stay calm and professional."
-            }
-          ]
-        });
-      }, 1000);
-    });
-  };
-
-  const formatWebSearchResponse = (originalQuery: string, searchResults: any): string => {
-    // Check if query is in Arabic
-    const isArabicQuery = /[\u0600-\u06FF]/.test(originalQuery);
-    
-    if (isArabicQuery) {
-      return `🔍 **دليل شامل للتعامل مع العملاء غير الراضين - "${originalQuery}"**
-
-📋 **أسئلة شائعة من العملاء غير الراضين (مع نماذج ردود محترفة)**
-
-**1️⃣ "المنتج لم يصل بعد، وأنا غير راضٍ عن التأخير!"**
-💬 **الرد المثالي:**
-"نعتذر بصدق عن التأخير. نتفهم أهمية وصول طلبك في الوقت المحدد. سنتحقق مع فريق الشحن فورًا ونرسل لك تحديثًا خلال ساعة. كتعويض، نقدم لك خصم 15% على طلبك القادم."
-
-**2️⃣ "المكمل الغذائي لم يعطِ النتائج المتوقعة!"**
-💬 **الرد المثالي:**
-"نقدر ملاحظتك الصادقة. نوصي باستشارة أخصائي تغذية لضمان استخدام المنتج المناسب لاحتياجاتك. نقدم لك استبدالًا بمنتج آخر أو استردادًا كاملًا، ونسعد بإرسال دليل استخدام مفصل مجانًا."
-
-**3️⃣ "التغليف كان تالفًا عند الاستلام!"**
-💬 **الرد المثالي:**
-"نأسف لهذه التجربة. سلامة المنتج أولويتنا. سنقوم بإرسال بديل فوري دون تكلفة إضافية، وسنتابع مع شركة الشحن لضمان عدم تكرار هذا الأمر."
-
-**4️⃣ "المنتج مختلف عن الوصف على الموقع!"**
-💬 **الرد المثالي:**
-"شكرًا لإعلامنا بهذا. سنراجع الوصف فورًا لتجنب أي لبس. يمكنك إما الاحتفاظ بالمنتج مع خصم 20% أو إعادته مع تغطية كاملة للتكاليف."
-
-**5️⃣ "واجهت مشكلة فنية أثناء الدفع ولم يتم تأكيد الطلب!"**
-💬 **الرد المثالي:**
-"نعتذر عن الإزعاج. سنتحقق من النظام فورًا. يُرجى إرسال لقطة شاشة للخطأ إن أمكن، وسنضمن حصولك على خصم 10% لتعويض وقتك."
-
-🛠️ **استراتيجيات التعامل مع السخط (بناءً على مراحل الرحلة الشرائية)**
-
-**🎯 الاستماع الفعّال:**
-استخدم عبارات مثل: "أتفهم إحباطك تمامًا..." ثم كرر مشكلتهم بلغتك لتأكيد الفهم.
-
-**🙏 الاعتذار دون تبرير:**
-تجنب: "التأخير بسبب العطل الفني..."، واستبدلها بـ: "نتحمل المسؤولية الكاملة ونعتذر بصدق".
-
-**⚡ الحلول السريعة والملموسة:**
-قدم خيارين دائمًا (مثل: استبدال/استرداد، خصم/هدية مجانية).
-
-**📞 المتابعة بعد الحل:**
-أرسل رسالة بعد 3 أيام: "هل حُلت مشكلتك بطريقة ترضيك؟ نقدر رأيك لتحسين خدماتنا."
-
-📊 **نموذج تصعيد الشكاوى (للفريق الداخلي)**
-
-┌─────────────────────────┬──────────────────────────────────┬─────────────────────┐
-│ **مستوى السخط**         │ **الإجراء**                      │ **المسؤول**         │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🟢 منخفض                │ خصم 10% + متابعة الشحن           │ ممثل خدمة العملاء   │
-│ (تأخير بسيط)            │                                  │                     │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🟡 متوسط                │ إرسال بديل فوري +               │ المشرف              │
-│ (منتج تالف)             │ رسالة اعتذار                    │                     │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🔴 عالي                 │ اتصال هاتفي +                   │ مدير الخدمة        │
-│ (مشكلة متكررة)          │ تعويض بقيمة 30%                 │                     │
-└─────────────────────────┴──────────────────────────────────┴─────────────────────┘
-
-**📋 إرشادات سريعة للتطبيق:**
-• 🟢 **المستوى المنخفض:** تعامل مباشر من الممثل
-• 🟡 **المستوى المتوسط:** إشراك المشرف المباشر
-• 🔴 **المستوى العالي:** تدخل إدارة الخدمة فوراً
-
-💡 **نصائح خاصة بمتاجر المكملات الغذائية**
-• **الشفافية الطبية:** ذكّر العملاء بأن النتائج تختلف حسب الجسم، ونوّه بضرورة استشارة الطبيب قبل الاستخدام
-• **توثيق الشكاوى:** أنشئ قاعدة بيانات للمشكلات المتكررة (مثل: تغليف هش، تأخير شحن) لتحسين العمليات
-• **التدريب:** درّب فريقك على المصطلحات الطبية البسيطة لتوضيح مكونات المنتجات بدقة
-
-📌 **مثال تطبيقي لسيناريو معقد**
-**العميل:** "طلبت 3 عبوات ولم تصل، وأريد استرداد أموالي الآن!"
-**الرد:**
-"نعتذر بشدة عن هذا الخلل غير المقبول. سنقوم بـ:
-• استرداد المبلغ خلال 24 ساعة
-• إرسال هدية (عينة من منتج جديد) كاعتذار
-• التحقيق مع مزود الشحن لمعرفة السبب وإعلامك بالنتائج"
-
-🔄 **اكتب "بحث جديد" للبحث عن موضوع آخر أو "إنهاء البحث" للعودة للدردشة العادية**`;
-    }
-    
-    return `🔍 **Comprehensive Customer Complaint Resolution Guide - "${originalQuery}"**
-
-📋 **Common Upset Customer Scenarios (with Professional Response Templates)**
-
-**1️⃣ "My order hasn't arrived yet, and I'm really frustrated with the delay!"**
-💬 **Ideal Response:**
-"I sincerely apologize for the delay. I understand how important it is to receive your order on time. I'll check with our shipping team immediately and send you an update within the hour. As compensation, I'd like to offer you a 15% discount on your next order."
-
-**2️⃣ "The supplement didn't give me the expected results!"**
-💬 **Ideal Response:**
-"I appreciate your honest feedback. I recommend consulting with a nutritionist to ensure you're using the right product for your needs. We can offer you either an exchange for a different product or a full refund, plus I'd be happy to send you a detailed usage guide for free."
-
-**3️⃣ "The packaging was damaged when I received it!"**
-💬 **Ideal Response:**
-"I'm sorry for this experience. Product safety is our top priority. We'll send you an immediate replacement at no additional cost, and I'll follow up with our shipping partner to ensure this doesn't happen again."
-
-**4️⃣ "The product is different from what was described on the website!"**
-💬 **Ideal Response:**
-"Thank you for bringing this to our attention. We'll review the description immediately to avoid any confusion. You can either keep the product with a 20% discount or return it with full cost coverage."
-
-**5️⃣ "I had a technical issue during payment and my order wasn't confirmed!"**
-💬 **Ideal Response:**
-"I apologize for the inconvenience. I'll check our system immediately. If possible, please send a screenshot of the error, and I'll ensure you receive a 10% discount to compensate for your time."
-
-🛠️ **De-escalation Strategies (Based on Customer Journey Stages)**
-
-**🎯 Active Listening:**
-Use phrases like: "I completely understand your frustration..." then repeat their issue in your own words to confirm understanding.
-
-**🙏 Apologize Without Excuses:**
-Avoid: "The delay was due to technical issues..." Replace with: "We take full responsibility and sincerely apologize."
-
-**⚡ Quick & Tangible Solutions:**
-Always offer two options (like: replacement/refund, discount/free gift).
-
-**📞 Post-Resolution Follow-up:**
-Send a message after 3 days: "Has your issue been resolved to your satisfaction? We value your feedback to improve our services."
-
-📊 **Complaint Escalation Matrix (Internal Team)**
-
-┌─────────────────────────┬──────────────────────────────────┬─────────────────────┐
-│ **Frustration Level**   │ **Action Required**              │ **Responsible**     │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🟢 Low                  │ 10% discount +                  │ Customer Service    │
-│ (minor delay)           │ shipping follow-up               │ Representative      │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🟡 Medium               │ Immediate replacement +          │ Supervisor          │
-│ (damaged product)       │ apology letter                   │                     │
-├─────────────────────────┼──────────────────────────────────┼─────────────────────┤
-│ 🔴 High                 │ Phone call +                     │ Service Manager     │
-│ (recurring issue)       │ 30% compensation                 │                     │
-└─────────────────────────┴──────────────────────────────────┴─────────────────────┘
-
-**📋 Quick Implementation Guide:**
-• 🟢 **Low Level:** Direct handling by representative
-• 🟡 **Medium Level:** Involve direct supervisor
-• 🔴 **High Level:** Immediate management intervention
-
-💡 **Supplement Store Specific Tips**
-• **Medical Transparency:** Remind customers that results vary by individual, and emphasize the importance of consulting a doctor before use
-• **Complaint Documentation:** Create a database of recurring issues (like fragile packaging, shipping delays) to improve operations
-• **Training:** Train your team on basic medical terminology to accurately explain product ingredients
-
-📌 **Complex Scenario Example**
-**Customer:** "I ordered 3 bottles and they never arrived, I want my money back now!"
-**Response:**
-"I sincerely apologize for this unacceptable error. Here's what we'll do:
-• Full refund processed within 24 hours
-• Send a complimentary gift (sample of a new product) as an apology
-• Investigate with our shipping provider and inform you of the results"
-
-🔄 **Type "new search" to search for another topic or "end search" to return to normal chat**`;
+    setMessages(prev => [...prev, confirmationMessage]);
+    // Play sound for bot message
+    setTimeout(() => playBotSound(), 100);
+    setOrderForm(prev => ({ ...prev, currentStep: 0 }));
   };
 
   const handleComplaintSearch = async (query: string): Promise<string> => {
@@ -1061,9 +1299,8 @@ What else would you like to know?`;
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isTyping || isSearchingProducts) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       content: inputValue,
@@ -1071,79 +1308,144 @@ What else would you like to know?`;
       timestamp: new Date(),
       type: 'text'
     };
+
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = inputValue;
+    const originalInput = inputValue;
     setInputValue('');
+    setIsTyping(true);
 
-    // If creating order, handle form input
-    if (isCreatingOrder) {
-      setTimeout(() => {
-        handleOrderFormSubmit(currentInput);
-      }, 500);
-      return;
-    }
+    try {
+      // Smart search detection for Customer Service
+      if (user?.position === 'Customer Service') {
+        const lowerInput = originalInput.toLowerCase().trim();
+        
+        // Check for automatic search detection
+        const isSearchCommand = lowerInput.startsWith('search ') || lowerInput.startsWith('بحث ');
+        
+        if (isSearchCommand) {
+          // Extract search query after "search" or "بحث"
+          const searchQuery = lowerInput.startsWith('search ') 
+            ? originalInput.substring(7).trim() 
+            : originalInput.substring(4).trim(); // "بحث " is 4 characters including space
+          
+          if (searchQuery) {
+            await handleProductSearch(searchQuery);
+            return;
+          }
+        }
 
-    // If handling complaint search, perform web search
-    if (isHandlingComplaint) {
-      // Check if user wants to exit search mode
-      if (currentInput.toLowerCase().includes('end search') || currentInput.toLowerCase().includes('exit') || currentInput.toLowerCase().includes('إنهاء البحث')) {
-        setIsHandlingComplaint(false);
-        const exitMessage: Message = {
+        // Smart question detection - detect "what is" questions in Arabic and English
+        const questionPatterns = [
+          /^(ما هو|ما هي|what is|what are)\s+(.+)/i,
+          /^(أين أجد|where can i find|where is)\s+(.+)/i,
+          /^(هل يوجد|do you have|is there)\s+(.+)/i,
+          /^(أريد|i want|i need)\s+(.+)/i,
+          /^(أبحث عن|looking for|searching for)\s+(.+)/i
+        ];
+
+        const questionMatch = questionPatterns.find(pattern => pattern.test(originalInput));
+        if (questionMatch) {
+          const match = originalInput.match(questionMatch);
+          if (match && match[2]) {
+            const searchQuery = match[2].trim();
+            console.log('🔍 Smart search detected:', searchQuery);
+            await handleProductSearch(searchQuery);
+            return;
+          }
+        }
+
+        // Simple product name detection - if input contains Arabic/English product-like terms
+        const productIndicators = [
+          /[\u0600-\u06FF]{3,}/, // Arabic text with 3+ characters
+          /[a-zA-Z]{3,}/, // English text with 3+ characters
+        ];
+
+        const seemsLikeProduct = productIndicators.some(pattern => pattern.test(originalInput));
+        if (seemsLikeProduct && originalInput.length > 2 && !lowerInput.includes('hello') && !lowerInput.includes('hi')) {
+          console.log('🔍 Product-like query detected:', originalInput);
+          await handleProductSearch(originalInput);
+          return;
+        }
+      }
+
+      // Check if we're in order creation mode
+      if (isCreatingOrder) {
+        await handleOrderFormSubmit(userMessage.content);
+        return;
+      }
+
+      // Check if we're in product search mode
+      if (isInProductSearchMode || (messages.length > 0 && messages[messages.length - 1]?.type === 'product_search')) {
+        await handleProductSearch(userMessage.content);
+        setIsInProductSearchMode(false);
+        return;
+      }
+
+      // Check if we're in complaint handling mode
+      if (isHandlingComplaint) {
+        const complaintResponse = await handleComplaintSearch(userMessage.content);
+        const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: '✅ Exited search mode. I\'m back to normal chat mode. How can I help you with customer service tasks?',
+          content: complaintResponse,
           isUser: false,
           timestamp: new Date(),
           type: 'text'
         };
-        setMessages(prev => [...prev, exitMessage]);
+        setMessages(prev => [...prev, botMessage]);
+        // Play sound for bot message
+        setTimeout(() => playBotSound(), 100);
+        setIsHandlingComplaint(false);
         return;
       }
 
-      setIsTyping(true);
-      setTimeout(async () => {
-        try {
-          const searchResponse = await handleComplaintSearch(currentInput);
-          const botResponse: Message = {
-            id: (Date.now() + 1).toString(),
-            content: searchResponse,
-            isUser: false,
-            timestamp: new Date(),
-            type: 'text'
-          };
-          setMessages(prev => [...prev, botResponse]);
-        } catch (error) {
-          const errorResponse: Message = {
-            id: (Date.now() + 1).toString(),
-            content: '❌ Sorry, I couldn\'t search for that right now. Please try again or contact technical support.',
-            isUser: false,
-            timestamp: new Date(),
-            type: 'text'
-          };
-          setMessages(prev => [...prev, errorResponse]);
-        }
-        setIsTyping(false);
-      }, 1000);
-      return;
-    }
+      // Generate role-based response
+      const response = generateRoleResponse(userMessage.content);
+      
+      setTimeout(() => {
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: response,
+          isUser: false,
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, botMessage]);
+        // Play sound for bot message
+        setTimeout(() => playBotSound(), 100);
+      }, 1000 + Math.random() * 1000);
 
-    setIsTyping(true);
-
-    // Generate role-specific response
-    setTimeout(() => {
-      const botResponse: Message = {
+    } catch (error) {
+      console.error('Error handling message:', error);
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: generateRoleResponse(currentInput),
+        content: '❌ Sorry, I encountered an error. Please try again.',
         isUser: false,
         timestamp: new Date(),
         type: 'text'
       };
-      setMessages(prev => [...prev, botResponse]);
+      setMessages(prev => [...prev, errorMessage]);
+      // Play sound for bot message
+      setTimeout(() => playBotSound(), 100);
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }
   };
 
   const generateRoleResponse = (userMessage: string): string => {
     const message = userMessage.toLowerCase();
+    
+    // Check for shipping-related queries (Arabic)
+    if (message.includes('شحن') || message.includes('الشحن') || message.includes('تكلفه الشحن') || message.includes('مده الشحن') || message.includes('تكلفة الشحن') || message.includes('مدة الشحن')) {
+      return `📦 **معلومات الشحن:**
+
+⏰ **مدة الشحن:**
+الشحن في خلال 1 الي 3 ايام اقصي فتره
+
+💰 **تكلفة الشحن:**
+اذا كان الطلب اكثر من 200 ريال الشحن مجاني
+
+📍 نقوم بالشحن لجميع مناطق المملكة العربية السعودية`;
+    }
     
     // Customer Service specific responses
     if (user?.position === 'Customer Service') {
@@ -1196,6 +1498,8 @@ What else would you like to know?`;
       type: 'text'
     };
     setMessages(prev => [...prev, quickActionsMessage]);
+    // Play sound for bot message
+    setTimeout(() => playBotSound(), 100);
 
     // Show the quick actions buttons after a brief delay
     setTimeout(() => {
@@ -1207,28 +1511,227 @@ What else would you like to know?`;
         type: 'quick_actions'
       };
       setMessages(prev => [...prev, actionsMessage]);
+      // Play sound for bot message
+      setTimeout(() => playBotSound(), 100);
     }, 500);
   };
 
-  if (!isOpen) {
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+      setIsFullScreen(false);
+      setIsMinimized(false);
+    }, 300); // Wait for animation to complete
+  };
+
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-                      <div
-              className={`
-                fixed right-6 bottom-6 z-50
-                w-14 h-14 rounded-full
-                bg-gradient-to-r ${roleColors.gradient}
-                shadow-lg hover:shadow-xl
-                flex items-center justify-center
-                cursor-pointer transition-all duration-300
-                hover:scale-110 active:scale-95
-                border-2 border-white
-              `}
+    <div className="fixed bottom-5 right-5 z-[1000]">
+      <AnimatePresence mode="wait">
+        {isOpen ? (
+          <motion.div
+            key="chat-window"
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="w-[calc(100vw-2.5rem)] max-w-lg h-[75vh] max-h-[800px] flex flex-col bg-card/80 dark:bg-card/90 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border/50 bg-background/30">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-full bg-gradient-to-br ${roleColors.gradient}`}>
+                  <roleColors.icon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">{roleColors.name}</h3>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                    Online
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(m => !m)}>
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Messages Area */}
+            <div ref={messagesContainerRef} className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar">
+              {messages.map((msg, index) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`flex items-end gap-2 ${msg.isUser ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!msg.isUser && (
+                    <div className={`h-8 w-8 rounded-full flex-shrink-0 bg-gradient-to-br ${roleColors.gradient} flex items-center justify-center`}>
+                      <roleColors.icon className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                  <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-md ${
+                    msg.isUser
+                      ? 'bg-primary text-primary-foreground rounded-br-lg'
+                      : 'bg-muted text-foreground rounded-bl-lg'
+                  }`}>
+                    {/* Render message content based on type */}
+                    {msg.content && (
+                      <p className="text-sm whitespace-pre-line leading-relaxed">{msg.content}</p>
+                    )}
+
+                    {/* Render Quick Actions */}
+                    {msg.type === 'quick_actions' && (
+                      <div className="space-y-2 pt-2">
+                        <p className="text-sm font-semibold text-foreground/80 mb-2">✨ Quick Actions</p>
+                        {getRoleSpecificActions().map((action, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRoleAction(action.action)}
+                            disabled={isTyping}
+                            className="w-full text-left justify-start h-auto py-2 px-3 bg-background/50 hover:bg-background/80"
+                          >
+                            <action.icon className="h-4 w-4 mr-3 text-muted-foreground" />
+                            <span>{action.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <p className="text-xs opacity-60 mt-2 text-right">
+                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+
+                    {/* Render Product Search Results */}
+                    {msg.type === 'product_search_results' && (
+                      <div className="space-y-3 pt-2">
+                        {msg.productData?.products.map((product: WooCommerceProduct) => (
+                          <div key={product.id} className="flex items-start gap-3 p-2 rounded-lg bg-background/50">
+                            {product.images?.[0]?.src && (
+                              <img src={product.images[0].src} alt={product.name} className="w-16 h-16 rounded-md object-cover"/>
+                            )}
+                            <div className="flex-1">
+                              <p className="font-semibold text-sm">{product.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatProductPrice(product, /[\u0600-\u06FF]/.test(product.name))}</p>
+                              <Button
+                                size="sm"
+                                variant="link"
+                                className="p-0 h-auto text-primary mt-1"
+                                onClick={() => handleProductInfo(product)}
+                              >
+                                View Details
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Render Product Info (Detailed View) */}
+                    {msg.type === 'product_info' && msg.productData?.product && (
+                       (() => {
+                        const product = msg.productData.product;
+                        const isArabic = /[\u0600-\u06FF]/.test(product.name);
+                        const textAlign = isArabic ? 'text-right' : 'text-left';
+                        
+                        return (
+                          <div className="space-y-3" dir={isArabic ? 'rtl' : 'ltr'}>
+                            {product.images && product.images[0] && (
+                              <img 
+                                src={product.images[0].src} 
+                                alt={product.name}
+                                className="w-full h-48 rounded-lg object-cover"
+                              />
+                            )}
+                            <h3 className={`font-bold text-lg ${textAlign}`}>
+                              {product.name}
+                            </h3>
+                            <div className={`${textAlign}`}>
+                              {formatProductPrice(product, isArabic)}
+                            </div>
+                            {product.short_description && (
+                              <div className={`text-sm ${textAlign}`} dangerouslySetInnerHTML={{ __html: product.short_description }} />
+                            )}
+                            {product.description && product.description !== product.short_description && (
+                              <div className="pt-3 mt-3 border-t border-border/50">
+                                <div className={`text-sm text-muted-foreground ${textAlign}`} dangerouslySetInnerHTML={{ __html: product.description }} />
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground pt-2 mt-2 border-t border-border/50">
+                              <p><strong>SKU:</strong> {product.sku || 'N/A'}</p>
+                              <p><strong>Stock:</strong> {product.stock_status === 'instock' ? '✅ Available' : '❌ Out of Stock'}</p>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+
+              {isTyping && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-end gap-2"
+                >
+                  <div className={`h-8 w-8 rounded-full flex-shrink-0 bg-gradient-to-br ${roleColors.gradient} flex items-center justify-center`}>
+                    <roleColors.icon className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="p-3 rounded-2xl bg-muted text-foreground rounded-bl-lg flex items-center gap-1.5">
+                    <span className="h-2 w-2 bg-muted-foreground rounded-full animate-pulse delay-0"></span>
+                    <span className="h-2 w-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></span>
+                    <span className="h-2 w-2 bg-muted-foreground rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></span>
+                  </div>
+                </motion.div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area */}
+              {/* Input Area */}
+              <div className="p-3 border-t border-border/50 bg-background/30">
+                <div className="relative">
+                  <Textarea
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your message..."
+                    className="w-full bg-muted border-2 border-transparent focus:border-primary rounded-xl resize-none pr-12 custom-scrollbar"
+                    rows={1}
+                  />
+                  <Button
+                    size="icon"
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg bg-gradient-to-br ${roleColors.gradient} ${roleColors.hoverGradient}`}
+                    onClick={handleSendMessage}
+                    disabled={isTyping || !inputValue.trim()}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="chat-button"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
               onClick={() => setIsOpen(true)}
+              className={`w-14 h-14 rounded-full bg-gradient-to-r ${roleColors.gradient} shadow-lg hover:shadow-xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95 border-2 border-white`}
             >
               <div className="relative">
                 <Bot className="h-6 w-6 text-white" />
@@ -1237,280 +1740,14 @@ What else would you like to know?`;
                 {/* Secondary pulse */}
                 <div className={`absolute -inset-1 rounded-full ${roleColors.secondaryPulse} opacity-40 animate-pulse`}></div>
               </div>
-              
+
               {/* Notification dot */}
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                 <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
               </div>
-            </div>
-        </TooltipTrigger>
-        <TooltipContent side="left" sideOffset={15} className="max-w-xs">
-          <div className="flex items-center gap-3 p-1">
-            <div className="flex-shrink-0">
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${roleColors.gradient} flex items-center justify-center`}>
-                <MessageCircle className="h-4 w-4 text-white" />
-              </div>
-            </div>
-            <div>
-                <div className="font-semibold text-sm text-foreground">{roleColors.name}</div>
-                <div className="text-xs text-muted-foreground">💬 Click to chat with Noorcare!</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                  ✨ Get personalized assistance
-                </div>
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-    );
-  }
-
-      return (
-      <div className={`fixed bottom-6 right-6 z-[9999] transition-all duration-500 ease-out ${isOpen ? 'animate-in slide-in-from-bottom-5' : ''}`}>
-        <Card className={`w-80 sm:w-96 shadow-2xl transition-all duration-300 ${isMinimized ? 'h-16' : 'h-[500px]'} border-2`}>
-        <CardHeader className={`${roleColors.bgColor} text-white p-4 rounded-t-lg relative overflow-hidden`}>
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/20 to-transparent"></div>
-          </div>
-          
-          <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className={`w-10 h-10 rounded-full bg-white/20 flex items-center justify-center`}>
-                  <roleColors.icon className="h-5 w-5 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white">
-                  <div className="w-full h-full bg-green-500 rounded-full animate-pulse"></div>
-                </div>
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Noorcare AI</CardTitle>
-                <p className="text-sm opacity-90">{user?.position || 'Admin'} Assistant</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="h-8 w-8 p-0 text-white hover:bg-white/20 transition-colors"
-              >
-                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsOpen(false)}
-                className="h-8 w-8 p-0 text-white hover:bg-white/20 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        {!isMinimized && (
-          <CardContent className="p-0 h-[420px] flex flex-col bg-gradient-to-b from-gray-50 to-white">
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-                  >
-                    <div
-                      className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${
-                        message.isUser
-                          ? 'bg-white text-gray-800 border border-gray-200'
-                          : `${roleColors.bgColor} text-white`
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-line leading-relaxed">{message.content}</p>
-                      
-                      {/* Product Selection Buttons */}
-                      {message.type === 'product_selection' && message.productData?.products && (
-                        <div className="mt-4 space-y-3">
-                          {message.productData.products.map((product: WooCommerceProduct) => (
-                            <div key={product.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                              <div className="flex items-start gap-3">
-                                {product.images && product.images[0] && (
-                                  <img 
-                                    src={product.images[0].src} 
-                                    alt={product.name}
-                                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                                  />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-medium text-white truncate">{product.name}</h4>
-                                  <p className="text-xs text-white/80 mt-1">
-                                    {product.sale_price ? (
-                                      <>
-                                        <span className="line-through">{product.price} SAR</span>
-                                        <span className="ml-2 font-semibold">{product.sale_price} SAR</span>
-                                      </>
-                                    ) : (
-                                      <span className="font-semibold">{product.price} SAR</span>
-                                    )}
-                                  </p>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleProductSelection(product)}
-                                    className="mt-2 bg-white text-gray-800 hover:bg-gray-100 h-7 px-3 text-xs"
-                                  >
-                                    Select This Product
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const userMessage: Message = {
-                                id: Date.now().toString(),
-                                content: 'search again',
-                                isUser: true,
-                                timestamp: new Date(),
-                                type: 'text'
-                              };
-                              setMessages(prev => [...prev, userMessage]);
-                              setTimeout(() => {
-                                handleOrderFormSubmit('search again');
-                              }, 500);
-                            }}
-                            className="w-full bg-white/20 text-white border-white/30 hover:bg-white/30 h-8"
-                          >
-                            🔍 Search for Different Products
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Quick Actions Buttons */}
-                      {message.type === 'quick_actions' && (
-                        <div className="mt-4 space-y-2">
-                          {getRoleSpecificActions().map((action, index) => {
-                            const isPending = pendingActions.has(action.action);
-                            return (
-                              <Button
-                                key={index}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRoleAction(action.action)}
-                                disabled={isPending || isTyping}
-                                className={`w-full text-left justify-start text-sm h-auto py-3 px-4 bg-white/20 text-white border-white/30 hover:bg-white/30 transition-all duration-200 hover:scale-[1.02] hover:shadow-md ${
-                                  isPending ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
-                              >
-                                <action.icon className="h-4 w-4 mr-3" />
-                                {isPending ? '⏳ Processing...' : action.label}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      )}
-                      
-                      <p className="text-xs opacity-70 mt-2">
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div className="flex justify-start animate-in fade-in duration-300">
-                    <div className={`${roleColors.bgColor} text-white p-4 rounded-2xl shadow-sm`}>
-                      <div className="flex space-x-2 items-center">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                          <div className="w-2 h-2 bg-white/70 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                        </div>
-                        <span className="text-xs opacity-70">Noorcare is typing...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isSearchingProducts && (
-                  <div className="flex justify-start animate-in fade-in duration-300">
-                    <div className={`${roleColors.bgColor} text-white p-4 rounded-2xl shadow-sm`}>
-                      <div className="flex space-x-2 items-center">
-                        <Search className="h-4 w-4 animate-spin" />
-                        <span className="text-xs opacity-70">Searching WooCommerce products...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {messages.length <= 1 && !isTyping && (
-                  <div className="space-y-3 animate-in fade-in duration-500 delay-300">
-                    <p className="text-sm text-gray-600 font-semibold">✨ Quick Actions:</p>
-                    {getRoleSpecificActions().map((action, index) => {
-                      const isPending = pendingActions.has(action.action);
-                      return (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRoleAction(action.action)}
-                          disabled={isPending || isTyping}
-                          className={`w-full text-left justify-start text-sm h-auto py-3 px-4 ${roleColors.textColor} border-current transition-all duration-200 hover:bg-sky-400 hover:text-white hover:scale-[1.02] hover:shadow-md ${
-                            isPending ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          <action.icon className="h-4 w-4 mr-3" />
-                          {isPending ? '⏳ Processing...' : action.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div ref={messagesEndRef} />
-            </ScrollArea>
-
-            <div className="p-4 border-t bg-white">
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleQuickActionsClick}
-                  disabled={isTyping || isSearchingProducts}
-                  variant="outline"
-                  className="rounded-full w-12 h-12 p-0 border-2 hover:bg-sky-50 transition-all duration-200 hover:scale-105"
-                  title="Show Quick Actions"
-                >
-                  <Zap className="h-5 w-5 text-sky-600" />
-                </Button>
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={
-                    isCreatingOrder 
-                      ? `Enter ${createOrderSteps[orderForm.currentStep]?.label.toLowerCase()}...`
-                      : `Ask Noorcare anything...`
-                  }
-                  className="flex-1 rounded-full border-2 focus:border-current transition-colors"
-                  disabled={isTyping || isSearchingProducts}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!inputValue.trim() || isTyping || isSearchingProducts}
-                  className={`${roleColors.bgColor} hover:opacity-90 text-white rounded-full w-12 h-12 p-0 transition-all duration-200 hover:scale-105`}
-                >
-                  <Send className="h-5 w-5" />
-                </Button>
-              </div>
-              {isCreatingOrder && (
-                <div className="mt-2 text-xs text-gray-500 text-center">
-                  Step {orderForm.currentStep + 1} of {createOrderSteps.length} • Creating Real Order
-                </div>
-              )}
-            </div>
-          </CardContent>
-        )}
-      </Card>
+            </motion.div>
+          )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -39,7 +39,8 @@ import {
   Gem,
   Flame,
   Zap as Lightning,
-  Sparkle
+  Sparkle,
+  MoreVertical
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { recalculateOvertimeHours } from '@/utils/recalculateOvertime';
@@ -59,6 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from '@/contexts/AuthContext';
 import { assignDiamondRank, removeDiamondRank } from '@/lib/employeesApi';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // Diamond Icon Component
 const DiamondIcon: React.FC<{ className?: string }> = ({ className = "h-4 w-4" }) => (
@@ -2328,45 +2330,86 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                         </Badge>
                       </td>
 
+                      {/* Responsive Actions: Buttons visible on larger screens, menu on smaller */}
                       <td className="text-center p-2">
-                        <div className="flex justify-center gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-700 px-1 py-1 h-6 w-6"
-                            onClick={() => handleEditEmployee(employee)}
-                          >
-                            <Edit3 className="h-3 w-3 text-blue-600" />
-                          </Button>
+                        <div className="hidden md:flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => handleEditEmployee(employee)}
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit Performance</TooltipContent>
+                          </Tooltip>
+                          
                           {employee.diamondRank ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-cyan-50 dark:hover:bg-cyan-900/30 border-cyan-200 dark:border-cyan-700 px-1 py-1 h-6 w-6"
-                              onClick={() => handleRemoveDiamondRank(employee.id, employee.name)}
-                              title="Remove Diamond Rank"
-                            >
-                              <DiamondIcon className="h-3 w-3 text-cyan-600" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="destructive" 
+                                  size="icon" 
+                                  className="h-8 w-8 bg-red-100 text-red-600 hover:bg-red-200"
+                                  onClick={() => handleRemoveDiamondRank(employee.id, employee.name)}
+                                >
+                                  <Gem className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Remove Diamond Rank</TooltipContent>
+                            </Tooltip>
                           ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="hover:bg-cyan-50 dark:hover:bg-cyan-900/30 border-cyan-200 dark:border-cyan-700 px-1 py-1 h-6 w-6"
-                              onClick={() => handleAssignDiamondRank(employee.id, employee.name)}
-                              title="Assign Diamond Rank"
-                            >
-                              <DiamondIcon className="h-3 w-3 text-cyan-600" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  className="h-8 w-8 border-cyan-400 text-cyan-500 hover:bg-cyan-50"
+                                  onClick={() => handleAssignDiamondRank(employee.id, employee.name)}
+                                >
+                                  <Gem className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Assign Diamond Rank</TooltipContent>
+                            </Tooltip>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-red-50 dark:hover:bg-red-900/30 border-red-200 dark:border-red-700 px-1 py-1 h-6 w-6"
-                            onClick={() => handleDeleteEmployee(employee.id, employee.name)}
-                          >
-                            <Trash2 className="h-3 w-3 text-red-600" />
-                          </Button>
+                        </div>
+
+                        {/* Dropdown Menu for Mobile */}
+                        <div className="md:hidden">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                                <Edit3 className="mr-2 h-4 w-4" />
+                                <span>Edit Performance</span>
+                              </DropdownMenuItem>
+                              {employee.diamondRank ? (
+                                <DropdownMenuItem 
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                                  onClick={() => handleRemoveDiamondRank(employee.id, employee.name)}
+                                >
+                                  <Gem className="mr-2 h-4 w-4" />
+                                  <span>Remove Diamond</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem 
+                                  className="text-cyan-600 focus:bg-cyan-50 focus:text-cyan-700"
+                                  onClick={() => handleAssignDiamondRank(employee.id, employee.name)}
+                                >
+                                  <Gem className="mr-2 h-4 w-4" />
+                                  <span>Assign Diamond</span>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>

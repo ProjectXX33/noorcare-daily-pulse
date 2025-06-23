@@ -28,9 +28,6 @@ const EmployeeDashboard = () => {
   const [latestRating, setLatestRating] = useState<EmployeeRating | null>(null);
   const [averageRating, setAverageRating] = useState<number | null>(null);
   const [isLoadingRating, setIsLoadingRating] = useState(false);
-  const [isTopPerformer, setIsTopPerformer] = useState(false);
-  const [performanceRank, setPerformanceRank] = useState<number | null>(null);
-  const [performanceScore, setPerformanceScore] = useState<number | null>(null);
 
   // Translation object for multilingual support
   const translations = {
@@ -86,7 +83,6 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     if (user) {
       loadRatingData();
-      checkTopPerformerStatus();
     }
   }, [user]);
 
@@ -109,38 +105,7 @@ const EmployeeDashboard = () => {
     }
   };
 
-  const checkTopPerformerStatus = async () => {
-    if (!user) return;
-    
-    try {
-      // Get current month's performance data
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
-      
-      const { data: performanceData, error } = await supabase
-        .from('admin_performance_dashboard')
-        .select('employee_id, average_performance_score')
-        .eq('month_year', currentMonth)
-        .order('average_performance_score', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching performance data:', error);
-        return;
-      }
-
-      if (performanceData && performanceData.length > 0) {
-        // Find current user's ranking
-        const userPerformance = performanceData.find(p => p.employee_id === user.id);
-        if (userPerformance) {
-          const rank = performanceData.findIndex(p => p.employee_id === user.id) + 1;
-          setPerformanceRank(rank);
-          setPerformanceScore(userPerformance.average_performance_score);
-          setIsTopPerformer(rank === 1);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking top performer status:', error);
-    }
-  };
 
   const t = translations[language as keyof typeof translations];
 
@@ -152,8 +117,8 @@ const EmployeeDashboard = () => {
     return null;
   }
 
-  const userCheckIns = getUserCheckIns(user.id) as unknown as CheckIn[];
-  const userReports = getUserWorkReports(user.id) as unknown as WorkReport[];
+  const userCheckIns = getUserCheckIns(user.id);
+  const userReports = getUserWorkReports(user.id);
   const checkedInToday = hasCheckedInToday(user.id);
   
   // Check if user has check-in access (Customer Service and Designer)
@@ -331,21 +296,10 @@ const EmployeeDashboard = () => {
           </div>
         </div>
             
-        {/* Performance Summary - only for employees with check-in access */}
-        {hasCheckInAccess && (
-          <EmployeePerformanceSummary />
-        )}
+        {/* Performance Summary - Show for all employees */}
+        <EmployeePerformanceSummary />
 
-        {/* Mobile-optimized action button */}
-        <div className="flex">
-          <Button 
-            className="bg-primary hover:bg-primary/90 px-4 sm:px-6 min-h-[44px] w-full sm:w-auto" 
-            onClick={() => navigate('/employee-tasks')}
-          >
-            <CheckSquare className="mr-2 h-4 w-4" />
-            <span className="text-sm sm:text-base">{t.viewTasks}</span>
-          </Button>
-        </div>
+     
       </div>
     </div>
   );

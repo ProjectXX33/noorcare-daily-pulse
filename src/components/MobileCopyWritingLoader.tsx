@@ -15,10 +15,18 @@ const CopyWritingLoader = () => {
   const [pencilAnimation, setPencilAnimation] = React.useState(null);
 
   React.useEffect(() => {
-    fetch('/animation/Animation - 1750556950304.json')
-      .then(response => response.json())
+    fetch('/animation/copywrite.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
       .then(data => setPencilAnimation(data))
-      .catch(console.error);
+      .catch(error => {
+        console.error('Failed to load copywrite animation:', error);
+        // Fallback - don't set animation data, component will show fallback icon
+      });
   }, []);
 
   const handleClick = () => {
