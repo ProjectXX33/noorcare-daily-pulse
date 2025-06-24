@@ -5,6 +5,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent scrollbar jumping */
+:root {
+  scrollbar-gutter: stable;
+}
+
+/* Global scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--primary), 0.3) transparent;
+}
+
+/* Prevent horizontal scroll globally */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Webkit scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.3), hsl(var(--primary)/0.5));
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.4), hsl(var(--primary)/0.6));
+}
+
+/* Dark mode scrollbar */
+.dark *,
+[data-theme="dark"] * {
+  scrollbar-color: rgba(var(--primary), 0.5) transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.4), hsl(var(--primary)/0.6));
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.5), hsl(var(--primary)/0.7));
+}
+
+/* Sidebar specific scrollbar */
+.sidebar-content {
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  overflow-y: overlay;
+  overflow-x: hidden;
+}
+
+.sidebar-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.3), hsl(var(--primary)/0.5));
+  border-radius: 100px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.4), hsl(var(--primary)/0.6));
+}
+
 /* Enhanced Mobile First Responsive Design */
 @media (max-width: 640px) {
   /* Mobile table improvements */
@@ -112,6 +185,12 @@
     background: rgba(0, 0, 0, 0.95);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
+}
+
+.dark .admin-header-sticky,
+[data-theme="dark"] .admin-header-sticky {
+  background: rgba(0, 0, 0, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Add to your global CSS or Tailwind config */
@@ -390,7 +469,8 @@
     --sidebar-ring: 142 59% 40%;
   }
 
-  .dark {
+  .dark,
+  [data-theme="dark"] {
     --background: 222 47% 11%;
     --foreground: 210 20% 98%;
 
@@ -452,7 +532,12 @@
 
 @layer utilities {
   .glass-effect {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-soft dark:bg-black/50 dark:border-white/10;
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-soft;
+  }
+  
+  .dark .glass-effect,
+  [data-theme="dark"] .glass-effect {
+    @apply bg-black/50 border-white/10;
   }
   
   .text-balance {
@@ -531,19 +616,23 @@
 }
 
 /* Dark mode support for FullCalendar */
-body.dark .fc {
+body.dark .fc,
+[data-theme="dark"] .fc {
   background: #18181b !important;
   color: #e5e7eb !important;
 }
-body.dark .fc .fc-event {
+body.dark .fc .fc-event,
+[data-theme="dark"] .fc .fc-event {
   background: #27272a !important;
   color: #f1f5f9 !important;
   border-color: #52525b !important;
 }
-body.dark .fc .fc-daygrid-day-number {
+body.dark .fc .fc-daygrid-day-number,
+[data-theme="dark"] .fc .fc-daygrid-day-number {
   color: #a1a1aa !important;
 }
-body.dark .fc .fc-toolbar-title {
+body.dark .fc .fc-toolbar-title,
+[data-theme="dark"] .fc .fc-toolbar-title {
   color: #f1f5f9 !important;
 }
 
@@ -905,4 +994,246 @@ body.modal-open {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
+}
+
+/* Modern Gradient Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  background-color: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--primary)/0.4));
+  border-radius: 100px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--primary)/0.6));
+}
+
+/* Dark mode gradient */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.6), hsl(var(--secondary)/0.4));
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--secondary)/0.6));
+}
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)/0.8) transparent;
+}
+
+/* Global Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  background-color: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--primary)/0.4));
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--primary)/0.6));
+}
+
+/* Dark mode global scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.6), hsl(var(--secondary)/0.4));
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--secondary)/0.6));
+}
+
+/* Firefox global scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)/0.8) transparent;
+}
+
+/* Dark mode Firefox */
+.dark * {
+  scrollbar-color: hsl(var(--primary)/0.6) transparent;
+}
+
+/* Custom sidebar scrollbar - keeping it for specific sidebar customization if needed */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  background-color: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--primary)/0.4));
+  border-radius: 100px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)), hsl(var(--primary)/0.6));
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.6), hsl(var(--secondary)/0.4));
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--secondary)/0.6));
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)/0.8) transparent;
+}
+
+/* Dark mode cards for mobile */
+.dark .mobile-card,
+[data-theme="dark"] .mobile-card {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Dark mode for all card elements */
+.dark .card,
+[data-theme="dark"] .card {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Dark mode for buttons */
+.dark .button,
+[data-theme="dark"] .button {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Dark mode for modals and dialogs */
+.dark .modal,
+.dark .dialog,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .dialog {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Dark mode for dropdown menus */
+.dark .dropdown-menu,
+[data-theme="dark"] .dropdown-menu {
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border-color: hsl(var(--border));
+}
+
+/* Dark mode for tables */
+.dark table,
+[data-theme="dark"] table {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.dark table tr:hover,
+[data-theme="dark"] table tr:hover {
+  background: hsl(var(--muted));
+}
+
+/* Dark mode for inputs */
+.dark input,
+.dark textarea,
+.dark select,
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus,
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+/* Make Lottie bell animation white in dark mode */
+.dark .lottie-bell-white, [data-theme="dark"] .lottie-bell-white {
+  filter: invert(1) brightness(2) grayscale(1) !important;
+}
+
+/* Utility to fix sticky header overflow issues */
+.no-overflow-fix {
+  overflow: visible !important;
+}
+
+/* Make Lottie bell animation even whiter in dark mode */
+.dark .lottie-bell-white, [data-theme="dark"] .lottie-bell-white {
+  filter: invert(1) brightness(3) grayscale(1) contrast(2) !important;
+}
+
+/* Enhanced dark mode bell notification styling */
+.dark .lottie-bell-white, [data-theme="dark"] .lottie-bell-white {
+  filter: invert(1) brightness(3) grayscale(1) contrast(2);
+}
+
+/* Ensure sticky header works properly */
+.no-overflow-fix {
+  overflow: visible !important;
+}
+
+/* Enhanced dark mode bell styling for both static and animated bells */
+.dark .lottie-bell-white, [data-theme="dark"] .lottie-bell-white {
+  filter: invert(1) brightness(3) grayscale(1) contrast(2) !important;
+}
+
+/* Static bell icons in dark mode */
+.dark .notification-bell-static, [data-theme="dark"] .notification-bell-static {
+  color: white !important;
+}
+
+/* Enhanced sticky navigation header */
+.sticky-nav-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode support for sticky navigation header */
+.dark .sticky-nav-header, [data-theme="dark"] .sticky-nav-header {
+  background: rgba(0, 0, 0, 0.95) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Ensure proper scrolling context for sticky elements - simplified */
+.sticky-scroll-context {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }

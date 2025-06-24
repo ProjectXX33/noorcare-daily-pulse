@@ -347,11 +347,11 @@ const EmployeePerformanceSummary: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Excellent': return 'text-green-600 bg-green-50';
-      case 'Good': return 'text-blue-600 bg-blue-50';
-      case 'Average': return 'text-yellow-600 bg-yellow-50';
-      case 'Poor': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
+      case 'Excellent': return 'text-green-600 bg-green-50 dark:bg-green-900/20';
+      case 'Good': return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
+      case 'Average': return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20';
+      case 'Poor': return 'text-red-600 bg-red-50 dark:bg-red-900/20';
+      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
     }
   };
 
@@ -361,13 +361,13 @@ const EmployeePerformanceSummary: React.FC = () => {
       if (overtimeHours > 0) {
         return {
           text: `All Clear + ${formatTime(overtimeHours)} Extra`,
-          color: 'text-green-600',
+          color: 'text-green-600 dark:text-green-300',
           icon: <Trophy className="h-4 w-4" />
         };
       } else {
         return {
           text: 'All Clear',
-          color: 'text-green-600',
+          color: 'text-green-600 dark:text-green-300',
           icon: <CheckCircle className="h-4 w-4" />
         };
       }
@@ -375,7 +375,7 @@ const EmployeePerformanceSummary: React.FC = () => {
       // Delay remaining after overtime offset
       return {
         text: `${formatTime(delayToFinish)} Delay`,
-        color: 'text-red-600',
+        color: 'text-red-600 dark:text-red-300',
         icon: <AlertTriangle className="h-4 w-4" />
       };
     }
@@ -430,15 +430,15 @@ const EmployeePerformanceSummary: React.FC = () => {
   const renderRankBanner = () => {
     if (summary.diamondRank) {
       return (
-        <Card className="border-2 border-cyan-400 bg-gradient-to-r from-teal-50 via-cyan-50 to-teal-50 shadow-sm">
+        <Card className="border-2 border-cyan-400 bg-gradient-to-r from-teal-50 via-cyan-50 to-teal-50 dark:from-cyan-900/30 dark:via-cyan-800/30 dark:to-teal-900/30 dark:border-cyan-600 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-center gap-3">
-              <Gem className="h-8 w-8 text-cyan-600" />
+              <Gem className="h-8 w-8 text-cyan-600 dark:text-cyan-400" />
               <div className="text-center">
-                <h3 className="text-lg font-bold text-cyan-800">Diamond Rank Employee</h3>
-                <p className="text-sm text-cyan-700">Exceptional performance recognized by management</p>
+                <h3 className="text-lg font-bold text-cyan-800 dark:text-cyan-300">Diamond Rank Employee</h3>
+                <p className="text-sm text-cyan-700 dark:text-cyan-400">Exceptional performance recognized by management</p>
               </div>
-              <Gem className="h-8 w-8 text-cyan-600" />
+              <Gem className="h-8 w-8 text-cyan-600 dark:text-cyan-400" />
             </div>
           </CardContent>
         </Card>
@@ -448,22 +448,22 @@ const EmployeePerformanceSummary: React.FC = () => {
 
     const tierStyles: Record<string, { bg: string; text: string; border: string; icon: React.ReactNode }> = {
       gold: {
-        bg: 'from-yellow-100 via-yellow-50 to-yellow-100',
-        text: 'text-yellow-800',
-        border: 'border-yellow-500',
-        icon: <Crown className="h-8 w-8 text-yellow-700" />
+        bg: 'from-yellow-100 via-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:via-amber-800/30 dark:to-yellow-900/30',
+        text: 'text-yellow-800 dark:text-yellow-300',
+        border: 'border-yellow-500 dark:border-yellow-600',
+        icon: <Crown className="h-8 w-8 text-yellow-700 dark:text-yellow-400" />
       },
       silver: {
-        bg: 'from-gray-200 via-gray-100 to-gray-200',
-        text: 'text-gray-800',
-        border: 'border-gray-400',
-        icon: <Trophy className="h-8 w-8 text-gray-700" />
+        bg: 'from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800/50 dark:via-gray-700/50 dark:to-gray-800/50',
+        text: 'text-gray-800 dark:text-gray-300',
+        border: 'border-gray-400 dark:border-gray-600',
+        icon: <Trophy className="h-8 w-8 text-gray-700 dark:text-gray-400" />
       },
       bronze: {
-        bg: 'from-amber-200 via-amber-100 to-amber-200',
-        text: 'text-amber-800',
-        border: 'border-amber-500',
-        icon: <Medal className="h-8 w-8 text-amber-700" />
+        bg: 'from-amber-200 via-amber-100 to-amber-200 dark:from-amber-900/40 dark:via-amber-800/40 dark:to-amber-900/40',
+        text: 'text-amber-800 dark:text-amber-300',
+        border: 'border-amber-500 dark:border-amber-600',
+        icon: <Medal className="h-8 w-8 text-amber-700 dark:text-amber-400" />
       }
     };
     const style = tierStyles[rankTier];
@@ -477,7 +477,7 @@ const EmployeePerformanceSummary: React.FC = () => {
             {style.icon}
             <div className="text-center">
               <h3 className={`text-lg font-bold ${style.text}`}>{tierLabel} Rank Employee</h3>
-              <p className={`text-sm ${style.text}`}>Outstanding performance this month</p>
+              <p className={`text-sm ${style.text} opacity-90`}>Outstanding performance this month</p>
             </div>
             {style.icon}
           </div>
@@ -516,25 +516,25 @@ const EmployeePerformanceSummary: React.FC = () => {
           {/* Performance Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             {/* Total Regular Hours */}
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <Clock className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-              <div className="text-sm text-blue-600 mb-1">Total Regular Hours</div>
+            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <Clock className="h-6 w-6 text-blue-600 dark:text-blue-300 mx-auto mb-2" />
+              <div className="text-sm text-blue-600 dark:text-blue-300 mb-1">Total Regular Hours</div>
               <div className="text-xl font-bold text-blue-900">
                 {formatTime(summary.totalRegularHours)}
               </div>
             </div>
 
             {/* Total Overtime Hours */}
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-purple-600 mx-auto mb-2" />
-              <div className="text-sm text-purple-600 mb-1">Total Overtime Hours</div>
+            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-300 mx-auto mb-2" />
+              <div className="text-sm text-purple-600 dark:text-purple-300 mb-1">Total Overtime Hours</div>
               <div className="text-xl font-bold text-purple-900">
                 {formatTime(summary.totalOvertimeHours)}
               </div>
             </div>
 
             {/* Delay to Finish */}
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-center p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
               {delayDisplay.icon}
               <div className={`mx-auto mb-2 ${delayDisplay.color}`}></div>
               <div className={`text-sm mb-1 ${delayDisplay.color}`}>Delay to Finish</div>
@@ -544,19 +544,19 @@ const EmployeePerformanceSummary: React.FC = () => {
             </div>
 
             {/* Total Working Days */}
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <Calendar className="h-6 w-6 text-green-600 mx-auto mb-2" />
-              <div className="text-sm text-green-600 mb-1">Total Working Days</div>
+            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <Calendar className="h-6 w-6 text-green-600 dark:text-green-300 mx-auto mb-2" />
+              <div className="text-sm text-green-600 dark:text-green-300 mb-1">Total Working Days</div>
               <div className="text-xl font-bold text-green-900">
                 {summary.totalWorkingDays}
-                <div className="text-xs text-green-600 mt-1">days</div>
+                <div className="text-xs text-green-600 dark:text-green-300 mt-1">days</div>
               </div>
             </div>
 
             {/* Average Hours/Day */}
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <Target className="h-6 w-6 text-orange-600 mx-auto mb-2" />
-              <div className="text-sm text-orange-600 mb-1">Average Hours/Day</div>
+            <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <Target className="h-6 w-6 text-orange-600 dark:text-orange-300 mx-auto mb-2" />
+              <div className="text-sm text-orange-600 dark:text-orange-300 mb-1">Average Hours/Day</div>
               <div className="text-xl font-bold text-orange-900">
                 {formatTime(summary.averageHoursPerDay)}
               </div>
@@ -565,18 +565,18 @@ const EmployeePerformanceSummary: React.FC = () => {
 
           {/* Performance Score and Status */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-              <Award className="h-6 w-6 text-yellow-600 mx-auto mb-2" />
-              <div className="text-sm text-yellow-700 mb-1">Performance Score</div>
-              <div className="text-2xl font-bold text-yellow-800">
+            <div className="text-center p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <Award className="h-6 w-6 text-yellow-600 dark:text-yellow-200 mx-auto mb-2" />
+              <div className="text-sm text-yellow-700 dark:text-yellow-200 mb-1">Performance Score</div>
+              <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-100">
                 {summary.performanceScore.toFixed(1)}%
               </div>
             </div>
 
-            <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-              <Timer className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-              <div className="text-sm text-blue-700 mb-1">Punctuality</div>
-              <div className="text-2xl font-bold text-blue-800">
+            <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <Timer className="h-6 w-6 text-blue-600 dark:text-blue-200 mx-auto mb-2" />
+              <div className="text-sm text-blue-700 dark:text-blue-200 mb-1">Punctuality</div>
+              <div className="text-2xl font-bold text-blue-800 dark:text-blue-100">
                 {summary.punctualityPercentage.toFixed(1)}%
               </div>
             </div>
@@ -593,49 +593,49 @@ const EmployeePerformanceSummary: React.FC = () => {
           {/* Enhanced Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Tasks */}
-            <div className="text-center p-4 bg-indigo-50 rounded-lg">
-              <CheckSquare className="h-6 w-6 text-indigo-600 mx-auto mb-2" />
-              <div className="text-sm text-indigo-600 mb-1">Tasks Completed</div>
+            <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+              <CheckSquare className="h-6 w-6 text-indigo-600 dark:text-indigo-300 mx-auto mb-2" />
+              <div className="text-sm text-indigo-600 dark:text-indigo-300 mb-1">Tasks Completed</div>
               <div className="text-xl font-bold text-indigo-900">
                 {summary.tasks.completed}/{summary.tasks.total}
               </div>
-              <div className="text-xs text-indigo-600 mt-1">
+              <div className="text-xs text-indigo-600 dark:text-indigo-300 mt-1">
                 {summary.tasks.successRate.toFixed(1)}% success rate
               </div>
             </div>
 
             {/* Ratings */}
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <Star className="h-6 w-6 text-yellow-600 mx-auto mb-2" />
-              <div className="text-sm text-yellow-600 mb-1">Average Rating</div>
+            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <Star className="h-6 w-6 text-yellow-600 dark:text-yellow-300 mx-auto mb-2" />
+              <div className="text-sm text-yellow-600 dark:text-yellow-300 mb-1">Average Rating</div>
               <div className="text-xl font-bold text-yellow-900">
                 {summary.ratings.averageRating.toFixed(1)}/5
               </div>
-              <div className="text-xs text-yellow-600 mt-1">
+              <div className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
                 {summary.ratings.totalRatings} ratings received
               </div>
             </div>
 
             {/* Work Reports */}
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <FileText className="h-6 w-6 text-green-600 mx-auto mb-2" />
-              <div className="text-sm text-green-600 mb-1">Work Reports</div>
+            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <FileText className="h-6 w-6 text-green-600 dark:text-green-300 mx-auto mb-2" />
+              <div className="text-sm text-green-600 dark:text-green-300 mb-1">Work Reports</div>
               <div className="text-xl font-bold text-green-900">
                 {summary.workReports.submitted}/{summary.workReports.total}
               </div>
-              <div className="text-xs text-green-600 mt-1">
+              <div className="text-xs text-green-600 dark:text-green-300 mt-1">
                 {summary.workReports.completionRate.toFixed(1)}% completion
               </div>
             </div>
 
             {/* Ranking */}
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <BarChart3 className="h-6 w-6 text-purple-600 mx-auto mb-2" />
-              <div className="text-sm text-purple-600 mb-1">Performance Rank</div>
+            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-300 mx-auto mb-2" />
+              <div className="text-sm text-purple-600 dark:text-purple-300 mb-1">Performance Rank</div>
               <div className="text-xl font-bold text-purple-900">
                 #{summary.ranking.position}
               </div>
-              <div className="text-xs text-purple-600 mt-1">
+              <div className="text-xs text-purple-600 dark:text-purple-300 mt-1">
                 of {summary.ranking.totalEmployees} employees
               </div>
             </div>
@@ -645,23 +645,23 @@ const EmployeePerformanceSummary: React.FC = () => {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-2 text-gray-800">Shift Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <TimerOff className="h-6 w-6 text-red-600 mx-auto mb-2" />
-                <div className="text-sm text-red-600 mb-1">Total Delay</div>
+              <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <TimerOff className="h-6 w-6 text-red-600 dark:text-red-300 mx-auto mb-2" />
+                <div className="text-sm text-red-600 dark:text-red-300 mb-1">Total Delay</div>
                 <div className="text-xl font-bold text-red-900">
                   {formatTime(summary.totalRawDelayMinutes / 60)}
                 </div>
-                <div className="text-xs text-red-600 mt-1">
+                <div className="text-xs text-red-600 dark:text-red-300 mt-1">
                   Before overtime offset
                 </div>
               </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <Coffee className="h-6 w-6 text-orange-600 mx-auto mb-2" />
-                <div className="text-sm text-orange-600 mb-1">Total Break Time</div>
+              <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <Coffee className="h-6 w-6 text-orange-600 dark:text-orange-300 mx-auto mb-2" />
+                <div className="text-sm text-orange-600 dark:text-orange-300 mb-1">Total Break Time</div>
                 <div className="text-xl font-bold text-orange-900">
                   {formatTime(summary.totalBreakMinutes / 60)}
                 </div>
-                <div className="text-xs text-orange-600 mt-1">
+                <div className="text-xs text-orange-600 dark:text-orange-300 mt-1">
                   Tracked during shifts
                 </div>
               </div>

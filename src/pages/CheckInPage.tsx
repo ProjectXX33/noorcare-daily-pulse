@@ -58,8 +58,8 @@ const CheckInPage = () => {
         <Card className="max-w-md w-full">
           <CardContent className="p-4 sm:p-6 text-center">
             <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500 mx-auto mb-3 sm:mb-4" />
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">Access Restricted</h2>
-            <p className="text-sm sm:text-base text-gray-500">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Access Restricted</h2>
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
               Check-in functionality is available for Customer Service and Designer employees.
             </p>
           </CardContent>
@@ -166,7 +166,7 @@ const CheckInPage = () => {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -266,11 +266,11 @@ const CheckInPage = () => {
                 <div className="flex flex-col gap-3">
                   {/* Day Off Warning */}
                   {isDayOff && (
-                    <div className="text-center p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="text-blue-600 font-medium mb-2 text-sm sm:text-base">
+                    <div className="text-center p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="text-blue-600 dark:text-blue-400 font-medium mb-2 text-sm sm:text-base">
                         🏖️ Today is your day off
                       </div>
-                      <div className="text-blue-500 text-xs sm:text-sm">
+                      <div className="text-blue-500 dark:text-blue-300 text-xs sm:text-sm">
                         Enjoy your rest!
                       </div>
                     </div>
@@ -296,15 +296,15 @@ const CheckInPage = () => {
                         </div>
                       )}
                       {currentStatus === 'workday-complete' && (
-                        <div className="text-center p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="text-green-600 font-medium text-sm sm:text-base">
+                        <div className="text-center p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                          <div className="text-green-600 dark:text-green-400 font-medium text-sm sm:text-base">
                             ✅ Workday Complete
                           </div>
-                          <div className="text-green-500 text-xs sm:text-sm">
+                          <div className="text-green-500 dark:text-green-300 text-xs sm:text-sm">
                             Thank you for your work today!
                           </div>
                           {hasAnyCheckoutToday && !actualIsCheckedIn && (
-                            <div className="text-green-400 text-xs mt-1">
+                            <div className="text-green-400 dark:text-green-300 text-xs mt-1">
                               You were checked out automatically
                             </div>
                           )}
@@ -355,22 +355,22 @@ const CheckInPage = () => {
                           
                           {/* Break Information */}
                           {(checkIn as any).totalBreakMinutes > 0 && (
-                            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
+                            <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded text-xs">
                               <div className="flex items-center gap-2 mb-1">
-                                <Coffee className="h-3 w-3 text-orange-600" />
-                                <span className="font-medium text-orange-700">
+                                <Coffee className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                <span className="font-medium text-orange-700 dark:text-orange-300">
                                   Break Time: {(checkIn as any).totalBreakMinutes} minutes
                                 </span>
                               </div>
                               {(checkIn as any).breakSessions && (checkIn as any).breakSessions.length > 0 && (
                                 <div className="space-y-1">
                                   {(checkIn as any).breakSessions.map((session: any, index: number) => (
-                                    <div key={index} className="text-orange-600 bg-orange-100 px-2 py-1 rounded">
+                                    <div key={index} className="text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded">
                                       <span className="font-medium">
                                         {format(new Date(session.start_time), 'h:mm a')} - {format(new Date(session.end_time), 'h:mm a')} ({session.duration_minutes}m)
                                       </span>
                                       {session.reason && (
-                                        <div className="text-orange-500 text-xs mt-1">
+                                        <div className="text-orange-500 dark:text-orange-400 text-xs mt-1">
                                           Reason: {session.reason}
                                         </div>
                                       )}
@@ -383,13 +383,13 @@ const CheckInPage = () => {
                           
                           {/* Current break status */}
                           {(checkIn as any).isOnBreak && (
-                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                            <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
                               <div className="flex items-center gap-2">
-                                <Timer className="h-3 w-3 text-yellow-600 animate-pulse" />
-                                <span className="font-medium text-yellow-700">Currently on break</span>
+                                <Timer className="h-3 w-3 text-yellow-600 dark:text-yellow-400 animate-pulse" />
+                                <span className="font-medium text-yellow-700 dark:text-yellow-300">Currently on break</span>
                               </div>
                               {(checkIn as any).currentBreakReason && (
-                                <div className="text-yellow-600 mt-1">
+                                <div className="text-yellow-600 dark:text-yellow-400 mt-1">
                                   Reason: {(checkIn as any).currentBreakReason}
                                 </div>
                               )}
@@ -470,7 +470,7 @@ const CheckInPage = () => {
         </div>
 
         {/* Recent check-ins history */}
-        <CheckInHistory checkIns={userCheckIns.slice(0, 10)} title="Recent Check-ins" />
+        <CheckInHistory checkIns={userCheckIns.slice(0, 10) as unknown as import('@/types').CheckIn[]} title="Recent Check-ins" />
         
 
       </div>

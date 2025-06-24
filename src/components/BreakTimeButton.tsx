@@ -301,19 +301,19 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
     <div className="flex flex-col items-center space-y-3">
       {/* Break Duration Display */}
       {isOnBreak && (
-        <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded-lg max-w-xs">
+        <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg max-w-xs">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Timer className="h-4 w-4 text-orange-600" />
-            <span className="font-medium text-orange-700">On Break</span>
+            <Timer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <span className="font-medium text-orange-700 dark:text-orange-300">On Break</span>
           </div>
-          <div className="text-2xl font-mono font-bold text-orange-600">
+          <div className="text-2xl font-mono font-bold text-orange-600 dark:text-orange-400">
             {formatDuration(breakDuration)}
           </div>
-          <div className="text-xs text-orange-500 mt-1">
+          <div className="text-xs text-orange-500 dark:text-orange-300 mt-1">
             Started at {breakStartTime ? format(breakStartTime, 'h:mm a') : ''}
           </div>
           {currentBreakReason && (
-            <div className="text-xs text-orange-600 mt-2 font-medium bg-orange-100 px-2 py-1 rounded">
+            <div className="text-xs text-orange-600 dark:text-orange-400 mt-2 font-medium bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded">
               Reason: {currentBreakReason}
             </div>
           )}
@@ -364,7 +364,7 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
                     Why are you taking a break?
                   </label>
                   <Input
@@ -379,7 +379,7 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
                     className="w-full"
                     maxLength={100}
                   />
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {breakReason.length}/100 characters
                   </div>
                 </div>
@@ -408,7 +408,7 @@ const BreakTimeButton: React.FC<BreakTimeButtonProps> = ({
       </div>
 
       {/* Info Text */}
-      <div className="text-center text-xs text-gray-500 max-w-xs">
+      <div className="text-center text-xs text-gray-500 dark:text-gray-400 max-w-xs">
         {isOnBreak ? (
           <p>Work time is completely frozen until you stop the break.</p>
         ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -49,12 +49,12 @@ import {
   SidebarTrigger,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent
+  SidebarGroupContent,
+  useSidebar
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import NotificationsMenu from '@/components/NotificationsMenu';
-import ReportBugModal from '@/components/ReportBugModal';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -70,6 +70,7 @@ import { supabase } from '@/lib/supabase';
 import WorkShiftTimer from '@/components/WorkShiftTimer';
 import VersionDisplay from '@/components/VersionDisplay';
 import UserRankingProfile, { useUserRankingTheme, useUserRanking } from '@/components/UserRankingProfile';
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // SAR Icon Component
 const SARIcon = ({ className }: { className?: string }) => (
@@ -680,15 +681,140 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
   return null;
 };
 
+// Header component that uses sidebar context
+const HeaderContent = ({ children, themeColors, language }: { 
+  children: React.ReactNode; 
+  themeColors: any; 
+  language: string; 
+}) => {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { isMobile, state } = useSidebar();
+  const { userRanking } = useUserRanking();
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col flex-1">
+      <header
+        className={`fixed top-0 z-40 flex h-14 items-center justify-between border-b bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6 ${themeColors.header}`}
+        style={
+          // Full width on mobile or when sidebar is collapsed
+          isMobile || state === 'collapsed'
+            ? { left: 0, right: 0 }
+            : language === 'ar'
+            ? { right: 'var(--sidebar-width)', left: 0 }
+            : { left: 'var(--sidebar-width)', right: 0 }
+        }
+      >
+        {/* Special effects for top 3 performers */}
+        <HeaderEffects effectType={themeColors.effects} />
+        
+        <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'} relative z-10`}>
+          <SidebarTrigger />
+          <WorkShiftTimer />
+        </div>
+        <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'} relative z-10`}>
+          <NotificationsMenu />
+          <ThemeToggle />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 md:h-9 w-auto flex items-center gap-2 rounded-full p-0">
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-sm">{user?.name}</span>
+                  <UserRankingProfile />
+                </div>
+                <div className="relative">
+                  <Avatar className="h-7 w-7 md:h-8 md:w-8">
+                    <AvatarImage src="" alt={user?.name} />
+                    <AvatarFallback userRank={userRanking?.position}>{user?.name?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  
+                  {/* Enhanced ranking icons with performance dashboard styling */}
+                  {userRanking?.isDiamond && (
+                    <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-gradient-to-br from-cyan-300 via-blue-400 to-purple-500 shadow-xl border border-cyan-200/50">
+                      <Gem className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  {userRanking?.position === 1 && !userRanking?.isDiamond && (
+                    <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                      <Crown className="h-3 w-3 text-yellow-600" />
+                    </div>
+                  )}
+                  {userRanking?.position === 2 && !userRanking?.isDiamond && (
+                    <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                      <Medal className="h-3 w-3 text-slate-600" />
+                    </div>
+                  )}
+                  {userRanking?.position === 3 && !userRanking?.isDiamond && (
+                    <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
+                      <Award className="h-3 w-3 text-amber-800" />
+                    </div>
+                  )}
+                  
+                  {/* Special effects for ranking */}
+                  {userRanking?.isDiamond && (
+                    <>
+                      {/* ENHANCED Premium Diamond glow effect - Multi-layered shining */}
+                      <div className="absolute -inset-2 bg-gradient-to-r from-cyan-300 via-blue-400 via-purple-500 to-cyan-400 rounded-full opacity-25 animate-pulse -z-10 blur-sm"></div>
+                      <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse -z-10"></div>
+                      <div className="absolute -inset-1 bg-gradient-to-r from-cyan-200 via-blue-300 to-purple-400 rounded-full opacity-15 -z-10"></div>
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-100 to-purple-300 rounded-full opacity-10 -z-10"></div>
+                    </>
+                  )}
+                  {userRanking?.position === 1 && !userRanking?.isDiamond && (
+                    <>
+                      {/* Subtle pulsing golden background */}
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-10 -z-10"></div>
+                    </>
+                  )}
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-56 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+              <DropdownMenuLabel>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{user?.name}</p>
+                    <UserRankingProfile />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
+                <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                {t('settings')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className={`text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
+                <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                {t('signOut')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+      <main className="flex-1 pt-14 md:pt-14 overflow-auto">{children}</main>
+    </div>
+  );
+};
+
 const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
+  const { user } = useAuth();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
-  const { language, t } = useLanguage();
   const { unreadCount } = useWorkspaceMessages();
-  const isMobile = useIsMobile();
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   const userRankingTheme = useUserRankingTheme();
   const { userRanking } = useUserRanking();
   
@@ -697,24 +823,35 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const scrollPositionRef = useRef<number>(0);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Navigation with simple scroll preservation
+  // Navigation without scroll jumping
   const handleNavigation = (path: string) => {
-    // Save current scroll position immediately before navigation
+    // Save current scroll position
     if (sidebarContentRef.current) {
       const scrollTop = sidebarContentRef.current.scrollTop;
       scrollPositionRef.current = scrollTop;
       sessionStorage.setItem('sidebar-scroll-position', scrollTop.toString());
     }
+
+    // Navigate to the selected path
     navigate(path);
   };
 
-  // Restore scroll position immediately after route change - no delays
-  useEffect(() => {
-    if (sidebarContentRef.current && scrollPositionRef.current > 0) {
-      // Set scroll position directly without setTimeout to prevent jumping
-      sidebarContentRef.current.scrollTop = scrollPositionRef.current;
+  // Restore scroll position immediately to prevent jump flicker
+  useLayoutEffect(() => {
+    const savedPosition = sessionStorage.getItem('sidebar-scroll-position');
+    if (savedPosition && sidebarContentRef.current) {
+      const scrollPosition = parseInt(savedPosition, 10);
+      sidebarContentRef.current.scrollTop = scrollPosition;
+      scrollPositionRef.current = scrollPosition;
     }
-  }, [location.pathname]);
+  }, []);
+
+  // Ensure no forced smooth scroll that causes jumps
+  useEffect(() => {
+    if (sidebarContentRef.current) {
+      sidebarContentRef.current.style.scrollBehavior = 'auto';
+    }
+  }, []);
 
   // Track scroll position continuously
   const handleScroll = () => {
@@ -791,25 +928,6 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       }
     };
   }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
-
-  // Load initial scroll position on mount
-  useEffect(() => {
-    if (sidebarContentRef.current) {
-      const savedPosition = sessionStorage.getItem('sidebar-scroll-position');
-      if (savedPosition) {
-        const scrollPosition = parseInt(savedPosition, 10);
-        sidebarContentRef.current.scrollTop = scrollPosition;
-        scrollPositionRef.current = scrollPosition;
-      }
-    }
-  }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
-
-  if (!user) return null;
 
   // Define interface for nav items
   interface NavItem {
@@ -1092,7 +1210,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="flex min-h-screen w-full no-overflow-fix" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
           className="bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-500 ease-in-out"
           side={language === 'ar' ? 'right' : 'left'}
@@ -1105,12 +1223,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           </SidebarHeader>
           <SidebarContent 
             ref={sidebarContentRef}
-            className="flex-1 overflow-y-auto py-2 md:py-4 custom-scrollbar"
+            className="flex-1 overflow-y-auto py-2 md:py-4 sidebar-content"
             onScroll={handleScroll}
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#cbd5e1 #f1f5f9'
-            }}
           >
             {filteredNavGroups.map((group) => {
               const groupColorClasses = getColorClasses(group.color);
@@ -1120,67 +1234,65 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                   <SidebarGroupLabel className={`text-xs font-semibold uppercase tracking-wider mb-2 px-2 ${groupColorClasses.text}`}>
                     {group.label}
                   </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {group.items.map((item) => {
-                      const isActive = window.location.pathname === item.path;
-                      const colorClasses = getColorClasses(item.color, isActive);
-                      
-                      return (
-                        <SidebarMenuItem key={item.name}>
-                          <SidebarMenuButton
-                            onClick={() => {
-                              handleNavigation(item.path);
-                            }}
-                            tooltip={item.name}
-                            isActive={isActive}
-                            className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-200 border border-transparent ${
-                              isActive 
-                                ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm` 
-                                : `hover:bg-gray-50 ${colorClasses.text} hover:border-gray-200`
-                            } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                          >
-                            <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${
-                              isActive ? colorClasses.activeIcon : colorClasses.icon
-                            }`} />
-                            <span className="w-full text-sm md:text-base">{item.name}</span>
-                            {item.hasCounter && unreadCount > 0 && (
-                              <Badge 
-                                variant="destructive" 
-                                className="text-xs animate-pulse ml-auto flex-shrink-0"
-                              >
-                                {unreadCount}
-                              </Badge>
-                            )}
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                                  </SidebarGroupContent>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => {
+                        const isActive = window.location.pathname === item.path;
+                        const colorClasses = getColorClasses(item.color, isActive);
+                        
+                        return (
+                          <SidebarMenuItem key={item.name}>
+                            <SidebarMenuButton
+                              data-path={item.path}
+                              onClick={() => handleNavigation(item.path)}
+                              tooltip={item.name}
+                              isActive={isActive}
+                              onMouseDown={(e) => e.preventDefault()}
+                              className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-300 ease-in-out border border-transparent ${
+                                isActive 
+                                  ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm` 
+                                  : `${colorClasses.text}`
+                              } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                            >
+                              <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${
+                                isActive ? colorClasses.activeIcon : colorClasses.icon
+                              }`} />
+                              <span className="w-full text-sm md:text-base">{item.name}</span>
+                              {item.hasCounter && unreadCount > 0 && (
+                                <Badge 
+                                  variant="destructive" 
+                                  className="text-xs animate-pulse ml-auto flex-shrink-0"
+                                >
+                                  {unreadCount}
+                                </Badge>
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
                 </SidebarGroup>
               );
             })}
-            </SidebarContent>
+          </SidebarContent>
           
           <SidebarFooter>
             <div className="flex flex-col gap-2 p-2 md:p-3">
-              {user?.role === 'admin' && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className={`justify-start w-full text-sm ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                  onClick={() => handleNavigation('/settings')}
-                >
-                  <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                  {t('settings')}
-                </Button>
-              )}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={`justify-start w-full text-sm ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                onClick={() => handleNavigation('/settings')}
+              >
+                <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
+                {t('settings')}
+              </Button>
               <Button 
                 variant="ghost" 
                 size="sm"
                 className={`justify-start w-full text-red-500 hover:bg-red-50 hover:text-red-600 text-sm ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                onClick={handleLogout}
+                onClick={() => handleNavigation('/logout')}
               >
                 <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
                 {t('signOut')}
@@ -1189,117 +1301,10 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
           </SidebarFooter>
         </Sidebar>
         
-        <div className="flex flex-col flex-1">
-          <header className={`sticky top-0 z-50 flex h-14 items-center justify-between border-b px-4 md:px-6 shadow-sm transition-colors duration-300 ease-in-out ${themeColors.header}`}>
-            {/* Special effects for top 3 performers */}
-            <HeaderEffects effectType={themeColors.effects} />
-            
-            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'} relative z-10`}>
-              <SidebarTrigger />
-              <WorkShiftTimer />
-            </div>
-            <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'} relative z-10`}>
-              <NotificationsMenu />
-              
-              {/* Report Bug Button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsReportBugOpen(true)}
-                className="h-8 w-8 md:h-9 md:w-9 p-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-                title="Report Bug"
-              >
-                <Bug className="h-4 w-4" />
-              </Button>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 md:h-9 w-auto flex items-center gap-2 rounded-full p-0">
-                    <div className="hidden md:flex items-center gap-2">
-                      <span className="text-sm">{user?.name}</span>
-                      <UserRankingProfile />
-                    </div>
-                    <div className="relative">
-                      <Avatar className="h-7 w-7 md:h-8 md:w-8">
-                        <AvatarImage src="" alt={user?.name} />
-                        <AvatarFallback userRank={userRanking?.position}>{user?.name?.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      
-                      {/* Enhanced ranking icons with performance dashboard styling */}
-                      {userRanking?.isDiamond && (
-                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-gradient-to-br from-cyan-300 via-blue-400 to-purple-500 shadow-xl border border-cyan-200/50">
-                          <Gem className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                      {userRanking?.position === 1 && !userRanking?.isDiamond && (
-                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
-                          <Crown className="h-3 w-3 text-yellow-600" />
-                        </div>
-                      )}
-                      {userRanking?.position === 2 && !userRanking?.isDiamond && (
-                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
-                          <Medal className="h-3 w-3 text-slate-600" />
-                        </div>
-                      )}
-                      {userRanking?.position === 3 && !userRanking?.isDiamond && (
-                        <div className="absolute -top-1 -right-2 z-20 p-1 rounded-full bg-white shadow-lg">
-                          <Award className="h-3 w-3 text-amber-800" />
-                        </div>
-                      )}
-                      
-                      {/* Special effects for ranking */}
-                      {userRanking?.isDiamond && (
-                        <>
-                          {/* ENHANCED Premium Diamond glow effect - Multi-layered shining */}
-                          <div className="absolute -inset-2 bg-gradient-to-r from-cyan-300 via-blue-400 via-purple-500 to-cyan-400 rounded-full opacity-25 animate-pulse -z-10 blur-sm"></div>
-                          <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full opacity-20 animate-pulse -z-10"></div>
-                          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-200 via-blue-300 to-purple-400 rounded-full opacity-15 -z-10"></div>
-                          <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-100 to-purple-300 rounded-full opacity-10 -z-10"></div>
-                        </>
-                      )}
-                      {userRanking?.position === 1 && !userRanking?.isDiamond && (
-                        <>
-                          {/* Subtle pulsing golden background */}
-                          <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-10 -z-10"></div>
-                        </>
-                      )}
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-56 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{user?.name}</p>
-                        <UserRankingProfile />
-                      </div>
-                      <p className="text-xs text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-{user?.role === 'admin' && (
-                    <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
-                      <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                      {t('settings')}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleLogout} className={`text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
-                    <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
-                    {t('signOut')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto">{children}</main>
-        </div>
+        <HeaderContent themeColors={themeColors} language={language}>
+          {children}
+        </HeaderContent>
       </div>
-      
-      {/* Report Bug Modal */}
-      <ReportBugModal 
-        isOpen={isReportBugOpen} 
-        onClose={() => setIsReportBugOpen(false)} 
-      />
     </SidebarProvider>
   );
 };

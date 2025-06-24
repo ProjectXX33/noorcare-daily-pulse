@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, CheckIn as CheckInType, WorkReport as WorkReportType, Shift } from '@/types';
+import { User, WorkReport as WorkReportType, Shift, Department, Position } from '@/types';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fetchShifts, determineShift, createOrUpdateMonthlyShift } from '@/lib/shiftsApi';
@@ -14,8 +14,8 @@ export interface CheckIn {
   timestamp: Date;
   checkoutTime?: Date;
   userName: string;
-  department: string;
-  position: string;
+  department: Department;
+  position: Position;
   checkOutTime?: Date; // Added to match types/index.ts
   // Break time fields
   breakStartTime?: Date | null;
@@ -43,8 +43,8 @@ export interface WorkReport {
   issuesFaced: string | null;
   plansForTomorrow: string;
   createdAt: Date;
-  department: string;
-  position: string;
+  department: Department;
+  position: Position;
   fileAttachments?: string[];
 }
 

@@ -397,8 +397,8 @@ const EventsPage = () => {
         <Card className="max-w-md w-full">
           <CardContent className="p-4 sm:p-6 text-center">
             <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500 mx-auto mb-3 sm:mb-4" />
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">Access Denied</h2>
-            <p className="text-sm sm:text-base text-gray-500">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Access Denied</h2>
+            <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
               Please login to view events.
             </p>
           </CardContent>
@@ -742,18 +742,19 @@ const EventsPage = () => {
                   /* Calendar cell styles */
                   .fc-daygrid-day {
                     background: hsl(var(--background)) !important;
+                    border-color: hsl(var(--border)) !important;
                   }
                   
                   .fc-daygrid-day:hover {
-                    background: hsl(var(--muted))/50 !important;
+                    background: hsl(var(--accent))/5 !important;
                   }
                   
                   .fc-day-today {
-                    background: hsl(var(--accent))/30 !important;
+                    background: hsl(var(--accent))/15 !important;
                   }
                   
                   .fc-col-header-cell {
-                    background: hsl(var(--muted))/50 !important;
+                    background: hsl(var(--accent))/10 !important;
                     border-color: hsl(var(--border)) !important;
                     font-weight: 600 !important;
                     color: hsl(var(--foreground)) !important;
@@ -766,8 +767,13 @@ const EventsPage = () => {
                     padding: ${isMobile ? '4px' : '8px'} !important;
                   }
                   
+                  .fc-daygrid-other-month {
+                    background: hsl(var(--muted))/5 !important;
+                  }
+                  
                   .fc-daygrid-other-month .fc-daygrid-day-number {
                     color: hsl(var(--muted-foreground)) !important;
+                    opacity: 0.7 !important;
                   }
                   
                   .fc-scrollgrid {
@@ -777,141 +783,121 @@ const EventsPage = () => {
                   .fc-scrollgrid td, .fc-scrollgrid th {
                     border-color: hsl(var(--border)) !important;
                   }
-                  
-                  /* Mobile-specific layout */
-                  @media (max-width: 640px) {
-                    /* Force horizontal layout for mobile */
-                    .fc-toolbar {
-                      display: flex !important;
-                      flex-direction: row !important;
-                      align-items: center !important;
-                      justify-content: space-between !important;
-                      padding: 16px 12px !important;
-                      margin: 0 !important;
-                      width: 100% !important;
-                      flex-wrap: nowrap !important;
-                    }
-                    
-                    /* Ensure all chunks are visible and properly positioned */
-                    .fc-toolbar-chunk {
-                      display: flex !important;
-                      align-items: center !important;
-                      margin: 0 !important;
-                    }
-                    
-                    /* Left chunk - Previous button */
-                    .fc-toolbar-chunk:first-child {
-                      flex: 0 0 auto !important;
-                      justify-content: flex-start !important;
-                      order: 1 !important;
-                    }
-                    
-                    /* Center chunk - Title */
-                    .fc-toolbar-chunk:nth-child(2) {
-                      flex: 1 1 auto !important;
-                      justify-content: center !important;
-                      text-align: center !important;
-                      order: 2 !important;
-                    }
-                    
-                    /* Right chunk - Next button */
-                    .fc-toolbar-chunk:last-child {
-                      flex: 0 0 auto !important;
-                      justify-content: flex-end !important;
-                      order: 3 !important;
-                    }
-                    
-                    /* Ensure title is visible and centered */
-                    .fc-toolbar-title {
-                      display: block !important;
-                      visibility: visible !important;
-                      opacity: 1 !important;
-                      font-size: 1.1rem !important;
-                      font-weight: 600 !important;
-                      color: hsl(var(--foreground)) !important;
-                      text-align: center !important;
-                      margin: 0 8px !important;
-                      flex: 1 !important;
-                    }
-                    
-                    /* Ensure buttons are visible */
-                    .fc-prev-button, .fc-next-button {
-                      display: flex !important;
-                      visibility: visible !important;
-                      opacity: 1 !important;
-                      min-width: 44px !important;
-                      height: 44px !important;
-                      border-radius: 8px !important;
-                      margin: 0 !important;
-                    }
-                    
-                    .fc-daygrid-event {
-                      margin: 0.5px !important;
-                    }
-                    
-                    /* Footer toolbar for Today button */
-                    .fc-toolbar.fc-toolbar-bottom {
-                      justify-content: center !important;
-                      padding: 12px 8px 16px 8px !important;
-                    }
-                    
-                    .fc-toolbar.fc-toolbar-bottom .fc-today-button {
-                      min-width: 100px !important;
-                      height: 40px !important;
-                    }
+
+                  /* Event status colors */
+                  .event-status-active {
+                    background: hsl(217 91% 60% / 0.1) !important;
+                    border: 1px solid hsl(217 91% 60% / 0.3) !important;
+                    color: hsl(217 91% 60%) !important;
                   }
                   
-                  /* Desktop styles */  
-                  @media (min-width: 641px) {
-                    .fc-toolbar {
-                      justify-content: space-between !important;
-                    }
-                    
-                    .fc-toolbar-chunk {
-                      margin: 0 12px !important;
-                    }
-                    
-                    .fc-prev-button, .fc-next-button {
-                      min-width: 60px !important;
-                      height: 42px !important;
-                    }
-                    
-                    .fc-today-button {
-                      min-width: 80px !important;
-                      height: 42px !important;
-                    }
-                    
-                    .fc-button-group {
-                      margin-right: 20px !important;
-                    }
+                  .dark .event-status-active {
+                    background: hsl(217 91% 60% / 0.25) !important;
+                    border-color: hsl(217 91% 60% / 0.5) !important;
+                    color: hsl(217 91% 95%) !important;
                   }
 
-                  .event-status-active .fc-event-main {
-                    background-color: #EFF6FF !important; /* blue-50 */
-                    color: #1f2937 !important; /* dark gray */
-                  }
-                  .event-status-active {
-                    border-color: #3B82F6 !important; /* blue-500 */
-                    border-left-width: 4px !important;
-                  }
-                  .event-status-paused .fc-event-main {
-                    background-color: #FEF2F2 !important; /* red-50 */
-                    color: #1f2937 !important;
-                  }
                   .event-status-paused {
-                    border-color: #EF4444 !important; /* red-500 */
-                    border-left-width: 4px !important;
+                    background: hsl(0 84% 60% / 0.1) !important;
+                    border: 1px solid hsl(0 84% 60% / 0.3) !important;
+                    color: hsl(0 84% 60%) !important;
                   }
-                  .event-status-finished .fc-event-main {
-                    background-color: #F0FDF4 !important; /* green-50 */
-                    color: #1f2937 !important;
+
+                  .dark .event-status-paused {
+                    background: hsl(0 84% 60% / 0.25) !important;
+                    border-color: hsl(0 84% 60% / 0.5) !important;
+                    color: hsl(0 84% 95%) !important;
                   }
+
                   .event-status-finished {
-                    border-color: #22C55E !important; /* green-500 */
-                    border-left-width: 4px !important;
+                    background: hsl(142 76% 36% / 0.1) !important;
+                    border: 1px solid hsl(142 76% 36% / 0.3) !important;
+                    color: hsl(142 76% 36%) !important;
                   }
-                  .fc-event-main {
-                    padding: 4px;
+
+                  .dark .event-status-finished {
+                    background: hsl(142 76% 36% / 0.25) !important;
+                    border-color: hsl(142 76% 36% / 0.5) !important;
+                    color: hsl(142 76% 95%) !important;
+                  }
+
+                  /* Status badge styles */
+                  .status-badge-active {
+                    background: hsl(217 91% 60% / 0.1);
+                    color: hsl(217 91% 60%);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                  }
+
+                  .dark .status-badge-active {
+                    background: hsl(217 91% 60% / 0.25);
+                    color: white;
+                  }
+
+                  .status-badge-paused {
+                    background: hsl(0 84% 60% / 0.1);
+                    color: hsl(0 84% 60%);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                  }
+
+                  .dark .status-badge-paused {
+                    background: hsl(0 84% 60% / 0.25);
+                    color: white;
+                  }
+
+                  .status-badge-finished {
+                    background: hsl(142 76% 36% / 0.1);
+                    color: hsl(142 76% 36%);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                  }
+
+                  .dark .status-badge-finished {
+                    background: hsl(142 76% 36% / 0.25);
+                    color: white;
+                  }
+
+                  /* Calendar navigation */
+                  .fc .fc-button-primary {
+                    background: hsl(var(--primary)) !important;
+                    border-color: hsl(var(--primary)) !important;
+                    color: hsl(var(--primary-foreground)) !important;
+                  }
+
+                  .fc .fc-button-primary:hover {
+                    background: hsl(var(--primary) / 0.9) !important;
+                  }
+
+                  .fc .fc-button-primary:disabled {
+                    background: hsl(var(--primary) / 0.5) !important;
+                  }
+
+                  /* Calendar base styles for dark mode */
+                  .dark .fc {
+                    color: hsl(var(--foreground)) !important;
+                  }
+
+                  .dark .fc-toolbar-title {
+                    color: white !important;
+                  }
+
+                  .dark .fc-col-header-cell {
+                    color: white !important;
+                    background: hsl(var(--primary)/0.15) !important;
+                  }
+
+                  .dark .fc-daygrid-day-number {
+                    color: white !important;
+                  }
+
+                  .dark .fc-day-other .fc-daygrid-day-number {
+                    color: hsl(var(--muted-foreground)) !important;
+                  }
+
+                  /* Event hover effects in dark mode */
+                  .dark .fc-event:hover {
+                    filter: brightness(1.2) !important;
                   }
                 `}</style>
                 <FullCalendar

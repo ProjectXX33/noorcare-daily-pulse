@@ -21,8 +21,11 @@ import {
   Shrink,
   Expand,
   Zap,
-  Minus,
-  User
+  User,
+  Clock,
+  LogIn,
+  LogOut,
+  AlertTriangle
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCheckIn } from '@/contexts/CheckInContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createOrderSubmission, OrderSubmission, OrderItem } from '@/lib/orderSubmissionsApi';
 import wooCommerceAPI, { WooCommerceProduct } from '@/lib/woocommerceApi';
@@ -77,6 +81,7 @@ interface OrderFormData {
 
 const FloatingChatbot: React.FC = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const { isCheckedIn, hasCheckedInToday, hasCheckedOutToday, currentCheckIn } = useCheckIn();
   const location = useLocation();
   
   // Early return before any other hooks to prevent hook count mismatch
@@ -88,7 +93,7 @@ const FloatingChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isHovered, setIsHovered] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [isShrinking, setIsShrinking] = useState(false);
@@ -114,9 +119,13 @@ const FloatingChatbot: React.FC = () => {
   const [isHandlingComplaint, setIsHandlingComplaint] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [isInProductSearchMode, setIsInProductSearchMode] = useState(false);
+  const [lastWorkTimeCheck, setLastWorkTimeCheck] = useState<Date | null>(null);
+  const [hasShownWorkEndAlarm, setHasShownWorkEndAlarm] = useState(false);
+  const [userPreferences, setUserPreferences] = useState<any>(null);
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const alarmRef = useRef<HTMLAudioElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -175,15 +184,94 @@ const FloatingChatbot: React.FC = () => {
   useEffect(() => {
     audioRef.current = new Audio('/chatbot.mp3');
     audioRef.current.volume = 0.3; // Set volume to 30%
+    
+    // Initialize alarm audio
+    alarmRef.current = new Audio('/alarm.mp3');
+    alarmRef.current.volume = 0.7; // Set volume to 70%
   }, []);
 
   // Play sound for bot messages
   const playBotSound = () => {
-    if (audioRef.current) {
+    if (audioRef.current && userPreferences?.notifications?.sound) {
       audioRef.current.currentTime = 0; // Reset to start
       audioRef.current.play().catch(error => {
         console.log('Could not play audio:', error);
       });
+    }
+  };
+
+  // Play alarm sound when work time ends
+  const playWorkEndAlarm = () => {
+    if (alarmRef.current && !hasShownWorkEndAlarm && 
+        userPreferences?.workReminders?.workTimeAlarm && 
+        userPreferences?.notifications?.sound) {
+      alarmRef.current.currentTime = 0; // Reset to start
+      alarmRef.current.play().catch(error => {
+        console.log('Could not play alarm:', error);
+      });
+      setHasShownWorkEndAlarm(true);
+    }
+  };
+
+  // Check if work counter (remaining work time) is 0
+  const checkWorkCounterStatus = () => {
+    if (!user || !user.id || !currentCheckIn || !isCheckedIn) return false;
+
+    const now = new Date();
+    const checkInTime = new Date(currentCheckIn.timestamp);
+    const timeWorked = (now.getTime() - checkInTime.getTime()) / 1000; // seconds
+
+    // Calculate shift duration based on user's shift
+    let shiftDurationHours = 8; // default
+    
+    // Use the same logic as WorkShiftTimer to determine shift duration
+    const checkInHour = checkInTime.getHours();
+    if (checkInHour >= 8 && checkInHour < 16) {
+      shiftDurationHours = 7; // Day shift = 7 hours
+    } else {
+      shiftDurationHours = 8; // Night shift = 8 hours
+    }
+
+    const shiftDurationSeconds = shiftDurationHours * 3600;
+    const remainingSeconds = Math.max(0, shiftDurationSeconds - timeWorked);
+    
+    // Return true if remaining seconds is 0 (work counter reached 0)
+    return remainingSeconds === 0;
+  };
+
+  // Check work time and send reminders
+  const checkWorkTimeStatus = () => {
+    if (!user || !user.id) return;
+
+    // Only check for work counter reaching zero
+    const isWorkCounterZero = checkWorkCounterStatus();
+    if (isWorkCounterZero && !hasShownWorkEndAlarm && userPreferences?.workReminders?.workTimeAlarm) {
+      playWorkEndAlarm();
+      sendWorkTimeReminder('workend');
+    }
+  };
+
+  const sendWorkTimeReminder = (type: 'workend') => {
+    let reminderMessage: Message;
+    
+    switch (type) {
+      case 'workend':
+        reminderMessage = {
+          id: Date.now().toString(),
+          content: `🎯 **Work Day Complete!**\n\nCongratulations ${user?.name}! Your work counter has reached 0 - shift completed!\n\n✅ Great job today! You can check out now or continue working (overtime will be tracked).`,
+          isUser: false,
+          timestamp: new Date(),
+          type: 'text'
+        };
+        break;
+    }
+    
+    setMessages(prev => [...prev, reminderMessage]);
+    playBotSound();
+    
+    // Auto-open chatbot for important reminders
+    if (!isOpen) {
+      setIsOpen(true);
     }
   };
 
@@ -192,6 +280,57 @@ const FloatingChatbot: React.FC = () => {
     console.log('🤖 FloatingChatbot: AI Assistant is now available!');
     console.log('🎯 Features available: Role-based assistance, Order creation, Product search, Quick actions');
   }, []);
+
+  // Handle keyboard shortcuts for fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullScreen && isOpen) {
+        setIsFullScreen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullScreen, isOpen]);
+
+  // Load user preferences
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('preferences')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data?.preferences) {
+          setUserPreferences(data.preferences);
+        }
+      } catch (error) {
+        console.error('Error loading user preferences:', error);
+      }
+    };
+
+    loadUserPreferences();
+  }, [user?.id]);
+
+  // Work time monitoring interval
+  useEffect(() => {
+    if (!userPreferences) return; // Wait for preferences to load
+
+    const interval = setInterval(() => {
+      checkWorkTimeStatus();
+    }, 60000); // Check every minute
+
+    // Also check immediately
+    checkWorkTimeStatus();
+
+    return () => clearInterval(interval);
+  }, [user, isCheckedIn, currentCheckIn, hasShownWorkEndAlarm, userPreferences]);
 
   // Role-based color configurations with enhanced functionality
   // Helper function to format prices consistently
@@ -387,9 +526,9 @@ const FloatingChatbot: React.FC = () => {
         return [
           { icon: ShoppingCart, label: 'Create New Order', action: 'create_order' },
           { icon: Search, label: 'Search Products', action: 'search_products' },
-          { icon: User, label: 'Customer Support', action: 'customer_support' },
-          { icon: MapPin, label: 'Go to CRM', action: 'navigate_crm' },
-          { icon: Users, label: 'Loyal Customers', action: 'navigate_loyal' }
+          { icon: User, label: 'Customer Support', action: 'support_tips' },
+          { icon: MapPin, label: 'Go to CRM', action: 'go_to_crm' },
+          { icon: Users, label: 'Loyal Customers', action: 'loyal_customers' }
         ];
       case 'Copy Writing':
         return [
@@ -416,7 +555,6 @@ const FloatingChatbot: React.FC = () => {
         return [
           { label: '📊 Generate Reports', action: 'generate_reports', icon: FileText },
           { label: '👥 Team Management', action: 'team_management', icon: Users },
-          { label: '⚙️ System Settings', action: 'system_settings', icon: Settings },
           { label: '📈 Analytics Dashboard', action: 'analytics', icon: TrendingUp }
         ];
     }
@@ -997,7 +1135,50 @@ const FloatingChatbot: React.FC = () => {
         case 'support_tips':
           botResponse = {
             id: (Date.now() + 1).toString(),
-            content: '💡 Customer Support Best Practices:\n\n1. 👂 Listen actively to understand concerns\n2. 🤝 Acknowledge their frustration first\n3. 📝 Provide clear, step-by-step solutions\n4. 📞 Follow up to ensure satisfaction\n5. 📋 Document important interactions\n6. 😊 Stay positive and professional\n\nNeed help with a specific situation?',
+            content: `<div dir="rtl" style="text-align: right;">
+🔥 دليل التعامل مع العميل الغاضب في خدمة العملاء عبر الشات<br/>
+(مُعدّل خصيصًا للدردشة المكتوبة)<br/><br/>
+🌟 التهدئة الفورية (التعاطف أولًا)<br/>
+الرد الأول:<br/>
+"أهلًا [اسم العميل]، أتفهم انزعاجك تمامًا، وأعتذر عن هذا الإزعاج. سأعمل معك الآن لحل الأمر بسرعة."<br/>
+استخدم اسم العميل: مرة في البداية + مرة عند الحل + مرة في الختام (بدون تكلف).<br/>
+تجنب: الإطالة. ركّز على جمل قصيرة ومباشرة.<br/><br/>
+⚡ التصعيد الذكي (عند استمرار الغضب)<br/>
+المعيار: إذا تجاوزت المحادثة ٣ رسائل غاضبة أو ٣ دقائق دون تهدئة:<br/>
+"حتى تحصل على أفضل حل، سأنقلك الآن لمديري [اسم المشرف]. هل تسمح لي بذلك؟"<br/>
+مهم: لا تنتظر حتى يطلبه العميل. قدم التصعيد استباقيًا.<br/>
+❌ لا تقل أبدًا: "هذا ليس ضمن صلاحياتي" أو "القوانين تمنع مساعدتك".<br/><br/>
+💡 عرض الحلول (خُطط مُسبقة)<br/>
+قدّم خيارين واضحين:<br/>
+"لحل الأمر، هل تفضل:<br/>
+1️⃣ استبدال المنتج فورًا (نُجهزه خلال ٢٤ ساعة).<br/>
+2️⃣ إرجاع المبلغ كرصيد في حسابك + إرسال هدية تعويضية؟"<br/>
+استخدم أزرار اختيار (إن أمكن) لتسريع الرد.<br/><br/>
+📦 سياسة الاسترجاع (وفق SFDA - مُلخّصة)<br/>
+<b>الحالة</b> - <b>الإجراء المناسب (في الشات)</b><br/>
+منتج غير مفتوح: "نسترجعه خلال ١٤ يومًا + نُرسل لك رابط الشحن."<br/>
+منتج مفتوح + عيب: "استبداله فورًا خلال ٤٨ ساعة."<br/>
+منتج مفتوح بدون عيب: "للأسف لا يُمكن استرجاعه (حسب SFDA)، لكنني أقدم لك خصم ٢٠٪ على طلبك القادم."<br/><br/>
+⚠️ حالات الطوارئ (تصعيد فوري!)<br/>
+آثار صحية: "لصحتك، ننصحك بالتوجه للطوارئ فورًا. سنُبلغ SFDA خلال ساعة وسنتواصل معك للتغطية."<br/>
+تهديد بالنشر (سوشيال ميديا): "سأحل الأمر خلال ١٠ دقائق! نسترد المبلغ كاملًا + نرسل لك قسيمة ٣٠٪."<br/><br/>
+🧠 تقنيات مُعدّلة للشات<br/>
+الصمت الإيجابي: انتظر ٦٠ ثانية قبل الرد (لا تظهر كـ"يكتب...").<br/>
+أرسل: "أتحقق من ملفك الآن، لحظة من فضلك 🙏".<br/>
+كسر النمط: غيّر نمط الكتابة:<br/>
+البداية: جادّ → "أتفهم غضبك [اسم العميل]."<br/>
+الحل: ودود → "تمّ حل الأمر! 🎉 رصيدك سيصلك خلال ساعتين."<br/><br/>
+🚫 أخطاء قاتلة في الشات (تجنّبها!)<br/>
+❌ إلقاء اللوم: "لو اتبعت التعليمات لما حدث هذا!"<br/>
+❌ وعود غير قابلة للتنفيذ: "سنرسل المنتج غدًا" (بدون تأكيد النظام).<br/>
+❌ إهمال الإشارات العاطفية: تجاهل كلمات مثل "غاضب"، "مستفز"، "سأنشر التجربة".<br/><br/>
+📌 نصائح ذهبية للشات<br/>
+السرعة: متوسط الرد لا يتجاوز دقيقتين.<br/>
+التوثيق: اكتب ملخصًا فوريًا بعد المحادثة (مثل: "تم الاستبدال بعد غضب العميل").<br/>
+الإيموجيز: استخدمها بذكاء (مثل: 🙏 للتقدير، ⏳ للانتظار).<br/>
+النهايات الإيجابية: "شكرًا لصبرك [اسم العميل]! هل هناك شيء آخر أُساعدك فيه؟"<br/><br/>
+بالتطبيق العملي، ستُخفّف ٩٠٪ من حدة الغضب عبر الشات. التركيز على الحلول المرئية (خيارات واضحة - روابط مباشرة) هو المفتاح! 🔑
+</div>`,
             isUser: false,
             timestamp: new Date(),
             type: 'text'
@@ -1081,7 +1262,7 @@ Type your question below (in English or Arabic):`,
             setIsInProductSearchMode(true);
             botResponse = {
               id: Date.now().toString(),
-              content: '🔍 **WooCommerce Product Search**\n\nPlease enter the product name or keywords you want to search for in WooCommerce:',
+              content: '🔍 **Product Search**\n\nPlease enter the product name or keywords you want to search for nooralqmar:',
               isUser: false,
               timestamp: new Date(),
               type: 'product_search'
@@ -1096,6 +1277,35 @@ Type your question below (in English or Arabic):`,
             };
           }
           break;
+
+        case 'loyal_customers':
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            content: '👥 Opening Loyal Customers page...',
+            isUser: false,
+            timestamp: new Date(),
+            type: 'action'
+          };
+          setTimeout(() => {
+            navigate('/loyal-customers');
+            setIsOpen(false);
+          }, 1500);
+          break;
+
+        case 'go_to_crm':
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            content: '🔗 Opening Morasalaty CRM in a new tab...',
+            isUser: false,
+            timestamp: new Date(),
+            type: 'action'
+          };
+          setTimeout(() => {
+            window.open('https://crm.morasalaty.net/', '_blank');
+          }, 1500);
+          break;
+
+
 
         default:
           botResponse = {
@@ -1522,12 +1732,11 @@ What else would you like to know?`;
       setIsOpen(false);
       setIsClosing(false);
       setIsFullScreen(false);
-      setIsMinimized(false);
     }, 300); // Wait for animation to complete
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[1000]">
+    <div className={`${isFullScreen ? 'fixed inset-0 z-[1000] pointer-events-none' : 'fixed bottom-5 right-5 z-[1000]'}`}>
       <AnimatePresence mode="wait">
         {isOpen ? (
           <motion.div
@@ -1536,7 +1745,11 @@ What else would you like to know?`;
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="w-[calc(100vw-2.5rem)] max-w-lg h-[75vh] max-h-[800px] flex flex-col bg-card/80 dark:bg-card/90 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl overflow-hidden"
+            className={`${
+              isFullScreen 
+                ? 'fixed top-4 left-4 right-4 bottom-4 w-auto h-auto max-w-none max-h-none rounded-xl pointer-events-auto' 
+                : 'w-[calc(100vw-2.5rem)] max-w-lg h-[75vh] max-h-[800px] rounded-2xl'
+            } flex flex-col bg-card/80 dark:bg-card/90 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden transition-all duration-300`}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/50 bg-background/30">
@@ -1553,8 +1766,14 @@ What else would you like to know?`;
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(m => !m)}>
-                  <Minus className="h-4 w-4" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8" 
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  title={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                >
+                  {isFullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClose}>
                   <X className="h-4 w-4" />
@@ -1563,7 +1782,9 @@ What else would you like to know?`;
             </div>
 
             {/* Messages Area */}
-            <div ref={messagesContainerRef} className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar">
+            <div ref={messagesContainerRef} className={`flex-1 ${
+              isFullScreen ? 'p-6 sm:p-8' : 'p-4 sm:p-6'
+            } space-y-4 overflow-y-auto custom-scrollbar`}>
               {messages.map((msg, index) => (
                 <motion.div
                   key={msg.id}
@@ -1577,14 +1798,25 @@ What else would you like to know?`;
                       <roleColors.icon className="h-5 w-5 text-white" />
                     </div>
                   )}
-                  <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-md ${
+                  <div className={`${
+                    isFullScreen 
+                      ? 'max-w-md md:max-w-lg lg:max-w-xl' 
+                      : 'max-w-xs md:max-w-md'
+                  } p-3 rounded-2xl shadow-md ${
                     msg.isUser
                       ? 'bg-primary text-primary-foreground rounded-br-lg'
                       : 'bg-muted text-foreground rounded-bl-lg'
                   }`}>
                     {/* Render message content based on type */}
                     {msg.content && (
-                      <p className="text-sm whitespace-pre-line leading-relaxed">{msg.content}</p>
+                      msg.content.includes('<div') || msg.content.includes('<html') ? (
+                        <div 
+                          className="text-sm whitespace-pre-line leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: msg.content }}
+                        />
+                      ) : (
+                        <p className="text-sm whitespace-pre-line leading-relaxed">{msg.content}</p>
+                      )
                     )}
 
                     {/* Render Quick Actions */}
@@ -1670,6 +1902,17 @@ What else would you like to know?`;
                               <p><strong>SKU:</strong> {product.sku || 'N/A'}</p>
                               <p><strong>Stock:</strong> {product.stock_status === 'instock' ? '✅ Available' : '❌ Out of Stock'}</p>
                             </div>
+                            {/* Product Link Button */}
+                            <div className="pt-3 mt-3 border-t border-border/50">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                                onClick={() => window.open(product.permalink, '_blank')}
+                              >
+                                🔗 {isArabic ? 'زيارة المنتج على الموقع' : 'Visit Product on Website'}
+                              </Button>
+                            </div>
                           </div>
                         );
                       })()
@@ -1698,8 +1941,9 @@ What else would you like to know?`;
             </div>
 
             {/* Input Area */}
-              {/* Input Area */}
-              <div className="p-3 border-t border-border/50 bg-background/30">
+              <div className={`${
+                isFullScreen ? 'p-4 sm:p-6' : 'p-3'
+              } border-t border-border/50 bg-background/30`}>
                 <div className="relative">
                   <Textarea
                     ref={inputRef}
@@ -1707,7 +1951,7 @@ What else would you like to know?`;
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
-                    className="w-full bg-muted border-2 border-transparent focus:border-primary rounded-xl resize-none pr-12 custom-scrollbar"
+                    className="w-full bg-muted border-2 border-transparent focus:border-primary rounded-xl resize-none pr-12 custom-scrollbar min-h-[40px]"
                     rows={1}
                   />
                   <Button

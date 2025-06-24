@@ -9,10 +9,10 @@ const BellSVG: React.FC<{ className?: string; hasNotifications?: boolean }> = ({
 }) => {
   return (
     <svg 
-      className={`${className} transition-all duration-300 ${
+      className={`${className} notification-bell-static transition-all duration-300 ${
         hasNotifications 
           ? 'text-yellow-500 drop-shadow-lg' 
-          : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+          : 'text-gray-600 dark:text-white hover:text-gray-800 dark:hover:text-gray-200'
       }`} 
       width="24" 
       height="24" 
@@ -68,23 +68,23 @@ export const AnimatedNotificationBell: React.FC<{
 
   // If no notifications, show static SVG bell
   if (!hasNotifications) {
-    return <BellSVG className={className} hasNotifications={false} />;
+    return <BellSVG className={className + " notification-bell-static dark:text-white"} hasNotifications={false} />;
   }
 
   // If loading animation, show static bell
   if (isLoading) {
-    return <Bell className={className} />;
+    return <Bell className={`${className} notification-bell-static text-gray-600 dark:text-white`} />;
   }
 
   // If error loading animation, show static bell
   if (error || !animationData) {
-    return <Bell className={className} />;
+    return <Bell className={`${className} notification-bell-static text-gray-600 dark:text-white`} />;
   }
 
   // Show animated bell when there are notifications
   return (
     <div 
-      className={`${className} relative`} 
+      className={`${className} relative lottie-bell-white`} 
       style={{ 
         display: 'inline-flex', 
         alignItems: 'center', 
@@ -96,6 +96,7 @@ export const AnimatedNotificationBell: React.FC<{
         loop={true}
         autoplay={true}
         style={{ width: '100%', height: '100%' }}
+        className="lottie-bell-white"
       />
     </div>
   );

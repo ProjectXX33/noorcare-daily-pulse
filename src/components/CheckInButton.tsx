@@ -281,7 +281,7 @@ const CheckInButton = () => {
   return (
     <div className="flex flex-col items-center">
       <p className="text-xl font-bold mb-1">{currentTime}</p>
-      <p className="text-sm text-gray-500 mb-4">{currentDate}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{currentDate}</p>
       
 
       
@@ -302,13 +302,13 @@ const CheckInButton = () => {
       </div>
       
       {alreadyCheckedIn && (
-        <div className="mt-4 text-sm text-green-600 animate-fade-in bg-green-50 p-2 rounded-md border border-green-100">
+        <div className="mt-4 text-sm text-green-600 dark:text-green-400 animate-fade-in bg-green-50 dark:bg-green-900/20 p-2 rounded-md border border-green-100 dark:border-green-800">
           <p>You have successfully checked in for today.</p>
         </div>
       )}
       
       {!alreadyCheckedIn && !shiftValidation.canCheckIn && shiftValidation.message && (
-        <div className="mt-4 text-sm text-orange-600 animate-fade-in bg-orange-50 p-3 rounded-md border border-orange-200 text-center">
+        <div className="mt-4 text-sm text-orange-600 dark:text-orange-400 animate-fade-in bg-orange-50 dark:bg-orange-900/20 p-3 rounded-md border border-orange-200 dark:border-orange-800 text-center">
           <Clock className="h-4 w-4 mx-auto mb-1" />
           <p className="font-medium">{shiftValidation.message}</p>
           {shiftValidation.assignedShift && (
@@ -320,7 +320,7 @@ const CheckInButton = () => {
       )}
       
       {!alreadyCheckedIn && shiftValidation.canCheckIn && (
-        <p className="mt-4 text-sm text-gray-500">Click the button to check in for today.</p>
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Click the button to check in for today.</p>
       )}
     </div>
   );

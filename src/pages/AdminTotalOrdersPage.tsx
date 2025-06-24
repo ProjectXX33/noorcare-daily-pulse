@@ -651,7 +651,7 @@ const AdminTotalOrdersPage: React.FC = () => {
     <div className="container mx-auto py-6 space-y-6">
       {/* Header Section */}
       <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 md:p-6 text-white">
-        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+        <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2 md:gap-3">
               <SARIcon className="h-6 w-6 md:h-8 md:w-8" />
@@ -661,11 +661,11 @@ const AdminTotalOrdersPage: React.FC = () => {
               Admin dashboard - Current month order submissions ({orders.length} orders)
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
+          <div className="flex flex-col gap-1 sm:flex-row sm:gap-2 w-full sm:w-auto sm:items-center sm:justify-end mt-3 sm:mt-0">
+            <Button
               onClick={() => setViewMode(viewMode === 'orders' ? 'stats' : 'orders')}
               variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 w-full sm:w-auto"
             >
               {viewMode === 'orders' ? (
                 <>
@@ -679,40 +679,35 @@ const AdminTotalOrdersPage: React.FC = () => {
                 </>
               )}
             </Button>
-
-            <div className="flex items-center gap-3">
-              <Button 
-                onClick={handleSync} 
-                disabled={isRefreshing}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all duration-200"
-              >
-                {isRefreshing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                 Sync from WooCommerce
-              </Button>
-              
-              <Button
-                onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                variant="outline"
-                className={`border-white/20 text-white hover:scale-105 transition-all duration-200 ${
-                  autoSyncEnabled 
-                    ? 'bg-green-500/20 hover:bg-green-500/30 border-green-400/50' 
-                    : 'bg-white/10 hover:bg-white/20'
-                }`}
-              >
-                {autoSyncEnabled ? '🟢 Auto-Import ON' : '⚪ Auto-Import OFF'}
-              </Button>
-              
-              {lastSyncTime && (
-                <div className="text-white/80 text-sm bg-white/10 px-3 py-2 rounded-md">
-                  Last sync: {lastSyncTime.toLocaleTimeString()}
-                </div>
+            <Button
+              onClick={handleSync}
+              disabled={isRefreshing}
+              variant="outline"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all duration-200 w-full sm:w-auto px-4 py-2 flex items-center justify-center text-base gap-2"
+            >
+              <span className="block text-center">Sync</span>
+              {isRefreshing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-5 w-5" />
               )}
-            </div>
+            </Button>
+            <Button
+              onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+              variant="outline"
+              className={`border-white/20 text-white hover:scale-105 transition-all duration-200 w-full sm:w-auto ${
+                autoSyncEnabled
+                  ? 'bg-green-500/20 hover:bg-green-500/30 border-green-400/50'
+                  : 'bg-white/10 hover:bg-white/20'
+              }`}
+            >
+              {autoSyncEnabled ? '🟢 Auto-Import ON' : '⚪ Auto-Import OFF'}
+            </Button>
+            {lastSyncTime && (
+              <div className="text-white/80 text-sm bg-white/10 px-3 py-2 rounded-md w-full sm:w-auto text-center">
+                Last sync: {lastSyncTime.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1065,7 +1060,7 @@ const AdminTotalOrdersPage: React.FC = () => {
                           </div>
                           
                           {/* Action Buttons */}
-                          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
+                          <div className="flex flex-col sm:flex-row gap-1 pt-2 border-t border-gray-100">
                             <Button
                               onClick={() => viewOrderDetails(order)}
                               variant="outline"

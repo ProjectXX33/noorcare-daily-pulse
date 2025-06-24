@@ -147,7 +147,7 @@ const EmployeeRatingsPage = () => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Enhanced mobile-optimized header with modern design */}
       <div className="border-b border-border/50 bg-background/98 w-full">
         <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
@@ -187,15 +187,15 @@ const EmployeeRatingsPage = () => {
           <>
             {/* Mobile-responsive performance overview - Enhanced 2x2 grid on mobile */}
             <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-4">
-              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+              <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/30 dark:to-purple-800/30 dark:border-purple-800/30 dark:bg-purple-900/30">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-100 flex items-center justify-center mx-auto">
-                      <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-100 dark:bg-purple-800/50 flex items-center justify-center mx-auto">
+                      <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-200" />
                     </div>
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.averageRating}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-purple-100 truncate">{t.averageRating}</p>
                     <div className="flex flex-col items-center gap-1">
-                      <div className="text-lg sm:text-2xl font-bold text-purple-600">
+                      <div className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-200">
                         {averageRating ? averageRating.toFixed(1) : '0.0'}
                       </div>
                       {averageRating && (
@@ -204,37 +204,37 @@ const EmployeeRatingsPage = () => {
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground dark:text-purple-200/70 truncate">
                       {averageRating ? getRatingDescription(averageRating) : t.noRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
+              <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/30 dark:to-amber-800/30 dark:border-amber-800/30 dark:bg-amber-900/30">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
-                      <Star className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-100 dark:bg-amber-800/50 flex items-center justify-center mx-auto">
+                      <Star className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-200" />
                     </div>
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.totalRatings}</p>
-                    <div className="text-lg sm:text-2xl font-bold text-amber-600">{ratings.length}</div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-amber-100 truncate">{t.totalRatings}</p>
+                    <div className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-200">{ratings.length}</div>
+                    <p className="text-xs text-muted-foreground dark:text-amber-200/70 truncate">
                       {t.basedOnRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+              <Card className="col-span-2 sm:col-span-1 border-blue-200 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/30 dark:to-blue-800/30 dark:border-blue-800/30 dark:bg-blue-900/30">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
-                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-100 dark:bg-blue-800/50 flex items-center justify-center mx-auto">
+                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-200" />
                     </div>
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{t.latestRating}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-blue-100 truncate">{t.latestRating}</p>
                     <div className="flex flex-col items-center gap-1">
-                      <div className="text-lg sm:text-2xl font-bold text-blue-600">
+                      <div className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-200">
                         {ratings[0]?.rating || '—'}
                       </div>
                       {ratings[0] && (
@@ -243,24 +243,24 @@ const EmployeeRatingsPage = () => {
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground dark:text-blue-200/70 truncate">
                       {ratings[0] ? ratings[0].ratedAt.toLocaleDateString() : t.noRatings}
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="col-span-2 sm:col-span-1 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+              <Card className="col-span-2 sm:col-span-1 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white dark:bg-[#145c4c] dark:border-emerald-700">
                 <CardContent className="p-3 sm:p-4">
                   <div className="text-center space-y-1">
-                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-                      <Award className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto">
+                      <Award className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-100" />
                     </div>
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">Best Rating</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-gray-400 truncate">Best Rating</p>
                     <div className="text-lg sm:text-2xl font-bold text-emerald-600">
                       {Math.max(...ratings.map(r => r.rating)).toFixed(1)}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground dark:text-gray-400 truncate">
                       {getRatingDescription(Math.max(...ratings.map(r => r.rating)))}
                     </p>
                   </div>
@@ -290,7 +290,7 @@ const EmployeeRatingsPage = () => {
                               <StarRating rating={rating} readonly size="sm" spacing="tight" />
                               <span className="text-sm font-medium">{rating}.0</span>
                             </div>
-                            <span className="text-sm text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
+                            <span className="text-sm text-muted-foreground dark:text-gray-400">{count} ({percentage.toFixed(0)}%)</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                             <div 
@@ -323,7 +323,7 @@ const EmployeeRatingsPage = () => {
                           <StarRating rating={rating} readonly size="sm" spacing="tight" />
                           <span className="text-sm font-medium">{rating}.0</span>
                         </div>
-                        <span className="text-sm text-muted-foreground">{count}</span>
+                        <span className="text-sm text-muted-foreground dark:text-gray-400">{count}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                         <div 
@@ -331,7 +331,7 @@ const EmployeeRatingsPage = () => {
                           style={{ width: `${percentage}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-muted-foreground">{percentage.toFixed(0)}%</span>
+                      <span className="text-xs text-muted-foreground dark:text-gray-400">{percentage.toFixed(0)}%</span>
                     </div>
                   ))}
                 </div>
@@ -396,7 +396,7 @@ const EmployeeRatingsPage = () => {
                                   {getRatingDescription(rating.rating)}
                                 </Badge>
                               </div>
-                              <div className="text-right text-xs text-muted-foreground flex-shrink-0">
+                              <div className="text-right text-xs text-muted-foreground dark:text-gray-400 flex-shrink-0">
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
                                   <span className="whitespace-nowrap">
@@ -422,7 +422,7 @@ const EmployeeRatingsPage = () => {
                             {rating.comment && (
                               <div className="bg-muted/50 rounded-md p-3">
                                 <div className="flex items-start gap-2">
-                                  <MessageSquare className="h-3 w-3 mt-1 text-muted-foreground flex-shrink-0" />
+                                  <MessageSquare className="h-3 w-3 mt-1 text-muted-foreground dark:text-gray-400 flex-shrink-0" />
                                   <div className="flex-1">
                                     <p className="text-xs text-muted-foreground font-medium mb-1">{t.comment}:</p>
                                     <p className="text-xs break-words">

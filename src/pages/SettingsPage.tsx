@@ -3,18 +3,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { WorkTimeConfig } from '@/types';
-import { Settings } from 'lucide-react';
+import { Settings, Moon, Sun, Bell, Volume2, VolumeX, Palette } from 'lucide-react';
 
 interface Preferences {
   notifications: {
     enabled: boolean;
     email: boolean;
+    sound: boolean;
+  };
+  workReminders: {
+    checkInReminder: boolean;
+    checkOutReminder: boolean;
+    workTimeAlarm: boolean;
   };
 }
 
@@ -31,7 +38,13 @@ const SettingsPage = () => {
   const [preferences, setPreferences] = useState<Preferences>({
     notifications: {
       enabled: true,
-      email: true
+      email: true,
+      sound: true
+    },
+    workReminders: {
+      checkInReminder: true,
+      checkOutReminder: true,
+      workTimeAlarm: true
     }
   });
   const [workTimeConfig, setWorkTimeConfig] = useState<WorkTimeConfig | null>(null);
@@ -40,6 +53,16 @@ const SettingsPage = () => {
     workDayStart: '09:00',
     workDayEnd: '00:00'
   });
+
+  useEffect(() => {
+    // On mount, apply dark mode from localStorage immediately
+    const localDark = localStorage.getItem('theme');
+    if (localDark === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize user profile
@@ -324,42 +347,44 @@ const SettingsPage = () => {
             </Card>
 
             {/* Password Section */}
-            <Card className="mt-4 md:mt-6">
-              <CardHeader className="pb-3 sm:pb-4">
-                <CardTitle className="text-base sm:text-lg">{t('changePassword') || 'Change Password'}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 sm:space-y-6">
-                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="password" className="text-xs sm:text-sm">{t('newPassword') || 'New Password'}</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={userProfile.password}
-                      onChange={(e) => setUserProfile({ ...userProfile, password: e.target.value })}
-                      className="h-9 sm:h-10 text-sm"
-                    />
+            {user?.role !== 'employee' && (
+              <Card className="mt-4 md:mt-6">
+                <CardHeader className="pb-3 sm:pb-4">
+                  <CardTitle className="text-base sm:text-lg">{t('changePassword') || 'Change Password'}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 sm:space-y-6">
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="password" className="text-xs sm:text-sm">{t('newPassword') || 'New Password'}</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={userProfile.password}
+                        onChange={(e) => setUserProfile({ ...userProfile, password: e.target.value })}
+                        className="h-9 sm:h-10 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">{t('confirmPassword') || 'Confirm Password'}</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={userProfile.confirmPassword}
+                        onChange={(e) => setUserProfile({ ...userProfile, confirmPassword: e.target.value })}
+                        className="h-9 sm:h-10 text-sm"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">{t('confirmPassword') || 'Confirm Password'}</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={userProfile.confirmPassword}
-                      onChange={(e) => setUserProfile({ ...userProfile, confirmPassword: e.target.value })}
-                      className="h-9 sm:h-10 text-sm"
-                    />
-                  </div>
-                </div>
-                <Button 
-                  onClick={handlePasswordUpdate} 
-                  disabled={loading || !userProfile.password}
-                  className="w-full sm:w-auto min-h-[44px] text-sm"
-                >
-                  {t('updatePassword') || 'Update Password'}
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button 
+                    onClick={handlePasswordUpdate} 
+                    disabled={loading || !userProfile.password}
+                    className="w-full sm:w-auto min-h-[44px] text-sm"
+                  >
+                    {t('updatePassword') || 'Update Password'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Preferences Tab */}
@@ -373,44 +398,126 @@ const SettingsPage = () => {
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium text-sm sm:text-base">{t('enableNotifications') || 'Enable Notifications'}</h4>
+                      <h4 className="font-medium text-sm sm:text-base">Enable Notifications</h4>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        {t('receiveNotifications') || 'Receive notifications for tasks and events'}
+                        Receive notifications for tasks and events
                       </p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={preferences.notifications.enabled}
-                        onChange={(e) => setPreferences({
-                          ...preferences,
-                          notifications: { ...preferences.notifications, enabled: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                    </label>
+                    <Switch
+                      checked={preferences?.notifications?.enabled || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        notifications: { ...preferences?.notifications, enabled: checked }
+                      })}
+                    />
                   </div>
 
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium text-sm sm:text-base">{t('emailNotifications') || 'Email Notifications'}</h4>
+                      <h4 className="font-medium text-sm sm:text-base">Email Notifications</h4>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        {t('receiveEmailNotifications') || 'Receive notifications via email'}
+                        Receive notifications via email
                       </p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={preferences.notifications.email}
-                        onChange={(e) => setPreferences({
-                          ...preferences,
-                          notifications: { ...preferences.notifications, email: e.target.checked }
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/30 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                    </label>
+                    <Switch
+                      checked={preferences?.notifications?.email || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        notifications: { ...preferences?.notifications, email: checked }
+                      })}
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                    <div className="flex-1 flex items-center gap-2">
+                      <Volume2 className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <h4 className="font-medium text-sm sm:text-base">Sound Notifications</h4>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          Play sound for notifications and alerts
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={preferences?.notifications?.sound || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        notifications: { ...preferences?.notifications, sound: checked }
+                      })}
+                    />
+                  </div>
+                </div>
+
+                {/* Appearance Settings */}
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    Appearance Settings
+                  </h3>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Theme Settings</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Use the theme toggle in the top navigation bar to switch between light and dark themes
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Work Reminders Settings */}
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    Work Reminders
+                  </h3>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Check-in Reminders</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Get reminded to check in at the start of your shift
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferences?.workReminders?.checkInReminder || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        workReminders: { ...preferences?.workReminders, checkInReminder: checked }
+                      })}
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Check-out Reminders</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Get reminded to check out after working overtime
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferences?.workReminders?.checkOutReminder || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        workReminders: { ...preferences?.workReminders, checkOutReminder: checked }
+                      })}
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 p-3 sm:p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm sm:text-base">Work Time Alarm</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Play alarm sound when work counter reaches 0
+                      </p>
+                    </div>
+                    <Switch
+                      checked={preferences?.workReminders?.workTimeAlarm || false}
+                      onCheckedChange={(checked) => setPreferences({
+                        ...preferences,
+                        workReminders: { ...preferences?.workReminders, workTimeAlarm: checked }
+                      })}
+                    />
                   </div>
                 </div>
 
@@ -419,7 +526,7 @@ const SettingsPage = () => {
                   disabled={loading}
                   className="w-full sm:w-auto min-h-[44px] text-sm"
                 >
-                  {t('savePreferences') || 'Save Preferences'}
+                  Save
                 </Button>
               </CardContent>
             </Card>

@@ -34,7 +34,7 @@ const Dashboard = () => {
   // Filter states
   const [filters, setFilters] = useState({
     employeeName: 'all-employees',
-    month: '',
+    date: '',
     checkInStatus: 'all' // 'all', 'checked-in', 'checked-out', 'not-checked-in'
   });
 
@@ -147,12 +147,27 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  const userCheckIns = user.role === 'admin' 
-    ? (checkIns as unknown as CheckIn[]) || []
+  // Use the filter date for admin check-ins/reports
+  const selectedDate = filters.date
+    ? (() => { const d = new Date(filters.date); d.setHours(0,0,0,0); return d; })()
+    : null;
+
+  const userCheckIns = user.role === 'admin'
+    ? ((checkIns as unknown as CheckIn[]) || []).filter(ci => {
+        if (!selectedDate) return true;
+        const checkInDate = new Date(ci.timestamp);
+        checkInDate.setHours(0, 0, 0, 0);
+        return checkInDate.getTime() === selectedDate.getTime();
+      })
     : (getUserCheckIns(user.id) as unknown as CheckIn[]) || [];
-    
-  const userReports = user.role === 'admin' 
-    ? (workReports as unknown as WorkReport[]) || []
+
+  const userReports = user.role === 'admin'
+    ? ((workReports as unknown as WorkReport[]) || []).filter(r => {
+        if (!selectedDate) return true;
+        const reportDate = new Date(r.date);
+        reportDate.setHours(0, 0, 0, 0);
+        return reportDate.getTime() === selectedDate.getTime();
+      })
     : (getUserWorkReports(user.id) as unknown as WorkReport[]) || [];
 
   const checkedInToday = hasCheckedInToday(user.id);
@@ -220,18 +235,20 @@ const Dashboard = () => {
   // Filter check-ins based on current filters
   const filteredCheckIns = (userCheckIns || []).filter(checkIn => {
     if (!checkIn) return false;
-    
     try {
       // Employee name filter
       if (filters.employeeName && filters.employeeName !== 'all-employees' && checkIn.userName !== filters.employeeName) {
         return false;
       }
 
-      // Month filter
-      if (filters.month && checkIn.timestamp) {
+      // Date filter (replaces month filter)
+      if (filters.date && checkIn.timestamp) {
+        // Compare only the date part (no timezone offset)
         const checkInDate = new Date(checkIn.timestamp);
-        const checkInMonth = checkInDate.toISOString().slice(0, 7);
-        if (checkInMonth !== filters.month) {
+        const selected = new Date(filters.date);
+        checkInDate.setHours(0, 0, 0, 0);
+        selected.setHours(0, 0, 0, 0);
+        if (checkInDate.getTime() !== selected.getTime()) {
           return false;
         }
       }
@@ -241,27 +258,20 @@ const Dashboard = () => {
         const hasCheckOut = checkIn.checkOutTime;
         const today = new Date().toDateString();
         const checkInToday = new Date(checkIn.timestamp).toDateString() === today;
-        
         switch (filters.checkInStatus) {
           case 'checked-in':
-            // Show only today's check-ins that haven't checked out yet
             if (!checkInToday || hasCheckOut) return false;
             break;
           case 'checked-out':
-            // Show only check-ins that have been checked out
-            if (!hasCheckOut) return false;
+            if (!checkInToday || !hasCheckOut) return false;
             break;
           case 'not-checked-in':
-            // For "not checked in", we should show no check-in records
-            // because this filter is meant to show people who haven't checked in
             return false;
         }
       }
-
       return true;
     } catch (error) {
-      console.error('Error filtering check-ins:', error);
-      return true; // Show item if there's an error
+      return false;
     }
   });
 
@@ -275,11 +285,14 @@ const Dashboard = () => {
         return false;
       }
 
-      // Month filter
-      if (filters.month && report.date) {
+      // Date filter (replaces month filter)
+      if (filters.date && report.date) {
+        // Compare only the date part (no timezone offset)
         const reportDate = new Date(report.date);
-        const reportMonth = reportDate.toISOString().slice(0, 7);
-        if (reportMonth !== filters.month) {
+        const selected = new Date(filters.date);
+        reportDate.setHours(0, 0, 0, 0);
+        selected.setHours(0, 0, 0, 0);
+        if (reportDate.getTime() !== selected.getTime()) {
           return false;
         }
       }
@@ -303,7 +316,7 @@ const Dashboard = () => {
   const clearFilters = () => {
     setFilters({
       employeeName: 'all-employees',
-      month: '',
+      date: '',
       checkInStatus: 'all'
     });
   };
@@ -376,7 +389,7 @@ const Dashboard = () => {
 
         {/* Mobile-optimized check-in reminder - Only for employees */}
         {!checkedInToday && user.role === 'employee' && (
-          <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-md dark:bg-amber-900/20 dark:border-amber-900/30">
+          <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
               <div className="flex-1">
                 <h3 className="font-medium text-amber-800 dark:text-amber-200 text-sm sm:text-base">{t.checkInToday}</h3>
@@ -418,22 +431,18 @@ const Dashboard = () => {
                 </Select>
               </div>
 
-              {/* Month Filter */}
+              {/* Date Filter (replaces Month Filter) */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">{t.selectMonth}</label>
-                <Select value={filters.month || 'all-months'} onValueChange={(value) => handleFilterChange('month', value === 'all-months' ? '' : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={t.selectMonth} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-months">{t.allMonths}</SelectItem>
-                    {generateMonthOptions().map(month => (
-                      <SelectItem key={month.value} value={month.value}>
-                        {month.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Select Date:</label>
+                <Input
+                  type="date"
+                  value={filters.date || ''}
+                  onChange={e => {
+                    // Always use the selected date as-is (no timezone offset)
+                    handleFilterChange('date', e.target.value);
+                  }}
+                  className="w-full"
+                />
               </div>
 
               {/* Check-in Status Filter */}
@@ -498,21 +507,21 @@ const Dashboard = () => {
                           <p className="text-sm text-muted-foreground">
                             {notCheckedInEmployees.length} employee{notCheckedInEmployees.length !== 1 ? 's' : ''} haven't checked in today
                           </p>
-                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                          <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded">
                             {new Date().toLocaleDateString()}
                           </span>
                         </div>
                         
                         <div className="grid gap-2">
                           {notCheckedInEmployees.map(employee => (
-                            <div key={employee.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div key={employee.id} className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                               <div className="flex-1">
-                                <h4 className="font-medium text-sm">{employee.name}</h4>
+                                <h4 className="font-medium text-sm text-foreground">{employee.name}</h4>
                                 <p className="text-xs text-muted-foreground">
                                   {employee.department} • {employee.position}
                                 </p>
                               </div>
-                              <div className="flex items-center text-orange-600">
+                              <div className="flex items-center text-orange-600 dark:text-orange-400">
                                 <Clock className="h-4 w-4 mr-1" />
                                 <span className="text-xs font-medium">Not checked in</span>
                               </div>

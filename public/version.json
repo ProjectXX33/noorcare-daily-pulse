@@ -1,5 +1,5 @@
 {
-  "version": "3.2.3",
+  "version": "5.0.0",
   "buildTime": "2025-06-23T02:35:06.782Z",
   "buildTimestamp": "1750646106783",
   "buildDate": "6/23/2025",
@@ -9,5 +9,12 @@
     "Copy writing products page is now live"
   ],
   "minimumSupportedVersion": "3.1.2",
-  "forceUpdate": false
+  "forceUpdate": false,
+  "whatsNew": [
+    "Sticky header now works perfectly on all layouts (desktop, mobile, sidebar open/collapsed)",
+    "Workspace Chat now always auto-scrolls to the latest message after sending or receiving",
+    "Emoji reaction menu is horizontal on desktop, grid on mobile",
+    "Dark mode and theme toggle improvements",
+    "Performance and bug fixes"
+  ]
 }

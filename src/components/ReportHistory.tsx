@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,21 +115,21 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
       </CardHeader>
       <CardContent>
         {sortedReports.length === 0 ? (
-          <p className="text-sm text-gray-500">No report history found.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">No report history found.</p>
         ) : (
           <div className="space-y-8">
             {sortedReports.map((report) => {
               const { checkInTime, checkOutTime, totalHours } = getCheckInOutTimes(report.userId, report.date);
               
               return (
-                <div key={report.id} className="border-b pb-6">
+                <div key={report.id} className="border-b border-gray-200 dark:border-gray-700 pb-6">
                   <div className="flex justify-between mb-2">
                     <div>
-                      <p className="font-medium">{format(new Date(report.date), 'EEEE, MMMM d, yyyy')}</p>
-                      <p className="text-sm text-gray-500">{report.userName} - {report.department}</p>
+                      <p className="font-medium text-foreground">{format(new Date(report.date), 'EEEE, MMMM d, yyyy')}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{report.userName} - {report.department}</p>
                     </div>
                     <div className="text-right">
-                      <div className="bg-gray-100 rounded px-3 py-1">
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded px-3 py-1">
                         <p className="text-sm font-medium">Check-in: <span className="text-primary">{checkInTime}</span></p>
                         <p className="text-sm font-medium">Check-out: <span className="text-primary">{checkOutTime}</span></p>
                         <p className="text-sm font-medium">Hours: <span className="text-primary">{totalHours}</span></p>
@@ -140,23 +139,23 @@ const ReportHistory: React.FC<ReportHistoryProps> = ({
                   <div className="mt-4 space-y-3">
                     <div>
                       <h4 className="text-sm font-medium text-primary">Tasks Completed</h4>
-                      <p className="text-sm mt-1">{report.tasksDone}</p>
+                      <p className="text-sm mt-1 text-foreground">{report.tasksDone}</p>
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-primary">Issues Faced</h4>
-                      <p className="text-sm mt-1">{report.issuesFaced || 'None reported'}</p>
+                      <p className="text-sm mt-1 text-foreground">{report.issuesFaced || 'None reported'}</p>
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-primary">Plans for Tomorrow</h4>
-                      <p className="text-sm mt-1">{report.plansForTomorrow}</p>
+                      <p className="text-sm mt-1 text-foreground">{report.plansForTomorrow}</p>
                     </div>
                     {report.fileAttachments && report.fileAttachments.length > 0 && (
                       <div>
                         <h4 className="text-sm font-medium text-primary">Attachments</h4>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {report.fileAttachments.map((file, index) => (
-                            <div key={index} className="flex items-center text-sm bg-gray-100 px-2 py-1 rounded">
-                              <span className="mr-2">{file}</span>
+                            <div key={index} className="flex items-center text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                              <span className="mr-2 text-foreground">{file}</span>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 

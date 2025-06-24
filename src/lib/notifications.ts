@@ -58,7 +58,33 @@ export const maintainNotificationLimit = async (userId: string, maxNotifications
   }
 };
 
-// Enhanced function to create a notification with automatic limit enforcement
+// Function to send email notification
+const sendEmailNotification = async (userEmail: string, title: string, message: string) => {
+  try {
+    // Check if we have Supabase Edge Function for email sending
+    const { data, error } = await supabase.functions.invoke('send-email-notification', {
+      body: {
+        to: userEmail,
+        subject: title,
+        message: message,
+        from: 'notifications@noorcare.com'
+      }
+    });
+
+    if (error) {
+      console.warn('Email notification failed, but system notification will still be created:', error);
+      return false;
+    }
+
+    console.log('✅ Email notification sent successfully to:', userEmail);
+    return true;
+  } catch (error) {
+    console.warn('Email notification failed, but system notification will still be created:', error);
+    return false;
+  }
+};
+
+// Enhanced function to create a notification with automatic limit enforcement and email support
 export const createNotification = async (notification: {
   user_id: string;
   title: string;
@@ -72,6 +98,17 @@ export const createNotification = async (notification: {
     
     // FIRST: Maintain the notification limit (delete old ones if needed)
     await maintainNotificationLimit(notification.user_id, 10);
+
+    // Get user preferences and email for email notifications
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('email, preferences')
+      .eq('id', notification.user_id)
+      .single();
+
+    if (userError) {
+      console.warn('Could not fetch user preferences for email notifications:', userError);
+    }
 
     // Get current user as fallback for created_by
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -110,6 +147,12 @@ export const createNotification = async (notification: {
       title: data.title,
       user_id: data.user_id
     });
+
+    // Send email notification if user has email notifications enabled
+    if (userData?.email && userData?.preferences?.notifications?.enabled && userData?.preferences?.notifications?.email) {
+      console.log('📧 Sending email notification to:', userData.email);
+      await sendEmailNotification(userData.email, notification.title, notification.message);
+    }
     
     return data;
   } catch (error) {

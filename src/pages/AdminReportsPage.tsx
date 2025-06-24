@@ -39,6 +39,9 @@ const AdminReportsPage = () => {
     dateTo: '',
   });
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const reportsPerPage = 5;
+  const totalPages = Math.ceil(reports.length / reportsPerPage);
 
   useEffect(() => {
     setReports(workReports);
@@ -78,6 +81,9 @@ const AdminReportsPage = () => {
   const sortedReports = [...filteredReports].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
+
+  // Paginated reports
+  const paginatedReports = sortedReports.slice((currentPage - 1) * reportsPerPage, currentPage * reportsPerPage);
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -163,18 +169,6 @@ const AdminReportsPage = () => {
   const exportReports = () => {
     exportToCSVWithArabicSupport({
       filename: 'تقارير_العمل_Work_Reports',
-      data: sortedReports,
-      headers: COMMON_HEADERS.REPORTS,
-      includeEnglishHeaders: true,
-      dateFormat: 'both',
-      numberFormat: 'both'
-    });
-  };
-
-  const exportReportsExcel = () => {
-    exportToExcelWithArabicSupport({
-      filename: 'تقارير_العمل_Work_Reports',
-      sheetName: 'Work Reports / تقارير العمل',
       data: sortedReports,
       headers: COMMON_HEADERS.REPORTS,
       includeEnglishHeaders: true,
@@ -275,30 +269,20 @@ const AdminReportsPage = () => {
                 onClick={clearFilters}
                 className="h-9 min-h-[44px] text-xs sm:text-sm"
               >
-                مسح المرشحات / Clear Filters
-              </Button>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline"
-                  className="bg-green-600 hover:bg-green-700 text-white h-9 min-h-[44px] text-xs sm:text-sm"
-                  onClick={exportReportsExcel}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  تصدير Excel / Export Excel
+                Clear Filters
               </Button>
               <Button 
                 className="bg-primary hover:bg-primary/90 h-9 min-h-[44px] text-xs sm:text-sm"
                 onClick={exportReports}
               >
-                  <Download className="h-4 w-4 mr-2" />
-                  تصدير CSV / Export CSV
+                <Download className="h-4 w-4 mr-2" />
+                CSV / Export CSV
               </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
         
-        {/* Mobile-optimized reports display */}
+        {/* Mobile-optimized reports display with pagination */}
         <Card>
           <CardHeader className="pb-3 sm:pb-4">
             <CardTitle className="text-base sm:text-lg">Employee Reports</CardTitle>
@@ -307,74 +291,94 @@ const AdminReportsPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {sortedReports.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm sm:text-base text-gray-500">No reports found matching your criteria.</p>
-              </div>
+            {paginatedReports.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">No reports found for the selected filters.</div>
             ) : (
-              <div className="space-y-4 sm:space-y-6 md:space-y-8">
-                {sortedReports.map((report) => (
-                  <div key={report.id} className="border-b pb-4 sm:pb-6 last:border-b-0">
-                    {/* Mobile-responsive report header */}
-                    <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-sm sm:text-base">{report.userName}</h3>
-                        <p className="text-xs sm:text-sm text-gray-500">
-                          {report.department} - {report.position}
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                        <div className="text-xs sm:text-sm text-gray-500">
-                          {format(new Date(report.date), 'EEEE, MMMM d, yyyy')}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
-                          onClick={() => handleDeleteReport(report.id)}
-                        >
-                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      </div>
+              paginatedReports.map((report) => (
+                <div key={report.id} className="border-b pb-4 sm:pb-6 last:border-b-0">
+                  {/* Mobile-responsive report header */}
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-sm sm:text-base">{report.userName}</h3>
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        {report.department} - {report.position}
+                      </p>
                     </div>
-                    
-                    {/* Mobile-responsive report content */}
-                    <div className="space-y-2 sm:space-y-3">
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Tasks Completed</h4>
-                        <p className="text-xs sm:text-sm break-words">{report.tasksDone}</p>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                      <div className="text-xs sm:text-sm text-gray-500">
+                        {format(new Date(report.date), 'EEEE, MMMM d, yyyy')}
                       </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Issues Faced</h4>
-                        <p className="text-xs sm:text-sm break-words">{report.issuesFaced || 'None reported'}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Plans for Next Day</h4>
-                        <p className="text-xs sm:text-sm break-words">{report.plansForTomorrow}</p>
-                      </div>
-                      {report.fileAttachments && report.fileAttachments.length > 0 && (
-                        <div>
-                          <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Attachments</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {report.fileAttachments.map((file, index) => (
-                              <div key={index} className="flex items-center text-xs bg-gray-100 px-2 py-1 rounded max-w-full">
-                                <span className="mr-2 truncate flex-1">{file}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="p-1 h-auto min-h-[32px] flex-shrink-0"
-                                  onClick={() => handleFileDownload(report.id, file)}
-                                >
-                                  <Download className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0 sm:h-auto sm:w-auto sm:p-2"
+                        onClick={() => handleDeleteReport(report.id)}
+                      >
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
                     </div>
                   </div>
-                ))}
+                  
+                  {/* Mobile-responsive report content */}
+                  <div className="space-y-2 sm:space-y-3">
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Tasks Completed</h4>
+                      <p className="text-xs sm:text-sm break-words">{report.tasksDone}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Issues Faced</h4>
+                      <p className="text-xs sm:text-sm break-words">{report.issuesFaced || 'None reported'}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Plans for Next Day</h4>
+                      <p className="text-xs sm:text-sm break-words">{report.plansForTomorrow}</p>
+                    </div>
+                    {report.fileAttachments && report.fileAttachments.length > 0 && (
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-medium text-primary mb-1">Attachments</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {report.fileAttachments.map((file, index) => (
+                            <div key={index} className="flex items-center text-xs bg-gray-100 px-2 py-1 rounded max-w-full">
+                              <span className="mr-2 truncate flex-1">{file}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="p-1 h-auto min-h-[32px] flex-shrink-0"
+                                onClick={() => handleFileDownload(report.id, file)}
+                              >
+                                <Download className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm font-medium">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
               </div>
             )}
           </CardContent>

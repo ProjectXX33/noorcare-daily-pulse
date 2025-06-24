@@ -35,7 +35,27 @@ export const convertEmojis = (text: string) => {
     ':thumbsup:': '👍',
     ':thumbsdown:': '👎',
     ':fire:': '🔥',
-    ':rocket:': '🚀'
+    ':rocket:': '🚀',
+    ':smile:': '😊',
+    ':laugh:': '😄',
+    ':sad:': '😢',
+    ':cry:': '😭',
+    ':heart:': '❤️',
+    ':like:': '👍',
+    ':dislike:': '👎',
+    ':star:': '⭐',
+    ':sun:': '☀️',
+    ':moon:': '🌙',
+    ':check:': '✅',
+    ':x:': '❌',
+    ':warning:': '⚠️',
+    ':idea:': '💡',
+    ':time:': '⏰',
+    ':coffee:': '☕',
+    ':clap:': '👏',
+    ':pray:': '🙏',
+    ':100:': '💯',
+    ':sparkles:': '✨'
   };
   
   let result = text;
@@ -141,6 +161,9 @@ export const processMessageForDisplay = (message: string): string => {
   
   // Detect and format links
   processedMessage = detectAndFormatLinks(processedMessage);
+  
+  // Add emoji size class
+  processedMessage = processedMessage.replace(/(\p{Emoji}+)/gu, '<span class="text-xl">$1</span>');
   
   return processedMessage;
 };

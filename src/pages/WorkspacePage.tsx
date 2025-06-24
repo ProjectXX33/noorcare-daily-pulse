@@ -21,7 +21,9 @@ import {
   UserCircle,
   ChevronDown,
   Volume2,
-  VolumeX
+  VolumeX,
+  CornerDownLeft,
+  X
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { playNotificationSound } from '@/lib/notifications';
@@ -35,6 +37,15 @@ import {
   convertEmojis,
   getUserStatus
 } from '@/lib/chatUtils';
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+
+interface MessageReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -45,6 +56,8 @@ interface ChatMessage {
   message: string;
   created_at: string;
   updated_at?: string;
+  reply_to_id?: string;
+  reactions?: MessageReaction[];
 }
 
 interface OnlineUser {
@@ -97,6 +110,19 @@ const WorkspacePage = () => {
   const isAutoScrolling = useRef<boolean>(false);
   const shouldAutoScroll = useRef<boolean>(true);
   const hasUserManuallyScrolled = useRef<boolean>(false);
+  const [replyTo, setReplyTo] = useState<null | { id: string; user_name: string; message: string }>(null);
+  const [hoveredReplyId, setHoveredReplyId] = useState<string | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [emojiMenuFor, setEmojiMenuFor] = useState<string | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [swipeMessageId, setSwipeMessageId] = useState<string | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [dragOffset, setDragOffset] = useState<number>(0);
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
+  const [messageReactions, setMessageReactions] = useState<{[messageId: string]: {[emoji: string]: string[]}}>({});
+  const [longPressMessageId, setLongPressMessageId] = useState<string | null>(null);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Popular emojis for the menu
   const popularEmojis = [
@@ -178,8 +204,32 @@ const WorkspacePage = () => {
 
   // Emoji selection function
   const selectEmoji = (emoji: string) => {
+    if (inputRef.current) {
+      const start = inputRef.current.selectionStart || 0;
+      const end = inputRef.current.selectionEnd || 0;
+      const textBeforeCursor = newMessage.substring(0, start);
+      const textAfterCursor = newMessage.substring(end);
+      
+      setNewMessage(textBeforeCursor + emoji + textAfterCursor);
+      
+      // Set cursor position after emoji
+      setTimeout(() => {
+        if (inputRef.current) {
+          const newCursorPosition = start + emoji.length;
+          inputRef.current.selectionStart = newCursorPosition;
+          inputRef.current.selectionEnd = newCursorPosition;
+          inputRef.current.focus();
+        }
+      }, 0);
+    } else {
     setNewMessage(prev => prev + emoji);
+    }
     setShowEmojiMenu(false);
+  };
+
+  // Track cursor position
+  const handleSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    setCursorPosition(e.currentTarget.selectionStart);
   };
 
   // Close emoji menu when clicking outside
@@ -254,8 +304,11 @@ const WorkspacePage = () => {
       // Reset unread counter once when workspace page opens
       resetCounterOnly();
 
-      // Update presence every 30 seconds
-      const presenceInterval = setInterval(updateUserPresence, 30000);
+      // Update presence and online users list every 30 seconds
+      const presenceInterval = setInterval(() => {
+        updateUserPresence();
+        loadOnlineUsers();  // Added this to refresh online users list
+      }, 30000);
       
       // Check and cleanup messages when they exceed 50 (every 30 seconds)
       const cleanupInterval = setInterval(async () => {
@@ -268,7 +321,7 @@ const WorkspacePage = () => {
           }
           return prev;
         });
-      }, 30000); // Check every 30 seconds
+      }, 30000);
       
       // Cleanup on unmount
       return () => {
@@ -525,38 +578,19 @@ const WorkspacePage = () => {
   };
 
   const scrollToBottom = () => {
+    // Try to use messagesEndRef for reliable scroll
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    // Fallback: try to scroll using scrollAreaRef
     if (!isAutoScrolling.current && scrollAreaRef.current) {
       isAutoScrolling.current = true;
-      
-      // Get the ScrollArea viewport element
       const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      
       if (viewport) {
-        // Scroll with extra padding to ensure absolute bottom
-        viewport.scrollTo({
-          top: viewport.scrollHeight + 1000, // Extra padding to guarantee bottom
-          behavior: 'smooth'
-        });
-        
-        // Double-check with direct assignment
-        setTimeout(() => {
-          viewport.scrollTop = viewport.scrollHeight; // Force to absolute bottom
-        }, 300);
-      } else {
-        // Fallback: try to scroll using messagesEndRef
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'end',
-            inline: 'nearest'
-          });
-        }
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
       }
-      
-      // Reset auto-scrolling flag after animation completes
-      setTimeout(() => {
         isAutoScrolling.current = false;
-      }, 800);
     }
   };
 
@@ -668,10 +702,14 @@ const WorkspacePage = () => {
 
   const loadOnlineUsers = async () => {
     try {
+      // Get timestamp for 5 minutes ago
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
       const { data, error } = await supabase
         .from('users')
         .select('id, name, position, role, last_seen')
         .neq('id', user?.id)
+        .gte('last_seen', fiveMinutesAgo)  // Only get users seen in last 5 minutes
         .order('last_seen', { ascending: false });
 
       if (error) throw error;
@@ -761,7 +799,7 @@ const WorkspacePage = () => {
       // Process message with emoji conversion
       const processedMessage = convertEmojis(newMessage.trim());
       
-      const { error } = await supabase
+      const { data: insertedRows, error } = await supabase
         .from('workspace_messages')
         .insert([{
           user_id: user.id,
@@ -769,11 +807,23 @@ const WorkspacePage = () => {
           user_position: user.position,
           user_role: user.role,
           message: processedMessage,
-        }]);
+          reply_to_id: replyTo?.id || null,
+        }])
+        .select('*')
+        .single();
 
       if (error) throw error;
+
+      // Optimistically append the new message to state so the sender sees it instantly
+      if (insertedRows) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === insertedRows.id)) return prev;
+          return [...prev, insertedRows as any];
+        });
+      }
       
       setNewMessage('');
+      setReplyTo(null);
       
       // Auto-scroll to new message when user sends it
       shouldAutoScroll.current = true;
@@ -847,12 +897,12 @@ const WorkspacePage = () => {
     }
     
     const positionColors: { [key: string]: string } = {
-      'Customer Service': 'bg-blue-100 text-blue-800',
-      'Media Buyer': 'bg-purple-100 text-purple-800',
-      'Designer': 'bg-green-100 text-green-800',
+      'Customer Service': 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+      'Media Buyer': 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200',
+      'Designer': 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
     };
     
-    const colorClass = positionColors[position] || 'bg-gray-100 text-gray-800';
+    const colorClass = positionColors[position] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
     
     return (
       <Badge variant="secondary" className={`text-xs ${colorClass}`}>
@@ -927,81 +977,207 @@ const WorkspacePage = () => {
     return cleanupMessages(currentMessages);
   };
 
+  // Place this useEffect after the messages rendering (after the JSX that renders messages)
+  useEffect(() => {
+    // Always scroll to bottom when messages change
+    scrollToBottom();
+  }, [messages]);
+
+  // Add function to handle reactions
+  const handleReaction = async (messageId: string, emoji: string) => {
+    if (!user) {
+      toast.error('You must be logged in to react to messages');
+      return;
+    }
+
+    try {
+      const userName = user.name;
+      const currentReactions = messageReactions[messageId] || {};
+
+      // Determine if the user has already reacted (and with which emoji)
+      let existingEmoji: string | null = null;
+      for (const [em, users] of Object.entries(currentReactions)) {
+        if (users.includes(userName)) {
+          existingEmoji = em;
+          break;
+        }
+      }
+
+      // If the user clicked the same emoji they already reacted with -> toggle remove
+      if (existingEmoji === emoji) {
+        console.log('Removing reaction:', { messageId, userId: user.id, emoji });
+        const { error } = await supabase
+          .from('message_reactions')
+          .delete()
+          .match({ message_id: messageId, user_id: user.id, emoji });
+
+        if (error) {
+          console.error('Error removing reaction:', error);
+          throw error;
+        }
+
+        // Update local state
+        setMessageReactions(prev => {
+          const messageReacts = { ...(prev[messageId] || {}) } as {[e: string]: string[]};
+          messageReacts[emoji] = (messageReacts[emoji] || []).filter(name => name !== userName);
+          if (messageReacts[emoji].length === 0) {
+            delete messageReacts[emoji];
+          }
+          return { ...prev, [messageId]: messageReacts };
+        });
+        return;
+      }
+
+      // Remove any previous reaction by this user (if exists and different emoji)
+      if (existingEmoji) {
+        console.log('Replacing reaction: removing previous', existingEmoji);
+        const { error: deleteError } = await supabase
+          .from('message_reactions')
+          .delete()
+          .match({ message_id: messageId, user_id: user.id });
+
+        if (deleteError) {
+          console.error('Error removing previous reaction:', deleteError);
+          // Continue even if delete fails, to try inserting new reaction
+        }
+      }
+
+      // Add (or replace with) new reaction
+      console.log('Adding reaction:', { messageId, userId: user.id, emoji });
+      const { error: insertError } = await supabase
+        .from('message_reactions')
+        .insert({ message_id: messageId, user_id: user.id, emoji });
+
+      if (insertError) {
+        console.error('Error adding reaction:', insertError);
+        toast.error('Failed to add reaction');
+        return;
+      }
+
+      // Update local state
+      setMessageReactions(prev => {
+        // First remove user from any existing emoji arrays
+        const messageReacts = { ...(prev[messageId] || {}) } as {[e: string]: string[]};
+        Object.keys(messageReacts).forEach(em => {
+          messageReacts[em] = messageReacts[em].filter(name => name !== userName);
+          if (messageReacts[em].length === 0) {
+            delete messageReacts[em];
+          }
+        });
+
+        // Add user to the new emoji array
+        if (!messageReacts[emoji]) {
+          messageReacts[emoji] = [];
+        }
+        messageReacts[emoji].push(userName);
+
+        return { ...prev, [messageId]: messageReacts };
+      });
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+      toast.error('Failed to update reaction. Please try again.');
+    }
+  };
+
+  // Add function to load reactions
+  const loadReactions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('message_reactions')
+        .select(`
+          id,
+          message_id,
+          user_id,
+          emoji,
+          users!inner (
+            name
+          )
+        `)
+        .returns<Array<{
+          id: string;
+          message_id: string;
+          user_id: string;
+          emoji: string;
+          users: { name: string };
+        }>>();
+
+      if (error) throw error;
+
+      // Transform reactions into the format we need
+      const reactionsMap: {[messageId: string]: {[emoji: string]: string[]}} = {};
+      data?.forEach(reaction => {
+        const messageId = reaction.message_id;
+        const emoji = reaction.emoji;
+        const userName = reaction.users.name;
+
+        if (!reactionsMap[messageId]) {
+          reactionsMap[messageId] = {};
+        }
+        if (!reactionsMap[messageId][emoji]) {
+          reactionsMap[messageId][emoji] = [];
+        }
+        reactionsMap[messageId][emoji].push(userName);
+      });
+
+      setMessageReactions(reactionsMap);
+    } catch (error) {
+      console.error('Error loading reactions:', error);
+    }
+  };
+
+  // Subscribe to reaction changes
+  useEffect(() => {
+    const reactionsChannel = supabase
+      .channel('reactions_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'message_reactions' }, 
+        () => {
+          // Reload reactions when changes occur
+          loadReactions();
+        }
+      )
+      .subscribe();
+
+    // Load initial reactions
+    loadReactions();
+
+    return () => {
+      supabase.removeChannel(reactionsChannel);
+    };
+  }, []);
+
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full max-w-full overflow-x-hidden">
-      {/* Enhanced mobile-optimized header - Non-sticky, responsive layout */}
-      <div className="border-b border-border/50 bg-background/98 w-full">
-        <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-5 md:py-6 w-full max-w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 w-full">
-            <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
-              <div className="flex items-center gap-2">
-                <Hash className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
-                  Workspace Chat
-                </h1>
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="text-xs animate-pulse flex-shrink-0">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </div>
-
-            </div>
-            
-            {/* Header Controls */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleSound}
-                className="h-8 w-8 sm:h-10 sm:w-10 p-0"
-                title={soundEnabled ? 'Mute notifications' : 'Enable notifications'}
-              >
-                {soundEnabled ? (
-                  <Volume2 className="h-4 w-4 text-green-600" />
-                ) : (
-                  <VolumeX className="h-4 w-4 text-red-500" />
-                )}
-              </Button>
-              
-              {isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-                  className="h-8 w-8 sm:h-10 sm:w-10 p-0"
-                  title="Show team members"
-                >
-                  <Users className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content Area */}
-      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 w-full max-w-full overflow-x-hidden">
-        <div className="h-[calc(100vh-200px)] sm:h-[calc(100vh-220px)] md:h-[calc(100vh-240px)]">
-          {/* Chat Area - Full width on mobile, 3/4 on desktop */}
-          <div className={`${isMobile ? 'h-full' : 'grid grid-cols-1 lg:grid-cols-4 gap-4 h-full'}`}>
-            <Card className={`${isMobile ? 'h-full border-0 rounded-lg' : 'lg:col-span-3'} flex flex-col overflow-hidden`}>
-              <CardHeader className="flex-shrink-0 p-3 sm:p-6">
+      <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 w-full max-w-full overflow-x-hidden">
+        <div className="h-[calc(100vh-120px)] sm:h-[calc(100vh-140px)] md:h-[calc(100vh-160px)]">
+          {/* Chat Area - Full width on mobile, with sidebar on desktop */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-full">
+            <Card className="lg:col-span-3 flex flex-col overflow-hidden">
+              <CardHeader className="flex-shrink-0 p-3 sm:p-4 border-b">
+                <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
                   General Chat
                 </CardTitle>
+                  {/* Mobile Team Members Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                    className="lg:hidden"
+                    onClick={() => setShowMobileSidebar(true)}
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    <span className="text-sm">Team</span>
+              </Button>
+            </div>
               </CardHeader>
               
-              <CardContent className="flex-1 flex flex-col min-h-0 p-0 overflow-hidden">
+              <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
                 {/* Messages Area */}
-                <div 
-                  className={`flex-1 overflow-y-auto ${isMobile ? 'px-3 sm:px-6' : 'px-3 sm:px-6'}`} 
-                  ref={scrollAreaRef} 
-                  onScrollCapture={handleScroll}
-                >
+                <ScrollArea className="flex-1 p-3 sm:p-4">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1012,44 +1188,242 @@ const WorkspacePage = () => {
                       <p className="text-center text-sm">No messages yet. Start the conversation!</p>
                     </div>
                   ) : (
-                    <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 relative">
+                    <div className="space-y-2 sm:space-y-3 py-3 sm:py-4 relative">
                       {messages.map((message, index) => {
                         const isOwnMessage = message.user_id === user.id;
-                        const showAvatar = index === 0 || messages[index - 1].user_id !== message.user_id;
+                        const isReply = !!message.reply_to_id;
+                        const prev = messages[index - 1];
+                        const next = messages[index + 1];
+                        const isFirstInGroup = index === 0 || prev?.user_id !== message.user_id || !!prev?.reply_to_id || isReply;
+                        const isLastInGroup = index === messages.length - 1 || next?.user_id !== message.user_id || !!next?.reply_to_id || isReply;
+                        const isConsecutive = !isFirstInGroup && !isReply;
+                        const repliedMessage = message.reply_to_id ? messages.find(m => m.id === message.reply_to_id) : null;
                         
                         return (
-                          <div key={message.id} className={`flex gap-2 sm:gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
-                            {showAvatar && (
-                              <div className="flex-shrink-0">
-                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
+                          <div
+                            key={message.id}
+                            className={`flex gap-2 sm:gap-3 ${isFirstInGroup ? 'mt-3' : 'mt-0'} group-message-row`}
+                            onMouseEnter={() => { setHoveredReplyId(message.reply_to_id || null); setHoveredMessageId(message.id); }}
+                            onMouseLeave={() => { setHoveredReplyId(null); setHoveredMessageId(null); setEmojiMenuFor(null); }}
+                            // Enhanced mobile interactions - swipe to reply + long press for emoji
+                            onTouchStart={isMobile ? (e) => {
+                              setTouchStartX(e.touches[0].clientX);
+                              setSwipeMessageId(message.id);
+                              setSwipeDirection(null);
+                              setDragOffset(0);
+                              
+                              // Long press for emoji reactions
+                              const timer = setTimeout(() => {
+                                setLongPressMessageId(message.id);
+                                setEmojiMenuFor(message.id);
+                                // Add haptic feedback if available
+                                if (navigator.vibrate) {
+                                  navigator.vibrate(50);
+                                }
+                              }, 700);
+                              setLongPressTimer(timer);
+                            } : undefined}
+                            onTouchMove={isMobile ? (e) => {
+                              // Cancel long press if user starts swiping
+                              if (longPressTimer) {
+                                clearTimeout(longPressTimer);
+                                setLongPressTimer(null);
+                              }
+                              
+                              if (touchStartX !== null && swipeMessageId === message.id) {
+                                const deltaX = e.touches[0].clientX - touchStartX;
+                                setDragOffset(deltaX);
+                                if (Math.abs(deltaX) > 20) {
+                                  if (deltaX > 40) {
+                                    setSwipeDirection('right');
+                                  } else if (deltaX < -40) {
+                                    setSwipeDirection('left');
+                                  } else {
+                                    setSwipeDirection(null);
+                                  }
+                                }
+                              }
+                            } : undefined}
+                            onTouchEnd={isMobile ? () => {
+                              if (longPressTimer) {
+                                clearTimeout(longPressTimer);
+                                setLongPressTimer(null);
+                              }
+                              
+                              // Handle swipe to reply
+                              if (swipeDirection && Math.abs(dragOffset) > 60) {
+                                setReplyTo({ id: message.id, user_name: message.user_name, message: message.message });
+                                if (navigator.vibrate) {
+                                  navigator.vibrate(30);
+                                }
+                              }
+                              
+                              setTouchStartX(null);
+                              setSwipeMessageId(null);
+                              setSwipeDirection(null);
+                              setDragOffset(0);
+                            } : undefined}
+                            onTouchCancel={isMobile ? () => {
+                              if (longPressTimer) {
+                                clearTimeout(longPressTimer);
+                                setLongPressTimer(null);
+                              }
+                              setTouchStartX(null);
+                              setSwipeMessageId(null);
+                              setSwipeDirection(null);
+                              setDragOffset(0);
+                            } : undefined}
+                          >
+                            <div className={`flex flex-col items-end min-w-0 flex-1`}>
+                              {isFirstInGroup && (
+                                <div className="flex items-center gap-2 mb-1 transition-all duration-200 hover:scale-105">
+                                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-all duration-200 ${
                                   isOwnMessage 
-                                    ? 'bg-primary text-primary-foreground' 
-                                    : 'bg-muted text-muted-foreground'
+                                      ? 'bg-gradient-to-br from-primary to-primary/80 text-white shadow-md' 
+                                      : 'bg-gradient-to-br from-muted to-muted/60 text-muted-foreground shadow-sm'
                                 }`}>
                                   {message.user_name.charAt(0).toUpperCase()}
                                 </div>
-                              </div>
-                            )}
-                            
-                            <div className={`flex-1 ${showAvatar ? '' : 'ml-8 sm:ml-11'} ${isOwnMessage ? 'mr-8 sm:mr-11' : ''}`}>
-                              {showAvatar && (
-                                <div className={`flex items-center gap-2 mb-1 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
-                                  <span className="font-medium text-xs sm:text-sm truncate">{message.user_name}</span>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-xs sm:text-sm truncate text-foreground">{message.user_name}</span>
                                   {getUserRoleBadge(message.user_role, message.user_position)}
-                                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
                                     {formatMessageTime(message.created_at)}
                                   </span>
                                 </div>
+                                </div>
+                              )}
+                              {repliedMessage && (
+                                <div className={`flex items-center gap-1 text-xs rounded bg-muted/40 px-2 py-1 mb-1 ${isOwnMessage ? 'border-r-4 border-primary/60' : 'border-l-4 border-muted-foreground/60'} max-w-[80%]`}>
+                                  <div className="flex items-center gap-1">
+                                    <CornerDownLeft className="inline-block h-3 w-3 text-primary/70" />
+                                    <span className="font-medium text-muted-foreground">{repliedMessage.user_name}</span>
+                                  </div>
+                                  <span className="truncate text-muted-foreground/80" dangerouslySetInnerHTML={{__html: processMessageForDisplay(repliedMessage.message)}} />
+                                </div>
+                              )}
+                              <div className="relative group">
+                                {/* Compute bubble class and dir outside JSX for clarity and linter safety */}
+                                {(() => {
+                                  const base = 'px-4 py-2 max-w-[80vw] sm:max-w-md md:max-w-lg shadow-sm transition-all duration-200';
+                                  const shape = isFirstInGroup && isLastInGroup
+                                    ? 'rounded-2xl'
+                                    : isFirstInGroup
+                                      ? isOwnMessage
+                                        ? 'rounded-2xl rounded-br-lg'
+                                        : 'rounded-2xl rounded-bl-lg'
+                                      : isLastInGroup
+                                        ? isOwnMessage
+                                          ? 'rounded-2xl rounded-tr-lg'
+                                          : 'rounded-2xl rounded-tl-lg'
+                                        : 'rounded-2xl';
+                                  const color = isOwnMessage
+                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100';
+                                  const ring = hoveredReplyId === message.id ? 'ring-2 ring-primary/70 ring-offset-2' : '';
+                                  const dir = /^[\u0000-\u007F]*$/.test(message.message) ? 'ltr' : 'rtl';
+                                  const transform = swipeMessageId === message.id ? `transform translate-x-[${dragOffset}px]` : '';
+                                  const bubbleClass = `${base} ${shape} ${color} ${ring} ${transform}`;
+                                  return (
+                                    <div
+                                      className={bubbleClass + ' ml-auto'}
+                                      dir={dir}
+                                      style={{
+                                        margin: 0,
+                                        marginTop: isFirstInGroup ? '0' : '2px',
+                                        transform: isMobile && swipeMessageId === message.id ? `translateX(${Math.min(Math.abs(dragOffset), 100) * (dragOffset > 0 ? 1 : -1)}px)` : 'none',
+                                        transition: swipeMessageId === message.id ? 'none' : 'transform 200ms ease-out'
+                                      }}
+                                    >
+                                      <span className="text-sm whitespace-pre-line break-words" dangerouslySetInnerHTML={{__html: processMessageForDisplay(message.message)}} />
+                                    </div>
+                                  );
+                                })()}
+                                {/* Action buttons on hover */}
+                                {hoveredMessageId === message.id && (
+                                  <div
+                                    className={`absolute top-1/2 -translate-y-1/2 z-10 flex gap-1 bg-white/80 dark:bg-gray-800/80 rounded-full shadow px-1 py-0.5 border border-gray-200 dark:border-gray-700 transition-all duration-150 ${
+                                      // Always show on the left side regardless of message owner
+                                      'left-0 -translate-x-full'
+                                    }`}
+                                  >
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      onClick={e => { e.stopPropagation(); setEmojiMenuFor(message.id); }}
+                                      title="React with emoji"
+                                    >
+                                      <Smile className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                      onClick={e => { e.stopPropagation(); setReplyTo({ id: message.id, user_name: message.user_name, message: message.message }); }}
+                                      title="Reply to message"
+                                    >
+                                      <CornerDownLeft className="h-4 w-4" />
+                                    </Button>
+                                </div>
                               )}
                               
-                              <div className={`rounded-lg px-3 py-2 max-w-[85%] sm:max-w-[70%] ${
-                                isOwnMessage 
-                                  ? 'bg-primary text-primary-foreground ml-auto' 
-                                  : 'bg-muted'
-                              }`}>
-                                <p className="text-sm whitespace-pre-wrap break-words">{message.message}</p>
+                                {/* Quick emoji reactions menu with mobile-friendly design */}
+                                {emojiMenuFor === message.id && (
+                                  <div 
+                                    className={`absolute bottom-full right-0 mb-2 w-72 bg-background border rounded-lg shadow-lg overflow-hidden z-50`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="text-xs font-medium text-muted-foreground mb-3 text-center">React with emoji</div>
+                                    <div className={isMobile ? 'grid grid-cols-4 gap-2' : 'flex gap-1'}>
+                                      {['👍', '❤️', '😊', '😂', '😮', '😢', '😡', '🔥'].map((emoji) => (
+                                        <button
+                                          key={emoji}
+                                          onClick={() => {
+                                            handleReaction(message.id, emoji);
+                                            setEmojiMenuFor(null);
+                                          }}
+                                          className={`p-2 hover:bg-muted/80 rounded transition-colors ${
+                                            messageReactions[message.id]?.[emoji]?.includes(user?.name || '') 
+                                              ? 'bg-primary/20' 
+                                              : ''
+                                          }`}
+                                        >
+                                          {emoji}
+                                        </button>
+                                      ))}
                               </div>
                             </div>
+                                )}
+
+                                {/* Display reactions */}
+                                {messageReactions[message.id] ? (
+                                  Object.keys(messageReactions[message.id]).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 ml-0"> {/* Added ml-0 to ensure reactions start from left */}
+                                      {Object.entries(messageReactions[message.id]).map(([emoji, users]) => (
+                                        <button
+                                          key={emoji}
+                                          onClick={() => handleReaction(message.id, emoji)}
+                                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs border transition-all duration-200 hover:scale-110 ${
+                                            users.includes(user?.name || '') 
+                                              ? 'bg-primary/20 border-primary/30' 
+                                              : 'bg-muted/20 border-muted/30'
+                                          }`}
+                                          title={`${users.join(', ')}`}
+                                        >
+                                          <span>{emoji}</span>
+                                          <span>{users.length}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )
+                                ) : null}
+
+                              </div>
+                            </div>
+{!isFirstInGroup && <div className={`w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0 ${isOwnMessage ? 'order-3' : 'order-0'}`} />}
                           </div>
                         );
                       })}
@@ -1058,33 +1432,43 @@ const WorkspacePage = () => {
                       <TypingIndicator />
                       
                       <div ref={messagesEndRef} />
-                      
-
                     </div>
                   )}
-                </div>
+                </ScrollArea>
                 
                 <Separator />
                 
                 {/* Message Input */}
-                <div className="p-3 sm:p-4 bg-muted/30">
+                <div className="p-3 sm:p-4">
+                  {/* Reply preview */}
+                  {replyTo && (
+                    <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-muted/30 rounded-lg">
+                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                        <CornerDownLeft className="h-4 w-4 text-primary/70 flex-shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-medium text-muted-foreground">Replying to {replyTo.user_name}</span>
+                          <span className="text-xs truncate text-muted-foreground/70" dangerouslySetInnerHTML={{__html: processMessageForDisplay(replyTo.message)}} />
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 rounded-full hover:bg-muted/60"
+                        onClick={() => setReplyTo(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
-                      <Input
-                        value={newMessage}
-                        onChange={handleInputChange}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type your message..."
-                        disabled={isSending}
-                        className={`${isMobile ? 'pr-16 text-base' : 'pr-24'}`}
-                        maxLength={1000}
-                      />
+                      {/* Emoji button on the right */}
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
                         <div className="relative">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className={`${isMobile ? 'h-8 w-8' : 'h-6 w-6'} p-0`}
+                            className="h-8 w-8 p-0 hover:bg-muted/60 rounded-full"
                             onClick={(e) => {
                               e.stopPropagation();
                               setShowEmojiMenu(!showEmojiMenu);
@@ -1096,15 +1480,32 @@ const WorkspacePage = () => {
                           {/* Emoji Menu */}
                           {showEmojiMenu && (
                             <div 
-                              className={`absolute ${isMobile ? 'bottom-10 right-0 w-72 max-h-56' : 'bottom-8 right-0 w-64 max-h-48'} bg-background border rounded-lg shadow-lg p-3 overflow-y-auto z-50`}
+                              className="absolute bottom-full right-0 mb-2 w-72 bg-background border rounded-lg shadow-lg overflow-hidden z-50"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <div className={`grid ${isMobile ? 'grid-cols-9' : 'grid-cols-8'} gap-1`}>
+                              <div className="p-2 border-b">
+                                <div className="text-xs font-medium text-muted-foreground mb-2">Frequently Used</div>
+                                <div className="grid grid-cols-8 gap-1">
+                                  {popularEmojis.slice(0, 16).map((emoji, index) => (
+                                    <button
+                                      key={index}
+                                      onClick={() => selectEmoji(emoji)}
+                                      className="text-xl p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
+                                      title={emoji}
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="p-2">
+                                <div className="text-xs font-medium text-muted-foreground mb-2">All Emojis</div>
+                                <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
                                 {popularEmojis.map((emoji, index) => (
                                   <button
                                     key={index}
                                     onClick={() => selectEmoji(emoji)}
-                                    className={`${isMobile ? 'text-xl p-2' : 'text-lg p-1'} hover:bg-muted rounded transition-colors`}
+                                      className="text-xl p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
                                     title={emoji}
                                   >
                                     {emoji}
@@ -1112,48 +1513,44 @@ const WorkspacePage = () => {
                                 ))}
                               </div>
                             </div>
-                          )}
                         </div>
-                        {!isMobile && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                          >
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
                         )}
                       </div>
                     </div>
-                    <Button
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim() || isSending}
-                      size={isMobile ? "default" : "sm"}
-                      className={`${isMobile ? 'px-4' : ''}`}
-                    >
-                      <Send className="h-4 w-4" />
-                      {isMobile && <span className="ml-2">Send</span>}
-                    </Button>
+
+                      <Input
+                        ref={inputRef}
+                        value={newMessage}
+                        onChange={handleInputChange}
+                        onKeyPress={handleKeyPress}
+                        onSelect={handleSelect}
+                        placeholder={replyTo ? "Type your reply..." : "Type your message..."}
+                        disabled={isSending}
+                        className="pl-4 pr-12 text-base"
+                        maxLength={1000}
+                      />
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {newMessage.length}/1000 characters {!isMobile && '• Click 😊 for emoji menu'}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Desktop Sidebar */}
-            {!isMobile && (
-              <Card className="h-full">
-                <CardHeader>
+            {/* Desktop Sidebar - Only Online Users */}
+            <Card className="hidden lg:flex flex-col h-full">
+              <CardHeader className="flex-shrink-0 p-3 sm:p-4 border-b">
+                <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Users className="h-4 w-4" />
-                    Team Members
+                    Online Team
                   </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {onlineUsers.length + 1}
+                  </Badge>
+                </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="flex-1 overflow-y-auto">
-                    <div className="space-y-1 p-4">
+              <CardContent className="flex-1 p-0 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="space-y-1 p-3">
                       {/* Current User */}
                       <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
                         <div className="relative">
@@ -1173,9 +1570,8 @@ const WorkspacePage = () => {
                         </div>
                       </div>
 
-                      {/* Other Users */}
+                    {/* Other Online Users */}
                       {onlineUsers.map((otherUser) => {
-                        const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
                         const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
                         
                         return (
@@ -1184,47 +1580,45 @@ const WorkspacePage = () => {
                               <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
                                 {otherUser.name.charAt(0).toUpperCase()}
                               </div>
-                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
-                                isOnline ? 'bg-green-500' : 'bg-gray-400'
-                              }`}></div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{otherUser.name}</p>
                               <div className="flex items-center gap-1">
                                 {getUserRoleBadge(otherUser.role, otherUser.position)}
                               </div>
-                              {isUserTyping ? (
+                            {isUserTyping && (
                                 <p className="text-xs text-primary italic">typing...</p>
-                              ) : !isOnline && (
-                                <p className="text-xs text-muted-foreground">
-                                  {statusText}
-                                </p>
                               )}
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
+                </ScrollArea>
                 </CardContent>
               </Card>
-            )}
           </div>
 
-          {/* Mobile Sidebar Overlay */}
+          {/* Mobile Sidebar Overlay - Only Online Users */}
           {isMobile && showMobileSidebar && (
             <>
               {/* Backdrop */}
               <div 
-                className="absolute inset-0 bg-black/50 z-40"
+                className="fixed inset-0 bg-black/50 z-40"
                 onClick={() => setShowMobileSidebar(false)}
               />
               
               {/* Sidebar */}
-              <div className="absolute top-0 right-0 h-full w-80 max-w-[80vw] bg-background border-l z-50 overflow-hidden">
+              <div className="fixed top-0 right-0 h-full w-80 max-w-[80vw] bg-background border-l z-50">
                 <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between p-4 border-b">
-                    <h3 className="font-semibold">Team Members</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">Online Team</h3>
+                      <Badge variant="secondary" className="text-xs">
+                        {onlineUsers.length + 1}
+                      </Badge>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1235,7 +1629,7 @@ const WorkspacePage = () => {
                     </Button>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto">
+                  <ScrollArea className="flex-1">
                     <div className="space-y-1 p-4">
                       {/* Current User */}
                       <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
@@ -1256,9 +1650,8 @@ const WorkspacePage = () => {
                         </div>
                       </div>
 
-                      {/* Other Users */}
+                      {/* Other Online Users */}
                       {onlineUsers.map((otherUser) => {
-                        const { isOnline, statusText } = getUserStatus(otherUser.last_seen);
                         const isUserTyping = typingUsers.some(t => t.user_id === otherUser.id);
                         
                         return (
@@ -1267,28 +1660,22 @@ const WorkspacePage = () => {
                               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
                                 {otherUser.name.charAt(0).toUpperCase()}
                               </div>
-                              <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-background rounded-full ${
-                                isOnline ? 'bg-green-500' : 'bg-gray-400'
-                              }`}></div>
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate">{otherUser.name}</p>
                               <div className="flex items-center gap-1 mt-1">
                                 {getUserRoleBadge(otherUser.role, otherUser.position)}
                               </div>
-                              {isUserTyping ? (
+                              {isUserTyping && (
                                 <p className="text-xs text-primary italic mt-1">typing...</p>
-                              ) : !isOnline && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {statusText}
-                                </p>
                               )}
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
+                  </ScrollArea>
                 </div>
               </div>
             </>

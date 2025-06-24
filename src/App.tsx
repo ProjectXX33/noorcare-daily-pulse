@@ -21,9 +21,8 @@ import EmployeeRatingsPage from "./pages/EmployeeRatingsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ShiftsPageWrapper from "./pages/ShiftsPageWrapper";
 import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CheckInProvider } from "./contexts/CheckInContext";
-import { useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { WorkspaceMessageProvider } from "./contexts/WorkspaceMessageContext";
 import { LoyalCustomersProvider } from "./contexts/LoyalCustomersContext";
@@ -60,6 +59,8 @@ import CopyWritingLoader from "./components/MobileCopyWritingLoader";
 import StrategyPage from "./pages/StrategyPage";  
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
+import { ThemeProvider } from 'next-themes';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,6 +70,55 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Simple function to debug sticky header
+const debugStickyHeader = () => {
+  console.log('=== STICKY HEADER DEBUG ===');
+  const header = document.querySelector('header[class*="sticky"]');
+  
+  if (!header) {
+    console.log('❌ No sticky header found');
+    return;
+  }
+  
+  console.log('✅ Header found:', header);
+  
+  const computedStyle = window.getComputedStyle(header);
+  console.log('📊 Header computed styles:');
+  console.log('  - position:', computedStyle.position);
+  console.log('  - top:', computedStyle.top);
+  console.log('  - z-index:', computedStyle.zIndex);
+  
+  let parent = header.parentElement;
+  let level = 1;
+  
+  while (parent && level <= 5) {
+    const parentStyle = window.getComputedStyle(parent);
+    const overflow = parentStyle.overflow;
+    const overflowY = parentStyle.overflowY;
+    
+    console.log(`📦 Parent level ${level}:`, parent.tagName, parent.className);
+    console.log(`  - overflow: ${overflow}, overflow-y: ${overflowY}`);
+    
+    if (overflow !== 'visible' || overflowY !== 'visible') {
+      console.log(`⚠️  Found conflicting overflow on parent level ${level}!`);
+    }
+    
+    parent = parent.parentElement;
+    level++;
+  }
+  
+  // Check if there's enough content to scroll
+  const documentHeight = document.documentElement.scrollHeight;
+  const windowHeight = window.innerHeight;
+  console.log(`📏 Document height: ${documentHeight}px, Window height: ${windowHeight}px`);
+  
+  if (documentHeight <= windowHeight) {
+    console.log('⚠️  Not enough content to scroll - sticky header won\'t be noticeable');
+  }
+  
+  console.log('🔍 Try scrolling to test sticky behavior...');
+};
 
 // Private route component to protect routes that require authentication
 const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
@@ -201,9 +251,11 @@ const AuthenticatedNotificationBanner = () => {
   return <NotificationBanner />;
 };
 
-// This component is outside the BrowserRouter but inside the other providers
-const AppWithAuth = () => {
+// Component that uses auth hooks - must be inside AuthProvider
+const AppContent = () => {
   const [showOpeningAnimation, setShowOpeningAnimation] = useState(true);
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     // Hide opening animation after 2 seconds
@@ -221,346 +273,394 @@ const AppWithAuth = () => {
     }
   }, []);
 
+  // Fix dark mode by manually syncing with localStorage and listening for changes
+  useEffect(() => {
+    const applyStoredTheme = () => {
+      const theme = localStorage.getItem('theme-preference') || localStorage.getItem('theme') || 'light';
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    };
+
+    // Apply theme on mount and route change
+    applyStoredTheme();
+
+    // Listen for theme changes from the toggle button
+    const handleThemeChange = () => {
+      applyStoredTheme();
+    };
+
+    window.addEventListener('themeChange', handleThemeChange);
+    
+    // Debug sticky header after theme is applied
+    setTimeout(() => {
+      debugStickyHeader();
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('themeChange', handleThemeChange);
+    };
+  }, [location.pathname]);
+
+  return (
+    <>
+      <AnimatePresence>
+        {showOpeningAnimation && <OpeningAnimation />}
+      </AnimatePresence>
+      <AuthenticatedNotificationBanner />
+      <NotificationHandler />
+      <Routes>
+        <Route path="/" element={<PageTransition><Index /></PageTransition>} />
+        <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+        <Route 
+          path="/dashboard" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <Dashboard />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/employee-dashboard" 
+          element={
+            <EmployeeDashboardRoute>
+              <SidebarNavigation>
+                <EmployeeDashboard />
+              </SidebarNavigation>
+            </EmployeeDashboardRoute>
+          } 
+        />
+        <Route 
+          path="/copy-writing-dashboard" 
+          element={
+            <CopyWritingRoute>
+              <SidebarNavigation>
+                <CopyWritingDashboard />
+              </SidebarNavigation>
+            </CopyWritingRoute>
+          } 
+        />
+        <Route 
+          path="/check-in" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <CheckInPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/shifts" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <ShiftsPageWrapper />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/report" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <ReportPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/employees" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminEmployeesPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/reports" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminReportsPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/tasks" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminTasksPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin-ratings" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminRatingsPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/employee-tasks" 
+          element={
+            <EmployeeRoute>
+              <SidebarNavigation>
+                <EmployeeTasksPage />
+              </SidebarNavigation>
+            </EmployeeRoute>
+          } 
+        />
+        <Route 
+          path="/my-ratings" 
+          element={
+            <EmployeeRoute>
+              <SidebarNavigation>
+                <EmployeeRatingsPage />
+              </SidebarNavigation>
+            </EmployeeRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <SettingsPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/events" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <EventsPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/media-buyer-tasks" 
+          element={
+            <MediaBuyerRoute>
+              <SidebarNavigation>
+                <MediaBuyerTasksPage />
+              </SidebarNavigation>
+            </MediaBuyerRoute>
+          } 
+        />
+        <Route 
+          path="/admin-shift-management" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminShiftManagement />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/performance-dashboard" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminPerformancePage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/workspace" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <WorkspacePage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/analytics" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminAnalyticsPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin-bug-reports" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminBugReportsPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/customer-service-crm" 
+          element={
+            <CustomerServiceRoute>
+              <SidebarNavigation>
+                <CustomerServiceCRMPage />
+              </SidebarNavigation>
+            </CustomerServiceRoute>
+          } 
+        />
+        <Route 
+          path="/create-order" 
+          element={
+            <CustomerServiceRoute>
+              <SidebarNavigation>
+                <CreateOrderPage />
+              </SidebarNavigation>
+            </CustomerServiceRoute>
+          } 
+        />
+        <Route 
+          path="/my-orders" 
+          element={
+            <CustomerServiceRoute>
+              <SidebarNavigation>
+                <MyOrdersPage />
+              </SidebarNavigation>
+            </CustomerServiceRoute>
+          } 
+        />
+        <Route 
+          path="/admin-total-orders" 
+          element={
+            <AdminRoute>
+              <SidebarNavigation>
+                <AdminTotalOrdersPage />
+              </SidebarNavigation>
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/loyal-customers" 
+          element={
+            <CustomerServiceRoute>
+              <SidebarNavigation>
+                <LoyalCustomersPage />
+              </SidebarNavigation>
+            </CustomerServiceRoute>
+          } 
+        />
+        <Route 
+          path="/designer-dashboard" 
+          element={
+            <DesignerRoute>
+              <SidebarNavigation>
+                <DesignerDashboard />
+              </SidebarNavigation>
+            </DesignerRoute>
+          } 
+        />
+        <Route 
+          path="/copy-writing-dashboard" 
+          element={
+            <CopyWritingRoute>
+              <SidebarNavigation>
+                <CopyWritingDashboard />
+              </SidebarNavigation>
+            </CopyWritingRoute>
+          } 
+        />
+        <Route 
+          path="/copy-writing-products" 
+          element={
+            <CopyWritingRoute>
+              <SidebarNavigation>
+                <CopyWritingProductsPage />
+              </SidebarNavigation>
+            </CopyWritingRoute>
+          } 
+        />
+        <Route 
+          path="/strategy" 
+          element={
+            <StrategyRoute>
+              <SidebarNavigation>
+                <StrategyPage />
+              </SidebarNavigation>
+            </StrategyRoute>
+          } 
+        />
+        <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+      </Routes>
+      <AppUpdateManager />
+      <UpdateTrigger />
+      <PWAVersionChecker />
+      <PWAUpdateInstructions />
+      <FloatingChatbot />
+      <BackgroundProcessIndicator />
+      <CustomerLoader />
+      <CopyWritingLoader />
+      <PWAInstallPrompt />
+      <Toaster />
+      <Sonner />
+    </>
+  );
+};
+
+// Main App wrapper that provides all contexts
+const AppWithAuth = () => {
   return (
     <BrowserRouter>
-        <AuthProvider>
-          <WorkspaceMessageProvider>
-            <CheckInProvider>
-              <LoyalCustomersProvider>
-                <CopyWritingProductsProvider>
-                  <StrategyProvider>
-                    <LanguageProvider>
-                      <AnimatePresence>
-                        {showOpeningAnimation && <OpeningAnimation />}
-                      </AnimatePresence>
-                      <AuthenticatedNotificationBanner />
-                      <NotificationHandler />
-                      <Routes>
-                        <Route path="/" element={<PageTransition><Index /></PageTransition>} />
-                        <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
-                        <Route 
-                          path="/dashboard" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <Dashboard />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/employee-dashboard" 
-                          element={
-                            <EmployeeDashboardRoute>
-                              <SidebarNavigation>
-                                <EmployeeDashboard />
-                              </SidebarNavigation>
-                            </EmployeeDashboardRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/copy-writing-dashboard" 
-                          element={
-                            <CopyWritingRoute>
-                              <SidebarNavigation>
-                                <CopyWritingDashboard />
-                              </SidebarNavigation>
-                            </CopyWritingRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/check-in" 
-                          element={
-                            <PrivateRoute>
-                              <SidebarNavigation>
-                                <CheckInPage />
-                              </SidebarNavigation>
-                            </PrivateRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/shifts" 
-                          element={
-                            <PrivateRoute>
-                              <SidebarNavigation>
-                                <ShiftsPageWrapper />
-                              </SidebarNavigation>
-                            </PrivateRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/report" 
-                          element={
-                            <PrivateRoute>
-                              <SidebarNavigation>
-                                <ReportPage />
-                              </SidebarNavigation>
-                            </PrivateRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/employees" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminEmployeesPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/reports" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminReportsPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/tasks" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminTasksPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/admin-ratings" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminRatingsPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/employee-tasks" 
-                          element={
-                            <EmployeeRoute>
-                              <SidebarNavigation>
-                                <EmployeeTasksPage />
-                              </SidebarNavigation>
-                            </EmployeeRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/my-ratings" 
-                          element={
-                            <EmployeeRoute>
-                              <SidebarNavigation>
-                                <EmployeeRatingsPage />
-                              </SidebarNavigation>
-                            </EmployeeRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/settings" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <SettingsPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/events" 
-                          element={
-                            <PrivateRoute>
-                              <SidebarNavigation>
-                                <EventsPage />
-                              </SidebarNavigation>
-                            </PrivateRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/media-buyer-tasks" 
-                          element={
-                            <MediaBuyerRoute>
-                              <SidebarNavigation>
-                                <MediaBuyerTasksPage />
-                              </SidebarNavigation>
-                            </MediaBuyerRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/admin-shift-management" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminShiftManagement />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/performance-dashboard" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminPerformancePage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/workspace" 
-                          element={
-                            <PrivateRoute>
-                              <SidebarNavigation>
-                                <WorkspacePage />
-                              </SidebarNavigation>
-                            </PrivateRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/analytics" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminAnalyticsPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/admin-bug-reports" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminBugReportsPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/customer-service-crm" 
-                          element={
-                            <CustomerServiceRoute>
-                              <SidebarNavigation>
-                                <CustomerServiceCRMPage />
-                              </SidebarNavigation>
-                            </CustomerServiceRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/create-order" 
-                          element={
-                            <CustomerServiceRoute>
-                              <SidebarNavigation>
-                                <CreateOrderPage />
-                              </SidebarNavigation>
-                            </CustomerServiceRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/my-orders" 
-                          element={
-                            <CustomerServiceRoute>
-                              <SidebarNavigation>
-                                <MyOrdersPage />
-                              </SidebarNavigation>
-                            </CustomerServiceRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/admin-total-orders" 
-                          element={
-                            <AdminRoute>
-                              <SidebarNavigation>
-                                <AdminTotalOrdersPage />
-                              </SidebarNavigation>
-                            </AdminRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/loyal-customers" 
-                          element={
-                            <CustomerServiceRoute>
-                              <SidebarNavigation>
-                                <LoyalCustomersPage />
-                              </SidebarNavigation>
-                            </CustomerServiceRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/designer-dashboard" 
-                          element={
-                            <DesignerRoute>
-                              <SidebarNavigation>
-                                <DesignerDashboard />
-                              </SidebarNavigation>
-                            </DesignerRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/copy-writing-dashboard" 
-                          element={
-                            <CopyWritingRoute>
-                              <SidebarNavigation>
-                                <CopyWritingDashboard />
-                              </SidebarNavigation>
-                            </CopyWritingRoute>
-                          } 
-                        />
-                        <Route 
-                          path="/copy-writing-products" 
-                          element={
-                            <CopyWritingRoute>
-                              <SidebarNavigation>
-                                <CopyWritingProductsPage />
-                              </SidebarNavigation>
-                            </CopyWritingRoute>
-                          } 
-                        />
-                        {/* Strategy Page */}
-                        <Route 
-                          path="/strategy" 
-                          element={
-                            <StrategyRoute>
-                              <SidebarNavigation>
-                                <StrategyPage />
-                              </SidebarNavigation>
-                            </StrategyRoute>
-                          } 
-                        />
-                        <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
-                      </Routes>
-                      <AppUpdateManager />
-                      <UpdateTrigger />
-                      <PWAVersionChecker />
-                      <PWAUpdateInstructions />
-                      <FloatingChatbot />
-                      <BackgroundProcessIndicator />
-                      <CustomerLoader />
-                      <CopyWritingLoader />
-
-                      <PWAInstallPrompt />
-                      <Toaster />
-                      <Sonner />
-                    </LanguageProvider>
-                  </StrategyProvider>
-                </CopyWritingProductsProvider>
-              </LoyalCustomersProvider>
-            </CheckInProvider>
-          </WorkspaceMessageProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <WorkspaceMessageProvider>
+          <CheckInProvider>
+            <LoyalCustomersProvider>
+              <CopyWritingProductsProvider>
+                <StrategyProvider>
+                  <LanguageProvider>
+                    <AppContent />
+                  </LanguageProvider>
+                </StrategyProvider>
+              </CopyWritingProductsProvider>
+            </LoyalCustomersProvider>
+          </CheckInProvider>
+        </WorkspaceMessageProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AppWithAuth />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider
+      attribute="data-theme"
+      defaultTheme="light"
+      enableSystem={true}
+      storageKey="theme-preference"
+      disableTransitionOnChange={false}
+    >
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AppWithAuth />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

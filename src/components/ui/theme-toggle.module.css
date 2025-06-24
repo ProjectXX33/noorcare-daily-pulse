@@ -1,0 +1,131 @@
+@import "https://unpkg.com/open-props/easings.min.css";
+
+.themeToggle {
+  --icon-fill: hsl(0 0% 0%);
+  --icon-fill-hover: hsl(0 0% 20%);
+  
+  background: none;
+  border: none;
+  padding: 0;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  outline-offset: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.themeToggle:hover {
+  background-color: hsl(0 0% 95%);
+}
+
+.themeToggle:focus-visible {
+  outline: 2px solid hsl(0 0% 0%);
+  outline-offset: 2px;
+}
+
+/* Dark theme styles */
+:global(.dark) .themeToggle,
+:global([data-theme="dark"]) .themeToggle {
+  --icon-fill: hsl(0 0% 100%);
+  --icon-fill-hover: hsl(0 0% 90%);
+}
+
+:global(.dark) .themeToggle:hover,
+:global([data-theme="dark"]) .themeToggle:hover {
+  background-color: hsl(0 0% 15%);
+}
+
+:global(.dark) .themeToggle:focus-visible,
+:global([data-theme="dark"]) .themeToggle:focus-visible {
+  outline-color: hsl(0 0% 100%);
+}
+
+.sunAndMoon > :is(.moon, .sun, .sunBeams) {
+  transform-origin: center;
+}
+
+.sunAndMoon > :is(.moon, .sun) {
+  fill: var(--icon-fill);
+}
+
+.themeToggle:is(:hover, :focus-visible) > .sunAndMoon > :is(.moon, .sun) {
+  fill: var(--icon-fill-hover);
+}
+
+.sunAndMoon > .sunBeams {
+  stroke: var(--icon-fill);
+  stroke-width: 2px;
+}
+
+.themeToggle:is(:hover, :focus-visible) .sunAndMoon > .sunBeams {
+  stroke: var(--icon-fill-hover);
+}
+
+:global(.dark) .sunAndMoon > .sun,
+[data-theme="dark"] .sunAndMoon > .sun {
+  transform: scale(1.75);
+}
+
+:global(.dark) .sunAndMoon > .sunBeams,
+[data-theme="dark"] .sunAndMoon > .sunBeams {
+  opacity: 0;
+}
+
+:global(.dark) .sunAndMoon > .moon > circle,
+[data-theme="dark"] .sunAndMoon > .moon > circle {
+  transform: translateX(-7px);
+}
+
+  @supports (cx: 1) {
+    :global(.dark) .sunAndMoon > .moon > circle,
+    [data-theme="dark"] .sunAndMoon > .moon > circle {
+      cx: 17;
+      transform: translateX(0);
+    }
+  }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sunAndMoon > .sun {
+    transition: transform .5s var(--ease-elastic-3);
+  }
+
+  .sunAndMoon > .sunBeams {
+    transition: transform .5s var(--ease-elastic-4), opacity .5s var(--ease-3);
+  }
+
+  .sunAndMoon .moon > circle {
+    transition: transform .25s var(--ease-out-5);
+  }
+
+  @supports (cx: 1) {
+    .sunAndMoon .moon > circle {
+      transition: cx .25s var(--ease-out-5);
+    }
+  }
+
+  :global(.dark) .sunAndMoon > .sun,
+  [data-theme="dark"] .sunAndMoon > .sun {
+    transition-timing-function: var(--ease-3);
+    transition-duration: .25s;
+    transform: scale(1.75);
+  }
+
+  :global(.dark) .sunAndMoon > .sunBeams,
+  [data-theme="dark"] .sunAndMoon > .sunBeams {
+    transition-duration: .15s;
+    transform: rotateZ(-25deg);
+  }
+
+  :global(.dark) .sunAndMoon > .moon > circle,
+  [data-theme="dark"] .sunAndMoon > .moon > circle {
+    transition-duration: .5s;
+    transition-delay: .25s;
+  }
+} 
