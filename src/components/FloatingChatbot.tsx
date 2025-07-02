@@ -25,7 +25,10 @@ import {
   Clock,
   LogIn,
   LogOut,
-  AlertTriangle
+  AlertTriangle,
+  DollarSign,
+  Target,
+  BarChart3
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -574,33 +577,59 @@ const FloatingChatbot: React.FC = () => {
     }
   };
 
-  // Simplified Customer Service focused actions only
+  // Role-specific actions based on user position
   const getRoleSpecificActions = () => {
     const isArabic = language === 'ar';
     
-    // Only Customer Service actions - simplified and focused
-        return [
+    // Media Buyer specific actions
+    if (user?.position === 'Media Buyer') {
+      return [
         { 
-          label: isArabic ? 'البحث عن المنتجات' : 'Search Products', 
-          action: 'search_products',
-          icon: Search
+          label: isArabic ? 'إنشاء حملة إعلانية' : 'Create Campaign', 
+          action: 'create_campaign',
+          icon: TrendingUp
         },
         { 
+          label: isArabic ? 'تحسين الميزانية' : 'Budget Optimization', 
+          action: 'budget_optimization',
+          icon: DollarSign
+        },
+        { 
+          label: isArabic ? 'استهداف الجمهور' : 'Audience Targeting', 
+          action: 'audience_targeting',
+          icon: Target
+        },
+        { 
+          label: isArabic ? 'مؤشرات الأداء' : 'Performance Metrics', 
+          action: 'performance_metrics',
+          icon: BarChart3
+        }
+      ];
+    }
+    
+    // Customer Service actions (original functionality)
+    return [
+      { 
+        label: isArabic ? 'البحث عن المنتجات' : 'Search Products', 
+        action: 'search_products',
+        icon: Search
+      },
+      { 
         label: isArabic ? 'إنشاء طلب جديد' : 'Create New Order', 
-          action: 'create_order',
-          icon: ShoppingCart
-        },
-        { 
+        action: 'create_order',
+        icon: ShoppingCart
+      },
+      { 
         label: isArabic ? 'مساعدة العملاء' : 'Customer Help', 
         action: 'customer_help',
-          icon: User
+        icon: User
       },
       { 
         label: isArabic ? 'معلومات الشحن' : 'Shipping Info', 
         action: 'shipping_info',
-          icon: Package
-        }
-      ];
+        icon: Package
+      }
+    ];
   };
 
   const createOrderSteps = [
@@ -3793,31 +3822,31 @@ Would you like help implementing any of these recommendations?`;
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
               onMouseEnter={() => {
-                // Allow hover effects for Customer Service users only
-                if (user?.position === 'Customer Service') {
+                // Allow hover effects for Customer Service and Media Buyer users
+                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
                   setIsHovered(true);
                 }
               }}
               onMouseLeave={() => {
-                // Allow hover effects for Customer Service users only
-                if (user?.position === 'Customer Service') {
+                // Allow hover effects for Customer Service and Media Buyer users
+                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
                   setIsHovered(false);
                 }
               }}
               onClick={() => {
-                              // Allow Customer Service users only to open the chatbot (restored original functionality)
-              if (user?.position === 'Customer Service') {
+                // Allow Customer Service and Media Buyer users to open the chatbot
+                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
                   setIsOpen(true);
                 } else {
                   // Show a toast notification for other users
-                toast.info('🤖 Chatbot is only available for Customer Service users.', {
-                  description: 'This chatbot is specifically designed for product search and customer support. Please contact your administrator if you need access.',
+                  toast.info('🤖 Chatbot is only available for Customer Service and Media Buyer users.', {
+                    description: 'This chatbot is designed for product search, customer support, and marketing activities. Please contact your administrator if you need access.',
                     duration: 3000,
                   });
                 }
               }}
               className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r ${roleColors.gradient} shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 border-2 border-white ${
-                user?.position === 'Customer Service'
+                user?.position === 'Customer Service' || user?.position === 'Media Buyer'
                   ? 'cursor-pointer hover:scale-110' 
                   : 'cursor-not-allowed opacity-60'
               }`}

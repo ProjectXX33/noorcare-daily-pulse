@@ -97,14 +97,15 @@ const AdminTotalOrdersPage: React.FC = () => {
   // View mode
   const [viewMode, setViewMode] = useState<'orders' | 'stats'>('orders');
 
-  // Access control - Admin only
+  // Access control - Admin and Media Buyer only
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
       return;
     }
     
-    if (user.role !== 'admin' && user.position !== 'Media Buyer') {
+    // Only redirect if user is loaded and doesn't have access
+    if (user.id && user.role !== 'admin' && user.position !== 'Media Buyer') {
       console.warn('Access denied: User is not admin or media buyer');
       navigate('/dashboard', { replace: true });
       return;

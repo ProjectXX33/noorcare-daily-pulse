@@ -240,6 +240,17 @@ const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Admin and Media Buyer route component for shared admin/media buyer features
+const AdminAndMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
+    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  }
+  
+  return <>{children}</>;
+};
+
 // Warehouse route component for warehouse role access
 const WarehouseRoute = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -571,11 +582,11 @@ const AppContent = () => {
         <Route 
           path="/admin-total-orders" 
           element={
-            <AdminRoute>
+            <AdminAndMediaBuyerRoute>
               <SidebarNavigation>
                 <AdminTotalOrdersPage />
               </SidebarNavigation>
-            </AdminRoute>
+            </AdminAndMediaBuyerRoute>
           } 
         />
         <Route 
