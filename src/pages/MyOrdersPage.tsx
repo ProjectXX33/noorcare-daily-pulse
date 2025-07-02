@@ -32,7 +32,8 @@ import {
   syncAllOrderStatusesFromWooCommerce,
   retrySyncOrderToWooCommerce,
   OrderSubmission, 
-  OrderSubmissionFilters 
+  OrderSubmissionFilters,
+  syncOrderFromWooCommerce
 } from '@/lib/orderSubmissionsApi';
 // Remove date-fns dependency and use built-in date formatting
 
@@ -201,7 +202,7 @@ const MyOrdersPage: React.FC = () => {
     
     try {
       setIsSyncing(true);
-      toast.info(`📥 Starting sync for your orders...`);
+      toast.info(`📥 Starting enhanced sync for your orders...`);
       
       // Get only this user's orders that have WooCommerce IDs
       const myOrdersToSync = orders.filter(order => order.woocommerce_order_id);
@@ -216,9 +217,10 @@ const MyOrdersPage: React.FC = () => {
       
       for (const order of myOrdersToSync) {
         try {
-          const result = await syncOrderStatusFromWooCommerce(order.id!);
+          const result = await syncOrderFromWooCommerce(order.id!);
           if (result.success) {
             syncedCount++;
+            console.log(`✅ Synced order ${order.order_number}: ${result.updatedFields?.length || 0} fields updated`);
           } else {
             errorCount++;
           }
@@ -233,7 +235,7 @@ const MyOrdersPage: React.FC = () => {
       
       // Show results
       if (syncedCount > 0) {
-        toast.success(`✅ Synced ${syncedCount} of your orders from WooCommerce`);
+        toast.success(`✅ Enhanced sync completed. ${syncedCount} of your orders synced from WooCommerce`);
       }
       if (errorCount > 0) {
         toast.warning(`⚠️ ${errorCount} orders had sync errors`);
@@ -256,10 +258,14 @@ const MyOrdersPage: React.FC = () => {
       setSyncingOrderId(orderId);
       toast.info('📥 Syncing order from WooCommerce...');
       
-      const result = await syncOrderStatusFromWooCommerce(orderId);
+      const result = await syncOrderFromWooCommerce(orderId);
       
       if (result.success) {
-        toast.success(result.message);
+        if (result.updatedFields && result.updatedFields.length > 0) {
+          toast.success(`✅ Order synced successfully. Updated fields: ${result.updatedFields.join(', ')}`);
+        } else {
+          toast.success('✅ Order is already up to date with WooCommerce');
+        }
         // Refresh data to show updated status
         await fetchData();
       } else {

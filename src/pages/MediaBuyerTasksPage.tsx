@@ -31,7 +31,7 @@ interface TaskFormData {
   title: string;
   description: string;
   assignedTo: string;
-  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished';
   progressPercentage: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   projectType: 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other';
@@ -206,6 +206,7 @@ const MediaBuyerTasksPage = () => {
       case 'Complete': return 'bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl ring-2 ring-green-500/20';
       case 'In Progress': return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl ring-2 ring-blue-500/20';
       case 'On Hold': return 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-0 shadow-lg hover:shadow-xl ring-2 ring-yellow-500/20';
+      case 'Unfinished': return 'bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-lg hover:shadow-xl ring-2 ring-red-500/20';
       default: return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0 shadow-lg hover:shadow-xl ring-2 ring-gray-400/20';
     }
   };
@@ -310,7 +311,7 @@ const MediaBuyerTasksPage = () => {
       title: task.title || '',
       description: task.description || '',
       assignedTo: task.assignedTo || '',
-      status: task.status || 'Not Started',
+      status: (task.status || 'Not Started') as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished',
       progressPercentage: task.progressPercentage || 0,
       priority: task.priority || 'medium',
       projectType: task.projectType || 'social-media',
@@ -1125,6 +1126,7 @@ const MediaBuyerTasksPage = () => {
                       comments={selectedTaskForDetail.comments || []}
                       onCommentAdded={(comments) => handleAddTaskComment(selectedTaskForDetail.id, comments)}
                       language="en"
+                      isLocked={false}
                     />
                   </div>
                 </TabsContent>

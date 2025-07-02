@@ -25,6 +25,7 @@ export interface Product {
   campaign_performance: 'excellent' | 'good' | 'average' | 'poor' | 'terrible';
   permalink: string;
   language?: string;
+  price?: number;
 }
 
 export interface Order {
@@ -369,7 +370,8 @@ export const StrategyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           trend: trend,
           campaign_performance: performance,
           permalink: wooProduct.permalink || `https://noorcaregcc.com/product/${wooProduct.slug || wooProduct.id}`,
-          language: wooProduct.language || (wooProduct.sku && wooProduct.sku.endsWith('-ar') ? 'ar' : 'en')
+          language: wooProduct.language || (wooProduct.sku && wooProduct.sku.endsWith('-ar') ? 'ar' : 'en'),
+          price: parseFloat(wooProduct.price || wooProduct.regular_price || '0'),
         };
       });
 

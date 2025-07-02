@@ -52,6 +52,7 @@ import StarRating from '@/components/StarRating';
 import { supabase } from '@/lib/supabase';
 import { uploadFile, getFileUrl, isImageFile } from '@/lib/fileUpload';
 import { Star, MoreVertical, Palette, Smartphone, Globe, Award, FileText, Zap, FolderOpen, Plus, Users, TrendingUp, Clock, Calendar, Filter, Edit, Eye, Trash2 } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 
 // Enhanced Task interface with creator information
 interface EnhancedTask extends Task {
@@ -79,7 +80,7 @@ const AdminTasksPage = () => {
     title: '',
     description: '',
     assignedTo: '',
-    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
+    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished',
     progressPercentage: 0,
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other',
@@ -99,10 +100,11 @@ const AdminTasksPage = () => {
     title: '',
     description: '',
     assignedTo: '',
-    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
+    status: 'Not Started' as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished',
     progressPercentage: 0,
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     projectType: 'other' as 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other',
+    isLocked: false,
     // New fields for designer tasks
     tacticalPlan: '',
     timeEstimate: '',
@@ -154,6 +156,7 @@ const AdminTasksPage = () => {
       onHold: "On Hold",
       inProgress: "In Progress",
       complete: "Complete",
+      unfinished: "Unfinished",
       createTask: "Create Task",
       newTask: "New Task",
       createTaskDescription: "Assign a new task to an employee",
@@ -201,6 +204,7 @@ const AdminTasksPage = () => {
       onHold: "في الانتظار",
       inProgress: "قيد التنفيذ",
       complete: "مكتمل",
+      unfinished: "غير مكتمل",
       createTask: "إنشاء مهمة",
       newTask: "مهمة جديدة",
       createTaskDescription: "تعيين مهمة جديدة لموظف",
@@ -433,6 +437,7 @@ const AdminTasksPage = () => {
           progressPercentage: editingTask.progressPercentage,
           priority: editingTask.priority,
           projectType: editingTask.projectType,
+          isLocked: editingTask.isLocked,
           // Include designer fields
           tacticalPlan: editingTask.tacticalPlan,
           timeEstimate: editingTask.timeEstimate,
@@ -581,10 +586,11 @@ const AdminTasksPage = () => {
       title: task.title,
       description: task.description,
       assignedTo: task.assignedTo,
-      status: task.status as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete',
+      status: task.status as 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished',
       progressPercentage: task.progressPercentage,
       priority: task.priority || 'medium',
       projectType: task.projectType || 'other',
+      isLocked: task.isLocked || false,
       tacticalPlan: task.tacticalPlan || '',
       timeEstimate: task.timeEstimate || '',
       aim: task.aim || '',
@@ -636,6 +642,8 @@ const AdminTasksPage = () => {
         return 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg hover:shadow-xl ring-2 ring-yellow-500/20';
       case 'Not Started':
         return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg hover:shadow-xl ring-2 ring-gray-400/20';
+      case 'Unfinished':
+        return 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl ring-2 ring-red-500/20';
       default:
         return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg hover:shadow-xl ring-2 ring-gray-400/20';
     }
@@ -1062,7 +1070,8 @@ const AdminTasksPage = () => {
                             <span className={`inline-block px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:scale-105 whitespace-nowrap min-w-fit ${getStatusBadgeClass(task.status)}`}>
                                 {task.status === 'Not Started' ? t.notStarted :
                                  task.status === 'On Hold' ? t.onHold : 
-                                 task.status === 'In Progress' ? t.inProgress : t.complete}
+                                 task.status === 'In Progress' ? t.inProgress : 
+                                 task.status === 'Complete' ? t.complete : t.unfinished}
                               </span>
                             </TableCell>
                           <TableCell className="py-4">
@@ -1183,7 +1192,8 @@ const AdminTasksPage = () => {
                         <span className={`inline-block px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:scale-105 whitespace-nowrap ${getStatusBadgeClass(task.status)}`}>
                               {task.status === 'Not Started' ? t.notStarted : 
                                task.status === 'On Hold' ? t.onHold : 
-                               task.status === 'In Progress' ? t.inProgress : t.complete}
+                               task.status === 'In Progress' ? t.inProgress : 
+                               task.status === 'Complete' ? t.complete : t.unfinished}
                             </span>
                           </div>
                       <div className="text-sm text-muted-foreground break-words overflow-wrap-anywhere">{task.description}</div>
@@ -1338,10 +1348,11 @@ const AdminTasksPage = () => {
                     <SelectValue placeholder={t.selectStatus} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Not Started">{t.notStarted}</SelectItem>
-                    <SelectItem value="On Hold">{t.onHold}</SelectItem>
-                    <SelectItem value="In Progress">{t.inProgress}</SelectItem>
-                    <SelectItem value="Complete">{t.complete}</SelectItem>
+                                            <SelectItem value="Not Started">{t.notStarted}</SelectItem>
+                        <SelectItem value="On Hold">{t.onHold}</SelectItem>
+                        <SelectItem value="In Progress">{t.inProgress}</SelectItem>
+                        <SelectItem value="Complete">{t.complete}</SelectItem>
+                        <SelectItem value="Unfinished">{t.unfinished}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1719,7 +1730,7 @@ const AdminTasksPage = () => {
                     <Label htmlFor="edit-task-status" className="text-sm sm:text-base font-medium">{t.status}</Label>
                       <Select 
                         value={editingTask.status} 
-                        onValueChange={(value: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete') => 
+                        onValueChange={(value: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished') => 
                           setEditingTask({...editingTask, status: value})
                         }
                       >
@@ -1731,6 +1742,7 @@ const AdminTasksPage = () => {
                         <SelectItem value="On Hold" className="text-sm sm:text-base">{t.onHold}</SelectItem>
                         <SelectItem value="In Progress" className="text-sm sm:text-base">{t.inProgress}</SelectItem>
                         <SelectItem value="Complete" className="text-sm sm:text-base">{t.complete}</SelectItem>
+                        <SelectItem value="Unfinished" className="text-sm sm:text-base">{t.unfinished}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1754,6 +1766,20 @@ const AdminTasksPage = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                
+                <div className="flex items-center space-x-2 rounded-lg border p-4 shadow-sm bg-background">
+                  <Switch
+                    id="lock-task"
+                    checked={editingTask.isLocked}
+                    onCheckedChange={(checked) => setEditingTask({ ...editingTask, isLocked: checked })}
+                  />
+                  <Label htmlFor="lock-task" className="flex flex-col space-y-1">
+                    <span className="font-medium">Lock Task</span>
+                    <span className="text-xs text-muted-foreground">
+                      When locked, the task status becomes "Unfinished" and employees cannot edit it.
+                    </span>
+                  </Label>
                 </div>
                 
                 {/* Project Type Selection for Designer Tasks */}
@@ -1999,6 +2025,7 @@ const AdminTasksPage = () => {
                           setSelectedTask({...selectedTask, comments: newComments});
                         }}
                         language={language}
+                        isLocked={false}
                       />
                     )}
                   </div>
@@ -2393,6 +2420,7 @@ const AdminTasksPage = () => {
                         setSelectedTaskForDetails({...selectedTaskForDetails, comments: newComments});
                       }}
                       language={language}
+                      isLocked={false}
                     />
                   )}
                 </div>

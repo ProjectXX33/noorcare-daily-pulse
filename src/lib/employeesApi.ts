@@ -38,7 +38,7 @@ export async function createEmployee(employee: {
   password: string;
   department: Department;
   position: Position;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'warehouse';
 }): Promise<User> {
   try {
     console.log('Creating employee with data:', { ...employee, password: '[REDACTED]' });

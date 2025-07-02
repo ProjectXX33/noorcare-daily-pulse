@@ -144,8 +144,8 @@ interface EditablePerformanceDashboardProps {
   currentMonth?: string;
 }
 
-// BALANCED PERFORMANCE SCORING SYSTEM - Fair for everyone
-function calcBalancedPerformanceScore(
+// ENHANCED PERFORMANCE SCORING SYSTEM - Based on User Requirements
+function calcImprovedPerformanceScore(
   daysWorked: number,
   workTimeHours: number,
   delayMinutes: number,
@@ -153,78 +153,206 @@ function calcBalancedPerformanceScore(
   tasksCompleted: number,
   tasksTotal: number,
   reportsSubmitted: number,
-  loginCount: number = 0
+  expectedReports: number,
+  averageStarRating: number = 0,
+  totalRatingsCount: number = 0,
+  tasksDelayed: number = 0,
+  tasksUnfinished: number = 0,
+  isRemoteWorker: boolean = false
 ): number {
   let totalScore = 0;
-  let maxPossibleScore = 0;
 
-  // 1. DAYS WORKED POINTS (20 points max)
-  // Reward consistency - 1 point per day worked, up to 20 days
-  const daysPoints = Math.min(20, daysWorked * 1);
-  totalScore += daysPoints;
-  maxPossibleScore += 20;
-  
-  // 2. WORK TIME POINTS (20 points max)
-  // Reward productive work time - 0.5 points per hour, up to 40 hours
-  const workTimePoints = Math.min(20, workTimeHours * 0.5);
-  totalScore += workTimePoints;
-  maxPossibleScore += 20;
+  console.log(`🎯 ENHANCED PERFORMANCE CALCULATION FOR:
+    Days Worked: ${daysWorked} ${isRemoteWorker ? '(Remote - No tracking)' : ''}
+    Work Hours: ${workTimeHours}
+    Delay Minutes: ${delayMinutes}
+    Overtime Hours: ${overtimeHours}
+    Tasks: ${tasksCompleted}/${tasksTotal} (Delayed: ${tasksDelayed}, Unfinished: ${tasksUnfinished})
+    Reports: ${reportsSubmitted}/${expectedReports}
+    Star Rating: ${averageStarRating}⭐ (${totalRatingsCount} ratings)
+    Remote Worker: ${isRemoteWorker}`);
 
-  // 3. DELAY/PUNCTUALITY POINTS (20 points max)
-  // Start with 20 points, deduct for delays
-  let punctualityPoints = 20;
-  if (delayMinutes > 0) {
-    // Deduct 0.2 points per minute of delay
-    const delayPenalty = Math.min(20, delayMinutes * 0.2);
-    punctualityPoints = Math.max(0, punctualityPoints - delayPenalty);
+  if (isRemoteWorker) {
+    // **REMOTE WORKER CALCULATION** - Based on Tasks + Reports + Ratings ONLY
+    console.log('📱 Remote Worker - Using Tasks + Reports + Ratings calculation');
+    
+    // 1. TASK PERFORMANCE (50 points max) - Main scoring for remote workers
+    let taskPoints = 0;
+    if (tasksTotal > 0) {
+      const taskCompletionRate = tasksCompleted / tasksTotal;
+      
+      // Base points for completion rate
+      taskPoints = taskCompletionRate * 40; // Up to 40 points for 100% completion
+      
+      // BONUS: Extra points for completed tasks (+2 per completed task, max 10 bonus)
+      const completionBonus = Math.min(10, tasksCompleted * 2);
+      taskPoints += completionBonus;
+      
+      // PENALTY: Heavy penalty for delayed tasks (-5 per delayed task)
+      const delayedPenalty = tasksDelayed * 5;
+      taskPoints -= delayedPenalty;
+      
+      // PENALTY: Severe penalty for unfinished tasks (-7 per unfinished task)
+      const unfinishedPenalty = tasksUnfinished * 7;
+      taskPoints -= unfinishedPenalty;
+      
+      console.log(`📋 Task Analysis: Base ${(taskCompletionRate * 40).toFixed(1)} + Bonus ${completionBonus} - Delayed ${delayedPenalty} - Unfinished ${unfinishedPenalty} = ${taskPoints.toFixed(1)}`);
+    } else if (tasksCompleted > 0) {
+      // If no total but has completed tasks, give credit
+      taskPoints = Math.min(30, tasksCompleted * 3);
+    }
+    totalScore += Math.max(0, taskPoints); // Don't go below 0
+    
+    // 2. DAILY REPORTS (30 points max) - Important for remote workers
+    let reportPoints = 0;
+    if (expectedReports > 0) {
+      const reportCompletionRate = reportsSubmitted / expectedReports;
+      reportPoints = reportCompletionRate * 30; // Up to 30 points for 100% completion
+      
+      // PENALTY: Missing reports are critical for remote workers (-4 per missing report)
+      const missedReports = Math.max(0, expectedReports - reportsSubmitted);
+      const forgottenReportsPenalty = missedReports * 4;
+      reportPoints -= forgottenReportsPenalty;
+    } else if (reportsSubmitted > 0) {
+      // If no expected reports but has submitted some, give credit
+      reportPoints = Math.min(25, reportsSubmitted * 3);
+    }
+    totalScore += Math.max(0, reportPoints);
+    
+    // 3. STAR RATINGS (20 points max) - Quality indicator for remote workers
+    let starRatingBonus = 0;
+    if (totalRatingsCount > 0 && averageStarRating > 0) {
+      if (averageStarRating >= 5.0) {
+        starRatingBonus = 20; // Excellent: +20 points (higher for remote)
+      } else if (averageStarRating >= 4.5) {
+        starRatingBonus = 15; // Very Good: +15 points
+      } else if (averageStarRating >= 4.0) {
+        starRatingBonus = 10; // Good: +10 points
+      } else if (averageStarRating >= 3.5) {
+        starRatingBonus = 5;  // Average: +5 points
+      } else if (averageStarRating >= 3.0) {
+        starRatingBonus = 0;  // Neutral: no change
+      } else if (averageStarRating >= 2.0) {
+        starRatingBonus = -8; // Poor: -8 points
+      } else {
+        starRatingBonus = -15; // Very Poor: -15 points
+      }
+    }
+    totalScore += starRatingBonus;
+    
+    console.log(`📊 REMOTE WORKER SCORE BREAKDOWN:
+      Task Performance: +${Math.max(0, taskPoints).toFixed(1)} points (${tasksCompleted}/${tasksTotal})
+      Daily Reports: +${Math.max(0, reportPoints).toFixed(1)} points (${reportsSubmitted}/${expectedReports})
+      Star Rating: ${starRatingBonus > 0 ? '+' : ''}${starRatingBonus} points (${averageStarRating}⭐)
+      FINAL SCORE: ${Math.max(0, Math.min(100, totalScore)).toFixed(1)}%`);
+    
+  } else {
+    // **OFFICE WORKER CALCULATION** - Include check-in/out + Tasks + Reports + Ratings
+    console.log('🏢 Office Worker - Using full calculation with check-in/out');
+    
+    // 1. TOTAL DAYS WORK (20 points max) - Increases score
+    const daysPoints = Math.min(20, daysWorked * 1.0); // 1.0 points per day worked
+    totalScore += daysPoints;
+    
+    // 2. TOTAL REGULAR HOURS (20 points max) - Increases score
+    const regularHoursPoints = Math.min(20, workTimeHours * 0.6); // 0.6 points per hour
+    totalScore += regularHoursPoints;
+
+    // 3. DELAY TIME PENALTY (up to -25 points) - Decreases score
+    let delayPenalty = 0;
+    if (delayMinutes > 0) {
+      // Heavy penalty for delays: -0.4 points per minute
+      delayPenalty = Math.min(25, delayMinutes * 0.4);
+      totalScore -= delayPenalty;
+    }
+
+    // 4. OVERTIME (NO BONUS) - User specified overtime should NOT increase score
+    // Overtime is neutral - doesn't add or subtract points
+
+    // 5. ENHANCED TASK PERFORMANCE (25 points max) - Critical scoring
+    let taskPoints = 0;
+    if (tasksTotal > 0) {
+      const taskCompletionRate = tasksCompleted / tasksTotal;
+      
+      // Base points for completion rate
+      taskPoints = taskCompletionRate * 20; // Up to 20 points for 100% completion
+      
+      // BONUS: Extra points for completed tasks (+1 per completed task, max 5 bonus)
+      const completionBonus = Math.min(5, tasksCompleted * 1);
+      taskPoints += completionBonus;
+      
+      // PENALTY: Heavy penalty for delayed tasks (-3 per delayed task)
+      const delayedPenalty = tasksDelayed * 3;
+      taskPoints -= delayedPenalty;
+      
+      // PENALTY: Severe penalty for unfinished tasks (-5 per unfinished task)
+      const unfinishedPenalty = tasksUnfinished * 5;
+      taskPoints -= unfinishedPenalty;
+      
+    } else if (tasksCompleted > 0) {
+      // If no total but has completed tasks, give partial credit
+      taskPoints = Math.min(15, tasksCompleted * 2);
+    }
+    totalScore += Math.max(0, taskPoints); // Don't go below 0
+
+    // 6. REPORTS COMPLETION (20 points max) - Increases score
+    let reportPoints = 0;
+    if (expectedReports > 0) {
+      const reportCompletionRate = reportsSubmitted / expectedReports;
+      reportPoints = reportCompletionRate * 20; // Up to 20 points for 100% completion
+      
+      // FORGOTTEN REPORTS PENALTY - Additional penalty for missing reports
+      const missedReports = Math.max(0, expectedReports - reportsSubmitted);
+      const forgottenReportsPenalty = missedReports * 3; // -3 points per missed report
+      reportPoints -= forgottenReportsPenalty;
+    } else if (reportsSubmitted > 0) {
+      // If no expected reports but has submitted some, give partial credit
+      reportPoints = Math.min(15, reportsSubmitted * 2);
+    }
+    totalScore += Math.max(0, reportPoints);
+
+    // 7. STAR RATINGS BONUS (up to +15 points or -10 penalty) - Increases/decreases score
+    let starRatingBonus = 0;
+    if (totalRatingsCount > 0 && averageStarRating > 0) {
+      if (averageStarRating >= 5.0) {
+        starRatingBonus = 15; // Excellent: +15 points
+      } else if (averageStarRating >= 4.5) {
+        starRatingBonus = 12; // Very Good: +12 points
+      } else if (averageStarRating >= 4.0) {
+        starRatingBonus = 8;  // Good: +8 points
+      } else if (averageStarRating >= 3.5) {
+        starRatingBonus = 4;  // Average: +4 points
+      } else if (averageStarRating >= 3.0) {
+        starRatingBonus = 0;  // Neutral: no change
+      } else if (averageStarRating >= 2.0) {
+        starRatingBonus = -5; // Poor: -5 points
+      } else {
+        starRatingBonus = -10; // Very Poor: -10 points
+      }
+    }
+    totalScore += starRatingBonus;
+
+    console.log(`📊 OFFICE WORKER SCORE BREAKDOWN:
+      Days Worked: +${daysPoints.toFixed(1)} points (${daysWorked} days)
+      Regular Hours: +${regularHoursPoints.toFixed(1)} points (${workTimeHours}h)
+      Delay Penalty: -${delayPenalty.toFixed(1)} points (${delayMinutes}min delay)
+      Overtime: 0 points (${overtimeHours}h - neutral)
+      Task Performance: +${Math.max(0, taskPoints).toFixed(1)} points (${tasksCompleted}/${tasksTotal}, Delayed: ${tasksDelayed}, Unfinished: ${tasksUnfinished})
+      Reports: +${Math.max(0, reportPoints).toFixed(1)} points (${reportsSubmitted}/${expectedReports})
+      Star Rating: ${starRatingBonus > 0 ? '+' : ''}${starRatingBonus} points (${averageStarRating}⭐)
+      FINAL SCORE: ${Math.max(0, Math.min(100, totalScore)).toFixed(1)}%`);
   }
-  totalScore += punctualityPoints;
-  maxPossibleScore += 20;
-
-  // 4. OVERTIME BONUS POINTS (10 points max)
-  // Reward dedication - 1 point per hour of overtime
-  const overtimePoints = Math.min(10, overtimeHours * 1);
-  totalScore += overtimePoints;
-  maxPossibleScore += 10;
-
-  // 5. TASK COMPLETION POINTS (20 points max)
-  // Reward task completion rate
-  let taskPoints = 0;
-  if (tasksTotal > 0) {
-    const taskCompletionRate = tasksCompleted / tasksTotal;
-    taskPoints = taskCompletionRate * 20; // 20 points for 100% completion
-  } else if (tasksCompleted > 0) {
-    // If no total but has completed tasks, give partial credit
-    taskPoints = Math.min(15, tasksCompleted * 2);
-  }
-  totalScore += taskPoints;
-  maxPossibleScore += 20;
-
-  // 6. REPORTS POINTS (10 points max)
-  // Reward report submission - 2 points per report
-  const reportPoints = Math.min(10, reportsSubmitted * 2);
-  totalScore += reportPoints;
-  maxPossibleScore += 10;
 
   // Convert to percentage (0-100)
-  const finalScore = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 75;
+  const finalScore = Math.max(0, Math.min(100, totalScore));
   
-  console.log(`📊 BALANCED SCORE BREAKDOWN:
-    Days: ${daysPoints}/20 (${daysWorked} days)
-    Work Time: ${workTimePoints.toFixed(1)}/20 (${workTimeHours}h)
-    Punctuality: ${punctualityPoints.toFixed(1)}/20 (${delayMinutes}min delay)
-    Overtime: ${overtimePoints}/10 (${overtimeHours}h)
-    Tasks: ${taskPoints.toFixed(1)}/20 (${tasksCompleted}/${tasksTotal})
-    Reports: ${reportPoints}/10 (${reportsSubmitted})
-    TOTAL: ${totalScore.toFixed(1)}/${maxPossibleScore} = ${finalScore.toFixed(1)}%`);
-
-  return Math.max(0, Math.min(100, Math.round(finalScore * 100) / 100));
+  return Math.round(finalScore * 100) / 100;
 }
 
 // Legacy function for backward compatibility
 function calcPerformanceScore(delayMinutes: number, overtimeHours: number = 0): number {
-  // Use balanced scoring with default values
-  return calcBalancedPerformanceScore(1, 8, delayMinutes, overtimeHours, 0, 0, 0, 0);
+  // Use improved scoring with default values
+  return calcImprovedPerformanceScore(1, 8, delayMinutes, overtimeHours, 0, 0, 0, 1, 0, 0, 0, 0, false);
 }
 function calcPunctuality(delayMinutes: number): number {
   if (delayMinutes >= 60) return 0.0;
@@ -342,6 +470,30 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
       const monthlyWorkReports = workReportsData || [];
 
+      // Fetch rating data for ALL employees
+      const { data: employeeRatingsData, error: employeeRatingsError } = await supabase
+        .from('employee_ratings')
+        .select('*')
+        .gte('rated_at', startDate.toISOString())
+        .lte('rated_at', endDate.toISOString());
+
+      if (employeeRatingsError) {
+        console.error('Employee ratings error:', employeeRatingsError);
+      }
+
+      const { data: taskRatingsData, error: taskRatingsError } = await supabase
+        .from('task_ratings')
+        .select('task_id, rating, rated_at, tasks!inner(assigned_to)')
+        .gte('rated_at', startDate.toISOString())
+        .lte('rated_at', endDate.toISOString());
+
+      if (taskRatingsError) {
+        console.error('Task ratings error:', taskRatingsError);
+      }
+
+      const monthlyEmployeeRatings = employeeRatingsData || [];
+      const monthlyTaskRatings = taskRatingsData || [];
+
       // Fetch existing admin overrides for this month
       const { data: adminOverrides, error: adminError } = await supabase
         .from('admin_performance_dashboard')
@@ -413,7 +565,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           });
         }
 
-        // Enhanced task completion detection
+        // ENHANCED TASK ANALYSIS - Detect Completed, Delayed, and Unfinished tasks
         const completedTasks = employeeTasks.filter(task => {
           // Check multiple completion indicators
           const statusComplete = ['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status);
@@ -422,12 +574,41 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           
           return statusComplete || hasCompletionDate || hasVisualContent;
         }).length;
+
+        // DELAYED TASKS - Tasks past due date but not marked as complete
+        const delayedTasks = employeeTasks.filter(task => {
+          const isCompleted = ['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status) ||
+                             task.completed_at || task.completion_date || task.finished_at;
+          
+          if (isCompleted) return false; // Don't count completed tasks as delayed
+          
+          // Check if task is past due
+          if (task.due_date) {
+            const dueDate = new Date(task.due_date);
+            const now = new Date();
+            return dueDate < now; // Past due date
+          }
+          
+          // Also check for "delayed" status indicators
+          const isDelayedStatus = ['Delayed', 'delayed', 'DELAYED', 'Overdue', 'overdue', 'OVERDUE'].includes(task.status);
+          return isDelayedStatus;
+        }).length;
+
+        // UNFINISHED TASKS - Tasks marked as unfinished or abandoned
+        const unfinishedTasks = employeeTasks.filter(task => {
+          const isUnfinished = ['Unfinished', 'unfinished', 'UNFINISHED', 'Cancelled', 'cancelled', 'CANCELLED', 'Abandoned', 'abandoned', 'ABANDONED'].includes(task.status);
+          return isUnfinished;
+        }).length;
         
         const tasksWithImages = employeeTasks.filter(task => {
           return task.visual_feeding || task.image_url || task.visual_content || task.completion_image;
         }).length;
         
         const taskSuccessRate = employeeTasks.length > 0 ? (completedTasks / employeeTasks.length) * 100 : 0;
+
+        console.log(`📊 ${employee.name} Task Analysis:
+          Total: ${employeeTasks.length} | Completed: ${completedTasks} | Delayed: ${delayedTasks} | Unfinished: ${unfinishedTasks}
+          Success Rate: ${taskSuccessRate.toFixed(1)}%`);
 
         // Login tracking (simplified - you may want to add actual login tracking)
         const loginCount = daysWorked; // Assuming one login per work day
@@ -447,8 +628,28 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         
         const reportCompletionRate = expectedReports > 0 ? (employeeReports.length / expectedReports) * 100 : 0;
 
-        // **BALANCED PERFORMANCE CALCULATION** - Fair for everyone!
-        const performanceScore = calcBalancedPerformanceScore(
+        // Calculate star ratings for this employee
+        const employeeRatings = monthlyEmployeeRatings.filter(rating => rating.employee_id === employee.id);
+        const employeeAverageRating = employeeRatings.length > 0 
+          ? employeeRatings.reduce((sum, rating) => sum + rating.rating, 0) / employeeRatings.length 
+          : 0;
+
+        // Calculate task ratings for this employee's tasks
+        const employeeTaskRatings = monthlyTaskRatings.filter((rating: any) => 
+          rating.tasks && rating.tasks.assigned_to === employee.id
+        );
+        const taskAverageRating = employeeTaskRatings.length > 0 
+          ? employeeTaskRatings.reduce((sum, rating) => sum + rating.rating, 0) / employeeTaskRatings.length 
+          : 0;
+
+        // Overall average rating (combine employee and task ratings)
+        const totalRatingsCount = employeeRatings.length + employeeTaskRatings.length;
+        const overallAverageRating = totalRatingsCount > 0 
+          ? ((employeeAverageRating * employeeRatings.length) + (taskAverageRating * employeeTaskRatings.length)) / totalRatingsCount
+          : 0;
+
+        // **ENHANCED PERFORMANCE CALCULATION** - Based on User Requirements!
+        const performanceScore = calcImprovedPerformanceScore(
           isRemoteRole ? 0 : daysWorked, // Days worked (0 for remote = no tracking)
           isRemoteRole ? 0 : totalWorkTime, // Work time hours
           isRemoteRole ? 0 : totalDelay * 60, // Convert delay hours to minutes
@@ -456,7 +657,12 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           completedTasks, // Tasks completed
           employeeTasks.length, // Total tasks
           employeeReports.length, // Reports submitted
-          loginCount // Login count
+          expectedReports, // Expected reports
+          overallAverageRating, // Average star rating
+          totalRatingsCount, // Total ratings count
+          delayedTasks, // Tasks delayed
+          unfinishedTasks, // Tasks unfinished  
+          isRemoteRole // Is remote worker flag
         );
 
         // **FIXED**: Calculate "Delay to Finish" with proper logic and colors
@@ -869,7 +1075,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
           const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0); // Last day of month
           
-          const [employeeRatings, employeeTasks] = await Promise.all([
+          const [employeeRatings, taskRatingsData] = await Promise.all([
             // Get employee ratings for this month
             supabase
               .from('employee_ratings')
@@ -904,8 +1110,8 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           }
 
           // Process Task Ratings
-          if (employeeTasks.data && employeeTasks.data.length > 0) {
-            const taskRatings = employeeTasks.data
+          if (taskRatingsData.data && taskRatingsData.data.length > 0) {
+            const taskRatings = taskRatingsData.data
               .flatMap(task => task.task_ratings || [])
               .map(tr => tr.rating);
             
@@ -958,73 +1164,100 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             });
           }
 
-          // JUSTICE CALCULATION: Fair performance based on multiple factors
-          let totalPerformanceScore = 0;
-          let validShifts = 0;
+          // Get tasks and reports for improved calculation
+          const { data: userTasks } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('assigned_to', userRecord.id)
+            .gte('created_at', monthStart.toISOString())
+            .lte('created_at', monthEnd.toISOString());
 
-          for (const shift of monthlyShifts) {
-            if (shift.shifts) {
-              // Get expected hours for this shift type
-              let expectedHours;
-              if (shift.shifts.name.toLowerCase().includes('day')) {
-                expectedHours = 7; // Day shift
-              } else if (shift.shifts.name.toLowerCase().includes('night')) {
-                expectedHours = 8; // Night shift
-              } else {
-                // Custom shift - calculate from start/end times
-                try {
-                  const [startHour, startMin] = shift.shifts.start_time.split(':').map(Number);
-                  const [endHour, endMin] = shift.shifts.end_time.split(':').map(Number);
-                  
-                  let durationMinutes;
-                  if (endHour < startHour || (endHour === startHour && endMin < startMin)) {
-                    durationMinutes = (24 * 60 - (startHour * 60 + startMin)) + (endHour * 60 + endMin);
-                  } else {
-                    durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
-                  }
-                  
-                  expectedHours = durationMinutes / 60;
-                } catch (e) {
-                  expectedHours = 8; // Fallback
-                }
-              }
+          const { data: userReports } = await supabase
+            .from('work_reports')
+            .select('*')
+            .eq('user_id', userRecord.id)
+            .gte('date', startOfMonth)
+            .lte('date', endOfMonth);
 
-              // Calculate performance for this shift
-              const actualHours = (shift.regular_hours || 0) + (shift.overtime_hours || 0);
-              const shiftDelayMinutes = shift.delay_minutes || 0;
-              const shiftBreakMinutes = shift.total_break_minutes || 0;
-              
-              // 1. Work Completion Score (40%)
-              const workCompletionScore = actualHours >= expectedHours ? 100 : 
-                                        Math.max(0, (actualHours / expectedHours) * 100);
-              
-              // 2. Punctuality Score (30%)
-              const punctualityScore = shiftDelayMinutes === 0 ? 100 :
-                                     shiftDelayMinutes > 60 ? 0 :
-                                     Math.max(0, 100 - (shiftDelayMinutes * 2));
-              
-              // 3. Break Efficiency Score (20%)
-              const expectedBreakMinutes = expectedHours * 8; // 8 min break per hour
-              const breakEfficiencyScore = shiftBreakMinutes <= expectedBreakMinutes ? 100 :
-                                        Math.max(0, 100 - ((shiftBreakMinutes - expectedBreakMinutes) / 5));
-              
-              // 4. Rating Bonus (10%) - NEW FEATURE  
-              const shiftRatingBonus = ratingBonus * 0.1; // Apply rating bonus per shift
-              
-              // Calculate weighted final score with rating bonus (NO overtime bonus)
-              let performanceScore = (workCompletionScore * 0.4) + 
-                                   (punctualityScore * 0.3) + 
-                                   (breakEfficiencyScore * 0.2) + 
-                                   (10) + // Base completion bonus
-                                   shiftRatingBonus;
-              
-              totalPerformanceScore += performanceScore;
-              validShifts++;
+          // ENHANCED TASK ANALYSIS - Count completed, delayed, and unfinished tasks
+          const userTasksList = userTasks || [];
+          
+          const completedTasks = userTasksList.filter(task => {
+            const statusComplete = ['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status);
+            const hasCompletionDate = task.completed_at || task.completion_date || task.finished_at;
+            const hasVisualContent = task.visual_feeding || task.image_url || task.visual_content || task.completion_image;
+            return statusComplete || hasCompletionDate || hasVisualContent;
+          }).length;
+
+          // DELAYED TASKS - Tasks past due date but not marked as complete
+          const delayedTasks = userTasksList.filter(task => {
+            const isCompleted = ['Complete', 'Completed', 'complete', 'COMPLETE', 'COMPLETED'].includes(task.status) ||
+                               task.completed_at || task.completion_date || task.finished_at;
+            
+            if (isCompleted) return false; // Don't count completed tasks as delayed
+            
+            // Check if task is past due
+            if (task.due_date) {
+              const dueDate = new Date(task.due_date);
+              const now = new Date();
+              return dueDate < now; // Past due date
             }
+            
+            // Also check for "delayed" status indicators
+            const isDelayedStatus = ['Delayed', 'delayed', 'DELAYED', 'Overdue', 'overdue', 'OVERDUE'].includes(task.status);
+            return isDelayedStatus;
+          }).length;
+
+          // UNFINISHED TASKS - Tasks marked as unfinished or abandoned
+          const unfinishedTasks = userTasksList.filter(task => {
+            const isUnfinished = ['Unfinished', 'unfinished', 'UNFINISHED', 'Cancelled', 'cancelled', 'CANCELLED', 'Abandoned', 'abandoned', 'ABANDONED'].includes(task.status);
+            return isUnfinished;
+          }).length;
+
+          // Calculate expected reports
+          const expectedReports = totalWorkingDays; // One report per working day for office workers
+
+          console.log(`📊 ${userRecord.name} Task Analysis (Recalculate):
+            Total: ${userTasksList.length} | Completed: ${completedTasks} | Delayed: ${delayedTasks} | Unfinished: ${unfinishedTasks}`);
+
+          // Calculate overall average rating
+          let overallRatingAvg = 0;
+          if (totalRatingsCount > 0) {
+            let ratingSum = 0;
+            let ratingCount = 0;
+            
+            if (employeeRatingAvg > 0) {
+              ratingSum += employeeRatingAvg;
+              ratingCount++;
+            }
+            
+            if (taskRatingAvg > 0) {
+              ratingSum += taskRatingAvg;
+              ratingCount++;
+            }
+            
+            overallRatingAvg = ratingCount > 0 ? ratingSum / ratingCount : 0;
           }
 
-          // Calculate final metrics
-          const averagePerformanceScore = validShifts > 0 ? totalPerformanceScore / validShifts : 75;
+          // Check if this is a remote worker
+          const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Copy Writing', 'Content Creator', 'Social Media Manager'].includes(userRecord.position);
+
+          // **NEW ENHANCED PERFORMANCE CALCULATION** - Based on User Requirements!
+          const averagePerformanceScore = calcImprovedPerformanceScore(
+            isRemoteRole ? 0 : totalWorkingDays, // Days worked (0 for remote = no tracking)
+            isRemoteRole ? 0 : totalRegularHours, // Regular work hours (NOT including overtime)
+            isRemoteRole ? 0 : totalDelayMinutes, // Delay in minutes
+            isRemoteRole ? 0 : totalOvertimeHours, // Overtime hours (neutral - no bonus)
+            completedTasks, // Tasks completed
+            (userTasks || []).length, // Total tasks
+            (userReports || []).length, // Reports submitted
+            expectedReports, // Expected reports
+            overallRatingAvg, // Average star rating
+            totalRatingsCount, // Total ratings count
+            delayedTasks, // Tasks delayed
+            unfinishedTasks, // Tasks unfinished
+            isRemoteRole // Is remote worker flag
+          );
           const punctualityPercentage = totalDelayHours >= 1 ? 0 : 
                                       totalDelayMinutes > 30 ? Math.max(0, 50 - (totalDelayMinutes * 2)) :
                                       totalDelayMinutes > 0 ? Math.max(0, 90 - (totalDelayMinutes * 3)) : 100;
@@ -1048,7 +1281,6 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             averagePerformanceScore: averagePerformanceScore.toFixed(1),
             punctualityPercentage: punctualityPercentage.toFixed(1),
             performanceStatus,
-            validShifts,
             ratingBonus
           });
 

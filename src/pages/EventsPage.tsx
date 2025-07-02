@@ -37,13 +37,13 @@ const EventsPage = () => {
   const getStatusBadgeClass = (status: 'active' | 'paused' | 'finished' | undefined) => {
     switch (status) {
       case 'active':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300';
+        return 'bg-blue-100 text-blue-800 dark:bg-slate-800 dark:text-white dark:border-slate-600 border-blue-300 shadow-sm';
       case 'paused':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300';
+        return 'bg-red-100 text-red-800 dark:bg-slate-800 dark:text-white dark:border-slate-600 border-red-300 shadow-sm';
       case 'finished':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300';
+        return 'bg-green-100 text-green-800 dark:bg-slate-800 dark:text-white dark:border-slate-600 border-green-300 shadow-sm';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 border-gray-300';
+        return 'bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-white dark:border-slate-600 border-gray-300 shadow-sm';
     }
   };
 
@@ -789,73 +789,121 @@ const EventsPage = () => {
                     background: hsl(217 91% 60% / 0.1) !important;
                     border: 1px solid hsl(217 91% 60% / 0.3) !important;
                     color: hsl(217 91% 60%) !important;
+                    box-shadow: 0 1px 3px hsl(217 91% 60% / 0.1) !important;
                   }
                   
                   .dark .event-status-active {
-                    background: hsl(217 91% 60% / 0.25) !important;
-                    border-color: hsl(217 91% 60% / 0.5) !important;
-                    color: hsl(217 91% 95%) !important;
+                    background: hsl(215 28% 17%) !important;
+                    border-color: hsl(215 20% 25%) !important;
+                    color: white !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
                   }
 
                   .event-status-paused {
                     background: hsl(0 84% 60% / 0.1) !important;
                     border: 1px solid hsl(0 84% 60% / 0.3) !important;
                     color: hsl(0 84% 60%) !important;
+                    box-shadow: 0 1px 3px hsl(0 84% 60% / 0.1) !important;
                   }
 
                   .dark .event-status-paused {
-                    background: hsl(0 84% 60% / 0.25) !important;
-                    border-color: hsl(0 84% 60% / 0.5) !important;
-                    color: hsl(0 84% 95%) !important;
+                    background: hsl(215 28% 17%) !important;
+                    border-color: hsl(215 20% 25%) !important;
+                    color: white !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
                   }
 
                   .event-status-finished {
                     background: hsl(142 76% 36% / 0.1) !important;
                     border: 1px solid hsl(142 76% 36% / 0.3) !important;
                     color: hsl(142 76% 36%) !important;
+                    box-shadow: 0 1px 3px hsl(142 76% 36% / 0.1) !important;
                   }
 
                   .dark .event-status-finished {
-                    background: hsl(142 76% 36% / 0.25) !important;
-                    border-color: hsl(142 76% 36% / 0.5) !important;
-                    color: hsl(142 76% 95%) !important;
+                    background: hsl(215 28% 17%) !important;
+                    border-color: hsl(215 20% 25%) !important;
+                    color: white !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
                   }
 
                   /* Status badge styles */
                   .status-badge-active {
                     background: hsl(217 91% 60% / 0.1);
                     color: hsl(217 91% 60%);
-                    padding: 2px 8px;
-                    border-radius: 4px;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    border: 1px solid hsl(217 91% 60% / 0.3);
+                    font-weight: 600;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 1px 3px hsl(217 91% 60% / 0.1);
+                    transition: all 0.2s ease;
                   }
 
                   .dark .status-badge-active {
-                    background: hsl(217 91% 60% / 0.25);
+                    background: hsl(215 28% 17%);
                     color: white;
+                    border-color: hsl(215 20% 25%);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
                   }
 
                   .status-badge-paused {
                     background: hsl(0 84% 60% / 0.1);
                     color: hsl(0 84% 60%);
-                    padding: 2px 8px;
-                    border-radius: 4px;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    border: 1px solid hsl(0 84% 60% / 0.3);
+                    font-weight: 600;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 1px 3px hsl(0 84% 60% / 0.1);
+                    transition: all 0.2s ease;
                   }
 
                   .dark .status-badge-paused {
-                    background: hsl(0 84% 60% / 0.25);
+                    background: hsl(215 28% 17%);
                     color: white;
+                    border-color: hsl(215 20% 25%);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
                   }
 
                   .status-badge-finished {
                     background: hsl(142 76% 36% / 0.1);
                     color: hsl(142 76% 36%);
-                    padding: 2px 8px;
-                    border-radius: 4px;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    border: 1px solid hsl(142 76% 36% / 0.3);
+                    font-weight: 600;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 1px 3px hsl(142 76% 36% / 0.1);
+                    transition: all 0.2s ease;
                   }
 
                   .dark .status-badge-finished {
-                    background: hsl(142 76% 36% / 0.25);
+                    background: hsl(215 28% 17%);
                     color: white;
+                    border-color: hsl(215 20% 25%);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                  }
+
+                  /* Status badge hover effects */
+                  .status-badge-active:hover,
+                  .status-badge-paused:hover,
+                  .status-badge-finished:hover {
+                    transform: scale(1.05);
+                    filter: brightness(1.1);
+                  }
+
+                  .dark .status-badge-active:hover,
+                  .dark .status-badge-paused:hover,
+                  .dark .status-badge-finished:hover {
+                    background: hsl(215 28% 22%);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
                   }
 
                   /* Calendar navigation */
@@ -1070,12 +1118,12 @@ const EventsPage = () => {
                       
                       {/* Activity / Status Badges */}
                       <div className="flex justify-start">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold w-fit ${
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold w-fit border transition-all duration-200 hover:scale-105 ${
                           event.status === 'active'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                            ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-slate-800 dark:text-white dark:border-slate-600 shadow-sm'
                             : event.status === 'finished'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            ? 'bg-green-100 text-green-800 border-green-300 dark:bg-slate-800 dark:text-white dark:border-slate-600 shadow-sm'
+                            : 'bg-red-100 text-red-800 border-red-300 dark:bg-slate-800 dark:text-white dark:border-slate-600 shadow-sm'
                         }`}>
                           {event.status === 'active' ? 'Active' : event.status === 'finished' ? 'Finished' : 'Paused'}
                         </span>

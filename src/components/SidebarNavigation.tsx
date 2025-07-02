@@ -672,7 +672,6 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
         
         {/* 🌟 DIAMOND ATMOSPHERE - SUBTLE BACKGROUND */}
         <div className="absolute inset-0 bg-gradient-to-r from-cyan-50/20 via-blue-50/30 via-purple-50/25 to-cyan-50/15 animate-pulse opacity-60"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-cyan-100/10 via-blue-100/15 to-transparent animate-bounce animation-delay-1000 opacity-40"></div>
         
       </>
     );
@@ -997,6 +996,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'purple',
       items: [
         { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, mediaBuyerOnly: true, color: 'purple' },
+        { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, mediaBuyerOnly: true, color: 'purple' },
       ] as NavItem[]
     },
     {
@@ -1039,7 +1039,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     switch (theme) {
       case 'diamond':
         return {
-          header: 'bg-gradient-to-r/90 from-cyan-50/80 via-blue-50/80 to-purple-50/80 backdrop-blur-md supports-[backdrop-filter]:bg-cyan-50/60 border-cyan-200 relative overflow-hidden',
+          header: 'bg-gradient-to-r from-cyan-50/90 via-blue-50/90 to-purple-50/90 dark:from-cyan-900/90 dark:via-blue-900/90 dark:to-purple-900/90 backdrop-blur-md supports-[backdrop-filter]:bg-cyan-50/60 dark:supports-[backdrop-filter]:bg-cyan-900/70 border-cyan-200 dark:border-cyan-700 transition-all duration-300 ease-in-out',
           sidebar: 'bg-background',
           text: 'text-foreground',
           accent: 'text-muted-foreground',
@@ -1047,7 +1047,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         };
       case 'gold':
         return {
-          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          header: 'bg-gradient-to-r from-yellow-50/90 via-amber-50/90 to-orange-50/90 dark:from-yellow-950/80 dark:via-amber-950/80 dark:to-orange-950/80 backdrop-blur-md supports-[backdrop-filter]:bg-yellow-50/60 dark:supports-[backdrop-filter]:bg-yellow-950/60 border-yellow-200 dark:border-yellow-800',
           sidebar: 'bg-background',
           text: 'text-foreground',
           accent: 'text-muted-foreground',
@@ -1055,7 +1055,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         };
       case 'silver':
         return {
-          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          header: 'bg-gradient-to-r from-slate-50/90 via-gray-50/90 to-slate-50/90 dark:from-slate-900/90 dark:via-gray-800/90 dark:to-slate-900/90 backdrop-blur-md supports-[backdrop-filter]:bg-slate-50/60 dark:supports-[backdrop-filter]:bg-slate-900/70 border-slate-200 dark:border-slate-600',
           sidebar: 'bg-background',
           text: 'text-foreground',
           accent: 'text-muted-foreground',
@@ -1063,7 +1063,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         };
       case 'bronze':
         return {
-          header: 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-border',
+          header: 'bg-gradient-to-r from-amber-50/90 via-orange-50/90 to-amber-50/90 dark:from-amber-950/80 dark:via-orange-950/80 dark:to-amber-950/80 backdrop-blur-md supports-[backdrop-filter]:bg-amber-50/60 dark:supports-[backdrop-filter]:bg-amber-950/60 border-amber-200 dark:border-amber-800',
           sidebar: 'bg-background',
           text: 'text-foreground',
           accent: 'text-muted-foreground',

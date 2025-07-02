@@ -164,7 +164,6 @@ const StrategyPage: React.FC = () => {
     isBackgroundProcessing
   } = useStrategy();
 
-  const [dateRange, setDateRange] = useState('30d');
   const [searchTerm, setSearchTerm] = useState('');
   const [performanceFilter, setPerformanceFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -510,13 +509,13 @@ const StrategyPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md mx-auto"
         >
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50">
             <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
-                <StrategyIcon className="w-8 h-8 text-red-600" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                <StrategyIcon className="w-8 h-8 text-red-600 dark:text-red-400" />
               </div>
-              <h3 className="text-lg font-semibold text-red-800 mb-2">Unable to Load Strategy Data</h3>
-              <p className="text-red-600 mb-4">{error}</p>
+              <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Unable to Load Strategy Data</h3>
+              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
               <div className="space-y-2">
                 <Button onClick={startFetching} variant="outline" className="w-full">
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -541,50 +540,50 @@ const StrategyPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-2xl mx-auto"
         >
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
+          <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50">
             <CardContent className="p-8 text-center">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                <StrategyIcon className="w-12 h-12 text-blue-600" animated />
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/50 dark:to-purple-900/50 flex items-center justify-center">
+                <StrategyIcon className="w-12 h-12 text-blue-600 dark:text-blue-400" animated />
               </div>
               
-              <h3 className="text-2xl font-bold text-blue-800 mb-2">
+              <h3 className="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-2">
                 Analyzing Campaign Strategy
               </h3>
-              <p className="text-blue-700 mb-6">
+              <p className="text-blue-700 dark:text-blue-300 mb-6">
                 {stage || 'Connecting to WooCommerce for comprehensive product analysis...'}
               </p>
               
               {progress > 0 && (
-                <div className="mb-4 p-3 bg-blue-100 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-700">
+                <div className="mb-4 p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
                     <strong>⚡ Loading ALL Products:</strong> Fetching complete product catalog for comprehensive analysis.
                   </p>
                 </div>
               )}
               
-              <div className="w-full bg-blue-200 rounded-full h-3 mb-4 overflow-hidden">
+              <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3 mb-4 overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
                 />
               </div>
               
-              <div className="flex items-center justify-between text-sm text-blue-700 mb-4">
+              <div className="flex items-center justify-between text-sm text-blue-700 dark:text-blue-300 mb-4">
                 <span>Progress</span>
                 <span className="font-semibold">{Math.round(progress)}%</span>
               </div>
               
-              <p className="text-blue-600 text-sm">
+              <p className="text-blue-600 dark:text-blue-400 text-sm">
                 {details || 'Processing all WooCommerce products for strategic insights...'}
               </p>
               
-              <div className="mt-6 p-4 bg-blue-100 rounded-lg border border-blue-200">
-                <p className="text-xs text-blue-700">
+              <div className="mt-6 p-4 bg-blue-100 dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
                   <strong>Complete Analysis:</strong> Loading all products and saving to cache for faster future access.
                 </p>
-                <p className="text-xs text-blue-600 mt-2 md:hidden">
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 md:hidden">
                   📱 On mobile: Look for the floating progress circle when you navigate away.
                 </p>
               </div>
@@ -606,16 +605,16 @@ const StrategyPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-lg mx-auto"
         >
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-purple-50">
+          <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50">
             <CardContent className="p-8 text-center">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                <StrategyIcon className="w-12 h-12 text-blue-600" />
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/50 dark:to-purple-900/50 flex items-center justify-center">
+                <StrategyIcon className="w-12 h-12 text-blue-600 dark:text-blue-400" />
               </div>
               
-              <h3 className="text-2xl font-bold text-blue-800 mb-2">
+              <h3 className="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-2">
                 Strategy Analytics Ready
               </h3>
-              <p className="text-blue-700 mb-6">
+              <p className="text-blue-700 dark:text-blue-300 mb-6">
                 Load your WooCommerce data to generate AI-powered insights and campaign strategies.
               </p>
               
@@ -623,15 +622,15 @@ const StrategyPage: React.FC = () => {
                 <Button 
                   onClick={startFetching}
                   size="lg"
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-500 dark:to-purple-500 hover:from-blue-700 hover:to-purple-700 dark:hover:from-blue-600 dark:hover:to-purple-600 text-white"
                 >
                   <StrategyIcon className="w-5 h-5 mr-2" />
                   Load Strategy Data
                 </Button>
                 
-                <div className="p-4 bg-blue-100 rounded-lg border border-blue-200 text-left">
-                  <p className="text-sm font-medium text-blue-800 mb-2">📊 What will be analyzed:</p>
-                  <ul className="text-sm text-blue-700 space-y-1">
+                <div className="p-4 bg-blue-100 dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-800 text-left">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">📊 What will be analyzed:</p>
+                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                     <li>• All WooCommerce products and their performance</li>
                     <li>• Completed orders and revenue data</li>
                     <li>• AI-generated campaign strategies</li>
@@ -639,7 +638,7 @@ const StrategyPage: React.FC = () => {
                   </ul>
                 </div>
                 
-                <p className="text-xs text-blue-600">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
                   Only Media Buyers and Admins can load strategy data
                 </p>
               </div>
@@ -658,7 +657,7 @@ const StrategyPage: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-lg p-6 text-white"
+        className="bg-gradient-to-r from-blue-600 to-purple-700 dark:from-blue-700 dark:to-purple-800 rounded-lg p-6 text-white"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div>
@@ -666,25 +665,14 @@ const StrategyPage: React.FC = () => {
               <StrategyIcon className="h-8 w-8" />
               Strategy
             </h1>
-            <p className="mt-2 text-blue-100">
+            <p className="mt-2 text-blue-100 dark:text-blue-200">
               AI-powered insights from {stats.total_orders} completed orders and {stats.total_products} products
             </p>
           </div>
           <div className="flex gap-2">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 3 months</SelectItem>
-                <SelectItem value="1y">Last year</SelectItem>
-              </SelectContent>
-            </Select>
             <Button 
               variant="outline" 
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="bg-white/10 dark:bg-white/20 border-white/20 dark:border-white/30 text-white hover:bg-white/20 dark:hover:bg-white/30"
               onClick={refreshData}
               disabled={loading}
             >
@@ -700,64 +688,62 @@ const StrategyPage: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+        className="grid grid-cols-1 md:grid-cols-4 gap-6"
       >
-        <Card>
-          <CardContent className="p-4">
+        <Card className="border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Products</p>
-                <p className="text-2xl font-bold">{stats.total_products}</p>
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Products</p>
+                <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">{stats.total_products}</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">Available for campaigns</p>
               </div>
-              <Package className="h-8 w-8 text-blue-600" />
+              <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-4">
+
+        <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{stats.total_revenue.toLocaleString()} SAR</p>
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">High Performers</p>
+                <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100">
+                  {products.filter(p => p.total_sales > 10).length}
+                </p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Products with 10+ sales</p>
               </div>
-              <SARIcon className="h-8 w-8 text-green-600" />
+              <Star className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-4">
+
+        <Card className="border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/50 dark:to-yellow-950/50">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Top Performers</p>
-                <p className="text-2xl font-bold text-green-600">{stats.best_performers}</p>
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Campaign Ready</p>
+                <p className="text-3xl font-bold text-amber-900 dark:text-amber-100">
+                  {products.filter(p => p.images && p.images.length > 0 && p.short_description).length}
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">With images & descriptions</p>
               </div>
-              <Award className="h-8 w-8 text-green-600" />
+              <Target className="h-8 w-8 text-amber-600 dark:text-amber-400" />
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-4">
+
+        <Card className="border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/50 dark:to-violet-950/50">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Need Attention</p>
-                <p className="text-2xl font-bold text-red-600">{stats.worst_performers}</p>
+                <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Avg. Performance</p>
+                <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">
+                  {products.length > 0 ? (products.reduce((sum, p) => sum + (p.total_sales || 0), 0) / products.length).toFixed(1) : '0'}
+                </p>
+                <p className="text-xs text-purple-600 dark:text-purple-400">Sales per product</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Avg Conversion</p>
-                <p className="text-2xl font-bold">{stats.avg_conversion.toFixed(1)}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-600" />
+              <BarChart3 className="h-8 w-8 text-purple-600 dark:text-purple-400" />
             </div>
           </CardContent>
         </Card>
@@ -792,411 +778,412 @@ const StrategyPage: React.FC = () => {
         <TabsContent value="analytics" className="space-y-6">
           {/* Monthly Order Completion Stats */}
           <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                     <CardHeader>
-             <CardTitle className="flex items-center gap-3">
-               <CheckCircle2 className="h-6 w-6 text-green-600" />
-               Monthly Performance Estimates
-               <Badge className="bg-green-600 text-white">
-                 {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-               </Badge>
-               <Badge variant="outline" className="text-xs">
-                 Real Order Data
-               </Badge>
-             </CardTitle>
-           </CardHeader>
-          <CardContent>
-                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-               <div className="bg-white p-4 rounded-lg border border-green-200">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <p className="text-sm font-medium text-green-700">This Month Orders</p>
-                     <p className="text-2xl font-bold text-green-800">{monthlyOrderStats.totalThisMonth}</p>
-                     <p className="text-xs text-green-600">Day {monthlyOrderStats.currentDay}/{monthlyOrderStats.daysInMonth} • Prev: {monthlyOrderStats.previousMonthOrders}</p>
-                   </div>
-                   <ShoppingCart className="h-8 w-8 text-green-600" />
-                 </div>
-               </div>
-               
-               <div className="bg-white p-4 rounded-lg border border-green-200">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <p className="text-sm font-medium text-green-700">Revenue This Month</p>
-                     <p className="text-2xl font-bold text-green-800">{Math.round(monthlyOrderStats.revenueThisMonth).toLocaleString()} SAR</p>
-                     <p className="text-xs text-green-600">From completed orders</p>
-                   </div>
-                   <SARIcon className="h-8 w-8 text-green-600" />
-                 </div>
-               </div>
-               
-               <div className="bg-white p-4 rounded-lg border border-green-200">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <p className="text-sm font-medium text-green-700">Growth Rate</p>
-                     <p className={`text-2xl font-bold ${monthlyOrderStats.growth >= 0 ? 'text-green-800' : 'text-red-600'}`}>
-                       {monthlyOrderStats.growth >= 0 ? '+' : ''}{monthlyOrderStats.growth.toFixed(1)}%
-                     </p>
-                     <p className="text-xs text-green-600">vs. previous month</p>
-                   </div>
-                   {monthlyOrderStats.growth >= 0 ? 
-                     <TrendingUp className="h-8 w-8 text-green-600" /> : 
-                     <TrendingDown className="h-8 w-8 text-red-600" />
-                   }
-                 </div>
-               </div>
-               
-               <div className="bg-white p-4 rounded-lg border border-green-200">
-                 <div className="flex items-center justify-between">
-                   <div>
-                     <p className="text-sm font-medium text-green-700">Month Progress</p>
-                     <p className="text-2xl font-bold text-green-800">{monthlyOrderStats.completionRate.toFixed(0)}%</p>
-                     <p className="text-xs text-green-600">{monthlyOrderStats.recentlyActive} products with orders</p>
-                   </div>
-                   <Calendar className="h-8 w-8 text-green-600" />
-                 </div>
-               </div>
-             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Best Selling Products */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
-          <CardHeader>
-            <div className="flex flex-col space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <Card className="border-green-200 dark:border-green-800 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-3">
-                  <Crown className="h-6 w-6 text-yellow-600" />
-                  Best Selling Products
-                  <Badge className="bg-yellow-600 text-white">Top {bestSellsRange}</Badge>
-                </CardTitle>
-                <Button 
-                  onClick={exportToExcel}
-                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-                  disabled={bestSellingProducts.length === 0}
-                >
-                  <Download className="h-4 w-4" />
-                 Export to Excel
-                </Button>
-              </div>
-              
-              {/* Filters Row */}
-              <div className="flex flex-col md:flex-row gap-3 md:items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-yellow-700 font-medium">Show Top:</span>
-                  <Select value={bestSellsRange.toString()} onValueChange={(value) => setBestSellsRange(parseInt(value))}>
-                    <SelectTrigger className="w-24 bg-white border-yellow-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="15">15</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="25">25</SelectItem>
-                      <SelectItem value="30">30</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-yellow-700" />
-                  <span className="text-sm text-yellow-700 font-medium">Date Range:</span>
-                  <Select value={bestSellsDateFilter} onValueChange={setBestSellsDateFilter}>
-                    <SelectTrigger className="w-32 bg-white border-yellow-300">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="7d">Last 7 Days</SelectItem>
-                      <SelectItem value="30d">Last 30 Days</SelectItem>
-                      <SelectItem value="90d">Last 90 Days</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {bestSellsDateFilter === 'custom' && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-36 bg-white border-yellow-300"
-                      placeholder="Start Date"
-                    />
-                    <span className="text-yellow-700">to</span>
-                    <Input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-36 bg-white border-yellow-300"
-                      placeholder="End Date"
-                    />
-                  </div>
-                )}
-                
-                {bestSellsDateFilter !== 'all' && (
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                    {bestSellsDateFilter === 'custom' && customStartDate && customEndDate 
-                      ? `${customStartDate} to ${customEndDate}`
-                      : bestSellsDateFilter === '7d' ? 'Last 7 Days'
-                      : bestSellsDateFilter === '30d' ? 'Last 30 Days' 
-                      : bestSellsDateFilter === '90d' ? 'Last 90 Days'
-                      : 'Filtered'
-                    }
+                  <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <span className="text-green-800 dark:text-green-200">Monthly Performance Estimates</span>
+                  <Badge className="bg-green-600 dark:bg-green-700 text-white">
+                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </Badge>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {bestSellingProducts.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
-                <p className="text-yellow-700 font-medium">No products found</p>
-                <p className="text-yellow-600 text-sm">
-                  {bestSellsDateFilter !== 'all' 
-                    ? 'No sales found in the selected date range. Try adjusting your date filter or range.'
-                    : 'Try adjusting your range or wait for data to load'
-                  }
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {bestSellingProducts.map((product, index) => (
-                <Card 
-                  key={product.id} 
-                  className="border border-yellow-200 hover:shadow-md transition-shadow cursor-pointer bg-white"
-                  onClick={() => handleProductClick(product.permalink)}
-                >
-                  <CardContent className="p-4">
+                  <Badge variant="outline" className="text-xs border-green-300 dark:border-green-700 text-green-700 dark:text-green-300">
+                    Real Order Data
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge className="bg-yellow-600 text-white">#{index + 1}</Badge>
-                          <h4 className="font-medium text-sm">{product.name}</h4>
-                          <ExternalLink className="h-3 w-3 text-gray-400" />
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-600">
-                          <span>{product.total_sales} sales</span>
-                          <span>{product.revenue.toLocaleString()} SAR</span>
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3 w-3 text-yellow-500" />
-                            <span>{product.rating}</span>
-                          </div>
-                        </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">This Month Orders</p>
+                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">{monthlyOrderStats.totalThisMonth}</p>
+                        <p className="text-xs text-green-600 dark:text-green-400">Day {monthlyOrderStats.currentDay}/{monthlyOrderStats.daysInMonth} • Prev: {monthlyOrderStats.previousMonthOrders}</p>
                       </div>
-                      {getPerformanceBadge(product.campaign_performance)}
+                      <ShoppingCart className="h-8 w-8 text-green-600 dark:text-green-400" />
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Strategy Insights */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-      >
-        {insights.map((insight, index) => (
-          <Card key={index} className={`${getPriorityColor(insight.priority)} border-2`}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                {getInsightIcon(insight.type)}
-                {insight.title}
-                <Badge className={`ml-auto ${insight.priority === 'high' ? 'bg-red-600' : insight.priority === 'medium' ? 'bg-yellow-600' : 'bg-green-600'} text-white`}>
-                  {insight.priority.toUpperCase()}
-                </Badge>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">{insight.description}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {insight.products.map((product) => (
-                  <div 
-                    key={product.id} 
-                    className="flex items-center justify-between p-3 bg-white rounded-lg border cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleProductClick(product.permalink)}
-                  >
-                    <div className="flex-1">
-                      <h4 className="font-medium flex items-center gap-2">
-                        {product.name}
-                        <ExternalLink className="h-3 w-3 text-gray-400" />
-                      </h4>
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="text-sm text-muted-foreground">
-                          {product.quantity_sold} sales • {product.revenue.toLocaleString()} SAR
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {getTrendIcon(product.trend)}
-                          <span className="text-sm">{product.conversion_rate}%</span>
-                        </div>
-                      </div>
-                    </div>
-                    {getPerformanceBadge(product.campaign_performance)}
                   </div>
-                ))}
-                <Separator />
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800">🎯 Recommended Action:</p>
-                  <p className="text-sm text-blue-700 mt-1">{insight.action}</p>
+                  
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Revenue This Month</p>
+                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">{Math.round(monthlyOrderStats.revenueThisMonth).toLocaleString()} SAR</p>
+                        <p className="text-xs text-green-600 dark:text-green-400">From completed orders</p>
+                      </div>
+                      <SARIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Growth Rate</p>
+                        <p className={`text-2xl font-bold ${monthlyOrderStats.growth >= 0 ? 'text-green-800 dark:text-green-200' : 'text-red-600 dark:text-red-400'}`}>
+                          {monthlyOrderStats.growth >= 0 ? '+' : ''}{monthlyOrderStats.growth.toFixed(1)}%
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400">vs. previous month</p>
+                      </div>
+                      {monthlyOrderStats.growth >= 0 ? 
+                        <TrendingUp className="h-8 w-8 text-green-600 dark:text-green-400" /> : 
+                        <TrendingDown className="h-8 w-8 text-red-600 dark:text-red-400" />
+                      }
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Month Progress</p>
+                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">{monthlyOrderStats.completionRate.toFixed(0)}%</p>
+                        <p className="text-xs text-green-600 dark:text-green-400">{monthlyOrderStats.recentlyActive} products with orders</p>
+                      </div>
+                      <Calendar className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-      {/* Detailed Product Analysis with Pagination */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Complete Product Performance Analysis
-                <Badge variant="outline">
-                  {filteredProducts.length} Products • Page {currentPage} of {totalPages}
-                </Badge>
-              </CardTitle>
-              <div className="flex flex-col md:flex-row gap-2">
-                <Input
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full md:w-64"
-                />
-                <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
-                  <SelectTrigger className="w-full md:w-40">
-                    <SelectValue placeholder="Performance" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Performance</SelectItem>
-                    <SelectItem value="excellent">Excellent</SelectItem>
-                    <SelectItem value="good">Good</SelectItem>
-                    <SelectItem value="average">Average</SelectItem>
-                    <SelectItem value="poor">Poor</SelectItem>
-                    <SelectItem value="terrible">Terrible</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full md:w-40">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full md:w-40">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="performance">Best Performance</SelectItem>
-                    <SelectItem value="sales">Highest Sales</SelectItem>
-                    <SelectItem value="revenue">Highest Revenue</SelectItem>
-                    <SelectItem value="rating">Highest Rating</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {paginatedProducts.map((product) => (
-                <Card key={product.id} className="border border-gray-200 hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 
-                            className="font-semibold text-lg cursor-pointer hover:text-blue-600 flex items-center gap-2"
-                            onClick={() => handleProductClick(product.permalink)}
-                          >
-                            {product.name}
-                            <ExternalLink className="h-4 w-4 text-gray-400" />
-                          </h3>
-                          {getPerformanceBadge(product.campaign_performance)}
-                          <Badge variant="outline" className="text-xs">
-                            {product.category}
-                          </Badge>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Sales</p>
-                            <p className="font-medium">{product.quantity_sold} units</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Revenue</p>
-                            <p className="font-medium">{product.revenue.toLocaleString()} SAR</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Conversion</p>
-                            <div className="flex items-center gap-1">
-                              {getTrendIcon(product.trend)}
-                              <span className="font-medium">{product.conversion_rate}%</span>
+          {/* Best Selling Products */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-yellow-200 dark:border-yellow-800 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/50 dark:to-amber-950/50">
+              <CardHeader>
+                <div className="flex flex-col space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                    <CardTitle className="flex items-center gap-3">
+                      <Crown className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                      <span className="text-yellow-800 dark:text-yellow-200">Best Selling Products</span>
+                      <Badge className="bg-yellow-600 dark:bg-yellow-700 text-white">Top {bestSellsRange}</Badge>
+                    </CardTitle>
+                    <Button 
+                      onClick={exportToExcel}
+                      className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white flex items-center gap-2"
+                      disabled={bestSellingProducts.length === 0}
+                    >
+                      <Download className="h-4 w-4" />
+                      Export to Excel
+                    </Button>
+                  </div>
+                  
+                  {/* Filters Row */}
+                  <div className="flex flex-col md:flex-row gap-3 md:items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">Show Top:</span>
+                      <Select value={bestSellsRange.toString()} onValueChange={(value) => setBestSellsRange(parseInt(value))}>
+                        <SelectTrigger className="w-24 bg-white dark:bg-gray-800 border-yellow-300 dark:border-yellow-700">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="15">15</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="30">30</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-yellow-700 dark:text-yellow-300" />
+                      <span className="text-sm text-yellow-700 dark:text-yellow-300 font-medium">Date Range:</span>
+                      <Select value={bestSellsDateFilter} onValueChange={setBestSellsDateFilter}>
+                        <SelectTrigger className="w-32 bg-white dark:bg-gray-800 border-yellow-300 dark:border-yellow-700">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Time</SelectItem>
+                          <SelectItem value="7d">Last 7 Days</SelectItem>
+                          <SelectItem value="30d">Last 30 Days</SelectItem>
+                          <SelectItem value="90d">Last 90 Days</SelectItem>
+                          <SelectItem value="custom">Custom Range</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {bestSellsDateFilter === 'custom' && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="date"
+                          value={customStartDate}
+                          onChange={(e) => setCustomStartDate(e.target.value)}
+                          className="w-36 bg-white dark:bg-gray-800 border-yellow-300 dark:border-yellow-700"
+                          placeholder="Start Date"
+                        />
+                        <span className="text-yellow-700 dark:text-yellow-300">to</span>
+                        <Input
+                          type="date"
+                          value={customEndDate}
+                          onChange={(e) => setCustomEndDate(e.target.value)}
+                          className="w-36 bg-white dark:bg-gray-800 border-yellow-300 dark:border-yellow-700"
+                          placeholder="End Date"
+                        />
+                      </div>
+                    )}
+                    
+                    {bestSellsDateFilter !== 'all' && (
+                      <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                        {bestSellsDateFilter === 'custom' && customStartDate && customEndDate 
+                          ? `${customStartDate} to ${customEndDate}`
+                          : bestSellsDateFilter === '7d' ? 'Last 7 Days'
+                          : bestSellsDateFilter === '30d' ? 'Last 30 Days' 
+                          : bestSellsDateFilter === '90d' ? 'Last 90 Days'
+                          : 'Filtered'
+                        }
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {bestSellingProducts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
+                    <p className="text-yellow-700 font-medium">No products found</p>
+                    <p className="text-yellow-600 text-sm">
+                      {bestSellsDateFilter !== 'all' 
+                        ? 'No sales found in the selected date range. Try adjusting your date filter or range.'
+                        : 'Try adjusting your range or wait for data to load'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {bestSellingProducts.map((product, index) => (
+                    <Card 
+                      key={product.id} 
+                      className="border border-yellow-200 dark:border-yellow-800 hover:shadow-md transition-shadow cursor-pointer bg-white dark:bg-gray-800"
+                      onClick={() => handleProductClick(product.permalink)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge className="bg-yellow-600 dark:bg-yellow-700 text-white">#{index + 1}</Badge>
+                              <h4 className="font-medium text-sm">{product.name}</h4>
+                              <ExternalLink className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                              <span>{product.total_sales} sales</span>
+                              <span>Price: {parseFloat((product as any).price || (product as any).regular_price || '0').toLocaleString()} SAR</span>
+                              <span>{product.revenue.toLocaleString()} SAR</span>
+                              <div className="flex items-center gap-1">
+                                <Star className="h-3 w-3 text-yellow-500 dark:text-yellow-400" />
+                                <span>{product.rating}</span>
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Profit Margin</p>
-                            <p className="font-medium">{product.profit_margin}%</p>
+                          {getPerformanceBadge(product.campaign_performance)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Strategy Insights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            {insights.map((insight, index) => (
+              <Card key={index} className={`${getPriorityColor(insight.priority)} border-2`}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    {getInsightIcon(insight.type)}
+                    {insight.title}
+                    <Badge className={`ml-auto ${insight.priority === 'high' ? 'bg-red-600' : insight.priority === 'medium' ? 'bg-yellow-600' : 'bg-green-600'} text-white`}>
+                      {insight.priority.toUpperCase()}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">{insight.description}</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {insight.products.map((product) => (
+                      <div 
+                        key={product.id} 
+                        className="flex items-center justify-between p-3 bg-white rounded-lg border cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => handleProductClick(product.permalink)}
+                      >
+                        <div className="flex-1">
+                          <h4 className="font-medium flex items-center gap-2">
+                            {product.name}
+                            <ExternalLink className="h-3 w-3 text-gray-400" />
+                          </h4>
+                          <div className="flex items-center gap-4 mt-1">
+                            <span className="text-sm text-muted-foreground">
+                              {product.quantity_sold} sales • {parseFloat((product as any).price || (product as any).regular_price || '0').toLocaleString()} SAR
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {getTrendIcon(product.trend)}
+                              <span className="text-sm">{product.conversion_rate}%</span>
+                            </div>
                           </div>
                         </div>
+                        {getPerformanceBadge(product.campaign_performance)}
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleProductClick(product.permalink)}
-                          className="flex items-center gap-2"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                          View Product
-                        </Button>
-                      </div>
+                    ))}
+                    <Separator />
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="text-sm font-medium text-blue-800">Recommended Action:</p>
+                      <p className="text-sm text-blue-700 mt-1">{insight.action}</p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            {/* Pagination */}
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </CardContent>
-        </Card>
-      </motion.div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </motion.div>
+
+          {/* Detailed Product Analysis with Pagination */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Complete Product Performance Analysis
+                    <Badge variant="outline">
+                      {filteredProducts.length} Products • Page {currentPage} of {totalPages}
+                    </Badge>
+                  </CardTitle>
+                  <div className="flex flex-col md:flex-row gap-2">
+                    <Input
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full md:w-64"
+                    />
+                    <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
+                      <SelectTrigger className="w-full md:w-40">
+                        <SelectValue placeholder="Performance" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Performance</SelectItem>
+                        <SelectItem value="excellent">Excellent</SelectItem>
+                        <SelectItem value="good">Good</SelectItem>
+                        <SelectItem value="average">Average</SelectItem>
+                        <SelectItem value="poor">Poor</SelectItem>
+                        <SelectItem value="terrible">Terrible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-full md:w-40">
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map(category => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-full md:w-40">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="performance">Best Performance</SelectItem>
+                        <SelectItem value="sales">Highest Sales</SelectItem>
+                        <SelectItem value="revenue">Highest Revenue</SelectItem>
+                        <SelectItem value="rating">Highest Rating</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {paginatedProducts.map((product) => (
+                    <Card key={product.id} className="border border-gray-200 hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 
+                                className="font-semibold text-lg cursor-pointer hover:text-blue-600 flex items-center gap-2"
+                                onClick={() => handleProductClick(product.permalink)}
+                              >
+                                {product.name}
+                                <ExternalLink className="h-4 w-4 text-gray-400" />
+                              </h3>
+                              {getPerformanceBadge(product.campaign_performance)}
+                              <Badge variant="outline" className="text-xs">
+                                {product.category}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Sales</p>
+                                <p className="font-medium">{product.quantity_sold} units</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Price</p>
+                                <p className="font-medium">{parseFloat((product as any).price || (product as any).regular_price || '0').toLocaleString()} SAR</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Revenue</p>
+                                <p className="font-medium">{parseFloat((product as any).price || (product as any).regular_price || '0').toLocaleString()} SAR</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Conversion</p>
+                                <div className="flex items-center gap-1">
+                                  {getTrendIcon(product.trend)}
+                                  <span className="font-medium">{product.conversion_rate}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleProductClick(product.permalink)}
+                              className="flex items-center gap-2"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              View Product
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                
+                {/* Pagination */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-6">

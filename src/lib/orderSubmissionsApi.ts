@@ -10,6 +10,9 @@ export interface OrderItem {
   sku?: string;
   regular_price?: string;
   sale_price?: string;
+  
+  // NEW: product thumbnail
+  image_url?: string;
 }
 
 export interface OrderSubmission {
@@ -67,6 +70,8 @@ export interface OrderSubmission {
   is_synced_to_woocommerce?: boolean;
   sync_error?: string;
   last_sync_attempt?: string;
+  
+  copied_by_warehouse?: boolean;
 }
 
 export interface OrderSubmissionFilters {
@@ -361,14 +366,14 @@ export const getCustomerServiceOrderStats = async (): Promise<{
   }
 };
 
-// Sync order status from WooCommerce
-export const syncOrderStatusFromWooCommerce = async (orderSubmissionId: number): Promise<{
+// Enhanced sync order from WooCommerce (syncs status, price, trash status, and other fields)
+export const syncOrderFromWooCommerce = async (orderSubmissionId: number): Promise<{
   success: boolean;
   message: string;
-  updatedStatus?: string;
+  updatedFields?: string[];
 }> => {
   try {
-    console.log('Syncing order status for submission:', orderSubmissionId);
+    console.log('🔄 Enhanced syncing order from WooCommerce for submission:', orderSubmissionId);
 
     // Get the order submission from database
     const { data: orderSubmission, error: fetchError } = await supabase
@@ -389,12 +394,17 @@ export const syncOrderStatusFromWooCommerce = async (orderSubmissionId: number):
       };
     }
 
-    console.log('Fetching WooCommerce order:', orderSubmission.woocommerce_order_id);
+    console.log('📥 Fetching WooCommerce order:', orderSubmission.woocommerce_order_id);
 
     // Fetch the order from WooCommerce
     const wooOrder = await wooCommerceAPI.getOrder(orderSubmission.woocommerce_order_id);
     
-    console.log('WooCommerce order status:', wooOrder.status);
+    console.log('📊 WooCommerce order data received:', {
+      status: wooOrder.status,
+      total: wooOrder.total,
+      date_modified: wooOrder.date_modified,
+      line_items_count: wooOrder.line_items?.length || 0
+    });
 
     // Map WooCommerce status to our internal status
     const statusMap: { [key: string]: string } = {
@@ -408,38 +418,147 @@ export const syncOrderStatusFromWooCommerce = async (orderSubmissionId: number):
     };
 
     const mappedStatus = statusMap[wooOrder.status] || wooOrder.status;
+    const wooTotal = parseFloat(wooOrder.total || '0');
+    const wooSubtotal = wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0');
+    const wooShippingAmount = parseFloat(wooOrder.shipping_total || '0');
+    const wooDiscountAmount = parseFloat(wooOrder.discount_total || '0');
 
-    // Update the status in our database if it's different
+    // Check if order is trashed (deleted) in WooCommerce
+    // WooCommerce doesn't have a direct "trash" status, but we can check meta_data for deletion flags
+    const isTrashed = wooOrder.meta_data?.some(meta => 
+      meta.key === '_wp_trash_meta' || 
+      meta.key === '_deleted' || 
+      meta.key === 'trash_status'
+    ) || false;
+
+    // Prepare update data with all synced fields
+    const updateData: any = {
+      last_sync_attempt: new Date().toISOString(),
+      sync_error: null
+    };
+
+    const updatedFields: string[] = [];
+
+    // Sync status
     if (orderSubmission.status !== mappedStatus) {
+      updateData.status = mappedStatus;
+      updatedFields.push('status');
+    }
+
+    // Sync total amount
+    if (Math.abs((orderSubmission.total_amount || 0) - wooTotal) > 0.01) {
+      updateData.total_amount = wooTotal;
+      updatedFields.push('total_amount');
+    }
+
+    // Sync subtotal
+    if (Math.abs((orderSubmission.subtotal || 0) - wooSubtotal) > 0.01) {
+      updateData.subtotal = wooSubtotal;
+      updatedFields.push('subtotal');
+    }
+
+    // Sync shipping amount
+    if (Math.abs((orderSubmission.shipping_amount || 0) - wooShippingAmount) > 0.01) {
+      updateData.shipping_amount = wooShippingAmount;
+      updatedFields.push('shipping_amount');
+    }
+
+    // Sync discount amount
+    if (Math.abs((orderSubmission.discount_amount || 0) - wooDiscountAmount) > 0.01) {
+      updateData.discount_amount = wooDiscountAmount;
+      updatedFields.push('discount_amount');
+    }
+
+    // Sync payment method
+    if (orderSubmission.payment_method !== wooOrder.payment_method_title) {
+      updateData.payment_method = wooOrder.payment_method_title;
+      updatedFields.push('payment_method');
+    }
+
+    // Sync customer information if available
+    if (wooOrder.billing) {
+      if (orderSubmission.customer_email !== wooOrder.billing.email) {
+        updateData.customer_email = wooOrder.billing.email;
+        updatedFields.push('customer_email');
+      }
+      if (orderSubmission.customer_phone !== wooOrder.billing.phone) {
+        updateData.customer_phone = wooOrder.billing.phone;
+        updatedFields.push('customer_phone');
+      }
+      if (orderSubmission.billing_address_1 !== wooOrder.billing.address_1) {
+        updateData.billing_address_1 = wooOrder.billing.address_1;
+        updatedFields.push('billing_address_1');
+      }
+      if (orderSubmission.billing_city !== wooOrder.billing.city) {
+        updateData.billing_city = wooOrder.billing.city;
+        updatedFields.push('billing_city');
+      }
+    }
+
+    // Sync customer note
+    if (orderSubmission.customer_note !== wooOrder.customer_note) {
+      updateData.customer_note = wooOrder.customer_note;
+      updatedFields.push('customer_note');
+    }
+
+    // Sync order items if they've changed
+    if (wooOrder.line_items && wooOrder.line_items.length > 0) {
+      const wooOrderItems = wooOrder.line_items.map(item => ({
+        product_id: item.product_id,
+        product_name: item.name,
+        quantity: item.quantity,
+        price: item.price?.toString() || '0',
+        sku: item.sku || ''
+      }));
+
+      const currentItems = orderSubmission.order_items || [];
+      const itemsChanged = JSON.stringify(wooOrderItems) !== JSON.stringify(currentItems);
+      
+      if (itemsChanged) {
+        updateData.order_items = wooOrderItems;
+        updatedFields.push('order_items');
+      }
+    }
+
+    // Add trash status to meta_data if order is trashed
+    if (isTrashed) {
+      const currentMetaData = orderSubmission.internal_notes || '';
+      const trashNote = `[TRASHED IN WOOCOMMERCE - ${new Date().toISOString()}]`;
+      
+      if (!currentMetaData.includes('[TRASHED IN WOOCOMMERCE')) {
+        updateData.internal_notes = currentMetaData ? `${currentMetaData}\n${trashNote}` : trashNote;
+        updatedFields.push('trash_status');
+      }
+    }
+
+    // Update the order in our database if there are changes
+    if (updatedFields.length > 0) {
       const { error: updateError } = await supabase
         .from('order_submissions')
-        .update({ 
-          status: mappedStatus,
-          last_sync_attempt: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', orderSubmissionId);
 
       if (updateError) {
-        throw new Error(`Failed to update order status: ${updateError.message}`);
+        throw new Error(`Failed to update order: ${updateError.message}`);
       }
 
-      console.log(`Order status updated from '${orderSubmission.status}' to '${mappedStatus}'`);
+      console.log(`✅ Order updated with fields: ${updatedFields.join(', ')}`);
 
       return {
         success: true,
-        message: `Order status synced successfully: ${mappedStatus}`,
-        updatedStatus: mappedStatus
+        message: `Order synced successfully. Updated fields: ${updatedFields.join(', ')}`,
+        updatedFields
       };
     } else {
       return {
         success: true,
-        message: 'Order status is already up to date',
-        updatedStatus: mappedStatus
+        message: 'Order is already up to date with WooCommerce',
+        updatedFields: []
       };
     }
 
   } catch (error) {
-    console.error('Error syncing order status:', error);
+    console.error('❌ Error syncing order from WooCommerce:', error);
     
     // Update last sync attempt even if failed
     await supabase
@@ -452,10 +571,13 @@ export const syncOrderStatusFromWooCommerce = async (orderSubmissionId: number):
 
     return {
       success: false,
-      message: `Failed to sync order status: ${error.message}`
+      message: `Failed to sync order from WooCommerce: ${error.message}`
     };
   }
 };
+
+// Keep the old function for backward compatibility
+export const syncOrderStatusFromWooCommerce = syncOrderFromWooCommerce;
 
 // Retry syncing an order that failed to sync to WooCommerce
 export const retrySyncOrderToWooCommerce = async (orderSubmissionId: number): Promise<{
@@ -608,7 +730,7 @@ export const syncAllOrderStatusesFromWooCommerce = async (): Promise<{
   errors: string[];
 }> => {
   try {
-    console.log('Starting bulk sync of order statuses...');
+    console.log('🚀 Starting enhanced bulk sync of orders from WooCommerce...');
 
     // Get all orders that have WooCommerce order IDs
     const { data: orders, error: fetchError } = await supabase
@@ -629,7 +751,7 @@ export const syncAllOrderStatusesFromWooCommerce = async (): Promise<{
       };
     }
 
-    console.log(`Found ${orders.length} orders to sync`);
+    console.log(`📊 Found ${orders.length} orders to sync`);
 
     let syncedCount = 0;
     const errors: string[] = [];
@@ -637,9 +759,10 @@ export const syncAllOrderStatusesFromWooCommerce = async (): Promise<{
     // Sync each order (with a small delay to avoid overwhelming the API)
     for (const order of orders) {
       try {
-        const result = await syncOrderStatusFromWooCommerce(order.id);
+        const result = await syncOrderFromWooCommerce(order.id);
         if (result.success) {
           syncedCount++;
+          console.log(`✅ Synced order ${order.order_number}: ${result.updatedFields?.length || 0} fields updated`);
         } else {
           errors.push(`Order ${order.order_number}: ${result.message}`);
         }
@@ -653,16 +776,16 @@ export const syncAllOrderStatusesFromWooCommerce = async (): Promise<{
 
     return {
       success: true,
-      message: `Sync completed. ${syncedCount}/${orders.length} orders synced successfully`,
+      message: `Enhanced sync completed. ${syncedCount}/${orders.length} orders synced successfully`,
       synced_count: syncedCount,
       errors: errors
     };
 
   } catch (error) {
-    console.error('Error in bulk sync:', error);
+    console.error('❌ Error in enhanced bulk sync:', error);
     return {
       success: false,
-      message: `Bulk sync failed: ${error.message}`,
+      message: `Enhanced bulk sync failed: ${error.message}`,
       synced_count: 0,
       errors: [error.message]
     };

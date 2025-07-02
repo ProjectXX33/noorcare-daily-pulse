@@ -335,6 +335,28 @@ export interface WooCommerceOrder {
   }>;
 }
 
+export interface WooCommercePaymentMethod {
+  id: string;
+  title: string;
+  description: string;
+  order: number;
+  enabled: boolean;
+  method_title: string;
+  method_description: string;
+  settings: {
+    [key: string]: {
+      id: string;
+      label: string;
+      description: string;
+      type: string;
+      value: string;
+      default: string;
+      tip: string;
+      placeholder: string;
+    };
+  };
+}
+
 // WooCommerce API Service
 const API_CONFIG = {
   baseURL: 'https://nooralqmar.com/wp-json/wc/v3', // Always use direct URL
@@ -346,26 +368,30 @@ const API_CONFIG = {
 };
 
 // Helper function to handle API requests with retry logic
-const makeRequest = async (url: string, attempt: number = 1): Promise<any> => {
+const makeRequest = async (url: string, options: RequestInit = {}, attempt: number = 1): Promise<any> => {
   const timeout = attempt === 1 ? API_CONFIG.timeout : API_CONFIG.retryTimeout;
   
-  console.log(`🔄 WooCommerce API request (attempt ${attempt}/${API_CONFIG.maxRetries + 1}):`, url);
+  console.log(`🔄 WooCommerce API request (attempt ${attempt}/${API_CONFIG.maxRetries + 1}):`, url, options.method || 'GET');
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   
+  const requestOptions: RequestInit = {
+    method: 'GET',
+    ...options, // User options will override defaults
+    headers: {
+      'Authorization': `Basic ${btoa(`${API_CONFIG.consumerKey}:${API_CONFIG.consumerSecret}`)}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'NoorHub-Strategy/2.0',
+      ...options.headers,
+    },
+    signal: controller.signal,
+    mode: 'cors'
+  };
+
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${btoa(`${API_CONFIG.consumerKey}:${API_CONFIG.consumerSecret}`)}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'NoorHub-Strategy/2.0'
-      },
-      signal: controller.signal,
-      mode: 'cors'
-    });
+    const response = await fetch(url, requestOptions);
     
     clearTimeout(timeoutId);
     
@@ -428,7 +454,7 @@ const makeRequest = async (url: string, attempt: number = 1): Promise<any> => {
       const delay = 2000 + Math.random() * 2000; // 2-4 second delay
       console.log(`⏳ Retrying WooCommerce API request in ${Math.round(delay)}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      return makeRequest(url, attempt + 1);
+      return makeRequest(url, options, attempt + 1);
     }
     
     // Final error handling
@@ -490,21 +516,22 @@ class WooCommerceAPI {
     status?: string;
     after?: string;
     before?: string;
+    modified_after?: string;
   } = {}): Promise<any[]> {
     const {
       per_page = 50,
       page = 1,
       status = 'completed',
       after,
-      before
+      before,
+      modified_after
     } = params;
     
     // Build query parameters for orders
     const queryParams = new URLSearchParams({
       per_page: per_page.toString(),
       page: page.toString(),
-      status,
-      orderby: 'date',
+      orderby: 'modified',
       order: 'desc',
       // Request all essential order fields for full sync
       _fields: [
@@ -528,6 +555,11 @@ class WooCommerceAPI {
         'shipping'
       ].join(',')
     });
+
+    // Only add status parameter if it's not 'any' - WooCommerce will return all statuses if no status is specified
+    if (status && status !== 'any') {
+      queryParams.append('status', status);
+    }
     
     // Add date filters if provided
     if (after) {
@@ -535,6 +567,9 @@ class WooCommerceAPI {
     }
     if (before) {
       queryParams.append('before', before);
+    }
+    if (modified_after) {
+      queryParams.append('modified_after', modified_after);
     }
     
     const url = `${API_CONFIG.baseURL}/orders?${queryParams.toString()}`;
@@ -551,6 +586,65 @@ class WooCommerceAPI {
       
     } catch (error: any) {
       console.error('❌ Error fetching WooCommerce orders:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Fetch orders for a specific customer
+  async fetchOrdersForCustomer(customerId: number, params: {
+    per_page?: number;
+    page?: number;
+    status?: string;
+    orderby?: string;
+    order?: string;
+  } = {}): Promise<any[]> {
+    const {
+      per_page = 100,
+      page = 1,
+      status = 'completed',
+      orderby = 'date',
+      order = 'desc'
+    } = params;
+    
+    // Build query parameters for customer orders
+    const queryParams = new URLSearchParams({
+      customer: customerId.toString(),
+      per_page: per_page.toString(),
+      page: page.toString(),
+      orderby,
+      order,
+      // Request essential order fields for loyal customer analysis
+      _fields: [
+        'id',
+        'number',
+        'status',
+        'total',
+        'date_created',
+        'date_completed',
+        'customer_id',
+        'line_items'
+      ].join(',')
+    });
+
+    // Only add status parameter if it's not 'any'
+    if (status && status !== 'any') {
+      queryParams.append('status', status);
+    }
+    
+    const url = `${API_CONFIG.baseURL}/orders?${queryParams.toString()}`;
+    
+    try {
+      const orders = await makeRequest(url);
+      
+      if (!Array.isArray(orders)) {
+        console.warn('⚠️ WooCommerce API returned non-array response for customer orders:', orders);
+        return [];
+      }
+      
+      return orders;
+      
+    } catch (error: any) {
+      console.error(`❌ Error fetching orders for customer ${customerId}:`, error);
       throw error;
     }
   }
@@ -1100,15 +1194,16 @@ class WooCommerceAPI {
   // Get a single order by ID
   async getOrder(orderId: number): Promise<WooCommerceOrder> {
     const url = `${API_CONFIG.baseURL}/orders/${orderId}`;
-    
-    try {
-      const order = await makeRequest(url);
-      return order;
-      
-    } catch (error: any) {
-      console.error(`❌ Error fetching WooCommerce order ${orderId}:`, error);
-      throw error;
-    }
+    return makeRequest(url);
+  }
+
+  // Update an order in WooCommerce
+  async updateOrder(orderId: number, data: Partial<WooCommerceOrderData>): Promise<WooCommerceOrder> {
+    const url = `${API_CONFIG.baseURL}/orders/${orderId}`;
+    return makeRequest(url, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   }
 
   // Get coupon by code
@@ -1130,6 +1225,53 @@ class WooCommerceAPI {
     }
   }
 
+  // Fetch available payment methods
+  async fetchPaymentMethods(): Promise<WooCommercePaymentMethod[]> {
+    try {
+      console.log('💳 Fetching payment methods from WooCommerce...');
+      
+      const url = `${API_CONFIG.baseURL}/payment_gateways`;
+      const paymentMethods = await makeRequest(url);
+      
+      if (!Array.isArray(paymentMethods)) {
+        console.warn('⚠️ WooCommerce API returned non-array response for payment methods:', paymentMethods);
+        return [];
+      }
+      
+      // Filter only enabled payment methods
+      const enabledMethods = paymentMethods.filter(method => method.enabled === true);
+      
+      console.log(`✅ Fetched ${enabledMethods.length} enabled payment methods`);
+      return enabledMethods;
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching WooCommerce payment methods:', error);
+      // Return default payment methods if API fails
+      return [
+        {
+          id: 'cod',
+          title: 'Cash on Delivery',
+          description: 'Pay with cash upon delivery.',
+          order: 1,
+          enabled: true,
+          method_title: 'Cash on Delivery',
+          method_description: 'Pay with cash when your order is delivered.',
+          settings: {}
+        },
+        {
+          id: 'bacs',
+          title: 'Direct Bank Transfer',
+          description: 'Make your payment directly into our bank account.',
+          order: 2,
+          enabled: true,
+          method_title: 'Direct Bank Transfer',
+          method_description: 'Make your payment directly into our bank account.',
+          settings: {}
+        }
+      ];
+    }
+  }
+
   // Get API configuration info
   getConfig() {
     return {
@@ -1143,6 +1285,12 @@ class WooCommerceAPI {
 
 // Export singleton instance
 const wooCommerceAPI = new WooCommerceAPI();
+
+// Expose wooCommerceAPI globally for debugging & scripts
+if (typeof window !== 'undefined') {
+  (window as any).wooCommerceAPI = wooCommerceAPI;
+}
+
 export default wooCommerceAPI;
 
 // Helper function to check if WooCommerce is configured

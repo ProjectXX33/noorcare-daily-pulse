@@ -2,7 +2,7 @@ export type User = {
   id: string;
   username: string;
   name: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'warehouse';
   department: Department;
   position: Position;
   lastCheckin?: Date;
@@ -17,7 +17,7 @@ export type User = {
 
 export type Department = 'Engineering' | 'Medical' | 'General' | 'Management';
 
-export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer';
+export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer' | 'Warehouse Staff';
 
 export type CheckIn = {
   id: string;
@@ -70,7 +70,7 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished';
   assignedTo: string;
   assignedToName?: string;
   assignedToPosition?: string;
@@ -85,6 +85,7 @@ export interface Task {
   comments?: TaskComment[];
   latestRating?: TaskRating;
   averageRating?: number;
+  isLocked?: boolean;
   // New fields for designer tasks
   tacticalPlan?: string;
   timeEstimate?: string;
@@ -123,6 +124,7 @@ export type Shift = {
   endTime: string; // HH:MM format
   position: 'Customer Service' | 'Designer';
   isActive: boolean;
+  allTimeOvertime?: boolean; // When true, all time worked is counted as overtime
   createdAt: Date;
   updatedAt: Date;
 };
@@ -200,7 +202,7 @@ export type UserRecord = {
   username: string;
   name: string;
   email: string;
-  role: 'admin' | 'employee';
+  role: 'admin' | 'employee' | 'warehouse';
   department: Department;
   position: Position;
   last_checkin: string | null;
@@ -266,7 +268,7 @@ export type TaskRecord = {
   title: string;
   description: string;
   assigned_to: string;
-  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished';
   progress_percentage: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   project_type: 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other';
@@ -274,6 +276,7 @@ export type TaskRecord = {
   updated_at: string;
   created_by: string;
   comments: TaskComment[];
+  is_locked?: boolean;
   // New fields for designer tasks
   tactical_plan?: string;
   time_estimate?: string;
@@ -302,6 +305,7 @@ export type ShiftRecord = {
   end_time: string;
   position: string;
   is_active: boolean;
+  all_time_overtime: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -349,3 +353,34 @@ export interface UserPreferences {
   };
   theme: 'light' | 'dark';
 }
+
+// Warehouse Order Management Types
+export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded' | 'on-hold';
+
+export type OrderNote = {
+  id: string;
+  orderId: number;
+  note: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
+  noteType: 'general' | 'status_change' | 'cancel_reason' | 'warehouse';
+};
+
+export type OrderStatusHistory = {
+  id: string;
+  orderId: number;
+  oldStatus: string;
+  newStatus: string;
+  reason?: string;
+  changedBy: string;
+  changedByName: string;
+  changedAt: Date;
+};
+
+export type ShippingMethod = {
+  id: string;
+  name: string;
+  displayName: string;
+  isActive: boolean;
+};

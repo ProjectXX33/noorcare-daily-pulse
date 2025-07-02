@@ -10,8 +10,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { MonthlyShift, Shift, User } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek } from 'date-fns';
-import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye, RefreshCw } from 'lucide-react';
-import AdminRecalculateButton from '@/components/AdminRecalculateButton';
+import { CalendarIcon, Clock, TrendingUp, Filter, ChevronDown, Eye, RefreshCw, Download } from 'lucide-react';
+import AdminShiftsRecalculateButton from '@/components/AdminShiftsRecalculateButton';
+import { useAutoShiftsCalculation } from '@/hooks/useAutoShiftsCalculation';
 import { toast } from 'sonner';
 import CustomerServiceSchedule from '@/components/CustomerServiceSchedule';
 import {
@@ -89,9 +90,17 @@ const calculateDelayToFinish = (
   overtimeHours: number,
   shiftName?: string,
   shiftStartTime?: string,
-  shiftEndTime?: string
+  shiftEndTime?: string,
+  allTimeOvertime?: boolean
 ): string => {
   // NEW SMART LOGIC: Different calculation based on work completion
+  
+  // Check if this is an all-time overtime shift
+  if (allTimeOvertime || (shiftName && shiftName.toLowerCase().includes('overtime'))) {
+    // For all-time overtime shifts, no delay calculation needed
+    console.log('🔥 All-time overtime shift detected - No delay calculation');
+    return 'All Clear';
+  }
   
   // Get expected hours based on shift type (Day = 7h, Night = 8h, Custom = duration)
   const getExpectedHours = (shiftName?: string): number => {
@@ -126,7 +135,7 @@ const calculateDelayToFinish = (
   };
   
   const expectedHours = getExpectedHours(shiftName);
-  const workedHours = regularHours; // Total hours actually worked
+  const workedHours = regularHours + overtimeHours; // Total hours actually worked (for all-time overtime, this is overtimeHours)
   
   let finalDelayMinutes = 0;
   let calculationLogic = '';
@@ -179,7 +188,6 @@ const ShiftsPage = () => {
   const [monthlyShifts, setMonthlyShifts] = useState<MonthlyShift[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [customerServiceEmployees, setCustomerServiceEmployees] = useState<User[]>([]);
-  const [weeklyAssignments, setWeeklyAssignments] = useState<{[key: string]: {[key: string]: string}}>({});
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const now = new Date();
     console.log('Current date initialized:', now.toISOString());
@@ -200,9 +208,11 @@ const ShiftsPage = () => {
     return 'en';
   });
   
-  const [showWeeklyAssignment, setShowWeeklyAssignment] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingShifts, setUpdatingShifts] = useState<Set<string>>(new Set());
+
+  // Initialize automatic shifts calculation (runs in background for admins)
+  const { performAutoCalculation, lastAutoCalculation, isCalculating } = useAutoShiftsCalculation();
 
   const translations = {
     en: {
@@ -241,7 +251,10 @@ const ShiftsPage = () => {
       changeShift: "Change Shift",
       noShift: "No Shift",
       shiftUpdated: "Shift updated successfully",
-      shiftUpdateFailed: "Failed to update shift"
+      shiftUpdateFailed: "Failed to update shift",
+      export: "Export Data",
+      afterCoveringDelay: "After covering delay",
+      days: "days"
     },
     ar: {
       shifts: "مناوباتي",
@@ -279,7 +292,10 @@ const ShiftsPage = () => {
       changeShift: "تغيير الوردية",
       noShift: "بدون وردية",
       shiftUpdated: "تم تحديث الوردية بنجاح",
-      shiftUpdateFailed: "فشل في تحديث الوردية"
+      shiftUpdateFailed: "فشل في تحديث الوردية",
+      export: "تصدير البيانات",
+      afterCoveringDelay: "بعد تغطية التأخير",
+      days: "يوم"
     }
   };
 
@@ -691,58 +707,7 @@ const ShiftsPage = () => {
     }
   }, [user, shifts, loadMonthlyShifts]);
 
-  const saveWeeklyAssignment = async (employeeId: string, weekStart: string, shiftType: 'day' | 'night') => {
-    try {
-      const { error } = await supabase
-        .from('weekly_shift_assignments')
-        .upsert({
-          employee_id: employeeId,
-          week_start: weekStart,
-          shift_type: shiftType,
-          assigned_by: user?.id,
-          updated_at: new Date().toISOString()
-        });
 
-      if (error) throw error;
-
-      setWeeklyAssignments(prev => ({
-        ...prev,
-        [weekStart]: {
-          ...prev[weekStart],
-          [employeeId]: shiftType
-        }
-      }));
-
-      toast.success(`Assigned ${shiftType} shift successfully`);
-    } catch (error) {
-      console.error('Error saving weekly assignment:', error);
-      toast.error('Failed to save assignment');
-    }
-  };
-
-  const getCurrentWeekAssignments = async () => {
-    try {
-      const startOfWeekDate = startOfWeek(new Date());
-      const { data, error } = await supabase
-        .from('weekly_shift_assignments')
-        .select('*')
-        .eq('week_start', startOfWeekDate.toISOString().split('T')[0]);
-
-      if (error) throw error;
-
-      const assignments: {[key: string]: string} = {};
-      data?.forEach(assignment => {
-        assignments[assignment.employee_id] = assignment.shift_type;
-      });
-
-      setWeeklyAssignments(prev => ({
-        ...prev,
-        [startOfWeekDate.toISOString().split('T')[0]]: assignments
-      }));
-    } catch (error) {
-      console.error('Error fetching weekly assignments:', error);
-    }
-  };
 
 
 
@@ -945,7 +910,12 @@ const ShiftsPage = () => {
         )}
 
         {/* Admin Recalculation Tools */}
-        {user?.role === 'admin' && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
+        {user?.role === 'admin' && (
+          <AdminShiftsRecalculateButton 
+            onRecalculationComplete={() => loadMonthlyShifts(false)} 
+            autoCalculationFunction={performAutoCalculation}
+          />
+        )}
 
         {/* Enhanced mobile filters with better UX - Only show for admin */}
         {user?.role === 'admin' && (
@@ -1004,16 +974,7 @@ const ShiftsPage = () => {
                           </Popover>
                         </div>
 
-                  <div className="space-y-3">
-                          <Button 
-                            onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
-                            variant={showWeeklyAssignment ? "default" : "outline"}
-                            className="h-12 w-full text-sm font-medium"
-                          >
-                            <Users className="mr-2 h-4 w-4 shrink-0" />
-                            Weekly Assignment
-                          </Button>
-                        </div>
+
                       </div>
                     </div>
                   </div>
@@ -1024,8 +985,8 @@ const ShiftsPage = () => {
             {/* Enhanced desktop filters */}
             <Card className="hidden lg:block border border-border/50 shadow-sm w-full">
               <CardContent className="p-4">
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-                  <div className="min-w-0">
+                <div className="flex items-end gap-4">
+                  <div className="min-w-[200px]">
                     <label className="text-xs font-medium text-muted-foreground mb-2 block">{t.employee}</label>
                     <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
                       <SelectTrigger className="h-9 w-full">
@@ -1040,7 +1001,7 @@ const ShiftsPage = () => {
                     </Select>
                   </div>
                   
-                  <div className="min-w-0">
+                  <div className="min-w-[180px]">
                     <label className="text-xs font-medium text-muted-foreground mb-2 block">{t.month}</label>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -1060,17 +1021,83 @@ const ShiftsPage = () => {
                     </Popover>
                   </div>
 
-                  <div className="flex items-end">
-                      <Button 
-                        onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
-                        variant={showWeeklyAssignment ? "default" : "outline"}
-                      size="sm"
-                      className="h-9 w-full text-xs"
-                      >
-                      <Users className="mr-1 h-3 w-3 shrink-0" />
-                        Weekly Assignment
-                      </Button>
-                    </div>
+                  <div className="flex items-center gap-3 ml-auto">
+                    <Button
+                      onClick={() => {
+                        // Generate CSV data
+                        const headers = user?.role === 'admin' 
+                          ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
+                          : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
+                        
+                        const csvData = monthlyShifts.map(shift => {
+                          const row = user?.role === 'admin'
+                            ? [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.userName,
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                formatBreakTime(shift.totalBreakMinutes || 0),
+                                formatHoursAndMinutes(shift.regularHours || 0),
+                                formatHoursAndMinutes(shift.overtimeHours || 0),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                              ]
+                            : [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                formatBreakTime(shift.totalBreakMinutes || 0),
+                                formatHoursAndMinutes(shift.regularHours || 0),
+                                formatHoursAndMinutes(shift.overtimeHours || 0),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                              ];
+                          return row.join(',');
+                        });
+
+                        // Add summary section
+                        csvData.push(''); // Empty line for separation
+                        csvData.push('Summary,,,,,,,,,');
+                        csvData.push(`${t.totalRegularHours},${formatHoursAndMinutes(summary.totalRegular)}`);
+                        csvData.push(`${t.totalOvertimeHours},${formatHoursAndMinutes(summary.actualOvertimeHours)} (${t.afterCoveringDelay})`);
+                        csvData.push(`${t.delayToFinish},${formatDelayHoursAndMinutes(summary.rawDelayHours * 60)}`);
+                        csvData.push(`${t.totalWorkingDays},${summary.workingDays} ${t.days}`);
+                        csvData.push(`${t.averageHoursPerDay},${formatHoursAndMinutes(summary.averagePerDay)}`);
+                        
+                        // Add Smart Offsetting Summary
+                        csvData.push('');
+                        csvData.push('Smart Offsetting Summary,,,,,,,,,');
+                        csvData.push(`Raw Overtime,${formatHoursAndMinutes(summary.actualOvertimeHours)}`);
+                        csvData.push(`Raw Delay,${formatHoursAndMinutes(summary.rawDelayHours)}`);
+                        csvData.push(`Net Result,${summary.offsettingType === 'overtime_covers_delay' 
+                          ? `+${formatHoursAndMinutes(summary.totalOvertime)} OT`
+                          : `${formatHoursAndMinutes(summary.delayToFinish)} Delay`}`);
+                        csvData.push(`Smart Logic,${formatHoursAndMinutes(summary.actualOvertimeHours)} Overtime - ${formatHoursAndMinutes(summary.rawDelayHours)} Delay = ${
+                          summary.offsettingType === 'overtime_covers_delay'
+                            ? `+${formatHoursAndMinutes(summary.totalOvertime)} Net OT`
+                            : `${formatHoursAndMinutes(summary.delayToFinish)} Net Delay`
+                        }`);
+                        
+                        // Create CSV content
+                        const csvContent = [headers.join(','), ...csvData].join('\n');
+                        
+                        // Create and download file
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        const currentMonth = format(selectedDate, 'MMMM_yyyy');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `shifts_${currentMonth}.csv`;
+                        link.click();
+                      }}
+                      variant="outline"
+                      className="h-10 text-sm font-medium"
+                    >
+                      <Download className="mr-2 h-4 w-4 shrink-0" />
+                      {t.export}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1081,30 +1108,108 @@ const ShiftsPage = () => {
         {user?.role !== 'admin' && (
           <div className="w-full">
             <Card className="border border-border/50 shadow-sm w-full">
-            <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <label className="text-sm font-medium text-muted-foreground shrink-0">{t.month}</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="h-10 w-full sm:w-auto justify-start text-left font-normal text-sm">
-                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                        <span className="truncate">{format(selectedDate, "MMMM yyyy")}</span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                    <label className="text-sm font-medium text-muted-foreground shrink-0">{t.month}</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="h-10 w-full sm:w-auto justify-start text-left font-normal text-sm">
+                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                          <span className="truncate">{format(selectedDate, "MMMM yyyy")}</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      // Generate CSV data
+                      const headers = user?.role === 'admin' 
+                        ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
+                        : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
+                        
+                        const csvData = monthlyShifts.map(shift => {
+                          const row = user?.role === 'admin'
+                            ? [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.userName,
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                formatBreakTime(shift.totalBreakMinutes || 0),
+                                formatHoursAndMinutes(shift.regularHours || 0),
+                                formatHoursAndMinutes(shift.overtimeHours || 0),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                              ]
+                            : [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                formatBreakTime(shift.totalBreakMinutes || 0),
+                                formatHoursAndMinutes(shift.regularHours || 0),
+                                formatHoursAndMinutes(shift.overtimeHours || 0),
+                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                              ];
+                          return row.join(',');
+                        });
+                        
+                        // Add summary section
+                        csvData.push(''); // Empty line for separation
+                        csvData.push('Summary,,,,,,,,,');
+                        csvData.push(`${t.totalRegularHours},${formatHoursAndMinutes(summary.totalRegular)}`);
+                        csvData.push(`${t.totalOvertimeHours},${formatHoursAndMinutes(summary.actualOvertimeHours)} (${t.afterCoveringDelay})`);
+                        csvData.push(`${t.delayToFinish},${formatDelayHoursAndMinutes(summary.rawDelayHours * 60)}`);
+                        csvData.push(`${t.totalWorkingDays},${summary.workingDays} ${t.days}`);
+                        csvData.push(`${t.averageHoursPerDay},${formatHoursAndMinutes(summary.averagePerDay)}`);
+                        
+                        // Add Smart Offsetting Summary
+                        csvData.push('');
+                        csvData.push('Smart Offsetting Summary,,,,,,,,,');
+                        csvData.push(`Raw Overtime,${formatHoursAndMinutes(summary.actualOvertimeHours)}`);
+                        csvData.push(`Raw Delay,${formatHoursAndMinutes(summary.rawDelayHours)}`);
+                        csvData.push(`Net Result,${summary.offsettingType === 'overtime_covers_delay' 
+                          ? `+${formatHoursAndMinutes(summary.totalOvertime)} OT`
+                          : `${formatHoursAndMinutes(summary.delayToFinish)} Delay`}`);
+                        csvData.push(`Smart Logic,${formatHoursAndMinutes(summary.actualOvertimeHours)} Overtime - ${formatHoursAndMinutes(summary.rawDelayHours)} Delay = ${
+                          summary.offsettingType === 'overtime_covers_delay'
+                            ? `+${formatHoursAndMinutes(summary.totalOvertime)} Net OT`
+                            : `${formatHoursAndMinutes(summary.delayToFinish)} Net Delay`
+                        }`);
+                        
+                        // Create CSV content
+                        const csvContent = [headers.join(','), ...csvData].join('\n');
+                        
+                        // Create and download file
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        const currentMonth = format(selectedDate, 'MMMM_yyyy');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `shifts_${currentMonth}.csv`;
+                        link.click();
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="h-10 px-4 text-sm font-medium hover:shadow-md transition-all duration-200"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {t.export}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-                  </div>
-                )}
+          </div>
+        )}
 
         {/* Customer Service and Designer Schedule with enhanced mobile design */}
         {(user.position === 'Customer Service' || user.position === 'Designer') && (
@@ -1280,15 +1385,15 @@ const ShiftsPage = () => {
                         
                         <div className="pt-2 border-t border-border/50">
                           <div className={`flex justify-between items-center rounded-lg p-2 ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' 
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' 
                               ? 'bg-gradient-to-r from-green-100/50 to-green-50/30 dark:from-green-900/20 dark:to-green-800/10' 
                               : 'bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10'
                           }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
                             </span>
                           </div>
                         </div>
@@ -1304,17 +1409,17 @@ const ShiftsPage = () => {
               <div className="w-full overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-border/50">
-                      <TableHead className="font-semibold text-xs">{t.date}</TableHead>
-                      {user.role === 'admin' && <TableHead className="font-semibold text-xs">{t.employee}</TableHead>}
-                      <TableHead className="font-semibold text-xs">{t.shift}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.checkIn}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.checkOut}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.delay}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.breakTime}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.regularHours}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.overtimeHours}</TableHead>
-                      <TableHead className="font-semibold text-xs">{t.delayTime}</TableHead>
+                    <TableRow className="border-b border-border/50 dark:bg-[#23232b]">
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.date}</TableHead>
+                      {user.role === 'admin' && <TableHead className="font-semibold text-xs dark:text-white">{t.employee}</TableHead>}
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.shift}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.checkIn}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.checkOut}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.delay}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.breakTime}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.regularHours}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.overtimeHours}</TableHead>
+                      <TableHead className="font-semibold text-xs dark:text-white">{t.delayTime}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1425,9 +1530,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
                           </TableCell>
                         </TableRow>
                       ))

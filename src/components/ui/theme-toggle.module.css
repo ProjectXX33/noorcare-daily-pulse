@@ -22,7 +22,7 @@
 }
 
 .themeToggle:hover {
-  background-color: hsl(0 0% 95%);
+  /* Removed hover circle background */
 }
 
 .themeToggle:focus-visible {
@@ -39,7 +39,7 @@
 
 :global(.dark) .themeToggle:hover,
 :global([data-theme="dark"]) .themeToggle:hover {
-  background-color: hsl(0 0% 15%);
+  /* Removed dark mode hover circle background */
 }
 
 :global(.dark) .themeToggle:focus-visible,

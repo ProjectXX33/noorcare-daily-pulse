@@ -21,7 +21,7 @@ interface EnhancedTask {
   id: string;
   title: string;
   description: string;
-  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   projectType?: 'social-media' | 'web-design' | 'branding' | 'print' | 'ui-ux' | 'other';
   assignedTo: string;
@@ -36,6 +36,7 @@ interface EnhancedTask {
   comments?: any[];
   averageRating?: number;
   latestRating?: any;
+  isLocked?: boolean;
 }
 
 // Mock comments data for fallback
@@ -153,6 +154,11 @@ const EmployeeTasksPage = () => {
     return task.createdByPosition === 'Media Buyer' && task.assignedToPosition === 'Designer';
   };
 
+  // Helper function to check if a task is locked
+  const isTaskLocked = (task: EnhancedTask) => {
+    return task.isLocked === true;
+  };
+
   // Helper functions for priority and project type display with modern design
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
@@ -188,6 +194,8 @@ const EmployeeTasksPage = () => {
         return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl ring-2 ring-blue-500/20';
       case 'On Hold':
         return 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white shadow-lg hover:shadow-xl ring-2 ring-yellow-500/20';
+      case 'Unfinished':
+        return 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg hover:shadow-xl ring-2 ring-red-500/20';
       default:
         return 'bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg hover:shadow-xl ring-2 ring-gray-400/20';
     }
@@ -353,6 +361,7 @@ const EmployeeTasksPage = () => {
                   <SelectItem value="In Progress">In Progress</SelectItem>
                   <SelectItem value="On Hold">On Hold</SelectItem>
                   <SelectItem value="Complete">Complete</SelectItem>
+                  <SelectItem value="Unfinished">Unfinished</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -393,7 +402,9 @@ const EmployeeTasksPage = () => {
               <Card 
                 key={task.id} 
                 className={`p-3 sm:p-4 border shadow-sm transition-all hover:shadow-md ${
-                  isMediaBuyerToDesignerTask(task) 
+                  isTaskLocked(task)
+                    ? "bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-l-red-500 dark:from-red-900/20 dark:to-red-800/20 dark:border-l-red-400 opacity-75"
+                    : isMediaBuyerToDesignerTask(task) 
                     ? "bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-l-purple-500 dark:from-purple-900/20 dark:to-pink-900/20 dark:border-l-purple-400" 
                     : ""
                 }`}
@@ -406,6 +417,11 @@ const EmployeeTasksPage = () => {
                       
                       {/* Task metadata badges */}
                       <div className="flex flex-wrap gap-1 mb-2">
+                        {isTaskLocked(task) && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                            🔒 Task Locked
+                          </span>
+                        )}
                         {isMediaBuyerToDesignerTask(task) && (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                             📊 Media Buyer → Designer
@@ -476,9 +492,19 @@ const EmployeeTasksPage = () => {
                     onClick={() => handleOpenTask(task)}
                     className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
                     variant="outline"
+                    disabled={isTaskLocked(task)}
                   >
-                    <CheckSquare className="mr-2 h-4 w-4" />
-                    View & Update Task
+                    {isTaskLocked(task) ? (
+                      <>
+                        <span className="mr-2">🔒</span>
+                        Task Locked - View Only
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="mr-2 h-4 w-4" />
+                        View & Update Task
+                      </>
+                    )}
                   </Button>
                 </div>
               </Card>
@@ -498,6 +524,11 @@ const EmployeeTasksPage = () => {
                   
                   {/* Task metadata in dialog */}
                   <div className="flex flex-wrap gap-2 mt-2">
+                    {isTaskLocked(selectedTask) && (
+                      <Badge variant="destructive" className="text-xs">
+                        🔒 Task Locked - No Updates Allowed
+                      </Badge>
+                    )}
                     {selectedTask.priority && (
                       <span className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:scale-105 ${getPriorityColor(selectedTask.priority)}`}>
                         {getPriorityDisplay(selectedTask.priority)}
@@ -546,20 +577,34 @@ const EmployeeTasksPage = () => {
 
                   {/* Progress update - Enhanced for mobile */}
                   <div className="border-t pt-4">
-                    <h3 className="font-medium mb-3 text-sm sm:text-base">Update Progress</h3>
+                    <h3 className="font-medium mb-3 text-sm sm:text-base">
+                      {isTaskLocked(selectedTask) ? "Progress (Read Only)" : "Update Progress"}
+                    </h3>
+                    {isTaskLocked(selectedTask) && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-700">
+                        <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                          <span className="text-lg">🔒</span>
+                          <span className="font-medium text-sm">Task is Locked</span>
+                        </div>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                          This task has been marked as "Unfinished" and cannot be updated or commented on by employees.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-4">
                       <RadioGroup 
                         value={progressType} 
                         onValueChange={(value) => setProgressType(value as 'preset' | 'custom')}
                         className="flex flex-col sm:flex-row gap-3 sm:gap-4"
+                        disabled={isTaskLocked(selectedTask)}
                       >
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="preset" id="preset" />
-                          <Label htmlFor="preset" className="text-sm">Quick select</Label>
+                          <RadioGroupItem value="preset" id="preset" disabled={isTaskLocked(selectedTask)} />
+                          <Label htmlFor="preset" className={`text-sm ${isTaskLocked(selectedTask) ? 'text-gray-400' : ''}`}>Quick select</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="custom" id="custom" />
-                          <Label htmlFor="custom" className="text-sm">Custom value</Label>
+                          <RadioGroupItem value="custom" id="custom" disabled={isTaskLocked(selectedTask)} />
+                          <Label htmlFor="custom" className={`text-sm ${isTaskLocked(selectedTask) ? 'text-gray-400' : ''}`}>Custom value</Label>
                         </div>
                       </RadioGroup>
 
@@ -572,6 +617,7 @@ const EmployeeTasksPage = () => {
                               size="sm"
                               onClick={() => setCustomProgress(preset)}
                               className="min-h-[44px] text-xs sm:text-sm"
+                              disabled={isTaskLocked(selectedTask)}
                             >
                               {preset}%
                             </Button>
@@ -589,19 +635,25 @@ const EmployeeTasksPage = () => {
                             onChange={(e) => setCustomProgress(parseInt(e.target.value) || 0)}
                             placeholder="Enter percentage (0-100)"
                             className="min-h-[44px] text-base"
+                            disabled={isTaskLocked(selectedTask)}
                           />
                         </div>
                       )}
 
                       <Button
                         onClick={handleApplyCustomProgress}
-                        disabled={isLoading}
+                        disabled={isLoading || isTaskLocked(selectedTask)}
                         className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
                       >
                         {isLoading ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Updating...
+                          </>
+                        ) : isTaskLocked(selectedTask) ? (
+                          <>
+                            <span className="mr-2">🔒</span>
+                            Task Locked
                           </>
                         ) : (
                           'Update Progress'
@@ -612,13 +664,27 @@ const EmployeeTasksPage = () => {
 
                   {/* Comments section - Enhanced for mobile */}
                   <div className="border-t pt-4">
-                    <h3 className="font-medium mb-3 text-sm sm:text-base">Comments</h3>
+                    <h3 className="font-medium mb-3 text-sm sm:text-base">
+                      {isTaskLocked(selectedTask) ? "Comments (Read Only)" : "Comments"}
+                    </h3>
+                    {isTaskLocked(selectedTask) && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-700">
+                        <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                          <span className="text-lg">🔒</span>
+                          <span className="font-medium text-sm">Comments Disabled</span>
+                        </div>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                          You cannot add comments to locked tasks.
+                        </p>
+                      </div>
+                    )}
                     <TaskComments
                       taskId={selectedTask.id}
                       user={user}
                       comments={taskComments[selectedTask.id] || []}
                       onCommentAdded={(comments) => handleCommentAdded(selectedTask.id, comments)}
                       language={language}
+                      isLocked={isTaskLocked(selectedTask)}
                     />
                   </div>
 

@@ -25,7 +25,8 @@ import {
   TrendingDown,
   BarChart3,
   Users,
-  Award
+  Award,
+  Copy
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +39,7 @@ import {
 } from '@/lib/orderSubmissionsApi';
 import wooCommerceAPI from '@/lib/woocommerceApi';
 import { supabase } from '@/lib/supabase';
+import { syncOrderFromWooCommerce } from '@/lib/orderSubmissionsApi';
 // Remove date-fns dependency and use built-in date formatting
 
 // SAR Icon Component
@@ -102,8 +104,8 @@ const AdminTotalOrdersPage: React.FC = () => {
       return;
     }
     
-    if (user.role !== 'admin') {
-      console.warn('Access denied: User is not admin');
+    if (user.role !== 'admin' && user.position !== 'Media Buyer') {
+      console.warn('Access denied: User is not admin or media buyer');
       navigate('/dashboard', { replace: true });
       return;
     }
@@ -246,56 +248,24 @@ const AdminTotalOrdersPage: React.FC = () => {
         return;
       }
 
-      console.log('Syncing order from WooCommerce:', order.order_number);
-      toast.info('Fetching latest data from WooCommerce...');
+      console.log('🔄 Syncing order from WooCommerce:', order.order_number);
+      toast.info('📥 Fetching latest data from WooCommerce...');
       
-      // Fetch the latest order data from WooCommerce
-      const wooOrder = await wooCommerceAPI.getOrder(order.woocommerce_order_id);
+      // Use the enhanced sync function
+      const result = await syncOrderFromWooCommerce(order.id);
       
-      if (!wooOrder) {
-        toast.error('Order not found in WooCommerce');
-        return;
+      if (result.success) {
+        if (result.updatedFields && result.updatedFields.length > 0) {
+          toast.success(`✅ Order updated from WooCommerce. Updated fields: ${result.updatedFields.join(', ')}`);
+        } else {
+          toast.success('✅ Order is already up to date with WooCommerce');
+        }
+        
+        // Refresh data to show updated information
+        await fetchData(false);
+      } else {
+        toast.error(`❌ Failed to sync order: ${result.message}`);
       }
-
-      // Map WooCommerce status to local status
-      const statusMapping: { [key: string]: string } = {
-        'pending': 'pending',
-        'processing': 'processing', 
-        'on-hold': 'processing',
-        'completed': 'completed',
-        'cancelled': 'cancelled',
-        'refunded': 'cancelled',
-        'failed': 'cancelled'
-      };
-
-      const wooStatus = statusMapping[wooOrder.status] || wooOrder.status;
-      const wooTotal = parseFloat(wooOrder.total || '0');
-
-      // Update local order with WooCommerce data
-      const { error: updateError } = await supabase
-        .from('order_submissions')
-        .update({
-          status: wooStatus,
-          total_amount: wooTotal,
-          subtotal: wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
-          shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
-          payment_method: wooOrder.payment_method_title,
-          updated_at: new Date().toISOString(),
-          is_synced_to_woocommerce: true
-        })
-        .eq('id', order.id);
-
-      if (updateError) {
-        console.error('❌ Failed to update local order:', updateError);
-        toast.error('Failed to update local order');
-        return;
-      }
-
-      console.log('✅ Updated local order from WooCommerce data');
-      toast.success(`✅ Order updated from WooCommerce: ${wooOrder.number}`);
-      
-      // Refresh data
-      await fetchData(false);
       
     } catch (error) {
       console.error('❌ Failed to sync order from WooCommerce:', error);
@@ -521,7 +491,7 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Auto-sync functionality
   useEffect(() => {
-    if (!autoSyncEnabled || !user || user.role !== 'admin') return;
+    if (!autoSyncEnabled || !user || (user.role !== 'admin' && user.position !== 'Media Buyer')) return;
 
     const autoSyncInterval = setInterval(() => {
       console.log('🔄 Auto-sync triggered');
@@ -533,7 +503,7 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Initial data load
   useEffect(() => {
-    if (user && user.role === 'admin') {
+    if (user && (user.role === 'admin' || user.position === 'Media Buyer')) {
       fetchData();
     }
   }, [user]);
@@ -624,8 +594,58 @@ const AdminTotalOrdersPage: React.FC = () => {
     }
   };
 
+  // Copy order information in Arabic format
+  const copyOrderInArabic = async (order: OrderSubmission) => {
+    try {
+      // Get payment method in Arabic
+      const getPaymentMethodArabic = (method: string) => {
+        switch (method?.toLowerCase()) {
+          case 'cod':
+            return 'الدفع عند الاستلام (COD)';
+          case 'bank_transfer':
+            return 'تحويل بنكي';
+          case 'credit_card':
+            return 'بطاقة ائتمان';
+          default:
+            return 'الدفع عند الاستلام (COD)';
+        }
+      };
+
+      // Format the Arabic order invoice
+      const arabicOrderText = `🌙 نور القمر – فاتورة الطلب
+
+رقم الطلب: #${order.order_number}
+اسم العميل: ${order.customer_first_name} ${order.customer_last_name}
+رقم الهاتف: ${order.customer_phone}
+العنوان: ${order.billing_address_1}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
+المدينة: ${order.billing_city}
+الدولة: ${order.billing_country}
+طريقة الدفع: ${getPaymentMethodArabic(order.payment_method)}
+
+🛒 تفاصيل الطلب:
+${order.order_items.map(item => 
+`المنتج: ${item.product_name}
+الكمية: ${item.quantity}`
+).join('\n\n')}
+
+💰 إجمالي الطلب:
+${order.total_amount.toFixed(0)} ريال سعودي`;
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(arabicOrderText);
+      toast.success('تم نسخ تفاصيل الطلب بالعربية!', {
+        description: 'Order details copied in Arabic format',
+      });
+    } catch (error) {
+      console.error('Failed to copy order details:', error);
+      toast.error('فشل في نسخ تفاصيل الطلب', {
+        description: 'Failed to copy order details',
+      });
+    }
+  };
+
   // Don't render if user doesn't have access
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -650,14 +670,14 @@ const AdminTotalOrdersPage: React.FC = () => {
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header Section */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 md:p-6 text-white">
+      <div className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 rounded-lg p-4 md:p-6 text-white">
         <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2 md:gap-3">
               <SARIcon className="h-6 w-6 md:h-8 md:w-8" />
               Total Orders - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h1>
-            <p className="mt-1 md:mt-2 text-purple-100 text-sm md:text-base">
+            <p className="mt-1 md:mt-2 text-purple-100 dark:text-purple-200 text-sm md:text-base">
               Admin dashboard - Current month order submissions ({orders.length} orders)
             </p>
           </div>
@@ -665,7 +685,7 @@ const AdminTotalOrdersPage: React.FC = () => {
             <Button
               onClick={() => setViewMode(viewMode === 'orders' ? 'stats' : 'orders')}
               variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 w-full sm:w-auto"
+              className="bg-white/10 dark:bg-white/20 border-white/20 dark:border-white/30 text-white hover:bg-white/20 dark:hover:bg-white/30 w-full sm:w-auto"
             >
               {viewMode === 'orders' ? (
                 <>
@@ -683,7 +703,7 @@ const AdminTotalOrdersPage: React.FC = () => {
               onClick={handleSync}
               disabled={isRefreshing}
               variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 transition-all duration-200 w-full sm:w-auto px-4 py-2 flex items-center justify-center text-base gap-2"
+              className="bg-white/10 dark:bg-white/20 border-white/20 dark:border-white/30 text-white hover:bg-white/20 dark:hover:bg-white/30 hover:scale-105 transition-all duration-200 w-full sm:w-auto px-4 py-2 flex items-center justify-center text-base gap-2"
             >
               <span className="block text-center">Sync</span>
               {isRefreshing ? (
@@ -695,16 +715,16 @@ const AdminTotalOrdersPage: React.FC = () => {
             <Button
               onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
               variant="outline"
-              className={`border-white/20 text-white hover:scale-105 transition-all duration-200 w-full sm:w-auto ${
+              className={`border-white/20 dark:border-white/30 text-white hover:scale-105 transition-all duration-200 w-full sm:w-auto ${
                 autoSyncEnabled
-                  ? 'bg-green-500/20 hover:bg-green-500/30 border-green-400/50'
-                  : 'bg-white/10 hover:bg-white/20'
+                  ? 'bg-green-500/20 dark:bg-green-400/30 hover:bg-green-500/30 dark:hover:bg-green-400/40 border-green-400/50 dark:border-green-300/50'
+                  : 'bg-white/10 dark:bg-white/20 hover:bg-white/20 dark:hover:bg-white/30'
               }`}
             >
               {autoSyncEnabled ? '🟢 Auto-Import ON' : '⚪ Auto-Import OFF'}
             </Button>
             {lastSyncTime && (
-              <div className="text-white/80 text-sm bg-white/10 px-3 py-2 rounded-md w-full sm:w-auto text-center">
+              <div className="text-white/80 dark:text-white/90 text-sm bg-white/10 dark:bg-white/20 px-3 py-2 rounded-md w-full sm:w-auto text-center">
                 Last sync: {lastSyncTime.toLocaleTimeString()}
               </div>
             )}
@@ -713,16 +733,16 @@ const AdminTotalOrdersPage: React.FC = () => {
       </div>
 
       {/* Sync Status Info */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 border-blue-200 dark:border-blue-800">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <RefreshCw className="h-5 w-5 text-blue-600" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-blue-900">WooCommerce Import Status</h3>
-                <p className="text-sm text-blue-700">
+                <h3 className="font-semibold text-blue-900 dark:text-blue-100">WooCommerce Import Status</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
                   {isRefreshing 
                     ? '📥 Importing from WooCommerce...' 
                     : autoSyncEnabled 
@@ -733,10 +753,10 @@ const AdminTotalOrdersPage: React.FC = () => {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-medium text-blue-900">
+              <div className="text-sm font-medium text-blue-900 dark:text-blue-100">
                 {lastSyncTime ? 'Last Sync' : 'Never Synced'}
               </div>
-              <div className="text-xs text-blue-600">
+              <div className="text-xs text-blue-600 dark:text-blue-400">
                 {lastSyncTime ? lastSyncTime.toLocaleDateString() : 'Click sync to start'}
               </div>
             </div>
@@ -1060,7 +1080,7 @@ const AdminTotalOrdersPage: React.FC = () => {
                           </div>
                           
                           {/* Action Buttons */}
-                          <div className="flex flex-col sm:flex-row gap-1 pt-2 border-t border-gray-100">
+                          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
                             <Button
                               onClick={() => viewOrderDetails(order)}
                               variant="outline"
@@ -1070,6 +1090,17 @@ const AdminTotalOrdersPage: React.FC = () => {
                               <Eye className="h-4 w-4 mr-2" />
                               <span className="hidden sm:inline">View Details</span>
                               <span className="sm:hidden">Details</span>
+                            </Button>
+                            
+                            <Button
+                              onClick={() => copyOrderInArabic(order)}
+                              variant="outline"
+                              size="sm"
+                              className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 hover:from-purple-100 hover:to-purple-150 hover:border-purple-400 flex-1 sm:flex-none font-medium shadow-sm"
+                            >
+                              <Copy className="h-4 w-4 mr-1 text-purple-600" />
+                              <span className="hidden sm:inline">Copy Arabic</span>
+                              <span className="sm:hidden">📋 نسخ</span>
                             </Button>
                             
                             {order.woocommerce_order_id && (
@@ -1264,6 +1295,25 @@ const AdminTotalOrdersPage: React.FC = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <Button
+                  onClick={() => copyOrderInArabic(selectedOrder)}
+                  variant="outline"
+                  className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 hover:from-purple-100 hover:to-purple-150 hover:border-purple-400 font-medium shadow-sm px-6 py-2"
+                >
+                  <Copy className="h-4 w-4 mr-2 text-purple-600" />
+                  Copy Order in Arabic
+                </Button>
+                <Button
+                  onClick={() => setIsOrderDetailsOpen(false)}
+                  variant="outline"
+                  className="px-6 py-2"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

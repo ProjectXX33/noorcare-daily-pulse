@@ -478,47 +478,64 @@ const WorkShiftTimer: React.FC = () => {
           }
         }
         
-        // ENHANCED OVERTIME LOGIC: Works with Day, Night, and Custom shifts
-        // Counter-based overtime calculation with custom shift support
-        let minimumHoursForOvertime;
-        
-        if (isCustomShift) {
-          minimumHoursForOvertime = customShiftDuration; // Custom shift uses calculated duration
-        } else {
-          minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day: 7h, Night: 8h
-        }
-        
-        const hoursWorked = actualWorkSeconds / 3600; // Convert actual work seconds (excluding breaks) to hours
-        
-        // Check if overtime should start (based on hours worked, not time-of-day)
-        if (hoursWorked >= minimumHoursForOvertime) {
-          // Completed required shift hours - NOW overtime starts
+        // ENHANCED OVERTIME LOGIC: Works with Day, Night, Custom shifts, and All-Time Overtime
+        // Check if this is an all-time overtime shift
+        if (shiftInfo && shiftInfo.all_time_overtime) {
+          // All time is overtime - start overtime immediately
           setIsOvertime(true);
-          const overtimeSeconds = actualWorkSeconds - (minimumHoursForOvertime * 3600);
-          const overtimeMinutesCalc = Math.floor(overtimeSeconds / 60);
+          const overtimeMinutesCalc = Math.floor(actualWorkSeconds / 60);
           setOvertimeMinutes(overtimeMinutesCalc);
           
-          console.log('🔥 OVERTIME ACTIVATED (Enhanced Counter-based):', {
+          console.log('🔥 ALL-TIME OVERTIME ACTIVATED:', {
             shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
-            isCustomShift,
-            minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
-            hoursWorked: hoursWorked.toFixed(2),
-            overtimeHours: (overtimeSeconds / 3600).toFixed(2),
-            logic: `Overtime starts after completing ${minimumHoursForOvertime.toFixed(1)} hours`
+            shiftName: shiftInfo.name,
+            hoursWorked: (actualWorkSeconds / 3600).toFixed(2),
+            overtimeHours: (actualWorkSeconds / 3600).toFixed(2),
+            regularHours: 0,
+            logic: 'All time worked counts as overtime'
           });
         } else {
-          // Still working on required hours - no overtime yet
-          setIsOvertime(false);
-          setOvertimeMinutes(0);
+          // Regular overtime calculation - Counter-based overtime calculation with custom shift support
+          let minimumHoursForOvertime;
           
-          console.log('⏱️ REGULAR TIME (Enhanced Counter-based):', {
-            shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
-            isCustomShift,
-            minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
-            hoursWorked: hoursWorked.toFixed(2),
-            remainingHours: (minimumHoursForOvertime - hoursWorked).toFixed(2),
-            logic: `Need to complete ${minimumHoursForOvertime.toFixed(1)} hours before overtime`
-          });
+          if (isCustomShift) {
+            minimumHoursForOvertime = customShiftDuration; // Custom shift uses calculated duration
+          } else {
+            minimumHoursForOvertime = shiftType === 'day' ? 7 : 8; // Day: 7h, Night: 8h
+          }
+          
+          const hoursWorked = actualWorkSeconds / 3600; // Convert actual work seconds (excluding breaks) to hours
+          
+          // Check if overtime should start (based on hours worked, not time-of-day)
+          if (hoursWorked >= minimumHoursForOvertime) {
+            // Completed required shift hours - NOW overtime starts
+            setIsOvertime(true);
+            const overtimeSeconds = actualWorkSeconds - (minimumHoursForOvertime * 3600);
+            const overtimeMinutesCalc = Math.floor(overtimeSeconds / 60);
+            setOvertimeMinutes(overtimeMinutesCalc);
+            
+            console.log('🔥 OVERTIME ACTIVATED (Enhanced Counter-based):', {
+              shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
+              isCustomShift,
+              minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
+              hoursWorked: hoursWorked.toFixed(2),
+              overtimeHours: (overtimeSeconds / 3600).toFixed(2),
+              logic: `Overtime starts after completing ${minimumHoursForOvertime.toFixed(1)} hours`
+            });
+          } else {
+            // Still working on required hours - no overtime yet
+            setIsOvertime(false);
+            setOvertimeMinutes(0);
+            
+            console.log('⏱️ REGULAR TIME (Enhanced Counter-based):', {
+              shiftType: isCustomShift ? `custom (${shiftInfo?.name})` : shiftType,
+              isCustomShift,
+              minimumHoursRequired: minimumHoursForOvertime.toFixed(1),
+              hoursWorked: hoursWorked.toFixed(2),
+              remainingHours: (minimumHoursForOvertime - hoursWorked).toFixed(2),
+              logic: `Need to complete ${minimumHoursForOvertime.toFixed(1)} hours before overtime`
+            });
+          }
         }
         
         // Auto-checkout at 4AM regardless of hours worked

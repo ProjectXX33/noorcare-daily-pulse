@@ -166,9 +166,17 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
               }
             }
 
-            // Calculate regular and overtime hours using ACTUAL WORK TIME (excluding breaks)
-            regularHours = Math.min(actualWorkHours, standardWorkHours);
-            overtimeHours = Math.max(0, actualWorkHours - standardWorkHours);
+            // Check if this shift has "all time overtime" enabled
+            if (shift.all_time_overtime) {
+              // All time is overtime for this shift
+              regularHours = 0;
+              overtimeHours = actualWorkHours;
+              console.log(`🔥 All-time overtime shift detected: "${shift.name}" - ${actualWorkHours.toFixed(2)}h all overtime`);
+            } else {
+              // Calculate regular and overtime hours using ACTUAL WORK TIME (excluding breaks)
+              regularHours = Math.min(actualWorkHours, standardWorkHours);
+              overtimeHours = Math.max(0, actualWorkHours - standardWorkHours);
+            }
             
             // NEW SMART DELAY CALCULATION
             const [startHour, startMin] = shift.start_time.split(':').map(Number);
@@ -178,16 +186,25 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             const checkInDelayMinutes = Math.max(0, rawDelayMs / (1000 * 60));
             
             // SIMPLIFIED LOGIC: Only calculate missing work time (ignore late check-in)
-            if (actualWorkHours < standardWorkHours) {
-              // EARLY CHECKOUT: Only show missing hours as delay
-              const hoursShort = standardWorkHours - actualWorkHours;
-              const hoursShortMinutes = hoursShort * 60;
-              
-              // NEW: Only count missing work time, ignore check-in delay
-              delayMinutes = hoursShortMinutes;
+            // Special logic for all-time overtime shifts
+            if (shift.all_time_overtime) {
+              // For all-time overtime shifts, NO delay calculation needed
+              // All time worked is overtime, so any time worked is "completed work"
+              delayMinutes = 0; // Always "All Clear" for all-time overtime shifts
+              console.log(`🔥 All-time overtime shift - No delay calculation needed`);
             } else {
-              // FULL/OVERTIME WORK: No delay if completed required hours
-              delayMinutes = 0; // All clear if worked required hours or more
+              // Normal shift delay calculation
+              if (actualWorkHours < standardWorkHours) {
+                // EARLY CHECKOUT: Only show missing hours as delay
+                const hoursShort = standardWorkHours - actualWorkHours;
+                const hoursShortMinutes = hoursShort * 60;
+                
+                // NEW: Only count missing work time, ignore check-in delay
+                delayMinutes = hoursShortMinutes;
+              } else {
+                // FULL/OVERTIME WORK: No delay if completed required hours
+                delayMinutes = 0; // All clear if worked required hours or more
+              }
             }
             
             console.log(`🧮 ${shift.name} - NEW Smart Delay Formula:`, {
@@ -198,17 +215,26 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
               checkInDelayMinutes: checkInDelayMinutes.toFixed(1),
               breakTimeMinutes: breakTimeMinutes.toFixed(1),
               totalDelayMinutes: delayMinutes.toFixed(1),
-              logic: actualWorkHours < standardWorkHours ? 'MISSING_WORK_ONLY' : 'COMPLETED_WORK',
-              formula: actualWorkHours < standardWorkHours 
+              allTimeOvertime: shift.all_time_overtime || false,
+              logic: shift.all_time_overtime ? 'ALL_TIME_OVERTIME' : (actualWorkHours < standardWorkHours ? 'MISSING_WORK_ONLY' : 'COMPLETED_WORK'),
+              formula: shift.all_time_overtime 
+                ? `All-Time Overtime: No delay calculation (all time = overtime)`
+                : actualWorkHours < standardWorkHours 
                 ? `Missing Work Only: ${((standardWorkHours - actualWorkHours) * 60).toFixed(1)}min short = ${delayMinutes.toFixed(1)}min (check-in delay ignored)`
                 : `Completed Work: No delay (worked ${actualWorkHours.toFixed(2)}h >= ${standardWorkHours}h required)`
             });
             
             // Track early checkout penalty (based on actual work hours)
-            if (actualWorkHours < standardWorkHours) {
-              earlyCheckoutPenalty = standardWorkHours - actualWorkHours;
-            } else {
+            if (shift.all_time_overtime) {
+              // No penalty for all-time overtime shifts
               earlyCheckoutPenalty = 0;
+            } else {
+              // Normal penalty calculation
+              if (actualWorkHours < standardWorkHours) {
+                earlyCheckoutPenalty = standardWorkHours - actualWorkHours;
+              } else {
+                earlyCheckoutPenalty = 0;
+              }
             }
             
             console.log(`✅ ${shift.name} - Break-Time-Aware Calculation Complete:`, {
@@ -531,7 +557,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-orange-700">
             <AlertTriangle className="h-4 w-4" />
-            <span>Use this to recalculate with BREAK-TIME-AWARE logic - Work hours exclude break time, Regular hours freeze during breaks</span>
+            <span>Use this to recalculate with BREAK-TIME-AWARE logic and ALL-TIME OVERTIME feature - Work hours exclude break time, Regular hours freeze during breaks</span>
           </div>
           
           <Button
@@ -547,7 +573,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
             ) : (
               <>
                 <Calculator className="h-4 w-4 mr-2" />
-                Fix Delay & Overtime (Break-Time-Aware)
+                🔥 Fix Delay & Overtime (All-Time Overtime Ready)
               </>
             )}
           </Button>

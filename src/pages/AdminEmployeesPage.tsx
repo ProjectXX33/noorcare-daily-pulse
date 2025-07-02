@@ -55,7 +55,7 @@ const AdminEmployeesPage = () => {
     department: 'Engineering' as Department,
     position: 'Designer' as Position,
     password: '',
-    role: 'employee' as 'admin' | 'employee'
+    role: 'employee' as 'admin' | 'employee' | 'warehouse'
   });
   const [newPassword, setNewPassword] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -95,6 +95,7 @@ const AdminEmployeesPage = () => {
       role: "Role",
       admin: "Admin",
       employee: "Employee",
+      warehouse: "Warehouse",
       noRating: "No rating",
       employeeManagement: "Employee Management",
       manageAllEmployees: "Manage all employees and their access",
@@ -136,6 +137,7 @@ const AdminEmployeesPage = () => {
       role: "الدور",
       admin: "مدير",
       employee: "موظف",
+      warehouse: "مستودع",
       noRating: "لا يوجد تقييم",
       employeeManagement: "إدارة الموظفين",
       manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول",
@@ -677,6 +679,7 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                   <SelectItem value="Copy Writing">Copy Writing</SelectItem>
                   <SelectItem value="Web Developer">Web Developer</SelectItem>
+                  <SelectItem value="Warehouse Staff">Warehouse Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -686,7 +689,7 @@ const AdminEmployeesPage = () => {
               </Label>
               <Select
                 value={newEmployee.role}
-                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee'}))}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee' | 'warehouse'}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.role} />
@@ -694,6 +697,7 @@ const AdminEmployeesPage = () => {
                 <SelectContent>
                   <SelectItem value="admin">{t.admin}</SelectItem>
                   <SelectItem value="employee">{t.employee}</SelectItem>
+                  <SelectItem value="warehouse">{t.warehouse}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -790,6 +794,7 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                     <SelectItem value="Copy Writing">Copy Writing</SelectItem>
                     <SelectItem value="Web Developer">Web Developer</SelectItem>
+                    <SelectItem value="Warehouse Staff">Warehouse Staff</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -799,7 +804,7 @@ const AdminEmployeesPage = () => {
                 </Label>
                 <Select
                   value={selectedEmployee.role}
-                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee'} : null)}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee' | 'warehouse'} : null)}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder={t.role} />
@@ -807,6 +812,7 @@ const AdminEmployeesPage = () => {
                   <SelectContent>
                     <SelectItem value="admin">{t.admin}</SelectItem>
                     <SelectItem value="employee">{t.employee}</SelectItem>
+                    <SelectItem value="warehouse">{t.warehouse}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,0 +1,72 @@
+# ===================================
+# NOORCARE DAILY PULSE - ENVIRONMENT VARIABLES
+# ===================================
+# Copy this entire content to your .env file
+
+# ===================================
+# SUPABASE CONFIGURATION
+# ===================================
+# Replace with your actual Supabase project URL and key
+VITE_SUPABASE_URL=your-supabase-project-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# ===================================
+# WOOCOMMERCE CONFIGURATION
+# ===================================
+# Your WooCommerce store settings (already configured)
+VITE_WOOCOMMERCE_URL=https://nooralqmar.com/
+VITE_WOOCOMMERCE_CONSUMER_KEY=ck_dc373790e65a510998fbc7278cb12b987d90b04a
+VITE_WOOCOMMERCE_CONSUMER_SECRET=cs_815de347330e130a58e3e53e0f87b0cd4f0de90f
+
+# ===================================
+# WORDPRESS CREDENTIALS
+# ===================================
+# WordPress admin credentials for media uploads
+VITE_WP_USERNAME=ProjectX
+VITE_WP_PASSWORD=tTx0 3O6f MiCs EKsB nzJq cQBn
+
+# ===================================
+# PAYMENT GATEWAY CONFIGURATION
+# ===================================
+
+# TABBY PAYMENT GATEWAY
+# Replace these with your actual Tabby API keys from WooCommerce settings
+VITE_TABBY_API_KEY=pk_test_your-actual-tabby-public-key-here
+VITE_TABBY_SECRET_KEY=sk_test_your-actual-tabby-secret-key-here
+VITE_TABBY_MERCHANT_CODE=SA
+VITE_TABBY_LANGUAGE=ar
+VITE_TABBY_TIMEOUT=320
+
+# TAMARA PAYMENT GATEWAY
+# Configured from your Tamara dashboard (Live Mode)
+VITE_TAMARA_API_URL=https://api.tamara.co
+VITE_TAMARA_MERCHANT_TOKEN=ey0eXAi0uKV1QiLCJhbGci0iJSUzI1NiJ9.eyJhY2NvdW50X2lkIjoiNjA5NmMwOC0c1LC2kdcl6WY1STdxFX0j1FUkNIQU5IlI0simIn4Cl6MTq4MDA5MDUxNzswYWFNZSJ9NCOzk4nN2g9YZGFi9aHrGOnVYY1_7KtfoudVpm28PJ5INAlNAeQz+q21AtkX9eCHuT7GnGv80VaOrQHxXgt-xNnXPsJA0rPsGKsO9TjJnfXJimIqQ0TbqJfXPGLyKYpTdnU3MrQb+oWs0xnO'Y2sqjcyOZirtqJKiGXfYnXkMjdpwbIGwvw6tGWTh4rq9YZGFi94hDg
+VITE_TAMARA_NOTIFICATION_KEY=94b21446-9eca-4fc5-bff8-9107a0837206
+VITE_TAMARA_PUBLIC_KEY=4c6fb3f4-965c-4e87-ad64-adc3aec53112
+
+# OTHER PAYMENT GATEWAYS (Optional - add if you need them)
+# PAYPAL CONFIGURATION
+# VITE_PAYPAL_CLIENT_ID=your-paypal-client-id
+
+# STRIPE CONFIGURATION  
+# VITE_STRIPE_PUBLISHABLE_KEY=pk_your-stripe-publishable-key
+
+# ===================================
+# APPLICATION SETTINGS
+# ===================================
+NODE_ENV=development
+VITE_APP_NAME=Noorcare Daily Pulse
+VITE_APP_VERSION=2.8.0
+
+# ===================================
+# INSTRUCTIONS FOR SETUP
+# ===================================
+# 1. SUPABASE: Get your URL and key from Supabase dashboard
+# 2. TABBY: Copy your actual API keys from WooCommerce > Settings > Payments > Tabby
+#    - Look for Merchant Public Key (starts with pk_test_ or pk_live_)
+#    - Look for Merchant Secret Key (starts with sk_test_ or sk_live_)
+# 3. TAMARA: Already configured with your live credentials
+# 4. After updating, restart your development server
+#
+# ⚠️  IMPORTANT: Never commit this file to version control!
+#    Add .env to your .gitignore file to keep credentials secure. 

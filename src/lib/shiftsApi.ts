@@ -174,6 +174,22 @@ export function calculateWorkHours(
   const totalMinutes = differenceInMinutes(checkOutTime, checkInTime);
   const totalHours = totalMinutes / 60;
   
+  // Check if this shift has "all time overtime" enabled
+  if (shift.allTimeOvertime) {
+    console.log('🔥 All-time overtime shift detected:', {
+      shiftName: shift.name,
+      totalHours: totalHours.toFixed(2),
+      regularHours: 0,
+      overtimeHours: totalHours.toFixed(2),
+      logic: 'All time worked counts as overtime'
+    });
+    
+    return {
+      regularHours: 0,
+      overtimeHours: Math.round(totalHours * 100) / 100
+    };
+  }
+  
   let standardWorkHours: number;
   
   const nameLower = shift.name.toLowerCase();

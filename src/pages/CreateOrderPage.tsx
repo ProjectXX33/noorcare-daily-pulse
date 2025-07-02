@@ -26,13 +26,18 @@ import {
   CheckCircle,
   Eye,
   Star,
-  Info
+  Info,
+  CreditCard,
+  Link,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import wooCommerceAPI, { isWooCommerceConfigured } from '@/lib/woocommerceApi';
 import { createOrderSubmission, OrderSubmission, OrderItem as OrderSubmissionItem } from '@/lib/orderSubmissionsApi';
 import { supabase } from '@/integrations/supabase/client';
+import { generatePaymentLink, createPaymentLinksTable } from '@/lib/paymentLinkGenerator';
 
 interface Product {
   id: number;
@@ -217,6 +222,9 @@ const CreateOrderPage: React.FC = () => {
   const [tempShippingAmount, setTempShippingAmount] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
+  const [lastCreatedOrder, setLastCreatedOrder] = useState<OrderSubmission | null>(null);
+  const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
+  const [generatedPaymentLink, setGeneratedPaymentLink] = useState<string>('');
   const [billingInfo, setBillingInfo] = useState<BillingInfo>({
     first_name: '',
     last_name: '',
@@ -347,6 +355,7 @@ const CreateOrderPage: React.FC = () => {
     };
 
     fetchRecentProducts();
+    createPaymentLinksTable();
   }, []);
 
   // Search products from WooCommerce
@@ -764,6 +773,179 @@ const CreateOrderPage: React.FC = () => {
     return true;
   };
 
+  const handleCollectPayment = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsGeneratingPaymentLink(true);
+    try {
+      let orderToUse = lastCreatedOrder;
+
+      // If no order exists, create one first
+      if (!orderToUse?.id) {
+        // Prepare order submission data for our database
+        const orderSubmissionData: OrderSubmission = {
+          customer_first_name: billingInfo.first_name,
+          customer_last_name: billingInfo.last_name,
+          customer_phone: billingInfo.phone,
+          customer_email: '',
+          billing_address_1: billingInfo.address_1,
+          billing_address_2: billingInfo.address_2,
+          billing_city: billingInfo.city,
+          billing_state: billingInfo.state,
+          billing_postcode: billingInfo.postcode,
+          billing_country: billingInfo.country,
+          order_items: orderItems.map(item => ({
+            product_id: item.product.id,
+            product_name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.sale_price || item.product.price,
+            sku: item.product.sku,
+            regular_price: item.product.regular_price,
+            sale_price: item.product.sale_price
+          })),
+          subtotal: calculateSubtotal(),
+          discount_amount: calculateDiscount(),
+          shipping_amount: calculateShipping(),
+          total_amount: parseFloat(calculateTotal()),
+          coupon_code: appliedCoupon?.code,
+          coupon_discount_type: appliedCoupon?.discount_type,
+          coupon_amount: appliedCoupon?.amount,
+          custom_discount_type: customDiscount?.type,
+          custom_discount_amount: customDiscount?.amount,
+          custom_discount_reason: customDiscount?.reason,
+          customer_note: customerNote,
+          include_shipping: includeShipping,
+          custom_shipping_amount: isCustomShipping ? customShippingAmount : null,
+          status: 'pending',
+          payment_method: 'pending',
+          payment_status: 'pending'
+        };
+
+        // Save to our database first
+        if (!user?.id) {
+          throw new Error('User not authenticated');
+        }
+        
+        const savedOrder = await createOrderSubmission(orderSubmissionData, user.id, user.name);
+        console.log('Order saved to database for payment collection:', savedOrder);
+        
+        // Try to create in WooCommerce to get a real order number
+        if (isWooCommerceConfigured()) {
+          try {
+            const orderData = {
+              payment_method: 'pending',
+              payment_method_title: 'Pending Payment',
+              set_paid: false,
+              billing: billingInfo,
+              shipping: billingInfo,
+              line_items: orderItems.map(item => ({
+                product_id: item.product.id,
+                quantity: item.quantity
+              })),
+              shipping_lines: includeShipping && calculateShipping() > 0 ? [
+                {
+                  method_id: 'flat_rate',
+                  method_title: 'Standard Shipping',
+                  total: calculateShipping().toString()
+                }
+              ] : [],
+              coupon_lines: appliedCoupon ? [
+                {
+                  code: appliedCoupon.code
+                }
+              ] : [],
+              fee_lines: customDiscount ? [
+                {
+                  name: customDiscount.reason || 'Custom Discount',
+                  total: (-(customDiscount.type === 'percent' 
+                    ? (calculateSubtotal() * customDiscount.amount) / 100 
+                    : customDiscount.amount)).toString(),
+                  tax_status: 'none'
+                }
+              ] : [],
+              customer_note: customerNote,
+              meta_data: [
+                {
+                  key: '_created_by_customer_service',
+                  value: user?.name || 'Customer Service'
+                },
+                {
+                  key: '_payment_collection_mode',
+                  value: 'true'
+                }
+              ],
+              status: 'pending'
+            };
+            
+            const createdOrder = await wooCommerceAPI.createOrder(orderData);
+            
+            // Update our database record with the real WooCommerce order number
+            if (savedOrder.id && createdOrder.number) {
+              const { error: updateError } = await supabase
+                .from('order_submissions')
+                .update({ 
+                  order_number: `#${createdOrder.number}`,
+                  woocommerce_order_id: createdOrder.id,
+                  is_synced_to_woocommerce: true
+                })
+                .eq('id', savedOrder.id);
+              
+              if (!updateError) {
+                savedOrder.order_number = `#${createdOrder.number}`;
+                savedOrder.woocommerce_order_id = createdOrder.id;
+              }
+            }
+          } catch (wcError) {
+            console.warn('Could not create WooCommerce order for payment collection:', wcError);
+          }
+        }
+        
+        // Store the created order
+        setLastCreatedOrder(savedOrder);
+        orderToUse = savedOrder;
+
+        toast.success('Order prepared for payment collection!');
+      }
+
+      // Generate payment link
+      const result = await generatePaymentLink(orderToUse.id!);
+      
+      if (result.success && result.paymentUrl) {
+        setGeneratedPaymentLink(result.paymentUrl);
+        
+        // Try to copy to clipboard
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(result.paymentUrl);
+            toast.success('Payment page generated and copied to clipboard!', {
+              description: 'Share this link with the customer to complete payment'
+            });
+          } else {
+            toast.success('Payment page generated!', {
+              description: 'Copy the link below to share with the customer'
+            });
+          }
+        } catch (clipboardError) {
+          console.warn('Clipboard access failed:', clipboardError);
+          toast.success('Payment page generated!', {
+            description: 'Copy the link below to share with the customer'
+          });
+        }
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error: any) {
+      console.error('Error generating payment link:', error);
+      toast.error('Failed to generate payment page');
+    } finally {
+      setIsGeneratingPaymentLink(false);
+    }
+  };
+
+
+
   const createOrder = async () => {
     if (!validateForm()) return;
     
@@ -815,6 +997,9 @@ const CreateOrderPage: React.FC = () => {
       
       const savedOrder = await createOrderSubmission(orderSubmissionData, user.id, user.name);
       console.log('Order saved to database:', savedOrder);
+      
+      // Store the created order for potential payment collection
+      setLastCreatedOrder(savedOrder);
 
       // Prepare order data for WooCommerce API
       const orderData = {
@@ -1663,24 +1848,147 @@ const CreateOrderPage: React.FC = () => {
                 </>
               )}
               
-              <Button
-                onClick={createOrder}
-                disabled={isLoading || orderItems.length === 0}
-                className="w-full"
-                size="lg"
-              >
-                {isLoading ? (
+              <div className="space-y-3">
+                <Button
+                  onClick={createOrder}
+                  disabled={isLoading || orderItems.length === 0}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating Order...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Create Order
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleCollectPayment}
+                  disabled={isGeneratingPaymentLink || orderItems.length === 0 || !billingInfo.first_name || !billingInfo.last_name || !billingInfo.phone}
+                  variant="outline"
+                  className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
+                  size="lg"
+                >
+                  {isGeneratingPaymentLink ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating Payment Page...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Collect Payment
+                    </>
+                  )}
+                </Button>
+
+                {lastCreatedOrder && (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Order...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Create Order
+                    <Separator />
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                      <h3 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Order Created Successfully!
+                      </h3>
+                      <p className="text-sm text-emerald-700 mb-3">
+                        Order #{lastCreatedOrder.order_number} for {lastCreatedOrder.customer_first_name} {lastCreatedOrder.customer_last_name}
+                      </p>
+                    </div>
                   </>
                 )}
-              </Button>
+
+                {generatedPaymentLink && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                      <Link className="w-4 h-4" />
+                      Payment Page Generated!
+                    </h3>
+                    <p className="text-sm text-blue-700 mb-3">
+                      Share this link with the customer to complete their payment
+                    </p>
+                    
+                    <div className="bg-white border border-blue-200 rounded p-3 mb-3">
+                      <Label className="text-xs text-blue-700 font-medium">Customer Payment Link:</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Input
+                          value={generatedPaymentLink}
+                          readOnly
+                          className="text-xs"
+                          onClick={(e) => e.currentTarget.select()}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              if (navigator.clipboard && navigator.clipboard.writeText) {
+                                await navigator.clipboard.writeText(generatedPaymentLink);
+                                toast.success('Payment link copied to clipboard!');
+                              } else {
+                                // Fallback: select the text
+                                const input = document.querySelector('input[readonly]') as HTMLInputElement;
+                                if (input) {
+                                  input.select();
+                                  document.execCommand('copy');
+                                  toast.success('Payment link copied!');
+                                }
+                              }
+                            } catch (error) {
+                              console.warn('Copy failed:', error);
+                              toast.error('Could not copy link. Please select and copy manually.');
+                            }
+                          }}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(generatedPaymentLink, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        // Reset form for new order
+                        setLastCreatedOrder(null);
+                        setGeneratedPaymentLink('');
+                        setOrderItems([]);
+                        setBillingInfo({
+                          first_name: '',
+                          last_name: '',
+                          address_1: '',
+                          address_2: '',
+                          city: '',
+                          state: '',
+                          postcode: '',
+                          country: 'Saudi Arabia',
+                          phone: ''
+                        });
+                        setAppliedCoupon(null);
+                        setCustomDiscount(null);
+                        setCustomerNote('');
+                        toast.success('Ready for new order!');
+                      }}
+                      variant="outline"
+                      className="w-full border-green-300 text-green-700 hover:bg-green-100"
+                      size="sm"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create New Order
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1891,6 +2199,8 @@ const CreateOrderPage: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 };

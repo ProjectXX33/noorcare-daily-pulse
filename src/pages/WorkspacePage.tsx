@@ -96,6 +96,7 @@ const WorkspacePage = () => {
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [showEmojiMenu, setShowEmojiMenu] = useState(false);
+  const [isEmojiMenuClosing, setIsEmojiMenuClosing] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -202,6 +203,15 @@ const WorkspacePage = () => {
     return message;
   };
 
+  const handleCloseEmojiMenu = () => {
+    if (isEmojiMenuClosing) return;
+    setIsEmojiMenuClosing(true);
+    setTimeout(() => {
+      setShowEmojiMenu(false);
+      setIsEmojiMenuClosing(false);
+    }, 300); // Must match animation duration
+  };
+
   // Emoji selection function
   const selectEmoji = (emoji: string) => {
     if (inputRef.current) {
@@ -224,7 +234,7 @@ const WorkspacePage = () => {
     } else {
     setNewMessage(prev => prev + emoji);
     }
-    setShowEmojiMenu(false);
+    handleCloseEmojiMenu();
   };
 
   // Track cursor position
@@ -232,21 +242,47 @@ const WorkspacePage = () => {
     setCursorPosition(e.currentTarget.selectionStart);
   };
 
-  // Close emoji menu when clicking outside
+  // Close emoji menu when clicking outside and handle mobile scroll prevention
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showEmojiMenu) {
-        setShowEmojiMenu(false);
+      if ((event.target as HTMLElement).closest('.emoji-menu-container, .emoji-toggle-button')) {
+        return;
+      }
+      if (showEmojiMenu || emojiMenuFor) {
+        handleCloseEmojiMenu();
+        setEmojiMenuFor(null);
       }
     };
 
+    // Prevent body scroll on mobile when emoji menu is open
+    if ((showEmojiMenu || emojiMenuFor) && isMobile) {
+      document.body.classList.add('emoji-menu-open');
+    } else {
+      document.body.classList.remove('emoji-menu-open');
+    }
+
     document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [showEmojiMenu]);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.body.classList.remove('emoji-menu-open');
+    };
+  }, [showEmojiMenu, emojiMenuFor, isEmojiMenuClosing, isMobile]);
 
   // ============================================
   // 🎯 ADD CUSTOM useEffect HOOKS HERE
   // ============================================
+  
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Example: Custom keyboard event listener
   useEffect(() => {
@@ -1202,7 +1238,9 @@ const WorkspacePage = () => {
                         return (
                           <div
                             key={message.id}
-                            className={`flex gap-2 sm:gap-3 ${isFirstInGroup ? 'mt-3' : 'mt-0'} group-message-row`}
+                            className={`flex gap-2 sm:gap-3 ${isFirstInGroup ? 'mt-3' : 'mt-0'} group-message-row ${
+                              longPressMessageId === message.id ? 'long-press-active' : ''
+                            }`}
                             onMouseEnter={() => { setHoveredReplyId(message.reply_to_id || null); setHoveredMessageId(message.id); }}
                             onMouseLeave={() => { setHoveredReplyId(null); setHoveredMessageId(null); setEmojiMenuFor(null); }}
                             // Enhanced mobile interactions - swipe to reply + long press for emoji
@@ -1224,50 +1262,31 @@ const WorkspacePage = () => {
                               setLongPressTimer(timer);
                             } : undefined}
                             onTouchMove={isMobile ? (e) => {
-                              // Cancel long press if user starts swiping
+                              // Clear long press timer if user moves finger
                               if (longPressTimer) {
                                 clearTimeout(longPressTimer);
                                 setLongPressTimer(null);
                               }
                               
+                              // Handle swipe logic
                               if (touchStartX !== null && swipeMessageId === message.id) {
-                                const deltaX = e.touches[0].clientX - touchStartX;
-                                setDragOffset(deltaX);
-                                if (Math.abs(deltaX) > 20) {
-                                  if (deltaX > 40) {
-                                    setSwipeDirection('right');
-                                  } else if (deltaX < -40) {
-                                    setSwipeDirection('left');
-                                  } else {
-                                    setSwipeDirection(null);
-                                  }
+                                const currentX = e.touches[0].clientX;
+                                const diff = currentX - touchStartX;
+                                setDragOffset(diff);
+                                
+                                if (Math.abs(diff) > 10) {
+                                  setSwipeDirection(diff > 0 ? 'right' : 'left');
                                 }
                               }
                             } : undefined}
                             onTouchEnd={isMobile ? () => {
+                              // Clear long press timer
                               if (longPressTimer) {
                                 clearTimeout(longPressTimer);
                                 setLongPressTimer(null);
                               }
                               
-                              // Handle swipe to reply
-                              if (swipeDirection && Math.abs(dragOffset) > 60) {
-                                setReplyTo({ id: message.id, user_name: message.user_name, message: message.message });
-                                if (navigator.vibrate) {
-                                  navigator.vibrate(30);
-                                }
-                              }
-                              
-                              setTouchStartX(null);
-                              setSwipeMessageId(null);
-                              setSwipeDirection(null);
-                              setDragOffset(0);
-                            } : undefined}
-                            onTouchCancel={isMobile ? () => {
-                              if (longPressTimer) {
-                                clearTimeout(longPressTimer);
-                                setLongPressTimer(null);
-                              }
+                              // Reset touch states
                               setTouchStartX(null);
                               setSwipeMessageId(null);
                               setSwipeDirection(null);
@@ -1304,10 +1323,10 @@ const WorkspacePage = () => {
                                   <span className="truncate text-muted-foreground/80" dangerouslySetInnerHTML={{__html: processMessageForDisplay(repliedMessage.message)}} />
                                 </div>
                               )}
-                              <div className="relative group">
+                              <div className="relative group message-bubble-container">
                                 {/* Compute bubble class and dir outside JSX for clarity and linter safety */}
                                 {(() => {
-                                  const base = 'px-4 py-2 max-w-[80vw] sm:max-w-md md:max-w-lg shadow-sm transition-all duration-200';
+                                  const base = 'px-4 py-2 max-w-[90vw] sm:max-w-md md:max-w-lg shadow-sm transition-all duration-200';
                                   const shape = isFirstInGroup && isLastInGroup
                                     ? 'rounded-2xl'
                                     : isFirstInGroup
@@ -1341,8 +1360,8 @@ const WorkspacePage = () => {
                                     </div>
                                   );
                                 })()}
-                                {/* Action buttons on hover */}
-                                {hoveredMessageId === message.id && (
+                                {/* Action buttons on hover - Hidden on mobile since swipe/long-press exists */}
+                                {hoveredMessageId === message.id && !isMobile && (
                                   <div
                                     className={`absolute top-1/2 -translate-y-1/2 z-10 flex gap-1 bg-white/80 dark:bg-gray-800/80 rounded-full shadow px-1 py-0.5 border border-gray-200 dark:border-gray-700 transition-all duration-150 ${
                                       // Always show on the left side regardless of message owner
@@ -1370,56 +1389,74 @@ const WorkspacePage = () => {
                                 </div>
                               )}
                               
-                                {/* Quick emoji reactions menu with mobile-friendly design */}
-                                {emojiMenuFor === message.id && (
-                                  <div 
-                                    className={`absolute bottom-full right-0 mb-2 w-72 bg-background border rounded-lg shadow-lg overflow-hidden z-50`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <div className="text-xs font-medium text-muted-foreground mb-3 text-center">React with emoji</div>
-                                    <div className={isMobile ? 'grid grid-cols-4 gap-2' : 'flex gap-1'}>
-                                      {['👍', '❤️', '😊', '😂', '😮', '😢', '😡', '🔥'].map((emoji) => (
-                                        <button
-                                          key={emoji}
-                                          onClick={() => {
-                                            handleReaction(message.id, emoji);
-                                            setEmojiMenuFor(null);
-                                          }}
-                                          className={`p-2 hover:bg-muted/80 rounded transition-colors ${
-                                            messageReactions[message.id]?.[emoji]?.includes(user?.name || '') 
-                                              ? 'bg-primary/20' 
-                                              : ''
-                                          }`}
-                                        >
-                                          {emoji}
-                                        </button>
-                                      ))}
-                              </div>
-                            </div>
-                                )}
-
-                                {/* Display reactions */}
+                                {/* Enhanced horizontal reaction display - MOVED ABOVE MESSAGE */}
                                 {messageReactions[message.id] ? (
                                   Object.keys(messageReactions[message.id]).length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1 ml-0"> {/* Added ml-0 to ensure reactions start from left */}
+                                    <div className="message-reactions-container flex items-center gap-1.5 mb-2 flex-wrap"> {/* Improved horizontal layout */}
                                       {Object.entries(messageReactions[message.id]).map(([emoji, users]) => (
                                         <button
                                           key={emoji}
                                           onClick={() => handleReaction(message.id, emoji)}
-                                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs border transition-all duration-200 hover:scale-110 ${
+                                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border reaction-bubble group relative transition-all duration-200 ${
                                             users.includes(user?.name || '') 
-                                              ? 'bg-primary/20 border-primary/30' 
-                                              : 'bg-muted/20 border-muted/30'
+                                              ? 'bg-primary/20 border-primary/40 text-primary font-semibold shadow-sm' 
+                                              : 'bg-muted/40 border-muted/60 hover:bg-primary/15 hover:border-primary/30 text-muted-foreground hover:text-primary'
                                           }`}
-                                          title={`${users.join(', ')}`}
+                                          title={`Reacted by: ${users.join(', ')}`}
                                         >
-                                          <span>{emoji}</span>
-                                          <span>{users.length}</span>
+                                          <span className="text-sm emoji-scale-animation relative z-10">{emoji}</span>
+                                          <span className="font-medium relative z-10 text-xs">{users.length}</span>
                                         </button>
                                       ))}
                                     </div>
                                   )
                                 ) : null}
+
+                                                                {/* Quick 7-emoji reaction menu */}
+                                {emojiMenuFor === message.id && (
+                                  <>
+                                    {/* Backdrop for reaction menu */}
+                                    <div 
+                                      className="fixed inset-0 z-[99998] bg-transparent"
+                                      onClick={() => setEmojiMenuFor(null)}
+                                    />
+                                    <div 
+                                      className={`fixed z-[99999] mobile-emoji-menu
+                                        bottom-24 right-4 w-[280px]
+                                        md:absolute md:bottom-8 md:right-0 md:w-[280px]
+                                        bg-white dark:bg-gray-800 border-2 border-primary/20 rounded-2xl shadow-2xl overflow-hidden
+                                        ${isEmojiMenuClosing ? 'emoji-menu-exit' : 'emoji-menu-enter'}`}
+                                      aria-label="Quick emoji reactions"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <div className="p-3">
+                                        <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                                          <span className="text-primary">⚡</span>
+                                          Quick Reactions
+                                        </div>
+                                        <div className="grid grid-cols-7 gap-2">
+                                          {['👍', '❤️', '😊', '😂', '😡', '🔥', '💯'].map((emoji) => (
+                                            <button
+                                              key={emoji}
+                                              onClick={() => {
+                                                handleReaction(message.id, emoji);
+                                                setEmojiMenuFor(null);
+                                              }}
+                                              className="relative p-2 text-xl transition-all duration-200 rounded-xl group hover:bg-primary/10 hover:scale-110 active:scale-95"
+                                              title={emoji}
+                                            >
+                                              <span className="relative z-10 group-hover:drop-shadow-lg">
+                                                {emoji}
+                                              </span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+
+
 
                               </div>
                             </div>
@@ -1468,53 +1505,76 @@ const WorkspacePage = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 hover:bg-muted/60 rounded-full"
+                            className="h-8 w-8 p-0 hover:bg-muted/60 rounded-full emoji-toggle-button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setShowEmojiMenu(!showEmojiMenu);
+                              showEmojiMenu ? handleCloseEmojiMenu() : setShowEmojiMenu(true);
                             }}
                           >
                             <Smile className="h-4 w-4" />
                           </Button>
                           
-                          {/* Emoji Menu */}
+                                                    {/* Enhanced Emoji Menu with Higher Z-Index */}
                           {showEmojiMenu && (
-                            <div 
-                              className="absolute bottom-full right-0 mb-2 w-72 bg-background border rounded-lg shadow-lg overflow-hidden z-50"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div className="p-2 border-b">
-                                <div className="text-xs font-medium text-muted-foreground mb-2">Frequently Used</div>
-                                <div className="grid grid-cols-8 gap-1">
-                                  {popularEmojis.slice(0, 16).map((emoji, index) => (
-                                    <button
-                                      key={index}
-                                      onClick={() => selectEmoji(emoji)}
-                                      className="text-xl p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
-                                      title={emoji}
-                                    >
-                                      {emoji}
-                                    </button>
-                                  ))}
+                            <>
+                              {/* Backdrop */}
+                              <div 
+                                className="fixed inset-0 z-[99998] bg-transparent"
+                                onClick={handleCloseEmojiMenu}
+                              />
+                              {/* Emoji Menu */}
+                              <div 
+                                className={`fixed z-[99999] mobile-emoji-menu
+                                  bottom-4 right-4 w-[320px] max-h-[60vh]
+                                  md:absolute md:bottom-full md:mb-3 md:right-0 md:w-[420px] md:max-h-[50vh]
+                                  bg-white dark:bg-gray-800 border-2 border-primary/20 rounded-2xl shadow-2xl overflow-hidden
+                                  ${isEmojiMenuClosing ? 'emoji-menu-exit' : 'emoji-menu-enter'}`}
+                                style={{overflowY:'auto'}}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="p-4 border-b border-muted/50">
+                                  <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                                    <span className="text-primary emoji-scale-animation">🌟</span>
+                                    Frequently Used
+                                  </div>
+                                  <div className="grid grid-cols-8 gap-2">
+                                    {popularEmojis.slice(0, 16).map((emoji, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => selectEmoji(emoji)}
+                                        className="relative p-2 text-xl transition-all duration-200 rounded-xl group emoji-scale-animation emoji-button-gradient hover:bg-primary/10 hover:scale-110 active:scale-95"
+                                        title={emoji}
+                                      >
+                                        <span className="relative z-10 group-hover:drop-shadow-lg">
+                                          {emoji}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="p-4">
+                                  <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                                    <span className="text-blue-500 emoji-scale-animation">😊</span>
+                                    All Emojis
+                                  </div>
+                                  <div className="grid grid-cols-8 gap-2 emoji-menu-scroll" style={{maxHeight: '200px', overflowY: 'auto'}}>
+                                    {popularEmojis.slice(16).map((emoji, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => selectEmoji(emoji)}
+                                        className="relative p-2 text-xl transition-all duration-200 rounded-xl group emoji-scale-animation emoji-button-gradient hover:bg-primary/10 hover:scale-110 active:scale-95"
+                                        title={emoji}
+                                      >
+                                        <span className="relative z-10 group-hover:drop-shadow-lg">
+                                          {emoji}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="p-2">
-                                <div className="text-xs font-medium text-muted-foreground mb-2">All Emojis</div>
-                                <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
-                                {popularEmojis.map((emoji, index) => (
-                                  <button
-                                    key={index}
-                                    onClick={() => selectEmoji(emoji)}
-                                      className="text-xl p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
-                                    title={emoji}
-                                  >
-                                    {emoji}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                        </div>
-                        )}
+                            </>
+                          )}
                       </div>
                     </div>
 

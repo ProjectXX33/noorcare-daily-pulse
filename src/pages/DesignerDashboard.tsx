@@ -44,7 +44,7 @@ interface DesignTask {
   id: string;
   title: string;
   description: string;
-  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete';
+  status: 'Not Started' | 'On Hold' | 'In Progress' | 'Complete' | 'Unfinished';
   assignedTo: string;
   assignedToName?: string;
   assignedToPosition?: string;
@@ -273,6 +273,8 @@ const DesignerDashboard = () => {
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'On Hold':
         return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'Unfinished':
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -419,6 +421,7 @@ const DesignerDashboard = () => {
                   <SelectItem value="In Progress">In Progress</SelectItem>
                   <SelectItem value="On Hold">On Hold</SelectItem>
                   <SelectItem value="Complete">Complete</SelectItem>
+                  <SelectItem value="Unfinished">Unfinished</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1146,6 +1149,7 @@ const DesignerDashboard = () => {
                         setSelectedTask({...selectedTask, comments: newComments});
                       }}
                       language="en"
+                      isLocked={false}
                     />
                   </div>
                 </TabsContent>

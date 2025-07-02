@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -70,7 +71,8 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as 'Customer Service' | 'Designer'
+    position: 'Customer Service' as 'Customer Service' | 'Designer',
+    allTimeOvertime: false
   });
 
   // Add shift editing state
@@ -80,7 +82,8 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as 'Customer Service' | 'Designer'
+    position: 'Customer Service' as 'Customer Service' | 'Designer',
+    allTimeOvertime: false
   });
 
   const translations = {
@@ -218,7 +221,21 @@ const AdminShiftManagement = () => {
 
       if (error) throw error;
       console.log('Shifts loaded:', data?.length || 0);
-      setShifts(data || []);
+      
+      // Map database fields to Shift type
+      const mappedShifts = (data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        startTime: item.start_time,
+        endTime: item.end_time,
+        position: item.position,
+        allTimeOvertime: item.all_time_overtime || false,
+        isActive: item.is_active,
+        createdAt: new Date(item.created_at),
+        updatedAt: new Date(item.updated_at)
+      }));
+      
+      setShifts(mappedShifts);
     } catch (error) {
       console.error('Error loading shifts:', error);
       throw error;
@@ -378,6 +395,7 @@ const AdminShiftManagement = () => {
           start_time: customShiftData.startTime,
           end_time: customShiftData.endTime,
           position: customShiftData.position,
+          all_time_overtime: customShiftData.allTimeOvertime,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -394,6 +412,7 @@ const AdminShiftManagement = () => {
         startTime: data.start_time,
         endTime: data.end_time,
         position: data.position,
+        allTimeOvertime: data.all_time_overtime,
         isActive: data.is_active,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at)
@@ -406,7 +425,8 @@ const AdminShiftManagement = () => {
         name: '',
         startTime: '',
         endTime: '',
-        position: 'Customer Service'
+        position: 'Customer Service',
+        allTimeOvertime: false
       });
       setIsCustomShiftDialogOpen(false);
 
@@ -431,6 +451,7 @@ const AdminShiftManagement = () => {
           start_time: editShiftData.startTime,
           end_time: editShiftData.endTime,
           position: editShiftData.position,
+          all_time_overtime: editShiftData.allTimeOvertime,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingShift.id)
@@ -448,6 +469,7 @@ const AdminShiftManagement = () => {
               startTime: data.start_time,
               endTime: data.end_time,
               position: data.position,
+              allTimeOvertime: data.all_time_overtime,
               updatedAt: new Date(data.updated_at)
             }
           : shift
@@ -461,7 +483,8 @@ const AdminShiftManagement = () => {
         name: '',
         startTime: '',
         endTime: '',
-        position: 'Customer Service'
+        position: 'Customer Service',
+        allTimeOvertime: false
       });
       setIsEditShiftDialogOpen(false);
 
@@ -503,7 +526,8 @@ const AdminShiftManagement = () => {
       name: shift.name,
       startTime: shift.startTime,
       endTime: shift.endTime,
-      position: shift.position as 'Customer Service' | 'Designer'
+      position: shift.position as 'Customer Service' | 'Designer',
+      allTimeOvertime: shift.allTimeOvertime || false
     });
     setIsEditShiftDialogOpen(true);
   };
@@ -642,6 +666,22 @@ const AdminShiftManagement = () => {
                       </Select>
                     </div>
                     
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="all-time-overtime"
+                        checked={customShiftData.allTimeOvertime}
+                        onCheckedChange={(checked) => 
+                          setCustomShiftData(prev => ({...prev, allTimeOvertime: Boolean(checked)}))
+                        }
+                      />
+                      <Label htmlFor="all-time-overtime" className="text-sm font-normal">
+                        All time is overtime
+                      </Label>
+                    </div>
+                    <div className="text-xs text-muted-foreground ml-6">
+                      When enabled, all hours worked in this shift will be counted as overtime instead of regular time.
+                    </div>
+                    
                     <div className="flex gap-2 pt-4">
                       <Button 
                         onClick={createCustomShift}
@@ -668,7 +708,14 @@ const AdminShiftManagement = () => {
               {shifts.map((shift) => (
                 <div key={shift.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="space-y-1">
-                    <div className="font-medium">{shift.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{shift.name}</span>
+                      {shift.allTimeOvertime && (
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 border-orange-200">
+                          All Overtime
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">
                       {shift.startTime} - {shift.endTime} • {shift.position}
                     </div>
@@ -753,6 +800,22 @@ const AdminShiftManagement = () => {
                     <SelectItem value="Designer">Designer</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-all-time-overtime"
+                  checked={editShiftData.allTimeOvertime}
+                  onCheckedChange={(checked) => 
+                    setEditShiftData(prev => ({...prev, allTimeOvertime: Boolean(checked)}))
+                  }
+                />
+                <Label htmlFor="edit-all-time-overtime" className="text-sm font-normal">
+                  All time is overtime
+                </Label>
+              </div>
+              <div className="text-xs text-muted-foreground ml-6">
+                When enabled, all hours worked in this shift will be counted as overtime instead of regular time.
               </div>
               
               <div className="flex gap-2 pt-4">

@@ -225,8 +225,28 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
-      setError(error.message);
-      toast.error(`Failed to load customer data: ${error.message}`);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('ERR_NETWORK')) {
+        errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+      } else if (error.message.includes('timeout') || error.message.includes('AbortError')) {
+        errorMessage = 'Request timed out. The server may be slow with large datasets. Please try again.';
+      } else if (error.message.includes('HTML page') || error.message.includes('<!DOCTYPE')) {
+        errorMessage = 'WooCommerce REST API configuration issue. Please verify the API is enabled on your store.';
+      } else if (error.message.includes('401') || error.message.includes('authentication')) {
+        errorMessage = 'Authentication failed. Please check your WooCommerce API credentials.';
+      } else if (error.message.includes('403') || error.message.includes('forbidden')) {
+        errorMessage = 'Access denied. Please check your WooCommerce API permissions.';
+      } else if (error.message.includes('404')) {
+        errorMessage = 'WooCommerce API endpoint not found. Please check your store URL and API configuration.';
+      } else {
+        errorMessage = `Failed to load customer data: ${error.message}`;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -245,7 +265,22 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
     }
 
     console.log('🚀 Starting fresh customer fetch process...');
-    fetchAllCustomers();
+    
+    // Test API connection first
+    wooCommerceAPI.testConnection()
+      .then((isConnected) => {
+        if (!isConnected) {
+          setError('Unable to connect to WooCommerce API. Please check your internet connection and try again.');
+          return;
+        }
+        
+        // If connection test passes, start fetching
+        fetchAllCustomers();
+      })
+      .catch((error) => {
+        console.error('🔥 WooCommerce connection test failed:', error);
+        setError(`Connection test failed: ${error.message}`);
+      });
   };
 
   const clearData = () => {

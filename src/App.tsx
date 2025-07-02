@@ -57,6 +57,7 @@ import BackgroundProcessIndicator from "./components/BackgroundProcessIndicator"
 import CustomerLoader from "./components/MobileCustomerLoader";
 import CopyWritingLoader from "./components/MobileCopyWritingLoader";
 import StrategyPage from "./pages/StrategyPage";  
+import WarehouseDashboard from "./pages/WarehouseDashboard";
 import PWAUpdateInstructions from "./components/PWAUpdateInstructions";
 import { useLocation } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
@@ -138,9 +139,13 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
   }
   
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return user.role === 'admin' 
-      ? <Navigate to="/dashboard" replace /> 
-      : <Navigate to="/employee-dashboard" replace />;
+    if (user.role === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    } else if (user.role === 'warehouse') {
+      return <Navigate to="/warehouse-dashboard" replace />;
+    } else {
+      return <Navigate to="/employee-dashboard" replace />;
+    }
   }
   
   return <>{children}</>;
@@ -233,6 +238,15 @@ const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return <>{children}</>;
+};
+
+// Warehouse route component for warehouse role access
+const WarehouseRoute = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <PrivateRoute allowedRoles={['warehouse']}>
+      {children}
+    </PrivateRoute>
+  );
 };
 
 // Component to conditionally show NotificationBanner only for authenticated users
@@ -344,6 +358,14 @@ const AppContent = () => {
                 <CopyWritingDashboard />
               </SidebarNavigation>
             </CopyWritingRoute>
+          } 
+        />
+        <Route 
+          path="/warehouse-dashboard" 
+          element={
+            <WarehouseRoute>
+              <WarehouseDashboard />
+            </WarehouseRoute>
           } 
         />
         <Route 

@@ -2088,6 +2088,9 @@ const CampaignStrategyCreator: React.FC = () => {
                                     <SARIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                                   </div>
                                   <div className="text-xs text-gray-600">{product.total_sales || 0} sales</div>
+                                  <div className="text-xs text-gray-600">
+                                    Price: {(product.price || product.regular_price || 0).toLocaleString()} SAR
+                                  </div>
                                   <Badge 
                                     className={`mt-1 text-xs border ${getPerformanceColor(performance)}`}
                                   >

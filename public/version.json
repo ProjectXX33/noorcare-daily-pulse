@@ -1,20 +1,13 @@
 {
   "version": "5.0.0",
-  "buildTime": "2025-06-23T02:35:06.782Z",
-  "buildTimestamp": "1750646106783",
-  "buildDate": "6/23/2025",
+  "buildTime": "2025-07-02T11:14:39.435Z",
+  "buildTimestamp": "1751454879436",
+  "buildDate": "7/2/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
     "Copy writing products page is now live"
   ],
   "minimumSupportedVersion": "3.1.2",
-  "forceUpdate": false,
-  "whatsNew": [
-    "Sticky header now works perfectly on all layouts (desktop, mobile, sidebar open/collapsed)",
-    "Workspace Chat now always auto-scrolls to the latest message after sending or receiving",
-    "Emoji reaction menu is horizontal on desktop, grid on mobile",
-    "Dark mode and theme toggle improvements",
-    "Performance and bug fixes"
-  ]
+  "forceUpdate": false
 }

@@ -218,7 +218,15 @@ const NotificationsMenu = () => {
       await markAsRead(notification.id);
     }
     
-    // Navigate based on notification type
+    // Don't navigate anywhere if user is warehouse role - just mark as read
+    if (user?.role === 'warehouse') {
+      toast.info('Notification marked as read', {
+        description: notification.title
+      });
+      return;
+    }
+    
+    // Navigate based on notification type (for non-warehouse users only)
     if (notification.related_to === 'task' && notification.related_id) {
       // Determine which task page to go to based on user role and position
       let taskPath = '/employee-tasks'; // Default for regular employees
@@ -242,6 +250,35 @@ const NotificationsMenu = () => {
       // Navigate to events page
       navigate('/events', { state: { eventId: notification.related_id } });
       toast.info(`Navigating to event: ${notification.related_id}`);
+    } else if (notification.related_to === 'warehouse_new_orders' || notification.related_to === 'warehouse_status_change' || notification.related_to === 'warehouse_sync_error') {
+      // Navigate to warehouse dashboard (only for non-warehouse users)
+      navigate('/warehouse-dashboard');
+      toast.info('Navigating to Warehouse Dashboard');
+    } else if (notification.related_to === 'shifts' && notification.related_id) {
+      // Navigate to shifts page
+      navigate('/shifts', { state: { shiftId: notification.related_id } });
+      toast.info(`Navigating to shifts: ${notification.related_id}`);
+    } else if (notification.related_to === 'performance' && notification.related_id) {
+      // Navigate to performance page
+      const performancePath = user?.role === 'admin' ? '/admin-performance' : '/performance';
+      navigate(performancePath, { state: { userId: notification.related_id } });
+      toast.info(`Navigating to performance dashboard`);
+    } else if (notification.related_to === 'workspace' && notification.related_id) {
+      // Navigate to workspace
+      navigate('/workspace', { state: { messageId: notification.related_id } });
+      toast.info('Navigating to Workspace');
+    } else if (notification.related_to === 'orders' && notification.related_id) {
+      // Navigate to orders page based on user role
+      if (user?.position === 'Warehouse Staff' || user?.role === 'admin') {
+        navigate('/warehouse-dashboard', { state: { orderId: notification.related_id } });
+      } else {
+        navigate('/my-orders', { state: { orderId: notification.related_id } });
+      }
+      toast.info(`Navigating to order: ${notification.related_id}`);
+    } else {
+      // Default navigation for unhandled notification types
+      console.log('Unhandled notification type:', notification.related_to);
+      toast.info('Notification clicked - no specific page available');
     }
   };
 

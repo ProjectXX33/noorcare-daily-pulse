@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { MonthlyShift, Shift, User } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek } from 'date-fns';
-import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye, RefreshCw } from 'lucide-react';
+import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye, RefreshCw, Download } from 'lucide-react';
 import AdminRecalculateButton from '@/components/AdminRecalculateButton';
 import { toast } from 'sonner';
 import CustomerServiceSchedule from '@/components/CustomerServiceSchedule';
@@ -89,9 +89,17 @@ const calculateDelayToFinish = (
   overtimeHours: number,
   shiftName?: string,
   shiftStartTime?: string,
-  shiftEndTime?: string
+  shiftEndTime?: string,
+  allTimeOvertime?: boolean
 ): string => {
   // NEW SMART LOGIC: Different calculation based on work completion
+  
+  // Check if this is an all-time overtime shift
+  if (allTimeOvertime || (shiftName && shiftName.toLowerCase().includes('overtime'))) {
+    // For all-time overtime shifts, no delay calculation needed
+    console.log('🔥 All-time overtime shift detected - No delay calculation');
+    return 'All Clear';
+  }
   
   // Get expected hours based on shift type (Day = 7h, Night = 8h, Custom = duration)
   const getExpectedHours = (shiftName?: string): number => {
@@ -131,7 +139,7 @@ const calculateDelayToFinish = (
   };
   
   const expectedHours = getExpectedHours(shiftName);
-  const workedHours = regularHours; // Total hours actually worked
+  const workedHours = regularHours + overtimeHours; // Total hours actually worked (for all-time overtime, this is overtimeHours)
   
   let finalDelayMinutes = 0;
   let calculationLogic = '';
@@ -246,7 +254,8 @@ const ShiftsPage = () => {
       changeShift: "Change Shift",
       noShift: "No Shift",
       shiftUpdated: "Shift updated successfully",
-      shiftUpdateFailed: "Failed to update shift"
+      shiftUpdateFailed: "Failed to update shift",
+      export: "Export Data"
     },
     ar: {
       shifts: "مناوباتي",
@@ -284,7 +293,8 @@ const ShiftsPage = () => {
       changeShift: "تغيير الوردية",
       noShift: "بدون وردية",
       shiftUpdated: "تم تحديث الوردية بنجاح",
-      shiftUpdateFailed: "فشل في تحديث الوردية"
+      shiftUpdateFailed: "فشل في تحديث الوردية",
+      export: "تصدير البيانات"
     }
   };
 
@@ -759,7 +769,55 @@ const ShiftsPage = () => {
     }
   };
 
+  // Add the export function after translations but before component render
+  const exportToCSV = (shifts: MonthlyShift[], isAdmin: boolean, currentDate: Date) => {
+    // Create CSV headers
+    const headers = [
+      'Date',
+      isAdmin ? 'Employee' : null,
+      'Shift',
+      'Check In',
+      'Check Out',
+      'Delay (mins)',
+      'Break Time (mins)',
+      'Regular Hours',
+      'Overtime Hours',
+      'Delay to Finish'
+    ].filter(Boolean).join(',');
 
+    // Create CSV rows
+    const rows = shifts.map(shift => {
+      const row = [
+        format(shift.workDate, 'yyyy-MM-dd'),
+        isAdmin ? shift.userName : null,
+        shift.shiftName || 'No Shift',
+        shift.checkInTime ? format(shift.checkInTime, 'HH:mm:ss') : '-',
+        shift.checkOutTime ? format(shift.checkOutTime, 'HH:mm:ss') : '-',
+        shift.delayMinutes || '0',
+        shift.totalBreakMinutes || '0',
+        shift.regularHours || '0',
+        shift.overtimeHours || '0',
+        shift.delayMinutes || '0'
+      ].filter(Boolean);
+      return row.join(',');
+    }).join('\n');
+
+    // Combine headers and rows
+    const csv = `${headers}\n${rows}`;
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `shifts_${format(currentDate, 'yyyy-MM')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   // Debug: Log smart offsetting status at render
   console.log('🔍 Render Debug - Smart Offsetting Status:', {
@@ -782,7 +840,67 @@ const ShiftsPage = () => {
               <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">{t.shifts}</h1>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">{t.manageShifts}</p>
             </div>
-            <div className="flex justify-end sm:justify-start shrink-0">
+            <div className="flex justify-end sm:justify-start shrink-0 gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => {
+                      // Generate CSV data
+                      const headers = user?.role === 'admin' 
+                        ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
+                        : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
+                      
+                      const csvData = monthlyShifts.map(shift => {
+                        const row = user?.role === 'admin'
+                          ? [
+                              format(shift.workDate, 'dd/MM/yyyy'),
+                              shift.userName,
+                              shift.shiftName || t.notWorked,
+                              formatTime(shift.checkInTime),
+                              formatTime(shift.checkOutTime),
+                              shift.delayMinutes || '0',
+                              shift.totalBreakMinutes || '0',
+                              shift.regularHours || '0',
+                              shift.overtimeHours || '0',
+                              shift.delayMinutes || '0'
+                            ]
+                          : [
+                              format(shift.workDate, 'dd/MM/yyyy'),
+                              shift.shiftName || t.notWorked,
+                              formatTime(shift.checkInTime),
+                              formatTime(shift.checkOutTime),
+                              shift.delayMinutes || '0',
+                              shift.totalBreakMinutes || '0',
+                              shift.regularHours || '0',
+                              shift.overtimeHours || '0',
+                              shift.delayMinutes || '0'
+                            ];
+                        return row.join(',');
+                      });
+                      
+                      // Create CSV content
+                      const csvContent = [headers.join(','), ...csvData].join('\n');
+                      
+                      // Create and download file
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement('a');
+                      const currentMonth = format(selectedDate, 'MMMM_yyyy');
+                      link.href = URL.createObjectURL(blob);
+                      link.download = `shifts_${currentMonth}.csv`;
+                      link.click();
+                    }}
+                    variant="outline"
+                    size="default"
+                    className="min-h-[44px] sm:min-h-[40px] px-4 sm:px-6 font-medium hover:shadow-md transition-all duration-200"
+                  >
+                    <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="ml-2 text-sm sm:text-base">{t.export}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                  <p className="text-sm">Export shifts data as CSV</p>
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1082,17 +1200,70 @@ const ShiftsPage = () => {
                     </Popover>
                   </div>
 
-                  <div className="flex items-end">
-                      <Button 
-                        onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
-                        variant={showWeeklyAssignment ? "default" : "outline"}
+                  <div className="flex items-end gap-2">
+                    <Button 
+                      onClick={() => setShowWeeklyAssignment(!showWeeklyAssignment)}
+                      variant={showWeeklyAssignment ? "default" : "outline"}
                       size="sm"
                       className="h-9 w-full text-xs"
-                      >
-                      <Users className="mr-1 h-3 w-3 shrink-0" />
-                        Weekly Assignment
-                      </Button>
-                    </div>
+                    >
+                      <Users className="mr-2 h-3 w-3 shrink-0" />
+                      Weekly Assignment
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        // Generate CSV data
+                        const headers = user?.role === 'admin' 
+                          ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
+                          : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
+                        
+                        const csvData = monthlyShifts.map(shift => {
+                          const row = user?.role === 'admin'
+                            ? [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.userName,
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                shift.delayMinutes || '0',
+                                shift.totalBreakMinutes || '0',
+                                shift.regularHours || '0',
+                                shift.overtimeHours || '0',
+                                shift.delayMinutes || '0'
+                              ]
+                            : [
+                                format(shift.workDate, 'dd/MM/yyyy'),
+                                shift.shiftName || t.notWorked,
+                                formatTime(shift.checkInTime),
+                                formatTime(shift.checkOutTime),
+                                shift.delayMinutes || '0',
+                                shift.totalBreakMinutes || '0',
+                                shift.regularHours || '0',
+                                shift.overtimeHours || '0',
+                                shift.delayMinutes || '0'
+                              ];
+                          return row.join(',');
+                        });
+                        
+                        // Create CSV content
+                        const csvContent = [headers.join(','), ...csvData].join('\n');
+                        
+                        // Create and download file
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        const currentMonth = format(selectedDate, 'MMMM_yyyy');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `shifts_${currentMonth}.csv`;
+                        link.click();
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 text-xs"
+                    >
+                      <Download className="mr-2 h-3 w-3 shrink-0" />
+                      {t.export}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1150,11 +1321,66 @@ const ShiftsPage = () => {
           <CardHeader className="pb-3 px-3 sm:px-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base sm:text-lg font-bold truncate">{t.monthlyShifts}</CardTitle>
-              {user?.role === 'admin' && (
-                <Badge variant="secondary" className="text-xs">
-                  Admin: Click shifts to edit
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {user?.role === 'admin' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Admin: Click shifts to edit
+                  </Badge>
+                )}
+                <Button
+                  onClick={() => {
+                    // Generate CSV data
+                    const headers = user?.role === 'admin' 
+                      ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
+                      : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
+                    
+                    const csvData = monthlyShifts.map(shift => {
+                      const row = user?.role === 'admin'
+                        ? [
+                            format(shift.workDate, 'dd/MM/yyyy'),
+                            shift.userName,
+                            shift.shiftName || t.notWorked,
+                            formatTime(shift.checkInTime),
+                            formatTime(shift.checkOutTime),
+                            shift.delayMinutes || '0',
+                            shift.totalBreakMinutes || '0',
+                            shift.regularHours || '0',
+                            shift.overtimeHours || '0',
+                            shift.delayMinutes || '0'
+                          ]
+                        : [
+                            format(shift.workDate, 'dd/MM/yyyy'),
+                            shift.shiftName || t.notWorked,
+                            formatTime(shift.checkInTime),
+                            formatTime(shift.checkOutTime),
+                            shift.delayMinutes || '0',
+                            shift.totalBreakMinutes || '0',
+                            shift.regularHours || '0',
+                            shift.overtimeHours || '0',
+                            shift.delayMinutes || '0'
+                          ];
+                      return row.join(',');
+                    });
+                    
+                    // Create CSV content
+                    const csvContent = [headers.join(','), ...csvData].join('\n');
+                    
+                    // Create and download file
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const currentMonth = format(selectedDate, 'MMMM_yyyy');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `shifts_${currentMonth}.csv`;
+                    link.click();
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs font-medium hover:shadow-sm transition-all duration-200"
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  {t.export}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0 w-full overflow-hidden">
@@ -1304,9 +1530,9 @@ const ShiftsPage = () => {
                           <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
                             </span>
                           </div>
                         </div>
@@ -1443,9 +1669,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
                           </TableCell>
                         </TableRow>
                       ))

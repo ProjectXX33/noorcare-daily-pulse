@@ -124,4 +124,93 @@ This document outlines the implementation of a critical warning note for Custome
 - Consider adding this warning to shift management pages
 - Potential to translate warning message for Arabic language support
 - Could add timestamp tracking of when employees view this warning
-- Possible integration with actual record validation to show real-time compliance status 
+- Possible integration with actual record validation to show real-time compliance status
+
+# 🤖 Chatbot Access Restriction
+
+## Overview
+
+The AI chatbot is **restored to Customer Service users only** for focused product search functionality. All other user roles (Admin, Copy Writing, Designer, Media Buyer, Warehouse Staff) will see the chatbot button but cannot interact with it.
+
+## 🔒 Access Control
+
+### ✅ **Customer Service Users**
+- **Full Access**: Can click and use the chatbot normally
+- **All Features**: Order creation, product search, customer support, etc.
+- **Visual Indicators**: Normal appearance with hover effects
+
+### ❌ **All Other Users**
+- **No Access**: Cannot click or open the chatbot
+- **Visual Feedback**: 
+  - Reduced opacity (60%)
+  - Cursor shows "not-allowed"
+  - No hover effects
+  - Toast notification when clicked
+- **Message**: "🤖 Chatbot is only available for Customer Service users."
+
+## 🎯 Implementation Details
+
+### **Frontend Changes**
+- **File**: `src/components/FloatingChatbot.tsx`
+- **Condition**: `user?.position === 'Customer Service'`
+- **Visual States**:
+  - **Enabled**: `cursor-pointer hover:scale-110`
+  - **Disabled**: `cursor-not-allowed opacity-60`
+
+### **User Experience**
+1. **Customer Service**: Normal chatbot experience
+2. **Other Roles**: 
+   - See disabled chatbot button
+   - Get informative toast message when clicked
+   - Cannot access any chatbot features
+
+## 🔧 Technical Implementation
+
+```typescript
+onClick={() => {
+  if (user?.position === 'Customer Service') {
+    setIsOpen(true);
+  } else {
+    toast.info('🤖 Chatbot is only available for Customer Service users.', {
+      description: 'Please contact your administrator if you need access.',
+      duration: 3000,
+    });
+  }
+}}
+```
+
+## 📋 User Roles Affected
+
+| Role | Access | Visual State |
+|------|--------|--------------|
+| Customer Service | ✅ Full Access | Normal |
+| Admin | ❌ No Access | Disabled |
+| Copy Writing | ❌ No Access | Disabled |
+| Designer | ❌ No Access | Disabled |
+| Media Buyer | ❌ No Access | Disabled |
+| Warehouse Staff | ❌ No Access | Disabled |
+
+## 🎨 Visual Changes
+
+### **For Non-Customer Service Users:**
+- **Opacity**: Reduced to 60%
+- **Cursor**: Shows "not-allowed" symbol
+- **Hover Effects**: Disabled
+- **Scale Effects**: Disabled
+- **Click Feedback**: Toast notification
+
+### **For Customer Service Users:**
+- **All Features**: Remain unchanged
+- **Full Functionality**: Order creation, product search, etc.
+- **Normal Appearance**: Full opacity and hover effects
+
+## 🔄 Future Considerations
+
+If access needs to be granted to other roles in the future:
+1. Modify the condition in `FloatingChatbot.tsx`
+2. Update this documentation
+3. Test functionality for the new role(s)
+
+## 📞 Support
+
+For questions about chatbot access or to request access for additional roles, contact the system administrator. 

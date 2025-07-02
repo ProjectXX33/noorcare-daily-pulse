@@ -55,7 +55,8 @@ export const fetchTasks = async (): Promise<Task[]> => {
       copy: task.copy,
       visualFeeding: task.visual_feeding,
       attachmentFile: task.attachment_file,
-      notes: task.notes
+      notes: task.notes,
+      isLocked: task.is_locked
     }));
     
     console.log('Tasks fetched:', tasks);
@@ -113,7 +114,8 @@ export const fetchUserTasks = async (userId: string): Promise<Task[]> => {
       copy: task.copy,
       visualFeeding: task.visual_feeding,
       attachmentFile: task.attachment_file,
-      notes: task.notes
+      notes: task.notes,
+      isLocked: task.is_locked
     }));
 
     console.log('User tasks fetched:', tasks);
@@ -227,7 +229,8 @@ export const createTask = async (
       copy: data.copy,
       visualFeeding: data.visual_feeding,
       attachmentFile: data.attachment_file,
-      notes: data.notes
+      notes: data.notes,
+      isLocked: data.is_locked
     };
     
     console.log('Task created:', newTask);
@@ -249,6 +252,7 @@ export const updateTask = async (
     progressPercentage?: number;
     priority?: string;
     projectType?: string;
+    isLocked?: boolean;
     // New designer fields
     tacticalPlan?: string;
     timeEstimate?: string;
@@ -280,8 +284,17 @@ export const updateTask = async (
     if (updates.attachmentFile !== undefined) dbUpdates.attachment_file = updates.attachmentFile;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     
-    // Always set status based on progress percentage
-    if (updates.progressPercentage !== undefined) {
+    // Handle task locking
+    if (updates.isLocked === true) {
+      dbUpdates.is_locked = true;
+      dbUpdates.status = 'Unfinished';
+    } else if (updates.isLocked === false) {
+      dbUpdates.is_locked = false;
+      dbUpdates.status = 'On Hold'; // Revert to a default status when unlocked
+    }
+
+    // Set status based on progress percentage, but only if not explicitly locked/unlocked
+    if (updates.progressPercentage !== undefined && updates.isLocked === undefined) {
       dbUpdates.progress_percentage = updates.progressPercentage;
       if (updates.progressPercentage === 0) {
         dbUpdates.status = 'Not Started';
@@ -290,7 +303,11 @@ export const updateTask = async (
       } else {
         dbUpdates.status = 'In Progress';
       }
+    } else if (updates.status && updates.isLocked === undefined) {
+      // Handle direct status updates if not locking/unlocking
+      dbUpdates.status = updates.status;
     }
+
     if (updates.assignedTo) dbUpdates.assigned_to = updates.assignedTo;
     
     // Get current task details for notification purposes
@@ -412,7 +429,8 @@ export const updateTask = async (
       copy: data.copy,
       visualFeeding: data.visual_feeding,
       attachmentFile: data.attachment_file,
-      notes: data.notes
+      notes: data.notes,
+      isLocked: data.is_locked
     };
     
     console.log('Task updated:', updatedTask);
@@ -466,6 +484,23 @@ export const addTaskComment = async (
 ): Promise<boolean> => {
   try {
     console.log(`Adding comment to task ${taskId}`);
+    
+    // Check if task is locked before allowing comments
+    const { data: taskStatusData, error: statusError } = await supabase
+      .from('tasks')
+      .select('is_locked')
+      .eq('id', taskId)
+      .single();
+    
+    if (statusError) {
+      console.error('Error fetching task lock status:', statusError);
+      throw statusError;
+    }
+    
+    if (taskStatusData.is_locked) {
+      console.error('Cannot add comment: Task is locked.');
+      throw new Error('Cannot add comment: Task is locked.');
+    }
     
     // Get current comments and task details including creator info
     const { data: taskData, error: fetchError } = await supabase

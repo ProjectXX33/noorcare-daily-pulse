@@ -22,6 +22,7 @@ interface TaskCommentsProps {
   comments: TaskComment[];
   onCommentAdded: (comments: TaskComment[]) => void;
   language: string;
+  isLocked?: boolean;
 }
 
 const TaskComments: React.FC<TaskCommentsProps> = ({ 
@@ -29,7 +30,8 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
   user,
   comments: initialComments,
   onCommentAdded,
-  language 
+  language,
+  isLocked = false
 }) => {
   const { user: authUser } = useAuth();
   const [newComment, setNewComment] = useState('');
@@ -216,31 +218,33 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
       
       <div className="space-y-4">
         {/* Comment input */}
-        <div className="space-y-2">
-          <Textarea
-            placeholder={t.addComment}
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            rows={3}
-            className="resize-none"
-          />
-          <div className="flex justify-end">
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !newComment.trim()}
-              size="sm"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                  {t.post}
-                </>
-              ) : (
-                t.post
-              )}
-            </Button>
+        {!isLocked && (
+          <div className="space-y-2">
+            <Textarea
+              placeholder={t.addComment}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !newComment.trim()}
+                size="sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    {t.post}
+                  </>
+                ) : (
+                  t.post
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Comments list */}
         <div className="space-y-3 max-h-96 overflow-y-auto">
