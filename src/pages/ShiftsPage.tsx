@@ -109,8 +109,8 @@ const calculateDelayToFinish = (
   
   // Get expected hours based on shift type (Day = 7h, Night = 8h, Custom = duration)
   const getExpectedHours = (shiftName?: string): number => {
-    // Default to Day Shift unless otherwise determined
-    if (!shiftName) return 7;
+    // Default to 8 hours for custom shifts
+    if (!shiftName) return 8;
 
     const nameLower = shiftName.toLowerCase();
 
@@ -135,13 +135,13 @@ const calculateDelayToFinish = (
 
         return durationMinutes / 60;
       } catch {
-        // If parsing fails, fallback to 7 hours
-        return 7;
+        // If parsing fails, fallback to 8 hours for custom shifts
+        return 8;
       }
     }
 
-    // If no start/end info, fallback to 7 hours
-    return 7;
+    // If no start/end info, fallback to 8 hours for custom shifts
+    return 8;
   };
   
   const expectedHours = getExpectedHours(shiftName);
@@ -472,10 +472,10 @@ const ShiftsPage = () => {
           delayMinutes: item.delay_minutes || 0,
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at),
-          // Day off tracking
-          isDayOff: item.is_day_off || (!item.shift_id && !item.shifts?.name),
+          // Day off tracking - prioritize actual shift data over is_day_off flag
+          isDayOff: item.is_day_off && !item.shift_id && !item.shifts?.name,
           userName: item.users?.name,
-          shiftName: item.shifts?.name || (item.is_day_off || (!item.shift_id && !item.shifts?.name) ? t.dayOff : undefined),
+          shiftName: item.shifts?.name || (item.is_day_off && !item.shift_id && !item.shifts?.name ? t.dayOff : undefined),
           shiftStartTime: item.shifts?.start_time,
           shiftEndTime: item.shifts?.end_time,
           // Break time data

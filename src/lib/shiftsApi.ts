@@ -215,8 +215,8 @@ export function calculateWorkHours(
 
       standardWorkHours = durationMinutes / 60;
     } catch {
-      // Fallback safe default
-      standardWorkHours = 7;
+      // Fallback safe default - use 8 hours for custom shifts
+      standardWorkHours = 8;
     }
   }
   

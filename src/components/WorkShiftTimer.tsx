@@ -394,10 +394,10 @@ const WorkShiftTimer: React.FC = () => {
         if (shiftInfo && shiftInfo.name) {
           const shiftNameLower = shiftInfo.name.toLowerCase();
           
-          if (shiftNameLower.includes('day')) {
+          if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
             shiftType = 'day';
             isCustomShift = false;
-          } else if (shiftNameLower.includes('night')) {
+          } else if (shiftNameLower === 'night shift' || shiftNameLower === 'night') {
             shiftType = 'night';
             isCustomShift = false;
           } else {
@@ -411,13 +411,30 @@ const WorkShiftTimer: React.FC = () => {
                 const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
                 const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
                 
+                console.log(`🔍 Custom shift calculation debug:`, {
+                  shiftName: shiftInfo.name,
+                  startTime: shiftInfo.start_time,
+                  endTime: shiftInfo.end_time,
+                  startH, startM, endH, endM
+                });
+                
                 let durationMinutes;
                 if (endH < startH || (endH === startH && endM < startM)) {
                   // Overnight custom shift
                   durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+                  console.log(`📅 Overnight shift detected:`, {
+                    calculation: `(24 * 60 - (${startH} * 60 + ${startM})) + (${endH} * 60 + ${endM})`,
+                    result: `${durationMinutes} minutes`
+                  });
                 } else {
                   // Same-day custom shift
                   durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                  console.log(`☀️ Same-day shift detected:`, {
+                    calculation: `(${endH} * 60 + ${endM}) - (${startH} * 60 + ${startM})`,
+                    endMinutes: endH * 60 + endM,
+                    startMinutes: startH * 60 + startM,
+                    result: `${durationMinutes} minutes`
+                  });
                 }
                 
                 customShiftDuration = durationMinutes / 60;
@@ -909,41 +926,65 @@ const WorkShiftTimer: React.FC = () => {
   if (shiftInfo && shiftInfo.name) {
     const shiftNameLower = shiftInfo.name.toLowerCase();
     
-    if (shiftNameLower.includes('day')) {
+    if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
       shiftType = 'day';
       shiftDurationHours = 7; // Day shift = 7 hours
       isCustomShiftDisplay = false;
-    } else if (shiftNameLower.includes('night')) {
+    } else if (shiftNameLower === 'night shift' || shiftNameLower === 'night') {
       shiftType = 'night';
       shiftDurationHours = 8; // Night shift = 8 hours
       isCustomShiftDisplay = false;
     } else {
-      // CUSTOM SHIFT DETECTED - treat as normal shift for display
+      // CUSTOM SHIFT DETECTED - calculate duration consistently
       shiftType = 'custom';
       isCustomShiftDisplay = true;
       
-      // Calculate custom shift duration from start/end times
+      // Calculate custom shift duration from start/end times (consistent with main logic)
       if (shiftInfo.start_time && shiftInfo.end_time) {
         try {
           const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
           const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
           
+          console.log(`🔍 Timer display - Custom shift calculation:`, {
+            shiftName: shiftInfo.name,
+            startTime: shiftInfo.start_time,
+            endTime: shiftInfo.end_time,
+            startH, startM, endH, endM
+          });
+          
           let durationMinutes;
           if (endH < startH || (endH === startH && endM < startM)) {
             // Overnight custom shift
             durationMinutes = (24 * 60 - (startH * 60 + startM)) + (endH * 60 + endM);
+            console.log(`📅 Timer display - Overnight shift:`, {
+              calculation: `(24 * 60 - (${startH} * 60 + ${startM})) + (${endH} * 60 + ${endM})`,
+              result: `${durationMinutes} minutes`
+            });
           } else {
             // Same-day custom shift
             durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+            console.log(`☀️ Timer display - Same-day shift:`, {
+              calculation: `(${endH} * 60 + ${endM}) - (${startH} * 60 + ${startM})`,
+              endMinutes: endH * 60 + endM,
+              startMinutes: startH * 60 + startM,
+              result: `${durationMinutes} minutes`
+            });
           }
           
           shiftDurationHours = durationMinutes / 60;
-          console.log(`🎯 Custom shift timer display: "${shiftInfo.name}" = ${shiftDurationHours.toFixed(1)} hours`);
+          console.log(`🎯 Timer display - Final duration: "${shiftInfo.name}" = ${shiftDurationHours.toFixed(1)} hours`);
         } catch (error) {
-          console.error('Error calculating custom shift duration for display:', error);
+          console.error('Error calculating custom shift duration for timer display:', error);
           shiftDurationHours = 8; // Fallback
         }
       } else {
+        console.warn(`⚠️ Timer display - Custom shift missing time data:`, {
+          shiftName: shiftInfo.name,
+          hasStartTime: !!shiftInfo.start_time,
+          hasEndTime: !!shiftInfo.end_time,
+          startTime: shiftInfo.start_time,
+          endTime: shiftInfo.end_time
+        });
         shiftDurationHours = 8; // Fallback for custom shifts without time info
       }
     }
@@ -956,6 +997,12 @@ const WorkShiftTimer: React.FC = () => {
       shiftType = 'night';
       shiftDurationHours = 8; // Night shift = 8 hours
     }
+    console.log('⚠️ Using fallback check-in time detection:', {
+      checkInHour,
+      detectedType: shiftType,
+      duration: shiftDurationHours + 'h',
+      note: 'No database shift info available'
+    });
   }
   
   // Calculate countdown from full shift duration (FREEZE MODE: Use actual work time, not elapsed time)

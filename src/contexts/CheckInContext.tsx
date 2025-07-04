@@ -591,9 +591,23 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               const allowedStartTime = 15 * 60 + 30; // 3:30 PM in minutes
               canCheckIn = currentTotalMinutes >= allowedStartTime;
             } else {
-              // Generic shift: Use 30 minutes before shift start
+              // Generic shift: Use 30 minutes before shift start AND check end time
               const allowEarlyMinutes = 30;
-              canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes);
+              const [endHour, endMinute] = shift.end_time.split(':').map(Number);
+              const shiftEndMinutes = endHour * 60 + endMinute;
+              
+              // Handle overnight shifts where end time is next day
+              const isOvernightShift = endHour < shiftHour || (endHour === shiftHour && endMinute < shiftMinute);
+              
+              if (isOvernightShift) {
+                // For overnight shifts, allow check-in from (start-30min) until end time next day
+                canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes) || 
+                            currentTotalMinutes <= shiftEndMinutes;
+              } else {
+                // For same-day shifts, must be after (start-30min) AND before end time
+                canCheckIn = currentTotalMinutes >= (shiftTotalMinutes - allowEarlyMinutes) && 
+                            currentTotalMinutes <= shiftEndMinutes;
+              }
             }
 
             if (!canCheckIn) {
@@ -617,7 +631,18 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
               } else if (shift.name.toLowerCase().includes('night')) {
                 message += ' Night shift employees can check in from 3:30 PM.';
               } else {
-                message += ' You can check in 30 minutes before.';
+                // Custom shift - check if too early or too late
+                const [endHour, endMinute] = shift.end_time.split(':').map(Number);
+                const shiftEndMinutes = endHour * 60 + endMinute;
+                const isOvernightShift = endHour < shiftHour || (endHour === shiftHour && endMinute < shiftMinute);
+                
+                if (!isOvernightShift && currentTotalMinutes > shiftEndMinutes) {
+                  // Too late - shift has ended
+                  const formattedEndTime = formatTime(shift.end_time);
+                  message = `Your ${shift.name} has ended at ${formattedEndTime}. You cannot check in after the shift ends.`;
+                } else {
+                  message += ' You can check in 30 minutes before.';
+                }
               }
 
               toast.warning(message, {
