@@ -194,9 +194,9 @@ export function calculateWorkHours(
   
   const nameLower = shift.name.toLowerCase();
   
-  if (nameLower.includes('day')) {
+  if (nameLower === 'day shift' || nameLower === 'day') {
     standardWorkHours = 7;
-  } else if (nameLower.includes('night')) {
+  } else if (nameLower === 'night shift' || nameLower === 'night') {
     standardWorkHours = 8;
   } else {
     // Custom shift: derive duration from start/end time strings
@@ -250,7 +250,7 @@ export function calculateWorkHours(
       overtimeHours: overtimeHours.toFixed(2),
       logic: 'Overtime starts ONLY after completing ' + standardWorkHours + ' required hours'
     });
-  } else if (shift.name.toLowerCase().includes('night')) {
+  } else if (shift.name.toLowerCase() === 'night shift' || shift.name.toLowerCase() === 'night') {
     // Night shift overtime calculation
     // NEW LOGIC: Overtime starts ONLY after completing required shift hours
     // Work day ends at 4AM with auto-checkout

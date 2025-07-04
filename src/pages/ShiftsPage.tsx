@@ -114,8 +114,8 @@ const calculateDelayToFinish = (
 
     const nameLower = shiftName.toLowerCase();
 
-    if (nameLower.includes('day')) return 7;
-    if (nameLower.includes('night')) return 8;
+    if (nameLower === 'day shift' || nameLower === 'day') return 7;
+    if (nameLower === 'night shift' || nameLower === 'night') return 8;
 
     // For custom shifts (anything else), attempt to calculate duration from
     // provided start/end strings, e.g. "08:00" / "14:00". Fallback safely on error.

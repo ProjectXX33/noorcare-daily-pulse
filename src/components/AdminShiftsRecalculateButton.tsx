@@ -121,9 +121,10 @@ const AdminShiftsRecalculateButton: React.FC<AdminShiftsRecalculateButtonProps> 
             
             // Determine standard work hours based on shift type
             let standardWorkHours = 8;
-            if (shift.name.toLowerCase().includes('day')) {
+            const shiftNameLower = shift.name.toLowerCase();
+            if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
               standardWorkHours = 7; // Day shift is 7 hours
-            } else if (!shift.name.toLowerCase().includes('night')) {
+            } else if (shiftNameLower !== 'night shift' && shiftNameLower !== 'night') {
               // For custom shifts, calculate duration from start/end times
               try {
                 const [startHour, startMin] = shift.start_time.split(':').map(Number);

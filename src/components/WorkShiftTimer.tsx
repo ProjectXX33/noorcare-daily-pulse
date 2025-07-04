@@ -791,12 +791,12 @@ const WorkShiftTimer: React.FC = () => {
   if (shiftInfo && shiftInfo.name) {
     const shiftNameLower = shiftInfo.name.toLowerCase();
     
-    if (shiftNameLower.includes('day')) {
+    if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
       currentShiftType = 'day';
       currentShiftDuration = 7;
       shiftEndTime.setHours(16, 0, 0, 0); // 4PM
       isCurrentCustomShift = false;
-    } else if (shiftNameLower.includes('night')) {
+    } else if (shiftNameLower === 'night shift' || shiftNameLower === 'night') {
       currentShiftType = 'night';
       currentShiftDuration = 8;
       if (sessionStartHour >= 15) {

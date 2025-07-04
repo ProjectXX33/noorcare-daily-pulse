@@ -145,14 +145,15 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
           for (const shift of monthlyShifts) {
             if (shift.shifts) {
               // Determine expected hours based on shift type
-              const isCustomShift = !shift.shifts.name?.toLowerCase().includes('day') && 
-                                   !shift.shifts.name?.toLowerCase().includes('night');
+              const shiftNameLower = shift.shifts.name?.toLowerCase() || '';
+              const isCustomShift = (shiftNameLower !== 'day shift' && shiftNameLower !== 'day') && 
+                                   (shiftNameLower !== 'night shift' && shiftNameLower !== 'night');
               
               let expectedHours = 8; // Default
               
-              if (shift.shifts.name?.toLowerCase().includes('day')) {
+              if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
                 expectedHours = 7; // Day shift = 7 hours
-              } else if (shift.shifts.name?.toLowerCase().includes('night')) {
+              } else if (shiftNameLower === 'night shift' || shiftNameLower === 'night') {
                 expectedHours = 8; // Night shift = 8 hours
               } else if (isCustomShift && shift.shifts.start_time && shift.shifts.end_time) {
                 // Custom shift: calculate duration

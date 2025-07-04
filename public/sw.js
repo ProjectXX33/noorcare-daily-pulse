@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '5.0.0'; // Enhanced cache clearing with auth preservation
+const APP_VERSION = '5.0.1'; // Enhanced cache clearing with auth preservation
 const CACHE_NAME = `noorhub-v${APP_VERSION}-${Date.now()}`;
 const CACHE_VERSION_KEY = 'noorhub-cache-version';
 

@@ -1,12 +1,12 @@
 {
-  "version": "5.0.0",
-  "buildTime": "2025-07-04T16:01:31.920Z",
-  "buildTimestamp": "1751644891921",
+  "version": "5.0.1",
+  "buildTime": "2025-07-04T16:49:48.231Z",
+  "buildTimestamp": "1751647788232",
   "buildDate": "7/4/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Copy writing products page is now live"
+    "Fixed a bug where the shift timer was not working correctly"
   ],
   "minimumSupportedVersion": "3.1.2",
   "forceUpdate": false

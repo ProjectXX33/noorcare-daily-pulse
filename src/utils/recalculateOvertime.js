@@ -142,9 +142,10 @@ function calculateWorkHours(checkInTime, checkOutTime, shift) {
   // Updated standard work hours based on new shift requirements:
   // Day shift: 7 hours, Night shift: 8 hours
   let standardWorkHours = 8; // Default to 8 hours for night shift
-  if (shift.name && shift.name.toLowerCase().includes('day')) {
+  const shiftNameLower = (shift.name || '').toLowerCase();
+  if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
     standardWorkHours = 7; // Day shift is 7 hours
-  } else if (shift.name && shift.name.toLowerCase().includes('night')) {
+  } else if (shiftNameLower === 'night shift' || shiftNameLower === 'night') {
     standardWorkHours = 8; // Night shift is 8 hours
   }
   

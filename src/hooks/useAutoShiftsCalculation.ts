@@ -243,9 +243,10 @@ export const useAutoShiftsCalculation = () => {
 
           // Determine standard work hours
           let standardWorkHours = 8;
-          if (shift.name.toLowerCase().includes('day')) {
+          const shiftNameLower = shift.name.toLowerCase();
+          if (shiftNameLower === 'day shift' || shiftNameLower === 'day') {
             standardWorkHours = 7;
-          } else if (!shift.name.toLowerCase().includes('night')) {
+          } else if (shiftNameLower !== 'night shift' && shiftNameLower !== 'night') {
             try {
               const [startHour, startMin] = shift.start_time.split(':').map(Number);
               const [endHour, endMin] = shift.end_time.split(':').map(Number);
