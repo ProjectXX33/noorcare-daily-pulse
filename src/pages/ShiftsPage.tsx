@@ -90,8 +90,14 @@ const calculateDelayToFinish = (
   shiftName?: string,
   shiftStartTime?: string,
   shiftEndTime?: string,
-  allTimeOvertime?: boolean
+  allTimeOvertime?: boolean,
+  isDayOff?: boolean
 ): string => {
+  // Check if this is a day off - always return All Clear
+  if (isDayOff || shiftName === 'Day Off' || shiftName === 'يوم إجازة') {
+    return 'All Clear';
+  }
+  
   // NEW SMART LOGIC: Different calculation based on work completion
   
   // Check if this is an all-time overtime shift
@@ -253,6 +259,7 @@ const ShiftsPage = () => {
       refreshing: "Refreshing...",
       changeShift: "Change Shift",
       noShift: "No Shift",
+      dayOff: "Day Off",
       shiftUpdated: "Shift updated successfully",
       shiftUpdateFailed: "Failed to update shift",
       export: "Export Data"
@@ -292,6 +299,7 @@ const ShiftsPage = () => {
       refreshing: "جاري التحديث...",
       changeShift: "تغيير الوردية",
       noShift: "بدون وردية",
+      dayOff: "يوم إجازة",
       shiftUpdated: "تم تحديث الوردية بنجاح",
       shiftUpdateFailed: "فشل في تحديث الوردية",
       export: "تصدير البيانات"
@@ -464,8 +472,10 @@ const ShiftsPage = () => {
           delayMinutes: item.delay_minutes || 0,
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at),
+          // Day off tracking
+          isDayOff: item.is_day_off || (!item.shift_id && !item.shifts?.name),
           userName: item.users?.name,
-          shiftName: item.shifts?.name,
+          shiftName: item.shifts?.name || (item.is_day_off || (!item.shift_id && !item.shifts?.name) ? t.dayOff : undefined),
           shiftStartTime: item.shifts?.start_time,
           shiftEndTime: item.shifts?.end_time,
           // Break time data
@@ -545,12 +555,14 @@ const ShiftsPage = () => {
 
   // Memoized calculations for performance
   const summary = useMemo(() => {
-    const totalRegular = monthlyShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
-    const actualOvertimeHours = monthlyShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
-    const workingDays = monthlyShifts.filter(shift => shift.checkInTime).length;
+    // Exclude day-off records from calculations
+    const workingShifts = monthlyShifts.filter(shift => !shift.isDayOff);
+    const totalRegular = workingShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
+    const actualOvertimeHours = workingShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
+    const workingDays = workingShifts.filter(shift => shift.checkInTime).length;
     const averagePerDay = workingDays > 0 ? (totalRegular + actualOvertimeHours) / workingDays : 0;
     
-    const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
+    const totalDelayMinutes = workingShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
     // Break time should not affect "Delay to Finish" because work hours freeze during breaks.
     // Keep break minutes for other displays but exclude from delay calculation.
 
@@ -620,7 +632,11 @@ const ShiftsPage = () => {
     return format(date, 'HH:mm');
   }, []);
 
-  const getShiftBadgeColor = useCallback((shiftName: string | undefined) => {
+  const getShiftBadgeColor = useCallback((shiftName: string | undefined, isDayOff?: boolean) => {
+    if (isDayOff || shiftName === 'Day Off' || shiftName === t.dayOff) {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200';
+    }
+    
     switch (shiftName) {
       case 'Day Shift':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
@@ -629,7 +645,7 @@ const ShiftsPage = () => {
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
-  }, []);
+  }, [t.dayOff]);
 
   // Refresh functionality
   const handleRefresh = useCallback(async () => {
@@ -679,19 +695,44 @@ const ShiftsPage = () => {
 
       if (assignmentError) throw assignmentError;
 
-      // Update monthly shift record if it exists
-      const { error: monthlyError } = await supabase
-        .from('monthly_shifts')
-        .update({
-          shift_id: shiftId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId)
-        .eq('work_date', workDateStr);
-
-      // Don't throw error if monthly shift doesn't exist yet
-      if (monthlyError && monthlyError.code !== 'PGRST116') {
-        console.warn('Monthly shift update error:', monthlyError);
+      // Update or create monthly shift record
+      if (isDayOff) {
+        // Create/update day-off record
+        const { error: monthlyError } = await supabase
+          .from('monthly_shifts')
+          .upsert({
+            user_id: userId,
+            work_date: workDateStr,
+            shift_id: null,
+            is_day_off: true,
+            regular_hours: 0,
+            overtime_hours: 0,
+            delay_minutes: 0,
+            check_in_time: null,
+            check_out_time: null,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,work_date'
+          });
+          
+        if (monthlyError) {
+          console.warn('Day-off monthly shift error:', monthlyError);
+        }
+      } else {
+        // Update existing record to regular shift
+        const { error: monthlyError } = await supabase
+          .from('monthly_shifts')
+          .update({
+            shift_id: shiftId,
+            is_day_off: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('work_date', workDateStr);
+          
+        if (monthlyError && monthlyError.code !== 'PGRST116') {
+          console.warn('Monthly shift update error:', monthlyError);
+        }
       }
 
       // Find the shift name for the toast message
@@ -791,13 +832,13 @@ const ShiftsPage = () => {
         format(shift.workDate, 'yyyy-MM-dd'),
         isAdmin ? shift.userName : null,
         shift.shiftName || 'No Shift',
-        shift.checkInTime ? format(shift.checkInTime, 'HH:mm:ss') : '-',
-        shift.checkOutTime ? format(shift.checkOutTime, 'HH:mm:ss') : '-',
-        shift.delayMinutes || '0',
-        shift.totalBreakMinutes || '0',
-        shift.regularHours || '0',
-        shift.overtimeHours || '0',
-        shift.delayMinutes || '0'
+        shift.isDayOff ? '-' : (shift.checkInTime ? format(shift.checkInTime, 'HH:mm:ss') : '-'),
+        shift.isDayOff ? '-' : (shift.checkOutTime ? format(shift.checkOutTime, 'HH:mm:ss') : '-'),
+        shift.isDayOff ? '0' : (shift.delayMinutes || '0'),
+        shift.isDayOff ? '0' : (shift.totalBreakMinutes || '0'),
+        shift.isDayOff ? '0' : (shift.regularHours || '0'),
+        shift.isDayOff ? '0' : (shift.overtimeHours || '0'),
+        shift.isDayOff ? '0' : (shift.delayMinutes || '0')
       ].filter(Boolean);
       return row.join(',');
     }).join('\n');
@@ -1339,25 +1380,25 @@ const ShiftsPage = () => {
                         ? [
                             format(shift.workDate, 'dd/MM/yyyy'),
                             shift.userName,
-                            shift.shiftName || t.notWorked,
-                            formatTime(shift.checkInTime),
-                            formatTime(shift.checkOutTime),
-                            shift.delayMinutes || '0',
-                            shift.totalBreakMinutes || '0',
-                            shift.regularHours || '0',
-                            shift.overtimeHours || '0',
-                            shift.delayMinutes || '0'
+                            shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                            shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                            shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                            shift.isDayOff ? '0' : (shift.delayMinutes || '0'),
+                            shift.isDayOff ? '0' : (shift.totalBreakMinutes || '0'),
+                            shift.isDayOff ? '0' : (shift.regularHours || '0'),
+                            shift.isDayOff ? '0' : (shift.overtimeHours || '0'),
+                            shift.isDayOff ? 'All Clear' : (shift.delayMinutes || '0')
                           ]
                         : [
                             format(shift.workDate, 'dd/MM/yyyy'),
-                            shift.shiftName || t.notWorked,
-                            formatTime(shift.checkInTime),
-                            formatTime(shift.checkOutTime),
-                            shift.delayMinutes || '0',
-                            shift.totalBreakMinutes || '0',
-                            shift.regularHours || '0',
-                            shift.overtimeHours || '0',
-                            shift.delayMinutes || '0'
+                            shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                            shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                            shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                            shift.isDayOff ? '0' : (shift.delayMinutes || '0'),
+                            shift.isDayOff ? '0' : (shift.totalBreakMinutes || '0'),
+                            shift.isDayOff ? '0' : (shift.regularHours || '0'),
+                            shift.isDayOff ? '0' : (shift.overtimeHours || '0'),
+                            shift.isDayOff ? 'All Clear' : (shift.delayMinutes || '0')
                           ];
                       return row.join(',');
                     });
@@ -1440,29 +1481,32 @@ const ShiftsPage = () => {
                                           {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
                                             <div className="animate-spin rounded-full h-2 w-2 border border-gray-300 border-t-transparent"></div>
                                           )}
-                                          <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-1 py-0.5 rounded-full font-semibold whitespace-nowrap`}>
-                                            {shift.shiftName || t.notWorked}
+                                          <Badge className={`${getShiftBadgeColor(shift.shiftName, shift.isDayOff)} text-xs px-1 py-0.5 rounded-full font-semibold whitespace-nowrap`}>
+                                            {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                                           </Badge>
                                         </div>
                                       </SelectValue>
                                     </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">
-                                        <span className="text-gray-500 text-xs">{t.noShift}</span>
-                                      </SelectItem>
-                                      {shifts.map((shiftOption) => (
-                                        <SelectItem key={shiftOption.id} value={shiftOption.id}>
-                                          <div className="flex flex-col gap-1">
-                                            <Badge className={getShiftBadgeColor(shiftOption.name)}>
-                                              {shiftOption.name}
-                                            </Badge>
-                                            <span className="text-xs text-gray-500">
-                                              {shiftOption.startTime} - {shiftOption.endTime}
-                                            </span>
+                                                                          <SelectContent>
+                                        <SelectItem value="none">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-2xl">🏖️</span>
+                                            <span className="text-green-700 font-medium text-xs">Day Off</span>
                                           </div>
                                         </SelectItem>
-                                      ))}
-                                    </SelectContent>
+                                        {shifts.map((shiftOption) => (
+                                          <SelectItem key={shiftOption.id} value={shiftOption.id}>
+                                            <div className="flex flex-col gap-1">
+                                              <Badge className={getShiftBadgeColor(shiftOption.name, false)}>
+                                                {shiftOption.name}
+                                              </Badge>
+                                              <span className="text-xs text-gray-500">
+                                                {shiftOption.startTime} - {shiftOption.endTime}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
                                   </Select>
                                 </div>
                               </TooltipTrigger>
@@ -1471,8 +1515,8 @@ const ShiftsPage = () => {
                               </TooltipContent>
                             </Tooltip>
                           ) : (
-                            <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
-                              {shift.shiftName || t.notWorked}
+                            <Badge className={`${getShiftBadgeColor(shift.shiftName, shift.isDayOff)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
+                              {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                             </Badge>
                           )}
                         </div>
@@ -1481,13 +1525,13 @@ const ShiftsPage = () => {
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.checkIn}</span>
                             <div className="text-xs font-bold text-foreground bg-muted/50 rounded-lg p-2 text-center">
-                              {formatTime(shift.checkInTime)}
+                              {shift.isDayOff ? '-' : formatTime(shift.checkInTime)}
                             </div>
                           </div>
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.checkOut}</span>
                             <div className="text-xs font-bold text-foreground bg-muted/50 rounded-lg p-2 text-center">
-                              {formatTime(shift.checkOutTime)}
+                              {shift.isDayOff ? '-' : formatTime(shift.checkOutTime)}
                             </div>
                           </div>
                             </div>
@@ -1496,17 +1540,17 @@ const ShiftsPage = () => {
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.delay}</span>
                             <div className={`text-xs font-bold rounded-lg p-2 text-center ${
-                              shift.delayMinutes > 0 
-                                ? 'text-red-600 bg-red-50 dark:bg-red-900/20' 
-                                : 'text-green-600 bg-green-50 dark:bg-green-900/20'
+                              shift.isDayOff || shift.delayMinutes === 0
+                                ? 'text-green-600 bg-green-50 dark:bg-green-900/20' 
+                                : 'text-red-600 bg-red-50 dark:bg-red-900/20'
                             }`}>
-                              {formatDelayHoursAndMinutes(shift.delayMinutes)}
+                              {shift.isDayOff ? '0min' : formatDelayHoursAndMinutes(shift.delayMinutes)}
                             </div>
                           </div>
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.breakTime}</span>
                             <div className="text-xs font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2 text-center">
-                              {formatBreakTime(shift.totalBreakMinutes || 0)}
+                              {shift.isDayOff ? '0min' : formatBreakTime(shift.totalBreakMinutes || 0)}
                             </div>
                           </div>
                         </div>
@@ -1515,24 +1559,28 @@ const ShiftsPage = () => {
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.regularHours}</span>
                             <div className="text-xs font-bold text-foreground bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 text-center">
-                              {formatHoursAndMinutes(shift.regularHours)}
+                              {shift.isDayOff ? '0h' : formatHoursAndMinutes(shift.regularHours)}
                             </div>
                           </div>
                           <div className="space-y-1">
                             <span className="text-xs text-muted-foreground font-medium block">{t.overtimeHours}</span>
                             <div className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-900/20 rounded-lg p-2 text-center">
-                              {formatHoursAndMinutes(shift.overtimeHours)}
+                              {shift.isDayOff ? '0h' : formatHoursAndMinutes(shift.overtimeHours)}
                             </div>
                           </div>
                         </div>
                         
                         <div className="pt-2 border-t border-border/50">
-                          <div className="flex justify-between items-center bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10 rounded-lg p-2">
+                          <div className={`flex justify-between items-center rounded-lg p-2 ${
+                            shift.isDayOff 
+                              ? 'bg-gradient-to-r from-green-100/50 to-green-50/30 dark:from-green-900/20 dark:to-green-800/10'
+                              : 'bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10'
+                          }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
                             </span>
                           </div>
                         </div>
@@ -1618,20 +1666,23 @@ const ShiftsPage = () => {
                                             {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
                                               <div className="animate-spin rounded-full h-3 w-3 border border-gray-300 border-t-transparent"></div>
                                             )}
-                                            <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                                              {shift.shiftName || t.notWorked}
+                                            <Badge className={getShiftBadgeColor(shift.shiftName, shift.isDayOff)}>
+                                              {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                                             </Badge>
                                           </div>
                                         </SelectValue>
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value="none">
-                                          <span className="text-gray-500">{t.noShift}</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-lg">🏖️</span>
+                                            <span className="text-green-700 font-medium">Day Off</span>
+                                          </div>
                                         </SelectItem>
                                         {shifts.map((shiftOption) => (
                                           <SelectItem key={shiftOption.id} value={shiftOption.id}>
                                             <div className="flex items-center gap-2">
-                                              <Badge className={getShiftBadgeColor(shiftOption.name)}>
+                                              <Badge className={getShiftBadgeColor(shiftOption.name, false)}>
                                                 {shiftOption.name}
                                               </Badge>
                                               <span className="text-xs text-gray-500">
@@ -1649,29 +1700,29 @@ const ShiftsPage = () => {
                                 </TooltipContent>
                               </Tooltip>
                             ) : (
-                              <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                                {shift.shiftName || t.notWorked}
+                              <Badge className={getShiftBadgeColor(shift.shiftName, shift.isDayOff)}>
+                                {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{formatTime(shift.checkInTime)}</TableCell>
-                          <TableCell className="font-mono text-xs">{formatTime(shift.checkOutTime)}</TableCell>
+                          <TableCell className="font-mono text-xs">{shift.isDayOff ? '-' : formatTime(shift.checkInTime)}</TableCell>
+                          <TableCell className="font-mono text-xs">{shift.isDayOff ? '-' : formatTime(shift.checkOutTime)}</TableCell>
                           <TableCell className={`font-semibold text-xs ${
-                            shift.delayMinutes > 0 ? 'text-red-600' : 'text-green-600'
+                            shift.isDayOff || shift.delayMinutes === 0 ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {formatDelayHoursAndMinutes(shift.delayMinutes)}
+                            {shift.isDayOff ? '0min' : formatDelayHoursAndMinutes(shift.delayMinutes)}
                           </TableCell>
                           <TableCell className="text-purple-600 font-semibold text-xs">
-                            {formatBreakTime(shift.totalBreakMinutes || 0)}
+                            {shift.isDayOff ? '0min' : formatBreakTime(shift.totalBreakMinutes || 0)}
                           </TableCell>
-                          <TableCell className="font-semibold text-xs">{formatHoursAndMinutes(shift.regularHours)}</TableCell>
+                          <TableCell className="font-semibold text-xs">{shift.isDayOff ? '0h' : formatHoursAndMinutes(shift.regularHours)}</TableCell>
                           <TableCell className="text-green-600 font-semibold text-xs">
-                            {formatHoursAndMinutes(shift.overtimeHours)}
+                            {shift.isDayOff ? '0h' : formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
                           </TableCell>
                         </TableRow>
                       ))

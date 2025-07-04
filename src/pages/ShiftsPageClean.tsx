@@ -91,8 +91,14 @@ const calculateDelayToFinish = (
   shiftName?: string,
   shiftStartTime?: string,
   shiftEndTime?: string,
-  allTimeOvertime?: boolean
+  allTimeOvertime?: boolean,
+  isDayOff?: boolean
 ): string => {
+  // Check if this is a day off - always return All Clear
+  if (isDayOff || shiftName === 'Day Off' || shiftName === 'يوم إجازة') {
+    return 'All Clear';
+  }
+  
   // NEW SMART LOGIC: Different calculation based on work completion
   
   // Check if this is an all-time overtime shift
@@ -250,6 +256,7 @@ const ShiftsPage = () => {
       refreshing: "Refreshing...",
       changeShift: "Change Shift",
       noShift: "No Shift",
+      dayOff: "Day Off",
       shiftUpdated: "Shift updated successfully",
       shiftUpdateFailed: "Failed to update shift",
       export: "Export Data",
@@ -291,6 +298,7 @@ const ShiftsPage = () => {
       refreshing: "جاري التحديث...",
       changeShift: "تغيير الوردية",
       noShift: "بدون وردية",
+      dayOff: "يوم إجازة",
       shiftUpdated: "تم تحديث الوردية بنجاح",
       shiftUpdateFailed: "فشل في تحديث الوردية",
       export: "تصدير البيانات",
@@ -465,8 +473,10 @@ const ShiftsPage = () => {
           delayMinutes: item.delay_minutes || 0,
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at),
+          // Day off tracking
+          isDayOff: item.is_day_off || (!item.shift_id && !item.shifts?.name),
           userName: item.users?.name,
-          shiftName: item.shifts?.name,
+          shiftName: item.shifts?.name || (item.is_day_off || (!item.shift_id && !item.shifts?.name) ? t.dayOff : undefined),
           shiftStartTime: item.shifts?.start_time,
           shiftEndTime: item.shifts?.end_time,
           // Break time data
@@ -546,13 +556,15 @@ const ShiftsPage = () => {
 
   // Memoized calculations for performance
   const summary = useMemo(() => {
-    const totalRegular = monthlyShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
-    const actualOvertimeHours = monthlyShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
-    const workingDays = monthlyShifts.filter(shift => shift.checkInTime).length;
+    // Exclude day-off records from calculations
+    const workingShifts = monthlyShifts.filter(shift => !shift.isDayOff);
+    const totalRegular = workingShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
+    const actualOvertimeHours = workingShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
+    const workingDays = workingShifts.filter(shift => shift.checkInTime).length;
     const averagePerDay = workingDays > 0 ? (totalRegular + actualOvertimeHours) / workingDays : 0;
     
     // Calculate total delay minutes (break time excluded because work hours freeze during breaks)
-    const totalDelayMinutes = monthlyShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
+    const totalDelayMinutes = workingShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
 
     const rawDelayToFinishHours = totalDelayMinutes / 60; // Convert to hours
     
@@ -611,7 +623,11 @@ const ShiftsPage = () => {
     return format(date, 'HH:mm');
   }, []);
 
-  const getShiftBadgeColor = useCallback((shiftName: string | undefined) => {
+  const getShiftBadgeColor = useCallback((shiftName: string | undefined, isDayOff?: boolean) => {
+    if (isDayOff || shiftName === 'Day Off' || shiftName === t.dayOff) {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200';
+    }
+    
     switch (shiftName) {
       case 'Day Shift':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
@@ -620,7 +636,7 @@ const ShiftsPage = () => {
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
-  }, []);
+  }, [t.dayOff]);
 
   // Refresh functionality
   const handleRefresh = useCallback(async () => {
@@ -1034,25 +1050,25 @@ const ShiftsPage = () => {
                             ? [
                                 format(shift.workDate, 'dd/MM/yyyy'),
                                 shift.userName,
-                                shift.shiftName || t.notWorked,
-                                formatTime(shift.checkInTime),
-                                formatTime(shift.checkOutTime),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
-                                formatBreakTime(shift.totalBreakMinutes || 0),
-                                formatHoursAndMinutes(shift.regularHours || 0),
-                                formatHoursAndMinutes(shift.overtimeHours || 0),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                                shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                                shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                                shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                                shift.isDayOff ? '0' : formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                shift.isDayOff ? '0' : formatBreakTime(shift.totalBreakMinutes || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.regularHours || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.overtimeHours || 0),
+                                shift.isDayOff ? 'All Clear' : formatDelayHoursAndMinutes(shift.delayMinutes || 0)
                               ]
                             : [
                                 format(shift.workDate, 'dd/MM/yyyy'),
-                                shift.shiftName || t.notWorked,
-                                formatTime(shift.checkInTime),
-                                formatTime(shift.checkOutTime),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
-                                formatBreakTime(shift.totalBreakMinutes || 0),
-                                formatHoursAndMinutes(shift.regularHours || 0),
-                                formatHoursAndMinutes(shift.overtimeHours || 0),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                                shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                                shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                                shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                                shift.isDayOff ? '0' : formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                shift.isDayOff ? '0' : formatBreakTime(shift.totalBreakMinutes || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.regularHours || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.overtimeHours || 0),
+                                shift.isDayOff ? 'All Clear' : formatDelayHoursAndMinutes(shift.delayMinutes || 0)
                               ];
                           return row.join(',');
                         });
@@ -1141,25 +1157,25 @@ const ShiftsPage = () => {
                             ? [
                                 format(shift.workDate, 'dd/MM/yyyy'),
                                 shift.userName,
-                                shift.shiftName || t.notWorked,
-                                formatTime(shift.checkInTime),
-                                formatTime(shift.checkOutTime),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
-                                formatBreakTime(shift.totalBreakMinutes || 0),
-                                formatHoursAndMinutes(shift.regularHours || 0),
-                                formatHoursAndMinutes(shift.overtimeHours || 0),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                                shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                                shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                                shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                                shift.isDayOff ? '0' : formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                shift.isDayOff ? '0' : formatBreakTime(shift.totalBreakMinutes || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.regularHours || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.overtimeHours || 0),
+                                shift.isDayOff ? 'All Clear' : formatDelayHoursAndMinutes(shift.delayMinutes || 0)
                               ]
                             : [
                                 format(shift.workDate, 'dd/MM/yyyy'),
-                                shift.shiftName || t.notWorked,
-                                formatTime(shift.checkInTime),
-                                formatTime(shift.checkOutTime),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0),
-                                formatBreakTime(shift.totalBreakMinutes || 0),
-                                formatHoursAndMinutes(shift.regularHours || 0),
-                                formatHoursAndMinutes(shift.overtimeHours || 0),
-                                formatDelayHoursAndMinutes(shift.delayMinutes || 0)
+                                shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked),
+                                shift.isDayOff ? '-' : formatTime(shift.checkInTime),
+                                shift.isDayOff ? '-' : formatTime(shift.checkOutTime),
+                                shift.isDayOff ? '0' : formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+                                shift.isDayOff ? '0' : formatBreakTime(shift.totalBreakMinutes || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.regularHours || 0),
+                                shift.isDayOff ? '0' : formatHoursAndMinutes(shift.overtimeHours || 0),
+                                shift.isDayOff ? 'All Clear' : formatDelayHoursAndMinutes(shift.delayMinutes || 0)
                               ];
                           return row.join(',');
                         });
@@ -1297,8 +1313,8 @@ const ShiftsPage = () => {
                                           {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
                                             <div className="animate-spin rounded-full h-2 w-2 border border-gray-300 border-t-transparent"></div>
                                           )}
-                                          <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-1 py-0.5 rounded-full font-semibold whitespace-nowrap`}>
-                                            {shift.shiftName || t.notWorked}
+                                          <Badge className={`${getShiftBadgeColor(shift.shiftName, shift.isDayOff)} text-xs px-1 py-0.5 rounded-full font-semibold whitespace-nowrap`}>
+                                            {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                                           </Badge>
                                         </div>
                                       </SelectValue>
@@ -1328,8 +1344,8 @@ const ShiftsPage = () => {
                               </TooltipContent>
                             </Tooltip>
                           ) : (
-                            <Badge className={`${getShiftBadgeColor(shift.shiftName)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
-                              {shift.shiftName || t.notWorked}
+                            <Badge className={`${getShiftBadgeColor(shift.shiftName, shift.isDayOff)} text-xs px-2 py-1 rounded-full font-semibold whitespace-nowrap shrink-0`}>
+                              {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                             </Badge>
                           )}
                         </div>
@@ -1385,15 +1401,15 @@ const ShiftsPage = () => {
                         
                         <div className="pt-2 border-t border-border/50">
                           <div className={`flex justify-between items-center rounded-lg p-2 ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' 
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' 
                               ? 'bg-gradient-to-r from-green-100/50 to-green-50/30 dark:from-green-900/20 dark:to-green-800/10' 
                               : 'bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10'
                           }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
                             </span>
                           </div>
                         </div>
@@ -1479,8 +1495,8 @@ const ShiftsPage = () => {
                                             {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
                                               <div className="animate-spin rounded-full h-3 w-3 border border-gray-300 border-t-transparent"></div>
                                             )}
-                                            <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                                              {shift.shiftName || t.notWorked}
+                                            <Badge className={getShiftBadgeColor(shift.shiftName, shift.isDayOff)}>
+                                              {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                                             </Badge>
                                           </div>
                                         </SelectValue>
@@ -1510,8 +1526,8 @@ const ShiftsPage = () => {
                                 </TooltipContent>
                               </Tooltip>
                             ) : (
-                              <Badge className={getShiftBadgeColor(shift.shiftName)}>
-                                {shift.shiftName || t.notWorked}
+                              <Badge className={getShiftBadgeColor(shift.shiftName, shift.isDayOff)}>
+                                {shift.isDayOff ? t.dayOff : (shift.shiftName || t.notWorked)}
                               </Badge>
                             )}
                           </TableCell>
@@ -1530,9 +1546,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
                           </TableCell>
                         </TableRow>
                       ))

@@ -133,7 +133,7 @@ export type Shift = {
 export type MonthlyShift = {
   id: string;
   userId: string;
-  shiftId: string;
+  shiftId: string | null;
   workDate: Date;
   checkInTime?: Date;
   checkOutTime?: Date;
@@ -142,6 +142,8 @@ export type MonthlyShift = {
   delayMinutes: number;
   createdAt: Date;
   updatedAt: Date;
+  // Day off tracking
+  isDayOff?: boolean;
   // Populated fields
   userName?: string;
   shiftName?: string;
