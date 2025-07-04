@@ -457,6 +457,31 @@ const WorkShiftTimer: React.FC = () => {
           // Day shift: 9AM to 4PM - ends at 4PM same day
           shiftEndTime = new Date(checkInTime);
           shiftEndTime.setHours(16, 0, 0, 0); // 4PM
+        } else if (shiftType === 'custom') {
+          // CUSTOM SHIFT - calculate end time from start + duration or use end_time directly
+          shiftEndTime = new Date(checkInTime);
+          
+          if (shiftInfo.start_time && shiftInfo.end_time) {
+            try {
+              const [endH, endM] = shiftInfo.end_time.split(':').map(Number);
+              shiftEndTime.setHours(endH, endM, 0, 0);
+              
+              // If end time is before start time, it's overnight
+              const [startH, startM] = shiftInfo.start_time.split(':').map(Number);
+              if (endH < startH || (endH === startH && endM < startM)) {
+                shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+              }
+              
+              console.log(`🎯 Custom shift end time set: "${shiftInfo.name}" ends at ${shiftEndTime.toISOString()}`);
+            } catch (error) {
+              console.error('Error calculating custom shift end time:', error);
+              // Fallback: end time = start time + calculated duration
+              shiftEndTime.setHours(shiftEndTime.getHours() + customShiftDuration);
+            }
+          } else {
+            // Fallback: end time = start time + calculated duration
+            shiftEndTime.setHours(shiftEndTime.getHours() + customShiftDuration);
+          }
         } else {
           // Night shift: 4PM to 4AM (next day) - NEW LOGIC: ends at 4AM
           shiftEndTime = new Date(checkInTime);
@@ -744,7 +769,7 @@ const WorkShiftTimer: React.FC = () => {
   let currentShiftType = 'day';
   let shiftEndTime = new Date(sessionStartTime);
   let isCurrentCustomShift = false;
-  let currentShiftDuration = 7; // Default day shift duration
+  let currentShiftDuration = 8; // Default duration (will be set correctly based on shift type)
   
   if (shiftInfo && shiftInfo.name) {
     const shiftNameLower = shiftInfo.name.toLowerCase();
@@ -877,7 +902,7 @@ const WorkShiftTimer: React.FC = () => {
   
   // Enhanced shift type and duration detection (including custom shifts)
   let shiftType = 'day'; // Default
-  let shiftDurationHours = 7; // Default day shift duration
+  let shiftDurationHours = 8; // Default duration (will be set correctly based on shift type)
   let isCustomShiftDisplay = false;
   
   // Use database shift assignment if available
