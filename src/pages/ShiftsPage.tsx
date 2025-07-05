@@ -392,7 +392,7 @@ const ShiftsPage = () => {
         .select(`
           *,
           users:user_id(name),
-          shifts:shift_id(name, start_time, end_time)
+          shifts:shift_id(name, start_time, end_time, all_time_overtime)
         `)
         .gte('work_date', format(startDate, 'yyyy-MM-dd'))
         .lte('work_date', format(endDate, 'yyyy-MM-dd'))
@@ -460,30 +460,35 @@ const ShiftsPage = () => {
         const breakKey = `${item.user_id}-${dateKey}`;
         const breakData = breakTimeMap.get(breakKey) || { totalBreakMinutes: 0, breakSessions: [] };
 
-        return {
-          id: item.id,
-          userId: item.user_id,
-          shiftId: item.shift_id,
-          workDate: new Date(item.work_date),
-          checkInTime: item.check_in_time ? new Date(item.check_in_time) : undefined,
-          checkOutTime: item.check_out_time ? new Date(item.check_out_time) : undefined,
-          regularHours: item.regular_hours,
-          overtimeHours: item.overtime_hours,
-          delayMinutes: item.delay_minutes || 0,
-          createdAt: new Date(item.created_at),
-          updatedAt: new Date(item.updated_at),
-          // Day off tracking - prioritize actual shift data over is_day_off flag
-          isDayOff: item.is_day_off && !item.shift_id && !item.shifts?.name,
-          userName: item.users?.name,
-          shiftName: item.shifts?.name || (item.is_day_off && !item.shift_id && !item.shifts?.name ? t.dayOff : undefined),
-          shiftStartTime: item.shifts?.start_time,
-          shiftEndTime: item.shifts?.end_time,
-          // Break time data
-          totalBreakMinutes: breakData.totalBreakMinutes,
-          breakSessions: breakData.breakSessions,
-          // Ensure allTimeOvertime is mapped for employee view
-          allTimeOvertime: item.shifts?.all_time_overtime || false
-        };
+        // If this is an all-time overtime shift, treat all worked hours as overtime locally
+        return (() => {
+          const baseRegular = item.regular_hours || 0;
+          const baseOvertime = item.overtime_hours || 0;
+          const isAllOT = item.shifts?.all_time_overtime;
+          const totalWorked = baseRegular + baseOvertime;
+          return {
+            id: item.id,
+            userId: item.user_id,
+            shiftId: item.shift_id,
+            workDate: new Date(item.work_date),
+            checkInTime: item.check_in_time ? new Date(item.check_in_time) : undefined,
+            checkOutTime: item.check_out_time ? new Date(item.check_out_time) : undefined,
+            regularHours: isAllOT ? 0 : baseRegular,
+            overtimeHours: isAllOT ? totalWorked : baseOvertime,
+            delayMinutes: isAllOT ? 0 : (item.delay_minutes || 0),
+            // Additional fields filled below
+            createdAt: new Date(item.created_at),
+            updatedAt: new Date(item.updated_at),
+            isDayOff: item.is_day_off && !item.shift_id && !item.shifts?.name,
+            userName: item.users?.name,
+            shiftName: item.shifts?.name || (item.is_day_off && !item.shift_id && !item.shifts?.name ? t.dayOff : undefined),
+            shiftStartTime: item.shifts?.start_time,
+            shiftEndTime: item.shifts?.end_time,
+            totalBreakMinutes: breakData.totalBreakMinutes,
+            breakSessions: breakData.breakSessions,
+            allTimeOvertime: isAllOT || false
+          };
+        })();
       });
 
       console.log('Formatted monthly shifts:', formattedShifts);
@@ -1580,9 +1585,9 @@ const ShiftsPage = () => {
                           }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff)}
                             </span>
                           </div>
                         </div>
@@ -1722,9 +1727,9 @@ const ShiftsPage = () => {
                             {shift.isDayOff ? '0h' : formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff)}
                           </TableCell>
                         </TableRow>
                       ))

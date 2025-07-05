@@ -157,6 +157,8 @@ export type MonthlyShift = {
     duration_minutes: number;
     reason: string;
   }>;
+  // For all-time overtime shifts
+  allTimeOvertime?: boolean;
 };
 
 // Rating Types

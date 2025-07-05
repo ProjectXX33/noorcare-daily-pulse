@@ -393,7 +393,7 @@ const ShiftsPage = () => {
         .select(`
           *,
           users:user_id(name),
-          shifts:shift_id(name, start_time, end_time)
+          shifts:shift_id(name, start_time, end_time, all_time_overtime)
         `)
         .gte('work_date', format(startDate, 'yyyy-MM-dd'))
         .lte('work_date', format(endDate, 'yyyy-MM-dd'))
@@ -461,6 +461,11 @@ const ShiftsPage = () => {
         const breakKey = `${item.user_id}-${dateKey}`;
         const breakData = breakTimeMap.get(breakKey) || { totalBreakMinutes: 0, breakSessions: [] };
 
+        const baseRegular = item.regular_hours || 0;
+        const baseOvertime = item.overtime_hours || 0;
+        const isAllOT = item.shifts?.all_time_overtime;
+        const totalWorked = baseRegular + baseOvertime;
+
         return {
           id: item.id,
           userId: item.user_id,
@@ -468,9 +473,9 @@ const ShiftsPage = () => {
           workDate: new Date(item.work_date),
           checkInTime: item.check_in_time ? new Date(item.check_in_time) : undefined,
           checkOutTime: item.check_out_time ? new Date(item.check_out_time) : undefined,
-          regularHours: item.regular_hours,
-          overtimeHours: item.overtime_hours,
-          delayMinutes: item.delay_minutes || 0,
+          regularHours: isAllOT ? 0 : baseRegular,
+          overtimeHours: isAllOT ? totalWorked : baseOvertime,
+          delayMinutes: isAllOT ? 0 : (item.delay_minutes || 0),
           createdAt: new Date(item.created_at),
           updatedAt: new Date(item.updated_at),
           // Day off tracking - prioritize actual shift data over is_day_off flag
@@ -481,7 +486,9 @@ const ShiftsPage = () => {
           shiftEndTime: item.shifts?.end_time,
           // Break time data
           totalBreakMinutes: breakData.totalBreakMinutes,
-          breakSessions: breakData.breakSessions
+          breakSessions: breakData.breakSessions,
+          // All-time overtime flag for smart logic
+          allTimeOvertime: isAllOT || false
         };
       });
 
@@ -1401,15 +1408,15 @@ const ShiftsPage = () => {
                         
                         <div className="pt-2 border-t border-border/50">
                           <div className={`flex justify-between items-center rounded-lg p-2 ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' 
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff) === 'All Clear' 
                               ? 'bg-gradient-to-r from-green-100/50 to-green-50/30 dark:from-green-900/20 dark:to-green-800/10' 
                               : 'bg-gradient-to-r from-red-100/50 to-red-50/30 dark:from-red-900/20 dark:to-red-800/10'
                           }`}>
                             <span className="text-xs text-muted-foreground font-semibold">{t.delayTime}</span>
                             <span className={`font-bold text-sm ${
-                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                              calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                             }`}>
-                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
+                              {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff)}
                             </span>
                           </div>
                         </div>
@@ -1546,9 +1553,9 @@ const ShiftsPage = () => {
                             {formatHoursAndMinutes(shift.overtimeHours)}
                           </TableCell>
                           <TableCell className={`font-bold text-xs ${
-                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
+                            calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff) === 'All Clear' ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, undefined, shift.isDayOff)}
+                            {calculateDelayToFinish(shift.totalBreakMinutes || 0, shift.delayMinutes, shift.regularHours, shift.overtimeHours, shift.shiftName, shift.shiftStartTime, shift.shiftEndTime, shift.allTimeOvertime, shift.isDayOff)}
                           </TableCell>
                         </TableRow>
                       ))
