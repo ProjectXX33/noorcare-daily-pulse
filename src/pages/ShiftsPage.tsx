@@ -480,7 +480,9 @@ const ShiftsPage = () => {
           shiftEndTime: item.shifts?.end_time,
           // Break time data
           totalBreakMinutes: breakData.totalBreakMinutes,
-          breakSessions: breakData.breakSessions
+          breakSessions: breakData.breakSessions,
+          // Ensure allTimeOvertime is mapped for employee view
+          allTimeOvertime: item.shifts?.all_time_overtime || false
         };
       });
 
