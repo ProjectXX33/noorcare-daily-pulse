@@ -93,7 +93,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     const nonAdminUsers = users.filter(user => user.role !== 'admin');
     
     // Only include positions that have check-in functionality
-    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer'];
+    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'];
     const checkInEnabledUsers = nonAdminUsers.filter(user => 
       CHECK_IN_POSITIONS.includes(user.position)
     );
@@ -263,7 +263,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const getDepartments = () => {
     const nonAdminUsers = users.filter(user => user.role !== 'admin');
     // Only include positions that have check-in functionality
-    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer'];
+    const CHECK_IN_POSITIONS = ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'];
     const checkInEnabledUsers = nonAdminUsers.filter(user => 
       CHECK_IN_POSITIONS.includes(user.position)
     );

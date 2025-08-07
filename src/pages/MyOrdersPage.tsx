@@ -21,7 +21,8 @@ import {
   Loader2,
   RefreshCw,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Edit3
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +36,7 @@ import {
   OrderSubmissionFilters,
   syncOrderFromWooCommerce
 } from '@/lib/orderSubmissionsApi';
+import EditOrderModal from '@/components/EditOrderModal';
 // Remove date-fns dependency and use built-in date formatting
 
 // SAR Icon Component
@@ -65,6 +67,8 @@ const MyOrdersPage: React.FC = () => {
   const [syncingOrderId, setSyncingOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderSubmission | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
+  const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
+  const [orderToEdit, setOrderToEdit] = useState<OrderSubmission | null>(null);
   const [stats, setStats] = useState({
     total_orders: 0,
     total_revenue: 0,
@@ -303,6 +307,17 @@ const MyOrdersPage: React.FC = () => {
   const viewOrderDetails = (order: OrderSubmission) => {
     setSelectedOrder(order);
     setIsOrderDetailsOpen(true);
+  };
+
+  // Edit order
+  const editOrder = (order: OrderSubmission) => {
+    setOrderToEdit(order);
+    setIsEditOrderOpen(true);
+  };
+
+  // Handle order updated
+  const handleOrderUpdated = () => {
+    fetchData(true);
   };
 
   // Get status badge color
@@ -624,6 +639,17 @@ const MyOrdersPage: React.FC = () => {
                           <span className="hidden sm:inline">View Details</span>
                           <span className="sm:hidden">Details</span>
                         </Button>
+
+                        <Button
+                          onClick={() => editOrder(order)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          <span className="hidden sm:inline">Edit Order</span>
+                          <span className="sm:hidden">Edit</span>
+                        </Button>
                         
                         {order.woocommerce_order_id && (
                           <Button
@@ -854,6 +880,14 @@ const MyOrdersPage: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Order Modal */}
+      <EditOrderModal
+        order={orderToEdit}
+        isOpen={isEditOrderOpen}
+        onClose={() => setIsEditOrderOpen(false)}
+        onOrderUpdated={handleOrderUpdated}
+      />
     </div>
   );
 };

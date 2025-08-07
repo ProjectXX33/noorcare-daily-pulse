@@ -38,7 +38,7 @@ USING (
     EXISTS (
         SELECT 1 FROM users 
         WHERE id = auth.uid() 
-        AND position IN ('Customer Service', 'Designer')
+        AND role = 'employee'
     )
 );
 

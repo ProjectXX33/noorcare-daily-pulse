@@ -51,8 +51,8 @@ const CheckInPage = () => {
 
   if (!user) return null;
   
-  // Check if user is Customer Service or Designer
-  if (user.position !== 'Customer Service' && user.position !== 'Designer') {
+  // Allow all employees to use check-in functionality
+  if (user.role !== 'employee') {
     return (
       <div className="flex items-center justify-center min-h-[50vh] p-4">
         <Card className="max-w-md w-full">
@@ -60,7 +60,7 @@ const CheckInPage = () => {
             <AlertCircle className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500 mx-auto mb-3 sm:mb-4" />
             <h2 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Access Restricted</h2>
             <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-              Check-in functionality is available for Customer Service and Designer employees.
+              Check-in functionality is available for all employees.
             </p>
           </CardContent>
         </Card>
@@ -183,7 +183,7 @@ const CheckInPage = () => {
             <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
               <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-foreground leading-tight">Daily Check-in</h1>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                Record your daily attendance and working hours for {user.position === 'Designer' ? 'Designer shifts' : 'Customer Service shifts'}.
+                Record your daily attendance and working hours for {user.position} shifts.
               </p>
             </div>
             <div className="flex justify-end sm:justify-start shrink-0">

@@ -325,11 +325,11 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
       // Get current month
       const currentMonth = format(new Date(), 'yyyy-MM');
       
-      // Get all users with Customer Service or Designer positions
+      // Get all users with employee positions that use check-in/check-out
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, name, position')
-        .in('position', ['Customer Service', 'Designer']);
+        .in('position', ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer']);
 
       if (usersError) {
         console.error('❌ Error fetching users:', usersError);

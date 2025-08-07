@@ -357,14 +357,16 @@ export interface WooCommercePaymentMethod {
   };
 }
 
-// WooCommerce API Service
+// Enhanced WooCommerce API Service Configuration
 const API_CONFIG = {
   baseURL: 'https://nooralqmar.com/wp-json/wc/v3', // Always use direct URL
   consumerKey: 'ck_dc373790e65a510998fbc7278cb12b987d90b04a', // Updated working credentials
   consumerSecret: 'cs_815de347330e130a58e3e53e0f87b0cd4f0de90f', // Updated working credentials
-  timeout: 25000, // 25 seconds for first attempt
-  retryTimeout: 35000, // 35 seconds for retry attempt
-  maxRetries: 1 // Reduce to 1 retry to avoid overwhelming server
+  timeout: 30000, // 30 seconds for first attempt (increased for monthly sync)
+  retryTimeout: 45000, // 45 seconds for retry attempt (increased for monthly sync)
+  maxRetries: 2, // Increased retries for monthly sync reliability
+  rateLimitDelay: 1000, // 1 second delay between requests to respect rate limits
+  batchDelay: 500 // 500ms delay between batches
 };
 
 // Helper function to handle API requests with retry logic
@@ -509,7 +511,7 @@ class WooCommerceAPI {
     }
   }
 
-  // Fetch completed orders with pagination
+  // Enhanced fetch orders with improved date filtering and error handling
   async fetchOrders(params: {
     per_page?: number;
     page?: number;
@@ -517,6 +519,11 @@ class WooCommerceAPI {
     after?: string;
     before?: string;
     modified_after?: string;
+    modified_before?: string;
+    orderby?: string;
+    order?: string;
+    search?: string;
+    customer?: number;
   } = {}): Promise<any[]> {
     const {
       per_page = 50,
@@ -524,16 +531,21 @@ class WooCommerceAPI {
       status = 'completed',
       after,
       before,
-      modified_after
+      modified_after,
+      modified_before,
+      orderby = 'date',
+      order = 'desc',
+      search,
+      customer
     } = params;
     
-    // Build query parameters for orders
+    // Build query parameters for orders with enhanced field selection
     const queryParams = new URLSearchParams({
       per_page: per_page.toString(),
       page: page.toString(),
-      orderby: 'modified',
-      order: 'desc',
-      // Request all essential order fields for full sync
+      orderby: orderby,
+      order: order,
+      // Enhanced field selection for complete order data
       _fields: [
         'id',
         'number',
@@ -546,35 +558,79 @@ class WooCommerceAPI {
         'date_created',
         'date_modified',
         'date_completed',
+        'date_paid',
         'line_items',
         'customer_id',
         'customer_note',
         'payment_method',
         'payment_method_title',
         'billing',
-        'shipping'
+        'shipping',
+        'meta_data'
       ].join(',')
     });
 
-    // Only add status parameter if it's not 'any' - WooCommerce will return all statuses if no status is specified
-    if (status && status !== 'any') {
+    // Handle status parameter with better logic
+    if (status && status !== 'any' && status !== 'all') {
       queryParams.append('status', status);
     }
     
-    // Add date filters if provided
+    // Enhanced date filtering with proper parameter handling
     if (after) {
-      queryParams.append('after', after);
+      // Ensure after is in ISO format
+      const afterDate = new Date(after);
+      if (!isNaN(afterDate.getTime())) {
+        queryParams.append('after', afterDate.toISOString());
+      } else {
+        console.warn('⚠️ Invalid after date provided:', after);
+      }
     }
+    
     if (before) {
-      queryParams.append('before', before);
+      // Ensure before is in ISO format
+      const beforeDate = new Date(before);
+      if (!isNaN(beforeDate.getTime())) {
+        queryParams.append('before', beforeDate.toISOString());
+      } else {
+        console.warn('⚠️ Invalid before date provided:', before);
+      }
     }
+    
     if (modified_after) {
-      queryParams.append('modified_after', modified_after);
+      // Ensure modified_after is in ISO format
+      const modifiedAfterDate = new Date(modified_after);
+      if (!isNaN(modifiedAfterDate.getTime())) {
+        queryParams.append('modified_after', modifiedAfterDate.toISOString());
+      } else {
+        console.warn('⚠️ Invalid modified_after date provided:', modified_after);
+      }
+    }
+    
+    if (modified_before) {
+      // Ensure modified_before is in ISO format
+      const modifiedBeforeDate = new Date(modified_before);
+      if (!isNaN(modifiedBeforeDate.getTime())) {
+        queryParams.append('modified_before', modifiedBeforeDate.toISOString());
+      } else {
+        console.warn('⚠️ Invalid modified_before date provided:', modified_before);
+      }
+    }
+    
+    // Add optional search parameter
+    if (search && search.trim()) {
+      queryParams.append('search', search.trim());
+    }
+    
+    // Add optional customer filter
+    if (customer && customer > 0) {
+      queryParams.append('customer', customer.toString());
     }
     
     const url = `${API_CONFIG.baseURL}/orders?${queryParams.toString()}`;
     
     try {
+      console.log(`🔍 Fetching orders: ${url.replace(/consumer_(key|secret)=[^&]+/g, '$1=***')}`);
+      
       const orders = await makeRequest(url);
       
       if (!Array.isArray(orders)) {
@@ -582,10 +638,41 @@ class WooCommerceAPI {
         return [];
       }
       
-      return orders;
+      // Validate order data and filter out invalid entries
+      const validOrders = orders.filter(order => {
+        if (!order || typeof order.id !== 'number' || !order.date_created) {
+          console.warn('⚠️ Invalid order data filtered out:', order);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validOrders.length !== orders.length) {
+        console.warn(`⚠️ Filtered out ${orders.length - validOrders.length} invalid orders`);
+      }
+      
+      console.log(`✅ Successfully fetched ${validOrders.length} valid orders`);
+      return validOrders;
       
     } catch (error: any) {
       console.error('❌ Error fetching WooCommerce orders:', error);
+      
+      // Enhanced error context
+      const errorContext = {
+        params: {
+          per_page,
+          page,
+          status,
+          orderby,
+          order,
+          hasDateFilters: !!(after || before || modified_after || modified_before),
+          hasSearch: !!search,
+          hasCustomer: !!customer
+        },
+        url: url.replace(/consumer_(key|secret)=[^&]+/g, '$1=***')
+      };
+      
+      console.error('📋 Request context:', errorContext);
       throw error;
     }
   }

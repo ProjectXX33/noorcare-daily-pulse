@@ -1,13 +1,18 @@
 {
-  "version": "5.0.1",
-  "buildTime": "2025-07-04T16:49:48.231Z",
-  "buildTimestamp": "1751647788232",
-  "buildDate": "7/4/2025",
+  "version": "5.1.0",
+  "buildTime": "2025-01-19T13:00:00.000Z",
+  "buildTimestamp": "1737288000000",
+  "buildDate": "1/19/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "Fixed a bug where the shift timer was not working correctly"
+    "🎉 Extended Check-in/Check-out to ALL Employee Roles",
+    "✅ Copywriting, Media Buyer, and Web Developer can now check in/out",
+    "📊 Monthly shift tracking now includes all employee positions",
+    "🔧 Added default shifts for all roles with flexible scheduling options",
+    "📈 Performance analytics extended to cover all employee positions",
+    "🚀 Universal attendance system across all departments"
   ],
-  "minimumSupportedVersion": "3.1.2",
+  "minimumSupportedVersion": "5.0.0",
   "forceUpdate": false
 }

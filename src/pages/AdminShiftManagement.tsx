@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { User, Shift } from '@/types';
-import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
+import { User, Shift, Position } from '@/types';
+import { format, addDays, startOfWeek, isSameDay, addWeeks, subWeeks } from 'date-fns';
 import { 
   Calendar,
   Clock, 
@@ -71,7 +71,7 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as 'Customer Service' | 'Designer',
+    position: 'Customer Service' as Position,
     allTimeOvertime: false
   });
 
@@ -82,7 +82,7 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as 'Customer Service' | 'Designer',
+    position: 'Customer Service' as Position,
     allTimeOvertime: false
   });
 
@@ -197,7 +197,6 @@ const AdminShiftManagement = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .in('position', ['Customer Service', 'Designer'])
         .eq('role', 'employee')
         .order('name');
 
@@ -243,9 +242,9 @@ const AdminShiftManagement = () => {
   };
 
   const loadAssignments = async () => {
-    try {
-      console.log('Loading assignments...');
-      const weekEnd = addDays(selectedWeekStart, 6);
+          try {
+        console.log('Loading assignments...');
+        const weekEnd = addDays(selectedWeekStart, 6);
       
       const { data, error } = await supabase
         .from('shift_assignments')
@@ -364,10 +363,10 @@ const AdminShiftManagement = () => {
   };
 
   const getWeekDays = () => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      days.push(addDays(selectedWeekStart, i));
-    }
+          const days = [];
+      for (let i = 0; i < 7; i++) {
+        days.push(addDays(selectedWeekStart, i));
+      }
     return days;
   };
 
@@ -526,7 +525,7 @@ const AdminShiftManagement = () => {
       name: shift.name,
       startTime: shift.startTime,
       endTime: shift.endTime,
-      position: shift.position as 'Customer Service' | 'Designer',
+      position: shift.position as Position,
       allTimeOvertime: shift.allTimeOvertime || false
     });
     setIsEditShiftDialogOpen(true);
@@ -652,7 +651,7 @@ const AdminShiftManagement = () => {
                       <Label>Position</Label>
                       <Select
                         value={customShiftData.position}
-                        onValueChange={(value: 'Customer Service' | 'Designer') => 
+                        onValueChange={(value: Position) => 
                           setCustomShiftData(prev => ({...prev, position: value}))
                         }
                       >
@@ -788,7 +787,7 @@ const AdminShiftManagement = () => {
                 <Label>Position</Label>
                 <Select
                   value={editShiftData.position}
-                  onValueChange={(value: 'Customer Service' | 'Designer') => 
+                  onValueChange={(value: Position) => 
                     setEditShiftData(prev => ({...prev, position: value}))
                   }
                 >
@@ -874,7 +873,7 @@ const AdminShiftManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
+                                              onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, -7))}
                       className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
                     >
                       <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -887,7 +886,7 @@ const AdminShiftManagement = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
+                                              onClick={() => setSelectedWeekStart(addDays(selectedWeekStart, 7))}
                       className="min-h-[44px] sm:min-h-auto px-2 sm:px-3"
                     >
                       <span className="hidden sm:inline mr-1">{t.nextWeek}</span>

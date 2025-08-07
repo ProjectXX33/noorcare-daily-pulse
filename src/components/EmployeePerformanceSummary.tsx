@@ -262,7 +262,7 @@ const EmployeePerformanceSummary: React.FC = () => {
       let ranking = { position: 0, totalEmployees: 0, isTopPerformer: false };
       if (allPerformanceData && allPerformanceData.length > 0 && allUsers) {
         // Filter performance data to only include check-in enabled positions
-        const checkInPositions = ['Customer Service', 'Designer'];
+        const checkInPositions = ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'];
         const checkInUserIds = allUsers
           .filter(u => checkInPositions.includes(u.position))
           .map(u => u.id);

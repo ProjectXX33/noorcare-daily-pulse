@@ -1003,7 +1003,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Time & Attendance',
       color: 'cyan',
       items: [
-        { name: t('checkIn') as string, path: '/check-in', icon: User, customerServiceAndDesignerOnly: true, color: 'cyan' },
+        { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true, color: 'cyan' },
         { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true, color: 'slate' },
       ] as NavItem[]
     },
@@ -1193,7 +1193,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.employeeOnly && user?.role === 'admin') return false;
       if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
       if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
-      if (item.shiftsAccess && !(user?.role === 'admin' || user?.position === 'Customer Service' || user?.position === 'Designer')) return false;
+      if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.designerOnly && user?.position !== 'Designer') return false;
       if (item.copyWritingOnly && user?.position !== 'Copy Writing') return false;

@@ -344,7 +344,7 @@ const ShiftsPage = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .in('position', ['Customer Service', 'Designer'])
+        .in('position', ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'])
         .eq('role', 'employee')
         .order('name');
 
@@ -1234,8 +1234,8 @@ const ShiftsPage = () => {
           </div>
         )}
 
-        {/* Customer Service and Designer Schedule with enhanced mobile design */}
-        {(user.position === 'Customer Service' || user.position === 'Designer') && (
+        {/* Employee Schedule with enhanced mobile design */}
+        {(['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user.position)) && (
           <Card className="border border-border/50 shadow-sm w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">

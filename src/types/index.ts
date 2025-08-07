@@ -122,7 +122,7 @@ export type Shift = {
   name: string;
   startTime: string; // HH:MM format
   endTime: string; // HH:MM format
-  position: 'Customer Service' | 'Designer';
+  position: Position;
   isActive: boolean;
   allTimeOvertime?: boolean; // When true, all time worked is counted as overtime
   createdAt: Date;

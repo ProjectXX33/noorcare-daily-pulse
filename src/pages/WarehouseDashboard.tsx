@@ -158,26 +158,41 @@ const WarehouseDashboard: React.FC = () => {
   const [autoSyncActive, setAutoSyncActive] = useState(false);
   const [lastAutoSyncTime, setLastAutoSyncTime] = useState<Date | null>(null);
   const syncIntervalRef = useRef<{ newOrders: NodeJS.Timeout; regular: NodeJS.Timeout } | null>(null);
+  const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [lastAutoCheckTime, setLastAutoCheckTime] = useState<Date | null>(null);
   const [isFixingImages, setIsFixingImages] = useState(false);
   const [syncAnimationData, setSyncAnimationData] = useState<any>(null);
   
   // New order highlighting system
   const [newOrderHighlights, setNewOrderHighlights] = useState<Map<number, number>>(new Map());
 
-  // Function to highlight new order until user interacts with it
+  // Function to highlight new order with GOLD styling until user interacts with it
   const highlightNewOrder = (orderId: number) => {
     const timestamp = Date.now();
     setNewOrderHighlights(prev => new Map(prev).set(orderId, timestamp));
-    console.log(`✨ Order ${orderId} highlighted as new - will remain until user interaction`);
+    console.log(`✨ Order ${orderId} highlighted with GOLD styling - will remain until user interaction`);
+    
+    // Show a toast notification about the gold highlighting
+    toast.success(`✨ New Order Highlighted!`, {
+      description: `Order #${orderId} is now highlighted in GOLD - click to view details`,
+      duration: 5000,
+      className: "border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50",
+    });
   };
 
-  // Function to remove highlight when user interacts with order
+  // Function to remove GOLD highlight when user interacts with order
   const removeOrderHighlight = (orderId: number) => {
     setNewOrderHighlights(prev => {
       const newMap = new Map(prev);
       const wasHighlighted = newMap.delete(orderId);
       if (wasHighlighted) {
-        console.log(`🎯 Order ${orderId} highlight removed due to user interaction`);
+        console.log(`🎯 Order ${orderId} GOLD highlight removed due to user interaction`);
+        // Optional: Show subtle feedback when gold highlighting is removed
+        toast.success(`✅ Order #${orderId} marked as viewed`, {
+          description: 'Gold highlighting removed',
+          duration: 2000,
+          className: "border-green-400 bg-gradient-to-r from-green-50 to-emerald-50",
+        });
       }
       return newMap;
     });
@@ -190,37 +205,105 @@ const WarehouseDashboard: React.FC = () => {
 
 
 
-  // Load orders and shipping stats on component mount
+  // Enhanced data loading with better performance and error handling
   useEffect(() => {
-    loadOrders();
-    loadShippingStats();
+    let isMounted = true;
     
-    // Start automatic WooCommerce sync immediately
-    console.log('🚀 Starting automatic WooCommerce sync system...');
-    startPeriodicWooCommerceSync();
-    
-    // Run initial sync after 10 seconds to allow component to fully load
-    setTimeout(() => {
-      console.log('🔄 Running initial WooCommerce sync...');
-      syncFromWooCommerce(false); // false = automatic sync, not manual
-      syncNewOrdersFromWooCommerce(); // Also check for new orders immediately
-    }, 10000);
-    
-    // Request notification permission for better new order alerts
-    if (Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          toast.success('🔔 Browser notifications enabled!', {
-            description: 'You will receive notifications for new WooCommerce orders'
+    const initializeDashboard = async () => {
+      try {
+        setIsLoading(true);
+        console.log('🚀 Initializing Warehouse Dashboard...');
+        
+        // Load core data first
+        await Promise.all([
+          loadOrders(),
+          loadShippingStats()
+        ]);
+        
+        if (!isMounted) return;
+        
+        // Request notification permission
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              toast.success('🔔 Browser notifications enabled!', {
+                description: 'You will receive notifications for new WooCommerce orders'
+              });
+            }
           });
         }
-      });
-    }
+        
+        // Start intelligent sync system after initial load
+        console.log('⏰ Starting intelligent sync system...');
+        startIntelligentSyncSystem();
+        
+      } catch (error) {
+        console.error('❌ Dashboard initialization failed:', error);
+        toast.error('Failed to initialize dashboard. Retrying in 30 seconds...');
+        
+        // Retry initialization after 30 seconds
+        setTimeout(() => {
+          if (isMounted) {
+            initializeDashboard();
+          }
+        }, 30000);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    initializeDashboard();
     
     return () => {
+      isMounted = false;
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current.newOrders);
         clearInterval(syncIntervalRef.current.regular);
+      }
+      if (autoCheckIntervalRef.current) {
+        clearInterval(autoCheckIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Set up 5-minute auto-check for new orders
+  useEffect(() => {
+    console.log('⏰ Setting up 5-minute auto-check for new orders...');
+    
+    // Start auto-check after 2 minutes to allow initial setup to complete
+    const startDelay = setTimeout(() => {
+      console.log('🤖 Starting 5-minute auto-check cycle...');
+      
+      // Run the first auto-check
+      const runAutoCheck = async () => {
+        if (!isSyncing) {
+          console.log('🤖 Auto-check: Checking for new orders...');
+          toast.info('🤖 Auto-check: Scanning for new orders...', {
+            description: 'Automatic 5-minute check'
+          });
+          setLastAutoCheckTime(new Date());
+          await fetchMonthlyOrdersFromWooCommerce();
+        } else {
+          console.log('🤖 Auto-check skipped: sync already in progress');
+        }
+      };
+      
+      // Run immediately, then every 5 minutes
+      runAutoCheck();
+      
+      // Set up 5-minute interval
+      autoCheckIntervalRef.current = setInterval(runAutoCheck, 5 * 60 * 1000); // 5 minutes
+      
+      console.log('✅ 5-minute auto-check cycle activated');
+    }, 2 * 60 * 1000); // 2-minute delay before starting
+    
+    return () => {
+      clearTimeout(startDelay);
+      if (autoCheckIntervalRef.current) {
+        clearInterval(autoCheckIntervalRef.current);
+        console.log('🛑 5-minute auto-check cycle stopped');
       }
     };
   }, []);
@@ -330,30 +413,88 @@ const WarehouseDashboard: React.FC = () => {
     filterOrders();
   }, [orders, searchTerm, statusFilter]);
 
-  const startPeriodicWooCommerceSync = () => {
-    console.log('⏰ Setting up automatic sync intervals...');
+  // Enhanced intelligent sync system with better performance and error handling
+  const startIntelligentSyncSystem = () => {
+    console.log('🧠 Setting up intelligent sync system...');
     
-    // Sync for new orders every 5 minutes
-    const newOrderSyncInterval = setInterval(() => {
-      console.log('🔍 Auto-checking for new WooCommerce orders...');
-      syncNewOrdersFromWooCommerce();
-    }, 300000); // 5 minutes (300,000 milliseconds)
-
-    // Regular sync every 5 minutes for status updates
-    const regularSyncInterval = setInterval(() => {
-      console.log('🔄 Auto-syncing WooCommerce status updates...');
-      syncFromWooCommerce(false); // false = automatic sync
-    }, 300000); // 5 minutes (300,000 milliseconds)
-
-    // Store both intervals for cleanup
-    syncIntervalRef.current = {
-      newOrders: newOrderSyncInterval,
-      regular: regularSyncInterval
+    let consecutiveErrors = 0;
+    let lastSyncTime = Date.now();
+    
+    // Consolidated sync function that handles both new orders and status updates efficiently
+    const performConsolidatedSync = async () => {
+      try {
+        console.log('🔄 Running consolidated WooCommerce sync...');
+        setIsSyncing(true);
+        
+        // Run both operations in parallel for efficiency
+        const [newOrdersResult, statusSyncResult] = await Promise.allSettled([
+          syncNewOrdersFromWooCommerce(),
+          syncFromWooCommerce(false)
+        ]);
+        
+        // Handle results
+        if (newOrdersResult.status === 'fulfilled' && statusSyncResult.status === 'fulfilled') {
+          consecutiveErrors = 0;
+          setLastAutoSyncTime(new Date());
+          console.log('✅ Consolidated sync completed successfully');
+        } else {
+          consecutiveErrors++;
+          console.warn(`⚠️ Sync partially failed (${consecutiveErrors} consecutive errors)`);
+        }
+        
+      } catch (error) {
+        consecutiveErrors++;
+        console.error(`❌ Consolidated sync failed (${consecutiveErrors} consecutive errors):`, error);
+        
+        // If too many consecutive errors, increase interval
+        if (consecutiveErrors >= 3) {
+          console.warn('🚨 Multiple sync failures detected. Increasing sync interval...');
+        }
+      } finally {
+        setIsSyncing(false);
+        lastSyncTime = Date.now();
+      }
     };
     
-    console.log('✅ Automatic sync intervals set: New orders every 5 minutes, Status updates every 5 minutes');
+    // Intelligent interval calculation based on errors and activity
+    const getNextSyncInterval = () => {
+      if (consecutiveErrors >= 3) {
+        return 15 * 60 * 1000; // 15 minutes if many errors
+      } else if (consecutiveErrors >= 1) {
+        return 10 * 60 * 1000; // 10 minutes if some errors
+      } else {
+        return 7 * 60 * 1000; // 7 minutes if no errors
+      }
+    };
+    
+    // Start the intelligent sync cycle
+    const scheduleNextSync = () => {
+      const interval = getNextSyncInterval();
+      console.log(`⏰ Next sync scheduled in ${interval / 60000} minutes`);
+      
+      const timeoutId = setTimeout(() => {
+        performConsolidatedSync().finally(() => {
+          scheduleNextSync(); // Schedule the next sync
+        });
+      }, interval);
+      
+      // Store for cleanup
+      syncIntervalRef.current = { 
+        newOrders: timeoutId, 
+        regular: timeoutId 
+      };
+    };
+    
+    // Initial sync after 5 seconds to allow full component initialization
+    setTimeout(() => {
+      console.log('🎯 Running initial consolidated sync...');
+      performConsolidatedSync().finally(() => {
+        scheduleNextSync(); // Start the intelligent cycle
+      });
+    }, 5000);
+    
     setAutoSyncActive(true);
-    setLastAutoSyncTime(new Date());
+    console.log('✅ Intelligent sync system activated');
   };
 
   // New function specifically for checking new orders immediately
@@ -403,9 +544,10 @@ const WarehouseDashboard: React.FC = () => {
             const newOrderData = await importWooCommerceOrder(wooOrder);
             newOrdersFound++;
             
-            // Highlight the new order for 2 minutes
+            // Highlight the new order with gold styling
             if (newOrderData && newOrderData.id) {
               highlightNewOrder(newOrderData.id);
+              console.log(`✨ Order ${newOrderData.id} highlighted with GOLD styling as NEW order`);
             }
             
             // Individual notifications removed to avoid duplicates - bulk notification handled later
@@ -461,64 +603,93 @@ const WarehouseDashboard: React.FC = () => {
     }
   };
 
-  // Function to import a WooCommerce order into our database
+  // Enhanced function to import a WooCommerce order with proper data validation
   const importWooCommerceOrder = async (wooOrder: any) => {
+    // Helper function to safely truncate strings to database limits
+    const truncateString = (str: string | null | undefined, maxLength: number): string => {
+      if (!str) return '';
+      const trimmed = String(str).trim();
+      if (trimmed.length <= maxLength) return trimmed;
+      const truncated = trimmed.substring(0, maxLength);
+      console.warn(`⚠️ Truncated field from ${trimmed.length} to ${maxLength} chars: "${trimmed}" → "${truncated}"`);
+      return truncated;
+    };
+
+    // Helper function to safely parse numeric values
+    const safeParseFloat = (value: any, defaultValue: number = 0): number => {
+      const parsed = parseFloat(value || '0');
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
+    // Validate and prepare order data with proper field limits
     const orderData = {
       woocommerce_order_id: wooOrder.id,
-      order_number: `#${wooOrder.number}`,
-      customer_first_name: wooOrder.billing.first_name,
-      customer_last_name: wooOrder.billing.last_name,
-      customer_phone: wooOrder.billing.phone || '',
-      customer_email: wooOrder.billing.email || '',
-      billing_address_1: wooOrder.billing.address_1,
-      billing_address_2: wooOrder.billing.address_2 || '',
-      billing_city: wooOrder.billing.city,
-      billing_state: wooOrder.billing.state || '',
-      billing_country: wooOrder.billing.country || '',
-      billing_postcode: wooOrder.billing.postcode || '',
-      total_amount: parseFloat(wooOrder.total),
-      subtotal: parseFloat(wooOrder.total) - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
-      shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
-      payment_method: wooOrder.payment_method_title,
+      order_number: truncateString(`#${wooOrder.number}`, 50), // Limit to 50 chars
+      customer_first_name: truncateString(wooOrder.billing?.first_name, 50), // Limit to 50 chars
+      customer_last_name: truncateString(wooOrder.billing?.last_name, 50), // Limit to 50 chars
+      customer_phone: truncateString(wooOrder.billing?.phone, 50), // Limit to 50 chars for phone
+      customer_email: truncateString(wooOrder.billing?.email, 100), // Limit to 100 chars for email
+      billing_address_1: truncateString(wooOrder.billing?.address_1, 255), // Address can be longer
+      billing_address_2: truncateString(wooOrder.billing?.address_2, 255), // Address can be longer
+      billing_city: truncateString(wooOrder.billing?.city, 50), // City limit reduced to 50
+      billing_state: truncateString(wooOrder.billing?.state, 50), // State limit
+      billing_country: truncateString(wooOrder.billing?.country, 50), // Country limit
+      billing_postcode: truncateString(wooOrder.billing?.postcode, 20), // Postcode limit
+      total_amount: safeParseFloat(wooOrder.total),
+      subtotal: safeParseFloat(wooOrder.total) - safeParseFloat(wooOrder.shipping_total) - safeParseFloat(wooOrder.total_tax),
+      shipping_amount: safeParseFloat(wooOrder.shipping_total),
+      payment_method: truncateString(wooOrder.payment_method_title, 50), // Payment method has 50 char limit
       status: wooOrder.status === 'completed' ? 'delivered' : 
              wooOrder.status === 'processing' ? 'processing' : 
              wooOrder.status === 'shipped' ? 'shipped' :
              wooOrder.status === 'cancelled' ? 'cancelled' : 'pending',
-      woocommerce_status: wooOrder.status, // Store raw WooCommerce status
+      woocommerce_status: truncateString(wooOrder.status, 50), // WooCommerce status limit
       order_items: await Promise.all(
-        wooOrder.line_items.map(async (item: any) => {
-          // Ensure quantity is a valid integer (fallback to 1)
-          const quantity = parseInt(item.quantity as any, 10) || 1;
+        (wooOrder.line_items || []).map(async (item: any) => {
+          try {
+            // Ensure quantity is a valid integer (fallback to 1)
+            const quantity = parseInt(item.quantity as any, 10) || 1;
 
-          // Try to get image directly from line item; WooCommerce often omits this
-          let imageUrl: string | null = (item as any).image?.src || null;
-          
-          console.log(`🖼️ Line item ${item.name} initial image:`, imageUrl);
+            // Try to get image directly from line item; WooCommerce often omits this
+            let imageUrl: string | null = (item as any).image?.src || null;
+            
+            console.log(`🖼️ Line item ${truncateString(item.name, 50)} initial image:`, imageUrl);
 
-          // If not present, fetch the product details from WooCommerce to get the first image
-          if (!imageUrl && item.product_id) {
-            try {
-              console.log(`🔍 Fetching product details for ID: ${item.product_id}`);
-              const productDetails = await wooCommerceAPI.fetchProduct(item.product_id);
-              imageUrl = productDetails?.images?.[0]?.src || null;
-              console.log(`🖼️ Product ${item.product_id} fetched image:`, imageUrl);
-              console.log(`📦 Product details images array:`, productDetails?.images);
-            } catch (err) {
-              console.warn(`⚠️ Unable to fetch product ${item.product_id} image`, err);
+            // If not present, fetch the product details from WooCommerce to get the first image
+            if (!imageUrl && item.product_id) {
+              try {
+                console.log(`🔍 Fetching product details for ID: ${item.product_id}`);
+                const productDetails = await wooCommerceAPI.fetchProduct(item.product_id);
+                imageUrl = productDetails?.images?.[0]?.src || null;
+                console.log(`🖼️ Product ${item.product_id} fetched image:`, imageUrl);
+              } catch (err) {
+                console.warn(`⚠️ Unable to fetch product ${item.product_id} image:`, err);
+              }
             }
-          }
 
-          const orderItem = {
-        product_id: item.product_id,
-        product_name: item.name,
-            quantity: quantity,
-            price: item.price?.toString() || '0',
-            sku: item.sku || '',
-            image_url: imageUrl,
-          };
-          
-          console.log(`✅ Final order item for ${item.name}:`, orderItem);
-          return orderItem;
+            const orderItem = {
+              product_id: item.product_id || 0,
+              product_name: truncateString(item.name, 255), // Product name can be longer
+              quantity: quantity,
+              price: truncateString(item.price?.toString(), 20) || '0', // Price as string
+              sku: truncateString(item.sku, 50), // SKU limit
+              image_url: imageUrl ? truncateString(imageUrl, 500) : null, // Image URL can be longer
+            };
+            
+            console.log(`✅ Final order item for ${orderItem.product_name}:`, orderItem);
+            return orderItem;
+          } catch (itemError) {
+            console.error(`❌ Error processing order item:`, itemError);
+            // Return a fallback item to prevent complete failure
+            return {
+              product_id: item.product_id || 0,
+              product_name: truncateString(item.name || 'Unknown Product', 255),
+              quantity: 1,
+              price: '0',
+              sku: '',
+              image_url: null,
+            };
+          }
         })
       ),
       created_by_name: 'WooCommerce Import',
@@ -528,17 +699,127 @@ const WarehouseDashboard: React.FC = () => {
       last_sync_attempt: new Date().toISOString()
     };
 
-    const { data: insertedData, error: insertError } = await supabase
-      .from('order_submissions')
-      .insert(orderData)
-      .select()
-      .single();
-
-    if (insertError) {
-      throw new Error(`Failed to insert order: ${insertError.message}`);
+    // Additional validation
+    if (!orderData.woocommerce_order_id) {
+      throw new Error('Invalid WooCommerce order: missing order ID');
     }
 
-    return insertedData;
+    // Debug logging to identify long fields before insert
+    const debugFieldLengths = {
+      order_number: orderData.order_number.length,
+      customer_first_name: orderData.customer_first_name.length,
+      customer_last_name: orderData.customer_last_name.length,
+      customer_phone: orderData.customer_phone.length,
+      customer_email: orderData.customer_email.length,
+      billing_city: orderData.billing_city.length,
+      billing_state: orderData.billing_state.length,
+      billing_country: orderData.billing_country.length,
+      billing_postcode: orderData.billing_postcode.length,
+      payment_method: orderData.payment_method.length,
+      woocommerce_status: orderData.woocommerce_status.length,
+      created_by_name: orderData.created_by_name.length
+    };
+
+    // Check for any fields that might exceed their database limits
+    const fieldsOver50 = Object.entries(debugFieldLengths)
+      .filter(([field, length]) => {
+        // These fields have 50-char database limits
+        const fields50Limit = ['order_number', 'customer_phone', 'payment_method', 'woocommerce_status', 'created_by_name'];
+        return fields50Limit.includes(field) && length > 50;
+      })
+      .map(([field, length]) => `${field}:${length}`);
+
+    if (fieldsOver50.length > 0) {
+      console.error('🚨 CRITICAL: Fields over 50-char database limit:', fieldsOver50);
+      console.error('🚨 These will cause database errors:', {
+        order_number: orderData.order_number,
+        customer_phone: orderData.customer_phone,
+        payment_method: orderData.payment_method,
+        woocommerce_status: orderData.woocommerce_status,
+        created_by_name: orderData.created_by_name
+      });
+    }
+    
+    // Also check for fields that are unexpectedly long (for monitoring)
+    const allLongFields = Object.entries(debugFieldLengths)
+      .filter(([field, length]) => length > 100)
+      .map(([field, length]) => `${field}:${length}`);
+      
+    if (allLongFields.length > 0) {
+      console.warn('⚠️ Fields over 100 chars (monitoring):', allLongFields);
+    }
+
+    // FINAL SAFETY CHECK: Force truncate any remaining long fields before database insert
+    const finalOrderData = {
+      ...orderData,
+      order_number: orderData.order_number.substring(0, 50),
+      customer_first_name: orderData.customer_first_name.substring(0, 255), 
+      customer_last_name: orderData.customer_last_name.substring(0, 255),
+      customer_phone: orderData.customer_phone.substring(0, 50),
+      customer_email: orderData.customer_email.substring(0, 255),
+      billing_city: orderData.billing_city.substring(0, 50),
+      billing_state: orderData.billing_state.substring(0, 50),
+      billing_country: orderData.billing_country.substring(0, 50),
+      billing_postcode: orderData.billing_postcode.substring(0, 20),
+      payment_method: orderData.payment_method.substring(0, 50), // ENFORCE 50 char limit
+      woocommerce_status: orderData.woocommerce_status.substring(0, 50),
+      created_by_name: orderData.created_by_name.substring(0, 255)
+    };
+
+    // Log if any final truncation occurred
+    const finalTruncations = Object.entries(orderData).filter(([key, value]) => {
+      if (typeof value === 'string' && typeof finalOrderData[key as keyof typeof finalOrderData] === 'string') {
+        return value.length !== (finalOrderData[key as keyof typeof finalOrderData] as string).length;
+      }
+      return false;
+    });
+
+    if (finalTruncations.length > 0) {
+      console.warn('🔧 FINAL SAFETY TRUNCATION applied to:', finalTruncations.map(([key]) => key));
+    }
+
+    console.log(`📝 Importing order ${finalOrderData.order_number} with ${finalOrderData.order_items.length} items`);
+    console.log('📊 Field lengths:', debugFieldLengths);
+
+    try {
+      const { data: insertedData, error: insertError } = await supabase
+        .from('order_submissions')
+        .insert(finalOrderData)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('❌ Database insert error details:', {
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+          orderData: debugFieldLengths,
+          actualValues: {
+            order_number: orderData.order_number,
+            customer_first_name: orderData.customer_first_name,
+            customer_last_name: orderData.customer_last_name,
+            customer_phone: orderData.customer_phone,
+            customer_email: orderData.customer_email,
+            billing_city: orderData.billing_city,
+            billing_state: orderData.billing_state,
+            billing_country: orderData.billing_country,
+            billing_postcode: orderData.billing_postcode,
+            payment_method: orderData.payment_method,
+            woocommerce_status: orderData.woocommerce_status,
+            created_by_name: orderData.created_by_name
+          }
+        });
+        throw new Error(`Failed to insert order: ${insertError.message}`);
+      }
+
+      console.log(`✅ Successfully imported order ${orderData.order_number} (DB ID: ${insertedData.id})`);
+      return insertedData;
+
+    } catch (dbError: any) {
+      console.error('❌ Database operation failed:', dbError);
+      throw new Error(`Database error importing order: ${dbError.message}`);
+    }
   };
 
   // Enhanced sync function with better error handling and logic
@@ -732,42 +1013,105 @@ const WarehouseDashboard: React.FC = () => {
     }
   };
 
-  const loadOrders = async () => {
-    setIsLoading(true);
+  // Enhanced loadOrders with retry logic and better error handling
+  const loadOrders = async (retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+    
     try {
+      if (retryCount === 0) {
+        setIsLoading(true);
+      }
+      
+      console.log(`📦 Loading orders... ${retryCount > 0 ? `(Retry ${retryCount}/${maxRetries})` : ''}`);
+      
       const data = await getAllOrderSubmissions();
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format received from API');
+      }
+      
       setOrders(data);
-      console.log('📦 Loaded orders:', data.length);
+      console.log(`✅ Successfully loaded ${data.length} orders`);
       
-      // Clear database highlights for final status orders
-      await clearDatabaseHighlights();
-      
-      // Clear frontend highlights for orders that are already in final statuses
-      setTimeout(() => {
-        data.forEach(order => {
-          if (order.id && (order.status === 'cancelled' || order.status === 'shipped' || order.status === 'delivered' || order.status === 'completed')) {
-            if (isOrderHighlighted(order.id)) {
-              removeOrderHighlight(order.id);
-              console.log(`🎯 Order ${order.id} frontend highlight cleared (already in final status: ${order.status})`);
+      // Clear database highlights for final status orders (optimized)
+      try {
+        await clearDatabaseHighlights();
+        
+        // Optimized frontend highlight clearing - batch process
+        const finalStatusOrders = data.filter(order => 
+          order.id && ['cancelled', 'shipped', 'delivered', 'completed'].includes(order.status || '')
+        );
+        
+        setTimeout(() => {
+          finalStatusOrders.forEach(order => {
+            if (isOrderHighlighted(order.id!)) {
+              removeOrderHighlight(order.id!);
+              console.log(`🎯 Order ${order.id} highlight cleared (status: ${order.status})`);
             }
-          }
-        });
-      }, 100); // Small delay to ensure state is updated
+          });
+        }, 100);
+        
+      } catch (highlightError) {
+        console.warn('⚠️ Error clearing highlights (non-critical):', highlightError);
+      }
+      
+      return data; // Return data for Promise.all usage
       
     } catch (error) {
-      console.error('Error loading orders:', error);
-      toast.error('Failed to load orders');
+      console.error(`❌ Error loading orders (attempt ${retryCount + 1}):`, error);
+      
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying in ${retryDelay / 1000} seconds...`);
+        
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return loadOrders(retryCount + 1);
+      } else {
+        // Final failure after all retries
+        toast.error(`Failed to load orders after ${maxRetries + 1} attempts. Please check your connection.`, {
+          description: 'Click the refresh button to try again.'
+        });
+        throw error;
+      }
     } finally {
-      setIsLoading(false);
+      if (retryCount === 0) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const loadShippingStats = async () => {
+  // Enhanced loadShippingStats with retry logic and caching
+  const loadShippingStats = async (retryCount = 0) => {
+    const maxRetries = 2;
+    const retryDelay = 1000 * (retryCount + 1);
+    
     try {
+      console.log(`📊 Loading shipping stats... ${retryCount > 0 ? `(Retry ${retryCount}/${maxRetries})` : ''}`);
+      
       const stats = await getShippingStats();
+      
+      if (!Array.isArray(stats)) {
+        throw new Error('Invalid shipping stats format received - expected array');
+      }
+      
       setShippingStats(stats);
+      console.log(`✅ Shipping stats loaded successfully (${stats.length} methods)`);
+      return stats;
+      
     } catch (error) {
-      console.error('Error loading shipping stats:', error);
+      console.error(`❌ Error loading shipping stats (attempt ${retryCount + 1}):`, error);
+      
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying shipping stats in ${retryDelay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return loadShippingStats(retryCount + 1);
+      } else {
+        console.warn('⚠️ Failed to load shipping stats, using empty array');
+        // Set empty array as default to prevent UI errors
+        const defaultStats: ShippingStats[] = [];
+        setShippingStats(defaultStats);
+        return defaultStats;
+      }
     }
   };
 
@@ -891,10 +1235,360 @@ const WarehouseDashboard: React.FC = () => {
     }
   };
 
-  // Enhanced manual sync that includes new order check
+  // Enhanced manual sync with better user feedback
   const manualSyncFromWooCommerce = async () => {
-    // This now calls the main sync function with a flag
-    await syncFromWooCommerce(true);
+    try {
+      setIsSyncing(true);
+      console.log('🔄 Manual WooCommerce sync initiated...');
+      
+      toast.info('🔄 Syncing with WooCommerce...', {
+        description: 'This may take a few moments'
+      });
+      
+      await syncFromWooCommerce(true);
+      
+      toast.success('✅ WooCommerce sync completed!', {
+        description: 'All orders have been synchronized'
+      });
+      
+    } catch (error) {
+      console.error('❌ Manual sync failed:', error);
+      toast.error('❌ Sync failed', {
+        description: 'Please check your connection and try again'
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Enhanced manual refresh function for all data
+  const manualRefreshAllData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Manual refresh of all data initiated...');
+      
+      toast.info('🔄 Refreshing dashboard...', {
+        description: 'Loading latest order and shipping data'
+      });
+      
+      // Load all data in parallel for better performance
+      await Promise.all([
+        loadOrders(),
+        loadShippingStats()
+      ]);
+      
+      toast.success('✅ Dashboard refreshed!', {
+        description: 'All data has been updated'
+      });
+      
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
+      toast.error('❌ Refresh failed', {
+        description: 'Some data may not be up to date. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced monthly sync that fetches ALL current month orders from WooCommerce
+  const fetchMonthlyOrdersFromWooCommerce = async () => {
+    try {
+      setIsSyncing(true);
+      console.log('🚀 Starting enhanced monthly WooCommerce sync...');
+      toast.info('🚀 Fetching ALL current month orders from WooCommerce...', {
+        description: 'Enhanced sync with better coverage and error handling'
+      });
+
+      // Test connection first
+      const isConnected = await wooCommerceAPI.testConnection();
+      if (!isConnected) {
+        toast.error('❌ Failed to connect to WooCommerce');
+        return;
+      }
+
+      // Get current month date range with proper timezone handling
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      console.log(`📅 Enhanced sync for current month: ${startOfCurrentMonth.toISOString()} to ${endOfCurrentMonth.toISOString()}`);
+
+      const syncStats = {
+        total: 0,
+        new: 0,
+        updated: 0,
+        errors: 0,
+        skipped: 0,
+        statusBreakdown: {} as Record<string, number>
+      };
+
+      // Step 1: Try to get ALL orders with 'any' status first (more efficient)
+      console.log('📦 Fetching ALL orders with any status for current month...');
+      toast.info('📦 Fetching orders with optimized method...');
+      
+      let allWooOrders: any[] = [];
+      let page = 1;
+      let hasMorePages = true;
+      let totalFetched = 0;
+
+      // Use a more reliable approach - fetch all orders regardless of status
+      while (hasMorePages && totalFetched < 10000) { // Safety limit
+        try {
+          console.log(`📄 Fetching page ${page} (fetched ${totalFetched} so far)...`);
+          
+          // Use 'any' status to get all orders, with proper date filtering
+          const orders = await wooCommerceAPI.fetchOrders({
+            per_page: 100,
+            page: page,
+            status: 'any', // This gets ALL statuses in one request
+            modified_after: startOfCurrentMonth.toISOString(), // Use modified_after for better results
+            orderby: 'date',
+            order: 'desc'
+          });
+
+          if (orders && orders.length > 0) {
+            // Filter orders to current month based on creation date (double-check)
+            const monthlyOrders = orders.filter(order => {
+              const orderDate = new Date(order.date_created);
+              return orderDate >= startOfCurrentMonth && orderDate <= endOfCurrentMonth;
+            });
+
+            if (monthlyOrders.length > 0) {
+              allWooOrders.push(...monthlyOrders);
+              totalFetched += monthlyOrders.length;
+              console.log(`✅ Page ${page}: ${monthlyOrders.length} current month orders (${orders.length} total on page)`);
+              
+              // Update status breakdown
+              monthlyOrders.forEach(order => {
+                syncStats.statusBreakdown[order.status] = (syncStats.statusBreakdown[order.status] || 0) + 1;
+              });
+            }
+            
+            // Check if we should continue - if we got less than 100 orders or no monthly orders
+            if (orders.length < 100) {
+              hasMorePages = false;
+            } else {
+              page++;
+              // Small delay between requests to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          } else {
+            hasMorePages = false;
+          }
+
+          // Show progress every 5 pages
+          if (page % 5 === 0) {
+            toast.info(`📄 Fetching page ${page}... Found ${totalFetched} current month orders`);
+          }
+
+        } catch (error) {
+          console.error(`❌ Error fetching page ${page}:`, error);
+          
+          // If the 'any' status method fails, fall back to individual status fetching
+          if (page === 1) {
+            console.log('🔄 Falling back to individual status fetching...');
+            toast.info('🔄 Switching to fallback method...');
+            break;
+          } else {
+            // For later pages, just log the error and continue
+            hasMorePages = false;
+          }
+        }
+      }
+
+      // Step 2: If the main method didn't work or got limited results, try individual status fetching
+      if (allWooOrders.length === 0) {
+        console.log('🔄 Using fallback method: fetching each status individually...');
+        toast.info('🔄 Using fallback method for complete coverage...');
+        
+        const statusesToSync = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'];
+        
+        for (const status of statusesToSync) {
+          console.log(`📦 Fetching ${status} orders...`);
+          toast.info(`📦 Fetching ${status} orders...`);
+
+          let statusPage = 1;
+          let statusHasMore = true;
+
+          while (statusHasMore) {
+            try {
+              const statusOrders = await wooCommerceAPI.fetchOrders({
+                per_page: 100,
+                page: statusPage,
+                status: status,
+                after: startOfCurrentMonth.toISOString(),
+                before: endOfCurrentMonth.toISOString(),
+                orderby: 'date',
+                order: 'desc'
+              });
+
+              if (statusOrders && statusOrders.length > 0) {
+                allWooOrders.push(...statusOrders);
+                syncStats.statusBreakdown[status] = (syncStats.statusBreakdown[status] || 0) + statusOrders.length;
+                console.log(`✅ ${status} page ${statusPage}: ${statusOrders.length} orders`);
+                
+                if (statusOrders.length < 100) {
+                  statusHasMore = false;
+                } else {
+                  statusPage++;
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                }
+              } else {
+                statusHasMore = false;
+              }
+            } catch (error) {
+              console.error(`❌ Error fetching ${status} orders page ${statusPage}:`, error);
+              statusHasMore = false;
+              syncStats.errors++;
+            }
+          }
+        }
+      }
+
+      syncStats.total = allWooOrders.length;
+      console.log(`📊 Total WooCommerce orders found: ${allWooOrders.length}`);
+      console.log(`📊 Status breakdown:`, syncStats.statusBreakdown);
+      toast.info(`📊 Found ${allWooOrders.length} orders. Processing...`);
+
+      if (allWooOrders.length === 0) {
+        toast.info('ℹ️ No orders found for current month', {
+          description: 'This could mean no orders exist or there was a connection issue'
+        });
+        return;
+      }
+
+      // Step 3: Process each order with improved error handling
+      const batchSize = 20; // Process in smaller batches for better stability
+      for (let batchStart = 0; batchStart < allWooOrders.length; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, allWooOrders.length);
+        const batch = allWooOrders.slice(batchStart, batchEnd);
+        
+        console.log(`🔄 Processing batch ${Math.floor(batchStart / batchSize) + 1}/${Math.ceil(allWooOrders.length / batchSize)} (orders ${batchStart + 1}-${batchEnd})`);
+        const batchProgress = Math.round((batchEnd / allWooOrders.length) * 100);
+        toast.info(`🔄 Processing orders... ${batchProgress}% complete`);
+
+        // Process orders in parallel within the batch
+        const batchPromises = batch.map(async (wooOrder, index) => {
+          try {
+            // Check if order exists
+            const { data: existingOrder, error: checkError } = await supabase
+              .from('order_submissions')
+              .select('id, status, total_amount, updated_at')
+              .eq('woocommerce_order_id', wooOrder.id)
+              .maybeSingle();
+
+            if (checkError) {
+              console.error(`❌ Error checking order ${wooOrder.id}:`, checkError);
+              return { type: 'error', orderId: wooOrder.id };
+            }
+
+            if (existingOrder) {
+              // Order exists - check if it needs updating
+              const wooStatus = mapWooCommerceStatus(wooOrder.status);
+              const wooTotal = parseFloat(wooOrder.total);
+              const needsUpdate = existingOrder.status !== wooStatus || 
+                                 Math.abs(existingOrder.total_amount - wooTotal) > 0.01;
+
+              if (needsUpdate) {
+                // Update existing order
+                const { error: updateError } = await supabase
+                  .from('order_submissions')
+                  .update({
+                    status: wooStatus,
+                    total_amount: wooTotal,
+                    woocommerce_status: wooOrder.status,
+                    last_sync_attempt: new Date().toISOString()
+                  })
+                  .eq('id', existingOrder.id);
+
+                if (updateError) {
+                  console.error(`❌ Error updating order ${wooOrder.id}:`, updateError);
+                  return { type: 'error', orderId: wooOrder.id };
+                } else {
+                  return { type: 'updated', orderId: wooOrder.id };
+                }
+              } else {
+                return { type: 'skipped', orderId: wooOrder.id };
+              }
+            } else {
+              // New order - import it
+              try {
+                await importWooCommerceOrder(wooOrder);
+                return { type: 'new', orderId: wooOrder.id };
+              } catch (importError) {
+                console.error(`❌ Error importing new order ${wooOrder.id}:`, importError);
+                return { type: 'error', orderId: wooOrder.id };
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error processing order ${wooOrder.id}:`, error);
+            return { type: 'error', orderId: wooOrder.id };
+          }
+        });
+
+        // Wait for batch to complete and update stats
+        const batchResults = await Promise.allSettled(batchPromises);
+        batchResults.forEach(result => {
+          if (result.status === 'fulfilled') {
+            const resultValue = result.value;
+            switch (resultValue.type) {
+              case 'new': syncStats.new++; break;
+              case 'updated': syncStats.updated++; break;
+              case 'skipped': syncStats.skipped++; break;
+              case 'error': syncStats.errors++; break;
+            }
+          } else {
+            syncStats.errors++;
+          }
+        });
+
+        // Small delay between batches to avoid overwhelming the database
+        if (batchEnd < allWooOrders.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Step 4: Show comprehensive final results
+      console.log('✅ Enhanced monthly sync completed:', syncStats);
+      const successRate = syncStats.total > 0 ? Math.round(((syncStats.new + syncStats.updated + syncStats.skipped) / syncStats.total) * 100) : 0;
+      
+      toast.success(`✅ Enhanced monthly sync completed!`, {
+        description: `Total: ${syncStats.total}, New: ${syncStats.new}, Updated: ${syncStats.updated}, Success Rate: ${successRate}%`
+      });
+
+      if (syncStats.errors > 0) {
+        toast.warning(`⚠️ ${syncStats.errors} orders had errors`, {
+          description: 'Check console for details. Orders may need manual review.'
+        });
+      }
+
+      // Refresh orders to show all changes
+      await loadOrders();
+
+    } catch (error) {
+      console.error('❌ Enhanced monthly sync failed:', error);
+      toast.error('❌ Enhanced monthly sync failed', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Helper function to map WooCommerce status to local status
+  const mapWooCommerceStatus = (wooStatus: string): string => {
+    const statusMap: { [key: string]: string } = {
+      'pending': 'pending',
+      'processing': 'processing', 
+      'on-hold': 'on-hold',
+      'shipped': 'shipped',
+      'completed': 'delivered',
+      'cancelled': 'cancelled',
+      'refunded': 'refunded',
+      'failed': 'cancelled'
+    };
+    return statusMap[wooStatus] || wooStatus;
   };
 
   const addOrderNote = async (noteText: string = newNote, noteType: 'general' | 'status_change' | 'cancel_reason' | 'warehouse' = 'warehouse') => {
@@ -1519,15 +2213,20 @@ const WarehouseDashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                 <p className="text-xs sm:text-sm text-gray-600">Order Management</p>
                 <div className="flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-yellow-500 animate-pulse' : autoSyncActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                  <span className={`text-xs font-medium ${isSyncing ? 'text-yellow-600' : autoSyncActive ? 'text-green-600' : 'text-gray-600'}`}>
-                    {isSyncing ? 'Syncing...' : autoSyncActive ? 'Auto-Sync' : 'Inactive'}
+                  <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`}></div>
+                  <span className={`text-xs font-medium ${isSyncing ? 'text-yellow-600' : 'text-blue-600'}`}>
+                    {isSyncing ? 'Checking...' : 'Auto-Check'}
                     {lastSyncNewOrders > 0 && !isSyncing && (
                       <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">
                         +{lastSyncNewOrders}
                       </span>
                     )}
                   </span>
+                  {lastAutoCheckTime && !isSyncing && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      Last: {lastAutoCheckTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1535,9 +2234,12 @@ const WarehouseDashboard: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
             {/* Sync Box */}
             <div
-              onClick={manualSyncFromWooCommerce}
+              onClick={() => {
+                console.log('🚀 Box logo clicked - checking for new orders...');
+                fetchMonthlyOrdersFromWooCommerce();
+              }}
               className="cursor-pointer transition-all duration-300 flex items-center justify-center hover:scale-105"
-              title={isSyncing ? "Syncing from WooCommerce..." : "Click to sync from WooCommerce"}
+              title={isSyncing ? "Checking for new orders..." : "Click to check for new orders"}
             >
               {syncAnimationData ? (
                 <Lottie
@@ -1550,6 +2252,20 @@ const WarehouseDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-gray-200 rounded"></div>
               )}
             </div>
+            
+            {/* Enhanced Refresh Button */}
+            <Button
+              onClick={manualRefreshAllData}
+              disabled={isLoading || isSyncing}
+              variant="outline"
+              size="sm"
+              className="gap-1 text-xs sm:text-sm px-2 sm:px-3"
+              title="Refresh all dashboard data"
+            >
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+            
             {/* Notifications */}
             <div className="flex items-center">
               <NotificationsMenu />
@@ -1823,22 +2539,12 @@ const WarehouseDashboard: React.FC = () => {
               {/* Check New Orders Button */}
               <div className="w-full sm:w-auto">
                 <Button
-                  onClick={async () => {
-                    console.log('🔄 Manually checking for new orders...');
-                    toast.info('Checking for new orders...', {
-                      description: 'Scanning WooCommerce for new orders'
-                    });
-                    
-                    try {
-                      await syncNewOrdersFromWooCommerce();
-                      console.log('✅ Manual new order check completed');
-                    } catch (error) {
-                      console.error('❌ Manual new order check failed:', error);
-                      toast.error('Failed to check for new orders');
-                    }
+                  onClick={() => {
+                    console.log('🚀 Manual check for new orders initiated...');
+                    fetchMonthlyOrdersFromWooCommerce();
                   }}
                   variant="outline"
-                  className="w-full sm:w-auto bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-blue-150 hover:border-blue-300 font-medium shadow-sm"
                   disabled={isLoading || isSyncing}
                 >
                   {isSyncing ? (
@@ -1849,6 +2555,8 @@ const WarehouseDashboard: React.FC = () => {
                   <span className="hidden sm:inline">Check New Orders</span>
                   <span className="sm:hidden">Check</span>
                 </Button>
+                <div className="text-xs text-blue-600 hidden sm:block">
+                </div>
               </div>
 
               {/* Export Button */}
@@ -1920,12 +2628,22 @@ const WarehouseDashboard: React.FC = () => {
                           key={order.id} 
                           className={`
                             ${order.copied_by_warehouse ? 'bg-purple-50' : ''}
-                            ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-r from-yellow-100 via-amber-50 to-yellow-100 border border-yellow-300 animate-pulse shadow-lg' : ''}
+                            ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-r from-yellow-50 via-amber-100 to-yellow-50 border-2 border-yellow-400 animate-pulse shadow-xl ring-4 ring-yellow-200/50 relative overflow-visible before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-yellow-200/30 before:to-transparent before:animate-pulse' : ''}
                             transition-all duration-500
                           `}
                         >
-                          <TableCell className="font-medium">
-                            {order.order_number || `#${order.id}`}
+                          <TableCell className="font-medium relative">
+                            <div className="flex items-center gap-2">
+                              {order.order_number || `#${order.id}`}
+                              {isOrderHighlighted(order.id!) && (
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-flex items-center px-2 py-1 text-xs font-bold text-yellow-800 bg-gradient-to-r from-yellow-300 to-amber-300 rounded-full shadow-sm animate-bounce">
+                                    ✨ NEW
+                                  </span>
+                                  <span className="text-yellow-600 animate-pulse">🆕</span>
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div>
@@ -2040,15 +2758,15 @@ const WarehouseDashboard: React.FC = () => {
                     <Card 
                       key={order.id} 
                       className={`
-                        p-4 hover:shadow-md transition-all duration-500
+                        p-4 hover:shadow-md transition-all duration-500 relative overflow-visible
                         ${order.copied_by_warehouse ? 'bg-purple-50' : ''}
-                        ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-r from-yellow-100 via-amber-50 to-yellow-100 border-2 border-yellow-400 animate-pulse shadow-xl ring-2 ring-yellow-200' : ''}
+                        ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-br from-yellow-50 via-amber-100 to-yellow-50 border-3 border-yellow-400 animate-pulse shadow-2xl ring-4 ring-yellow-200/60 relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-transparent before:via-yellow-200/40 before:to-transparent before:animate-pulse before:rounded-lg' : ''}
                       `}
                     >
                       <div className="space-y-3">
                         {/* Header */}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-lg text-blue-600">
                               {order.order_number || `#${order.id}`}
                             </span>
@@ -2056,6 +2774,14 @@ const WarehouseDashboard: React.FC = () => {
                               <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">WooCommerce</span>
                             ) : (
                               <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">Customer Service</span>
+                            )}
+                            {isOrderHighlighted(order.id!) && (
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-1 text-xs font-bold text-yellow-800 bg-gradient-to-r from-yellow-300 to-amber-300 rounded-full shadow-sm animate-bounce">
+                                  ✨ NEW
+                                </span>
+                                <span className="text-2xl animate-pulse">🆕</span>
+                              </div>
                             )}
                           </div>
                           <div className="flex items-center gap-2">

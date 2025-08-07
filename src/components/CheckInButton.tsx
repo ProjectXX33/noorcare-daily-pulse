@@ -24,7 +24,7 @@ const CheckInButton = () => {
 
   // Check shift assignment and timing validation
   const checkShiftValidation = async () => {
-    if (!user || user.position !== 'Customer Service' && user.position !== 'Designer') {
+    if (!user || user.role !== 'employee') {
       setShiftValidation({ canCheckIn: true, message: '' });
       return;
     }

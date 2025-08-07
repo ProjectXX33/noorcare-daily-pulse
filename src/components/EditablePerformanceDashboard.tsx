@@ -40,7 +40,11 @@ import {
   Flame,
   Zap as Lightning,
   Sparkle,
-  MoreVertical
+  MoreVertical,
+  LogIn,
+  Activity,
+  BarChart3,
+  TrendingDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { recalculateOvertimeHours } from '@/utils/recalculateOvertime';
@@ -111,28 +115,47 @@ interface PerformanceData {
   days: number;
   delay: number;
   overtime: number;
-  workTime: number; // NEW: Work time hours based on shift
+  workTime: number;
   tasks: {
     total: number;
     completed: number;
     successRate: number;
+    inProgress: number;
+    delayed: number;
   };
   logins: {
     count: number;
     avgPerDay: number;
+    uniqueDays: number;
+    totalSessions: number;
   };
   appUsage: {
     totalMinutes: number;
     avgPerDay: number;
+    totalHours: number;
+    activeSessionTime: number;
+  };
+  checkIns: {
+    totalCheckIns: number;
+    onTimeCheckIns: number;
+    lateCheckIns: number;
+    punctualityRate: number;
   };
   performance: number;
   status: 'Excellent' | 'Good' | 'Average' | 'Poor';
-  delayToFinish: number; // NEW: Smart delay/overtime calculation
-  delayToFinishType: 'delay' | 'overtime'; // NEW: Type for color coding
+  delayToFinish: number;
+  delayToFinishType: 'delay' | 'overtime';
   workReports: {
     submitted: number;
     total: number;
     completionRate: number;
+    onTimeReports: number;
+  };
+  realTimeMetrics: {
+    avgLoginTime: string;
+    avgWorkDuration: number;
+    productivityScore: number;
+    attendanceScore: number;
   };
   // Diamond rank fields
   diamondRank?: boolean;
@@ -392,6 +415,22 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     workReports: { submitted: 0, total: 0 }
   });
 
+  // Helper function to get current days in month for expected reports calculation
+  const getCurrentDaysInMonth = () => {
+    const currentDate = new Date(currentMonth + '-01');
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    
+    // If we're in the current month, return days passed so far, otherwise return total days in month
+    if (year === today.getFullYear() && month === today.getMonth()) {
+      return today.getDate();
+    } else {
+      return lastDayOfMonth;
+    }
+  };
+
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchEmployeeData();
@@ -515,6 +554,23 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
       // Process each employee's data
       const processedEmployees: PerformanceData[] = [];
 
+      // Fetch additional data for enhanced metrics
+      const { data: checkInsData, error: checkInsError } = await supabase
+        .from('check_ins')
+        .select('*')
+        .gte('timestamp', format(startDate, 'yyyy-MM-dd'))
+        .lte('timestamp', format(endDate, 'yyyy-MM-dd'));
+
+      if (checkInsError) console.error('Check-ins error:', checkInsError);
+
+      const { data: workSessionsData, error: sessionsError } = await supabase
+        .from('work_sessions')
+        .select('*')
+        .gte('work_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('work_date', format(endDate, 'yyyy-MM-dd'));
+
+      if (sessionsError) console.error('Work sessions error:', sessionsError);
+
       for (const employee of usersData) {
         console.log(`\n👤 Processing employee: ${employee.name} (${employee.position})`);
 
@@ -538,31 +594,79 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         });
         console.log(`📋 ${employee.name} work reports found:`, employeeReports.length);
 
-        // Calculate days worked
-        const daysWorked = employeeShifts.length;
+        // Get employee's check-ins for enhanced metrics
+        const employeeCheckIns = (checkInsData || []).filter(checkIn => checkIn.user_id === employee.id);
+        console.log(`🔐 ${employee.name} check-ins found:`, employeeCheckIns.length);
 
-        // Calculate total delay and overtime
-        const totalDelay = employeeShifts.reduce((sum, shift) => sum + (shift.delay_minutes || 0), 0) / 60; // Convert to hours
-        const totalOvertime = employeeShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0);
+        // Get employee's work sessions
+        const employeeSessions = (workSessionsData || []).filter(session => session.user_id === employee.id);
+        console.log(`⏱️ ${employee.name} work sessions found:`, employeeSessions.length);
 
-        // Calculate work time based on role
+        // Calculate days worked with fallback logic for missing monthly_shifts
+        let daysWorked = employeeShifts.length;
+        
+        // FALLBACK: If no monthly_shifts but has check-ins, use check-ins count for Customer Service/Designer
+        if (daysWorked === 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+          const employeeCheckInsInMonth = employeeCheckIns.filter(checkIn => {
+            const checkInDate = new Date(checkIn.timestamp);
+            return checkInDate >= startDate && checkInDate <= endDate && checkIn.checkout_time;
+          });
+          daysWorked = employeeCheckInsInMonth.length;
+          
+          if (daysWorked > 0) {
+            console.warn(`⚠️ ${employee.name}: Using check-ins fallback (${daysWorked} days) - monthly_shifts missing!`);
+          }
+        }
+
+        // Calculate total delay and overtime with fallbacks
+        let totalDelay = employeeShifts.reduce((sum, shift) => sum + (shift.delay_minutes || 0), 0) / 60; // Convert to hours
+        let totalOvertime = employeeShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0);
+        
+        // FALLBACK: If no monthly_shifts delay data but has check-ins, estimate delays for Customer Service/Designer
+        if (totalDelay === 0 && daysWorked > 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+          // This is a simplified estimation - actual delay calculation requires shift start times
+          // For now, we'll assume minimal delay if they're working but no monthly_shifts tracking
+          console.warn(`⚠️ ${employee.name}: No delay data available - monthly_shifts missing. Using default estimates.`);
+          // Don't add artificial delay - let it remain 0 until proper data is available
+        }
+
+        // Calculate work time based on role with enhanced fallbacks
         let totalWorkTime = 0;
         const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Copy Writing', 'Content Creator', 'Social Media Manager'].includes(employee.position);
         
         if (isRemoteRole) {
           // For remote roles, estimate work time based on tasks and reports
           totalWorkTime = (employeeTasks.length * 2) + (employeeReports.length * 1); // 2h per task, 1h per report
-            } else {
-          // For office roles, use shift-based calculation
+        } else {
+          // For office roles, use shift-based calculation from monthly_shifts
           employeeShifts.forEach(shift => {
             if (shift.shifts?.name?.toLowerCase().includes('day')) {
               totalWorkTime += 7; // Day shift: 7 hours
             } else if (shift.shifts?.name?.toLowerCase().includes('night')) {
               totalWorkTime += 8; // Night shift: 8 hours
-          } else {
+            } else {
               totalWorkTime += 8; // Default: 8 hours
             }
           });
+          
+          // FALLBACK: If no monthly_shifts but has check-ins with checkout, calculate from check-ins
+          if (totalWorkTime === 0 && daysWorked > 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+            const employeeCheckInsInMonth = employeeCheckIns.filter(checkIn => {
+              const checkInDate = new Date(checkIn.timestamp);
+              return checkInDate >= startDate && checkInDate <= endDate && checkIn.checkout_time;
+            });
+            
+            totalWorkTime = employeeCheckInsInMonth.reduce((total, checkIn) => {
+              const checkInTime = new Date(checkIn.timestamp);
+              const checkOutTime = new Date(checkIn.checkout_time);
+              const hoursWorked = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+              return total + Math.max(0, hoursWorked);
+            }, 0);
+            
+            if (totalWorkTime > 0) {
+              console.warn(`⚠️ ${employee.name}: Using check-ins for work time calculation (${totalWorkTime.toFixed(1)}h) - monthly_shifts missing!`);
+            }
+          }
         }
 
         // ENHANCED TASK ANALYSIS - Detect Completed, Delayed, and Unfinished tasks
@@ -614,19 +718,33 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         const loginCount = daysWorked; // Assuming one login per work day
         const avgLoginsPerDay = daysWorked > 0 ? loginCount / daysWorked : 0;
 
-        // Work reports tracking - adjusted for different roles
+        // Work reports tracking - adjusted for different roles with proper fallbacks
         let expectedReports = 0;
         if (isRemoteRole) {
           // Remote roles: expect reports based on actual task activity, not calendar days
-          // Use tasks + 5 as baseline (task-based workers should report when they have work)
+          // Use tasks + submitted reports as baseline (task-based workers should report when they have work)
           expectedReports = Math.max(employeeTasks.length, employeeReports.length);
-          if (expectedReports === 0) expectedReports = 5; // Minimum baseline
+          if (expectedReports === 0) expectedReports = 5; // Minimum baseline for remote workers
         } else {
-          // Office roles: one report per check-in day
-          expectedReports = daysWorked;
+          // Office roles: one report per check-in day, but with proper fallbacks
+          if (daysWorked > 0) {
+            expectedReports = daysWorked;
+          } else {
+            // If no working days recorded, but they have submitted reports, use that as baseline
+            if (employeeReports.length > 0) {
+              expectedReports = Math.max(employeeReports.length, getCurrentDaysInMonth());
+            } else {
+              // Use current days in month as baseline for office workers, but reasonable expectation
+              const daysInMonth = getCurrentDaysInMonth();
+              expectedReports = Math.max(5, Math.ceil(daysInMonth * 0.7)); // Minimum 5, or 70% of days passed
+            }
+          }
         }
         
         const reportCompletionRate = expectedReports > 0 ? (employeeReports.length / expectedReports) * 100 : 0;
+
+        // Debug log for expected reports calculation
+        console.log(`📋 ${employee.name} Reports: ${employeeReports.length}/${expectedReports} (${reportCompletionRate.toFixed(1)}%) - Days: ${daysWorked}, Remote: ${isRemoteRole}`);
 
         // Calculate star ratings for this employee
         const employeeRatings = monthlyEmployeeRatings.filter(rating => rating.employee_id === employee.id);
@@ -716,15 +834,39 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           tasks: {
             total: employeeTasks.length,
             completed: completedTasks,
-            successRate: taskSuccessRate
+            successRate: taskSuccessRate,
+            inProgress: employeeTasks.filter(task => 
+              task.status === 'In Progress' || 
+              (task.progress_percentage > 0 && task.progress_percentage < 100)
+            ).length,
+            delayed: delayedTasks
           },
           logins: {
             count: loginCount,
-            avgPerDay: avgLoginsPerDay
+            avgPerDay: avgLoginsPerDay,
+            uniqueDays: employeeCheckIns ? new Set(employeeCheckIns.map(checkIn => 
+              new Date(checkIn.timestamp).toDateString()
+            )).size : 0,
+            totalSessions: employeeCheckIns ? employeeCheckIns.length : 0
           },
           appUsage: {
             totalMinutes: daysWorked * 480, // Estimate: 8 hours per day
-            avgPerDay: 480
+            avgPerDay: 480,
+            totalHours: (daysWorked * 480) / 60,
+            activeSessionTime: employeeSessions ? employeeSessions.reduce((sum, session) => {
+              if (session.check_out_time) {
+                const duration = new Date(session.check_out_time).getTime() - new Date(session.check_in_time).getTime();
+                return sum + (duration / (1000 * 60)); // Convert to minutes
+              }
+              return sum;
+            }, 0) : 0
+          },
+          checkIns: {
+            totalCheckIns: employeeCheckIns ? employeeCheckIns.length : 0,
+            onTimeCheckIns: employeeShifts.filter(shift => (shift.delay_minutes || 0) <= 5).length,
+            lateCheckIns: employeeShifts.filter(shift => (shift.delay_minutes || 0) > 5).length,
+            punctualityRate: employeeCheckIns && employeeCheckIns.length > 0 ? 
+              (employeeShifts.filter(shift => (shift.delay_minutes || 0) <= 5).length / employeeCheckIns.length) * 100 : 100
           },
           performance: finalPerformanceScore,
           status: finalStatus,
@@ -733,7 +875,26 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           workReports: {
             submitted: employeeReports.length,
             total: expectedReports,
-            completionRate: reportCompletionRate
+            completionRate: reportCompletionRate,
+            onTimeReports: employeeReports.filter(report => {
+              const reportDate = new Date(report.date || report.created_at);
+              // Consider reports submitted by 6 PM as on-time
+              return reportDate.getHours() <= 18;
+            }).length
+          },
+          realTimeMetrics: {
+            avgLoginTime: employeeCheckIns && employeeCheckIns.length > 0 ? 
+              new Date(employeeCheckIns[0].timestamp).toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }) : 'No Data',
+            avgWorkDuration: totalWorkTime,
+            productivityScore: Math.min(100, Math.max(0, 
+              (completedTasks / Math.max(1, employeeTasks.length)) * 100
+            )),
+            attendanceScore: Math.min(100, Math.max(0, 
+              (daysWorked / Math.max(1, expectedReports)) * 100
+            ))
           },
           // Diamond rank fields
           diamondRank: employee.diamond_rank || false,
@@ -1214,8 +1375,29 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
             return isUnfinished;
           }).length;
 
-          // Calculate expected reports
-          const expectedReports = totalWorkingDays; // One report per working day for office workers
+          // Calculate expected reports with proper fallbacks
+          let expectedReports = totalWorkingDays; // One report per working day for office workers
+          
+          // If no working days recorded, but reports exist, use better calculation
+          if (expectedReports === 0 && userReports && userReports.length > 0) {
+            // Use submitted reports or current days in month as baseline
+            const currentDate = new Date(monthYear + '-01');
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+            
+            const daysInMonth = (year === today.getFullYear() && month === today.getMonth()) 
+              ? today.getDate() 
+              : lastDayOfMonth;
+              
+            expectedReports = Math.max(userReports.length, Math.ceil(daysInMonth * 0.8)); // 80% of days as reasonable expectation
+          }
+          
+          // Minimum baseline for any employee
+          if (expectedReports === 0) {
+            expectedReports = 20; // Reasonable monthly baseline
+          }
 
           console.log(`📊 ${userRecord.name} Task Analysis (Recalculate):
             Total: ${userTasksList.length} | Completed: ${completedTasks} | Delayed: ${delayedTasks} | Unfinished: ${unfinishedTasks}`);
@@ -1543,6 +1725,229 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   const remainingSlots = Math.max(0, 4 - diamondEmployees.length);
   const nonDiamondTopPerformers = nonDiamondEmployees.slice(0, remainingSlots);
   const championsToShow = [...diamondEmployees, ...nonDiamondTopPerformers];
+
+
+
+  // NEW: Data Repair Function to fix missing monthly_shifts records
+  const repairMissingTimeTrackingData = async () => {
+    if (!user || user.role !== 'admin') {
+      toast.error('Only administrators can repair time tracking data');
+      return;
+    }
+
+    try {
+      console.log('🔧 Starting time tracking data repair...');
+      toast.info('🔧 Repairing missing time tracking data...');
+
+      const startDate = startOfMonth(new Date(currentMonth));
+      const endDate = endOfMonth(new Date(currentMonth));
+      
+      // Get all check-ins for this month for Customer Service and Designer employees
+      const { data: checkInsData, error: checkInsError } = await supabase
+        .from('check_ins')
+        .select(`
+          *,
+          users:user_id(name, position, department)
+        `)
+        .gte('timestamp', startDate.toISOString())
+        .lte('timestamp', endDate.toISOString())
+        .not('checkout_time', 'is', null); // Only complete check-ins
+
+      if (checkInsError) throw checkInsError;
+
+      console.log(`📦 Found ${checkInsData?.length || 0} complete check-ins to analyze`);
+
+      // Filter for Customer Service and Designer only
+      const trackableCheckIns = checkInsData?.filter(checkIn => 
+        ['Customer Service', 'Designer'].includes(checkIn.users?.position)
+      ) || [];
+
+      console.log(`🎯 Found ${trackableCheckIns.length} trackable check-ins (Customer Service + Designer)`);
+
+      let repairedCount = 0;
+      let skippedCount = 0;
+
+      for (const checkIn of trackableCheckIns) {
+        try {
+          const workDate = new Date(checkIn.timestamp);
+          workDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+          // Check if monthly_shifts record already exists
+          const { data: existingShift, error: shiftCheckError } = await supabase
+            .from('monthly_shifts')
+            .select('id')
+            .eq('user_id', checkIn.user_id)
+            .eq('work_date', format(workDate, 'yyyy-MM-dd'))
+            .single();
+
+          if (!shiftCheckError && existingShift) {
+            // Record already exists, skip
+            skippedCount++;
+            continue;
+          }
+
+          // Calculate work hours and metrics
+          const checkInTime = new Date(checkIn.timestamp);
+          const checkOutTime = new Date(checkIn.checkout_time);
+          const totalHours = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+
+          // Determine shift type based on check-in time
+          const checkInHour = checkInTime.getHours();
+          let shiftType = 'day'; // Default to day shift
+          let expectedHours = 7; // Day shift default
+
+          if (checkInHour >= 9 && checkInHour < 16) {
+            shiftType = 'day';
+            expectedHours = 7;
+          } else if (checkInHour >= 16 || checkInHour < 9) {
+            shiftType = 'night';
+            expectedHours = 8;
+          }
+
+          // Get or create default shift
+          const { data: shifts, error: shiftsError } = await supabase
+            .from('shifts')
+            .select('*')
+            .eq('position', checkIn.users.position)
+            .eq('is_active', true);
+
+          if (shiftsError) {
+            console.warn(`⚠️ Could not fetch shifts for ${checkIn.users.name}:`, shiftsError);
+            skippedCount++;
+            continue;
+          }
+
+          // Find appropriate shift or use first available
+          let selectedShift = shifts?.find(s => s.name.toLowerCase().includes(shiftType)) || shifts?.[0];
+          
+          if (!selectedShift) {
+            console.warn(`⚠️ No shifts found for ${checkIn.users.name} (${checkIn.users.position})`);
+            skippedCount++;
+            continue;
+          }
+
+          // Calculate delay based on shift start time
+          const [startHour, startMin] = selectedShift.start_time.split(':').map(Number);
+          const scheduledStart = new Date(checkInTime);
+          scheduledStart.setHours(startHour, startMin, 0, 0);
+          
+          const delayMs = checkInTime.getTime() - scheduledStart.getTime();
+          const delayMinutes = Math.max(0, delayMs / (1000 * 60));
+
+          // Calculate regular and overtime hours
+          const regularHours = Math.min(totalHours, expectedHours);
+          const overtimeHours = Math.max(0, totalHours - expectedHours);
+
+          // Create monthly_shifts record
+          const { error: insertError } = await supabase
+            .from('monthly_shifts')
+            .insert({
+              user_id: checkIn.user_id,
+              shift_id: selectedShift.id,
+              work_date: format(workDate, 'yyyy-MM-dd'),
+              check_in_time: checkInTime.toISOString(),
+              check_out_time: checkOutTime.toISOString(),
+              regular_hours: Math.round(regularHours * 100) / 100, // Round to 2 decimals
+              overtime_hours: Math.round(overtimeHours * 100) / 100,
+              delay_minutes: Math.round(delayMinutes * 100) / 100,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (insertError) {
+            console.error(`❌ Failed to create monthly_shifts for ${checkIn.users.name}:`, insertError);
+            skippedCount++;
+          } else {
+            console.log(`✅ Repaired monthly_shifts for ${checkIn.users.name} on ${format(workDate, 'yyyy-MM-dd')}`);
+            repairedCount++;
+          }
+
+        } catch (error) {
+          console.error(`❌ Error processing check-in for user ${checkIn.user_id}:`, error);
+          skippedCount++;
+        }
+      }
+
+      if (repairedCount > 0) {
+        toast.success(`✅ Successfully repaired ${repairedCount} missing time tracking records!`, {
+          description: `${skippedCount} records were skipped (already exist or errors)`
+        });
+        
+        // Refresh the employee data to show updated results
+        await fetchEmployeeData();
+      } else {
+        toast.info('ℹ️ No missing time tracking records found to repair', {
+          description: `${skippedCount} records were already present or had errors`
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Time tracking data repair failed:', error);
+      toast.error('❌ Failed to repair time tracking data', {
+        description: 'Please check console for details'
+      });
+    }
+  };
+
+  // NEW: Debug function to check what data exists
+  const debugEmployeeData = async (employeeName: string) => {
+    try {
+      const startDate = startOfMonth(new Date(currentMonth));
+      const endDate = endOfMonth(new Date(currentMonth));
+      
+      console.log(`🔍 DEBUGGING ${employeeName} for ${currentMonth}:`);
+      
+      // Get employee
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('name', `%${employeeName}%`)
+        .single();
+      
+      if (userError) {
+        console.error('❌ User not found:', userError);
+        return;
+      }
+      
+      console.log('👤 Employee found:', userData);
+      
+      // Check monthly_shifts
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('monthly_shifts')
+        .select('*')
+        .eq('user_id', userData.id)
+        .gte('work_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('work_date', format(endDate, 'yyyy-MM-dd'));
+      
+      console.log('📊 Monthly shifts found:', shiftsData?.length || 0);
+      if (shiftsData?.length > 0) {
+        console.log('📊 Shifts data:', shiftsData);
+      }
+      
+      // Check check-ins
+      const { data: checkInsData, error: checkInsError } = await supabase
+        .from('check_ins')
+        .select('*')
+        .eq('user_id', userData.id)
+        .gte('timestamp', startDate.toISOString())
+        .lte('timestamp', endDate.toISOString());
+      
+      console.log('🔐 Check-ins found:', checkInsData?.length || 0);
+      if (checkInsData?.length > 0) {
+        console.log('🔐 Check-ins data:', checkInsData);
+        
+        // Check how many have checkout_time
+        const withCheckout = checkInsData.filter(c => c.checkout_time);
+        console.log(`🚪 Check-ins with checkout: ${withCheckout.length}/${checkInsData.length}`);
+      }
+      
+      toast.info(`Debug completed for ${employeeName} - check console for details`);
+      
+    } catch (error) {
+      console.error('❌ Debug failed:', error);
+      toast.error('Debug failed - check console');
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -1982,6 +2387,38 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                     • Based on: Work completion (40%) + Punctuality (30%) + Break efficiency (20%) + Rating bonus (10%)</p>
                   </TooltipContent>
                 </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      onClick={repairMissingTimeTrackingData}
+                      disabled={isRecalculating || isLoading}
+                      variant="outline"
+                      size="sm"
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30 text-xs sm:text-sm"
+                    >
+                      <Wrench className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                      Repair Data
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>🔧 Repair missing time tracking data:<br/>
+                    • Scan check-ins without monthly_shifts records<br/>
+                    • Create missing time tracking entries<br/>
+                    • Fix 0 days/hours for employees who are working<br/>
+                    • Only affects Customer Service & Designer employees</p>
+                  </TooltipContent>
+                </Tooltip>
+                
+                {/* Temporary Debug Button */}
+                <Button 
+                  onClick={() => debugEmployeeData('Yasmine')}
+                  variant="outline"
+                  size="sm"
+                  className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30 text-xs sm:text-sm"
+                >
+                  Debug Yasmine
+                </Button>
             </div>
             </CardTitle>
         </CardHeader>
@@ -2666,6 +3103,188 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
                             </div>
                         </CardContent>
                       </Card>
+
+      {/* Enhanced Real-Time Analytics Section */}
+      <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <Activity className="h-6 w-6 text-emerald-600" />
+            <span className="text-emerald-800 dark:text-emerald-200">📊 Real-Time Performance Analytics</span>
+            <Badge className="bg-emerald-600 dark:bg-emerald-700 text-white">
+              Live Data
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                <LogIn className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-blue-600">
+                  {employees.reduce((sum, emp) => sum + emp.logins.uniqueDays, 0)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Total Login Days</div>
+              </div>
+              <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-green-600">
+                  {employees.reduce((sum, emp) => sum + emp.tasks.completed, 0)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Tasks Completed</div>
+              </div>
+              <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-purple-600">
+                  {employees.reduce((sum, emp) => sum + emp.workReports.submitted, 0)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Reports Submitted</div>
+              </div>
+              <div className="text-center p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                <Clock className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                <div className="text-2xl font-bold text-orange-600">
+                  {Math.round(employees.reduce((sum, emp) => sum + emp.appUsage.totalHours, 0))}h
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Total App Usage</div>
+              </div>
+            </div>
+
+            {/* Detailed Metrics Table */}
+            <div className="overflow-x-auto">
+              <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Detailed Real-Time Metrics
+              </h3>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-emerald-100 dark:bg-emerald-900/30">
+                    <TableHead className="font-semibold">Employee</TableHead>
+                    <TableHead className="font-semibold">Login Days</TableHead>
+                    <TableHead className="font-semibold">Check-ins</TableHead>
+                    <TableHead className="font-semibold">Tasks Progress</TableHead>
+                    <TableHead className="font-semibold">Reports</TableHead>
+                    <TableHead className="font-semibold">Avg Login Time</TableHead>
+                    <TableHead className="font-semibold">Productivity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {employees.slice(0, 10).map((employee) => (
+                    <TableRow key={employee.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {employee.diamondRank && <Gem className="h-4 w-4 text-yellow-500" />}
+                          {employee.name}
+                          <span className="text-xs text-gray-500">({employee.position})</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <LogIn className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">{employee.logins.uniqueDays}</span>
+                          <span className="text-sm text-gray-500">days</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span>{employee.checkIns.totalCheckIns}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {employee.checkIns.punctualityRate.toFixed(1)}% on-time
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Target className="h-4 w-4 text-emerald-500" />
+                            <span>{employee.tasks.completed}/{employee.tasks.total}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {employee.tasks.inProgress} in progress, {employee.tasks.delayed} delayed
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-purple-500" />
+                            <span>{employee.workReports.submitted}/{employee.workReports.total}</span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {employee.workReports.onTimeReports} on-time
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-orange-500" />
+                          <span className="text-sm font-medium">{employee.realTimeMetrics.avgLoginTime}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${
+                          employee.realTimeMetrics.productivityScore >= 90 ? 'bg-green-100 text-green-800' :
+                          employee.realTimeMetrics.productivityScore >= 75 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {employee.realTimeMetrics.productivityScore.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="h-8 w-8 text-blue-500" />
+                    <div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {employees.length > 0 ? (employees.reduce((sum, emp) => sum + emp.realTimeMetrics.attendanceScore, 0) / employees.length).toFixed(1) : 0}%
+                      </div>
+                      <div className="text-sm text-gray-600">Avg Attendance Score</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-l-4 border-l-green-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Target className="h-8 w-8 text-green-500" />
+                    <div>
+                      <div className="text-lg font-bold text-green-600">
+                        {employees.length > 0 ? (employees.reduce((sum, emp) => sum + emp.realTimeMetrics.productivityScore, 0) / employees.length).toFixed(1) : 0}%
+                      </div>
+                      <div className="text-sm text-gray-600">Avg Productivity Score</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-l-4 border-l-purple-500">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Activity className="h-8 w-8 text-purple-500" />
+                    <div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {employees.filter(emp => emp.performance >= 85).length}
+                      </div>
+                      <div className="text-sm text-gray-600">High Performers (85%+)</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
     {/* Edit Employee Sheet - Simplified Performance Only */}
     <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>

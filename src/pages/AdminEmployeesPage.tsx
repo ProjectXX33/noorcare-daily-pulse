@@ -27,10 +27,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { User, Department, Position } from '@/types';
-import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword, assignDiamondRank, removeDiamondRank } from '@/lib/employeesApi';
+import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword, assignDiamondRank, removeDiamondRank, deleteEmployee } from '@/lib/employeesApi';
 import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { UserPlus, Star, Plus, Circle, CheckCircle, Crown } from 'lucide-react';
+import { UserPlus, Star, Plus, Circle, CheckCircle, Crown, Trash2 } from 'lucide-react';
 import RateEmployeeModal from '@/components/RateEmployeeModal';
 import StarRating from '@/components/StarRating';
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +45,10 @@ const AdminEmployeesPage = () => {
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
   const [isRateEmployeeOpen, setIsRateEmployeeOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
   const [employeeToRate, setEmployeeToRate] = useState<User | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<User | null>(null);
   const [language, setLanguage] = useState('en');
   const [newEmployee, setNewEmployee] = useState({
     username: '',
@@ -103,7 +105,13 @@ const AdminEmployeesPage = () => {
       removeDiamondRank: "Remove Diamond Rank",
       diamondRank: "Diamond",
       diamondRankAssigned: "Diamond rank assigned successfully!",
-      diamondRankRemoved: "Diamond rank removed successfully!"
+      diamondRankRemoved: "Diamond rank removed successfully!",
+      deleteEmployee: "Remove Employee",
+      confirmDelete: "Confirm Employee Removal",
+      deleteConfirmMessage: "Are you sure you want to remove this employee? They will lose access to the system.",
+      deleteEmployeeWarning: "This will deactivate the employee while preserving all historical data.",
+      employeeDeleted: "Employee removed successfully!",
+      deleteEmployeeError: "Failed to remove employee"
     },
     ar: {
       employees: "الموظفين",
@@ -145,7 +153,13 @@ const AdminEmployeesPage = () => {
       removeDiamondRank: "إزالة رتبة الماس",
       diamondRank: "الماس",
       diamondRankAssigned: "تم تعيين رتبة الماس بنجاح!",
-      diamondRankRemoved: "تم إزالة رتبة الماس بنجاح!"
+      diamondRankRemoved: "تم إزالة رتبة الماس بنجاح!",
+      deleteEmployee: "إزالة الموظف",
+      confirmDelete: "تأكيد إزالة الموظف",
+      deleteConfirmMessage: "هل أنت متأكد من أنك تريد إزالة هذا الموظف؟ سيفقد الوصول إلى النظام.",
+      deleteEmployeeWarning: "سيؤدي هذا إلى إلغاء تفعيل الموظف مع الحفاظ على جميع البيانات التاريخية.",
+      employeeDeleted: "تم إزالة الموظف بنجاح!",
+      deleteEmployeeError: "فشل في إزالة الموظف"
     }
   };
 
@@ -375,6 +389,29 @@ const AdminEmployeesPage = () => {
     }
   };
 
+  const openDeleteConfirmDialog = (employee: User) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+
+    setIsLoading(true);
+    try {
+      await deleteEmployee(employeeToDelete.id);
+      await loadEmployees(); // Refresh employee list
+      setIsDeleteConfirmOpen(false);
+      setEmployeeToDelete(null);
+      toast.success(`${t.employeeDeleted} (${employeeToDelete.name})`);
+    } catch (error: any) {
+      console.error('Error deleting employee:', error);
+      toast.error(`${t.deleteEmployeeError}: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleEmployeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setSelectedEmployee(prev => prev ? {...prev, [name]: value} : null);
@@ -568,6 +605,15 @@ const AdminEmployeesPage = () => {
                                       {t.assignDiamondRank}
                                     </DropdownMenuItem>
                                   )}
+                                  
+                                                    {/* Remove Employee Action */}
+                  <DropdownMenuItem 
+                    onClick={() => openDeleteConfirmDialog(employee)}
+                    className="text-red-600 hover:text-red-700 font-medium"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t.deleteEmployee}
+                  </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
@@ -914,6 +960,64 @@ const AdminEmployeesPage = () => {
         employee={employeeToRate}
         onRatingSubmitted={handleRatingSubmitted}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px] max-w-[95vw]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              {t.confirmDelete}
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <p>{t.deleteConfirmMessage}</p>
+              {employeeToDelete && (
+                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+                  <p className="font-medium text-red-800 dark:text-red-200">
+                    {employeeToDelete.name} ({employeeToDelete.email})
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-300">
+                    {employeeToDelete.position} - {employeeToDelete.department}
+                  </p>
+                </div>
+              )}
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                {t.deleteEmployeeWarning}
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className={language === 'ar' ? 'flex-row-reverse' : 'flex-col space-y-2 sm:space-y-0 sm:flex-row'}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsDeleteConfirmOpen(false);
+                setEmployeeToDelete(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              {t.cancel}
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteEmployee} 
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  {t.deleteEmployee}
+                </div>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t.deleteEmployee}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

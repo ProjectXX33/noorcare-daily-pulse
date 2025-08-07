@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { MonthlyShift, Shift, User } from '@/types';
+import { MonthlyShift, Shift, User, Position } from '@/types';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek } from 'date-fns';
 import { CalendarIcon, Clock, TrendingUp, Users, Filter, ChevronDown, Eye, RefreshCw, Download } from 'lucide-react';
 import AdminRecalculateButton from '@/components/AdminRecalculateButton';
@@ -325,7 +325,7 @@ const ShiftsPage = () => {
         name: item.name,
         startTime: item.start_time,
         endTime: item.end_time,
-        position: item.position as 'Customer Service' | 'Designer',
+        position: item.position as Position,
         isActive: item.is_active,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at)
@@ -338,12 +338,11 @@ const ShiftsPage = () => {
     }
   }, []);
 
-  const loadCustomerServiceEmployees = useCallback(async () => {
+  const loadEmployees = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .in('position', ['Customer Service', 'Designer'])
         .eq('role', 'employee')
         .order('name');
 
@@ -362,7 +361,7 @@ const ShiftsPage = () => {
 
       setCustomerServiceEmployees(employees);
     } catch (error) {
-      console.error('Error loading Customer Service and Designer employees:', error);
+      console.error('Error loading employees:', error);
       toast.error('Failed to load employees');
     }
   }, []);
@@ -516,7 +515,7 @@ const ShiftsPage = () => {
         // Load basic data first
         await Promise.all([
           loadShifts(),
-          loadCustomerServiceEmployees()
+          loadEmployees()
         ]);
         
         // Load monthly shifts with loading state
@@ -541,7 +540,7 @@ const ShiftsPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [user, loadShifts, loadCustomerServiceEmployees]);
+  }, [user, loadShifts, loadEmployees]);
 
   // Separate useEffect for filter changes (without loading state to prevent layout shift)
   useEffect(() => {
@@ -660,7 +659,7 @@ const ShiftsPage = () => {
     try {
       await Promise.all([
         loadShifts(),
-        loadCustomerServiceEmployees(),
+        loadEmployees(),
         loadMonthlyShifts(true) // Show loading state for manual refresh
       ]);
       toast.success('Data refreshed successfully');
@@ -670,7 +669,7 @@ const ShiftsPage = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadShifts, loadCustomerServiceEmployees, loadMonthlyShifts]);
+  }, [loadShifts, loadEmployees, loadMonthlyShifts]);
 
   // Handle shift change for admin
   const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {

@@ -8,7 +8,7 @@ const AutoCheckoutService = () => {
   const { checkIns, checkOutUser, hasCheckedInToday, hasCheckedOutToday } = useCheckIn();
 
   useEffect(() => {
-    if (!user || user.role !== 'employee' || (user.position !== 'Customer Service' && user.position !== 'Designer')) {
+    if (!user || user.role !== 'employee') {
       return;
     }
 
