@@ -1,7 +1,7 @@
 {
-  "name": "NoorHub",
-  "short_name": "NoorHub",
-  "description": "Team management and communication platform for NoorHub",
+  "name": "VNQ System",
+  "short_name": "VNQ System",
+  "description": "VNQ Management System - Comprehensive Business Management Solution",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -112,13 +112,13 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
-  "version": "5.0.1",
+  "version": "6.0.0",
   "edge_side_panel": {
     "preferred_width": 480
   },
   "protocol_handlers": [
     {
-      "protocol": "web+noorhub",
+      "protocol": "web+vnq",
       "url": "/?action=%s"
     }
   ]

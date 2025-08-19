@@ -779,22 +779,29 @@ const HeaderContent = ({ children, themeColors, language }: {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-56 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-              <DropdownMenuLabel>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{user?.name}</p>
+            <DropdownMenuContent align={language === 'ar' ? 'start' : 'end'} className={`w-96 max-w-[calc(100vw-2rem)] ${language === 'ar' ? 'text-right' : 'text-left'} scrollbar-thin scrollbar-thumb-blue-500 scrollbar-track-gray-100 !overflow-visible !p-0 user-profile-dropdown`}>
+              <DropdownMenuLabel className="px-4 py-3 w-full min-w-full">
+                <div className="flex flex-col gap-2 w-full min-w-full">
+                  <div className="flex items-center justify-between w-full min-w-full">
+                    <p className="font-medium text-base flex-1 min-w-0">
+                      {user?.name}
+                      {user?.position && (
+                        <span className="text-muted-foreground font-normal"> ({user.position})</span>
+                      )}
+                    </p>
                     <UserRankingProfile />
                   </div>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm text-muted-foreground w-full min-w-full">
+                    {user?.team || 'No Team Assigned'}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/settings')} className={language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}>
+              <DropdownMenuItem onClick={() => navigate('/settings')} className={`w-full ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
                 <Settings className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
                 {t('settings')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout} className={`text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
+              <DropdownMenuItem onClick={handleLogout} className={`w-full text-red-500 ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
                 <LogOut className={`h-4 w-4 ${language === 'ar' ? 'ml-2' : 'mr-2'}`} />
                 {t('signOut')}
               </DropdownMenuItem>
@@ -928,6 +935,26 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     };
   }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
+  // Helper function to get the correct dashboard path based on user role
+  const getDashboardPath = (user: any) => {
+    if (!user) return '/employee-dashboard';
+    
+    switch (user.role) {
+      case 'admin':
+        return '/dashboard';
+      case 'warehouse':
+        return '/warehouse-dashboard';
+      case 'content_creative_manager':
+        return '/content-creative-dashboard';
+      case 'customer_retention_manager':
+        return '/employee-dashboard'; // Will create specific dashboard later
+      case 'digital_solution_manager':
+        return '/employee-dashboard'; // Will create specific dashboard later
+      default:
+        return '/employee-dashboard';
+    }
+  };
+
   // Define interface for nav items
   interface NavItem {
     name: string;
@@ -938,11 +965,13 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     employeeOnly?: boolean;
     customerServiceAndDesignerOnly?: boolean;
     customerServiceOnly?: boolean;
+    managerRole?: string;
     shiftsAccess?: boolean;
     mediaBuyerOnly?: boolean;
     designerOnly?: boolean;
     excludeMediaBuyer?: boolean;
     excludeDesigner?: boolean;
+    excludeManagers?: boolean;
     excludeCopyWriting?: boolean;
     copyWritingOnly?: boolean;
     hasCounter?: boolean;
@@ -955,9 +984,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Overview',
       color: 'blue',
       items: [
-        { name: t('dashboard') as string, path: user?.role === 'admin' ? '/dashboard' : '/employee-dashboard', icon: Home, color: 'blue', excludeCopyWriting: true },
-        { name: 'Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
-        { name: 'Analytics', path: '/analytics', icon: BarChart3, adminOnly: true, color: 'purple' },
+        { name: 'Copy Writing Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
+
       ] as NavItem[]
     },
     {
@@ -965,8 +993,10 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'green',
       items: [
         { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true, color: 'green' },
+        { name: 'Content & Creative Dashboard', path: '/content-creative-dashboard', icon: Users, managerRole: 'content_creative_manager', color: 'purple' },
         { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true, color: 'yellow' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true, color: 'teal' },
+        { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, managerRole: 'content_creative_manager', color: 'teal' },
         { name: 'Performance', path: '/performance-dashboard', icon: TrendingUp, adminOnly: true, color: 'purple' },
       ] as NavItem[]
     },
@@ -974,10 +1004,10 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Task Management',
       color: 'orange',
       items: [
-        { name: t('tasks') as string, path: user?.role === 'admin' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
+        { name: t('tasks') as string, path: user?.role === 'admin' || user?.role === 'content_creative_manager' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
         { name: 'Media Buyer Dashboard', path: '/media-buyer-tasks', icon: TrendingUp, mediaBuyerOnly: true, color: 'amber' },
         { name: 'Design Studio', path: '/designer-dashboard', icon:  Brush, designerOnly: true, color: 'purple' },
-        { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, color: 'yellow' },
+        { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, managerRole: 'content_creative_manager', color: 'yellow' },
       ] as NavItem[]
     },
     {
@@ -989,6 +1019,9 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, adminOnly: true, color: 'purple' },
         { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, adminOnly: true, color: 'purple' },
         { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true, color: 'blue' },
+        { name: 'Team Reports', path: '/team-reports', icon: BarChart3, managerRole: 'content_creative_manager', color: 'purple' },
+        { name: 'Team Shifts', path: '/team-shifts', icon: Calendar, managerRole: 'content_creative_manager', color: 'teal' },
+        { name: 'Team Ratings', path: '/admin-ratings', icon: Star, managerRole: 'content_creative_manager', color: 'yellow' },
       ] as NavItem[]
     },
     {
@@ -1003,7 +1036,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Time & Attendance',
       color: 'cyan',
       items: [
-        { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true, color: 'cyan' },
+        { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true, excludeManagers: true, color: 'cyan' },
         { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true, color: 'slate' },
       ] as NavItem[]
     },
@@ -1191,6 +1224,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     items: group.items.filter(item => {
       if (item.adminOnly && user?.role !== 'admin') return false;
       if (item.employeeOnly && user?.role === 'admin') return false;
+      if (item.managerRole && user?.role !== item.managerRole) return false;
       if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
       if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee')) return false;
@@ -1201,6 +1235,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
       if (item.excludeDesigner && user?.position === 'Designer') return false;
       if (item.excludeCopyWriting && user?.position === 'Copy Writing') return false;
+      if (item.excludeManagers && ['content_creative_manager', 'customer_retention_manager', 'digital_solution_manager'].includes(user?.role)) return false;
       return true;
     })
       })).filter(group => group.items.length > 0); // Only show groups that have items
@@ -1248,10 +1283,10 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                               tooltip={item.name}
                               isActive={isActive}
                               onMouseDown={(e) => e.preventDefault()}
-                              className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-300 ease-in-out border border-transparent ${
+                              className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-300 ease-in-out ${
                                 isActive 
-                                  ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm` 
-                                  : `${colorClasses.text}`
+                                  ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm border-2 border-gradient-to-r from-blue-500 via-purple-500 to-pink-500` 
+                                  : `${colorClasses.text} border border-transparent`
                               } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
                             >
                               <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${

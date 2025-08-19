@@ -90,9 +90,9 @@ const updateManifest = (version) => {
     
     const manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     manifestData.version = version;
-    manifestData.name = "NoorHub";
-    manifestData.short_name = "NoorHub";
-    manifestData.description = "Team management and communication platform for NoorHub";
+      manifestData.name = "VNQ system";
+  manifestData.short_name = "VNQ system";
+  manifestData.description = "Team management and communication platform for VNQ system";
     manifestData.start_url = "/";
     manifestData.id = "/";
     

@@ -58,7 +58,7 @@ const NotificationPermission: React.FC<NotificationPermissionProps> = ({
         // Show a test notification
         await notificationManager.showGeneralNotification(
           'Notifications Enabled!',
-          'You will now receive notifications from NoorHub'
+          'You will now receive notifications from VNQ system'
         );
         
         // Hide after success animation
@@ -79,7 +79,7 @@ const NotificationPermission: React.FC<NotificationPermissionProps> = ({
         return {
           icon: <Bell className="h-6 w-6 text-emerald-500" />,
           title: 'Notifications Active',
-          description: 'You\'re all set to receive real-time updates from NoorHub',
+          description: 'You\'re all set to receive real-time updates from VNQ system',
           buttonText: 'Send Test Notification',
           buttonVariant: 'outline' as const,
           gradient: 'from-emerald-50 to-green-50',
@@ -87,7 +87,7 @@ const NotificationPermission: React.FC<NotificationPermissionProps> = ({
           buttonAction: async () => {
             await notificationManager.showGeneralNotification(
               'Test Notification',
-              'This is a test notification from NoorHub!'
+              'This is a test notification from VNQ system!'
             );
           }
         };
@@ -200,7 +200,7 @@ const NotificationPermission: React.FC<NotificationPermissionProps> = ({
         
         <CardDescription className="text-gray-700 leading-relaxed">
           {showSuccess 
-            ? 'Perfect! You\'ll now receive real-time notifications and stay updated with everything happening in NoorHub.'
+            ? 'Perfect! You\'ll now receive real-time notifications and stay updated with everything happening in VNQ system.'
             : statusInfo.description
           }
         </CardDescription>

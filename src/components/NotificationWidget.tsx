@@ -43,7 +43,7 @@ const NotificationWidget: React.FC<NotificationWidgetProps> = ({
       if (permission === 'granted') {
         await notificationManager.showGeneralNotification(
           'Notifications Enabled!',
-          'You will now receive notifications from NoorHub'
+          'You will now receive notifications from VNQ system'
         );
         
         // Auto-hide after success

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { User, Department, Position } from '@/types';
+import { User, Department, Position, Team } from '@/types';
 
 export async function fetchEmployees(): Promise<User[]> {
   try {
@@ -21,6 +21,7 @@ export async function fetchEmployees(): Promise<User[]> {
       role: user.role,
       department: user.department,
       position: user.position,
+      team: user.team,
       lastCheckin: user.last_checkin ? new Date(user.last_checkin) : undefined,
       diamondRank: user.diamond_rank || false,
       diamondRankAssignedBy: user.diamond_rank_assigned_by,
@@ -39,7 +40,8 @@ export async function createEmployee(employee: {
   password: string;
   department: Department;
   position: Position;
-  role: 'admin' | 'employee' | 'warehouse';
+  team?: Team;
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
 }): Promise<User> {
   try {
     console.log('Creating employee with data:', { ...employee, password: '[REDACTED]' });
@@ -48,13 +50,14 @@ export async function createEmployee(employee: {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: employee.email,
       password: employee.password,
-      options: {
+              options: {
         data: {
           username: employee.username,
           name: employee.name,
           role: employee.role,
           department: employee.department,
-          position: employee.position
+          position: employee.position,
+          team: employee.team
         }
       }
     });
@@ -81,6 +84,7 @@ export async function createEmployee(employee: {
         role: employee.role,
         department: employee.department,
         position: employee.position,
+        team: employee.team,
       }]);
 
     if (error) {
@@ -110,6 +114,7 @@ export async function createEmployee(employee: {
       role: userData.role,
       department: userData.department,
       position: userData.position,
+      team: userData.team,
       lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
     };
   } catch (error) {
@@ -120,6 +125,8 @@ export async function createEmployee(employee: {
 
 export async function updateEmployee(id: string, updates: Partial<User>): Promise<User> {
   try {
+    console.log('Updating employee with data:', { id, updates });
+    
     const { data, error } = await supabase
       .from('users')
       .update({
@@ -129,6 +136,7 @@ export async function updateEmployee(id: string, updates: Partial<User>): Promis
         role: updates.role,
         department: updates.department,
         position: updates.position,
+        team: updates.team, // This will be null when "No team assigned" is selected
       })
       .eq('id', id)
       .select()
@@ -144,6 +152,7 @@ export async function updateEmployee(id: string, updates: Partial<User>): Promis
       role: data.role,
       department: data.department,
       position: data.position,
+      team: data.team,
       lastCheckin: data.last_checkin ? new Date(data.last_checkin) : undefined
     };
   } catch (error) {

@@ -34,6 +34,7 @@ export const fetchUserProfile = async (userId: string): Promise<User | null> => 
       role: userData.role,
       department: userData.department,
       position: userData.position,
+      team: userData.team,
       lastCheckin: userData.last_checkin ? new Date(userData.last_checkin) : undefined
     };
     

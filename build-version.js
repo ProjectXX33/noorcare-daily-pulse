@@ -88,11 +88,11 @@ const updateManifest = (version) => {
     manifestContent.version = version;
     
     // Keep name clean without version
-    manifestContent.name = "NoorHub";
-    manifestContent.short_name = "NoorHub";
+    manifestContent.name = "VNQ System";
+    manifestContent.short_name = "VNQ System";
     
     // Keep description clean without version
-    manifestContent.description = "Team management and communication platform for NoorHub";
+    manifestContent.description = "VNQ Management System - Comprehensive Business Management Solution";
     
     // Use clean start URL
     manifestContent.start_url = "/";

@@ -42,7 +42,7 @@ const NotificationBanner: React.FC = () => {
         // Show test notification
         await notificationManager.showGeneralNotification(
           'Notifications Enabled!',
-          'You will now receive push notifications from NoorHub'
+          'You will now receive push notifications from VNQ system'
         );
         
         // Hide banner after success animation
@@ -154,7 +154,7 @@ const NotificationBanner: React.FC = () => {
                 
                 <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-lg leading-tight">
-                    {isSuccess ? 'Notifications Enabled!' : 'Stay Connected with NoorHub'}
+                    {isSuccess ? 'Notifications Enabled!' : 'Stay Connected with VNQ system'}
                   </h3>
                   <p className="text-sm text-emerald-50 leading-snug mt-1">
                     {isSuccess 

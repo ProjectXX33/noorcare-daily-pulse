@@ -69,7 +69,7 @@ const LoginForm = () => {
           <div className="flex justify-center items-center mb-2">
             <img
               src="/NQ-ICON.png"
-              alt="NoorHub Logo"
+              alt="VNQ System Logo"
               className="h-12 w-12"
             />
           </div>

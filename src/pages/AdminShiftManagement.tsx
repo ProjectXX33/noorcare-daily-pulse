@@ -134,14 +134,14 @@ const AdminShiftManagement = () => {
 
   useEffect(() => {
     console.log('AdminShiftManagement: Component mounted', { user });
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'content_creative_manager') {
       loadData();
     }
   }, [user, selectedWeekStart]);
 
   // Add real-time subscription for shift assignments
   useEffect(() => {
-    if (!user?.id || user.role !== 'admin') return;
+    if (!user?.id || (user.role !== 'admin' && user.role !== 'content_creative_manager')) return;
 
     // Create unique channel name to avoid conflicts
     const channelName = `shift-assignments-${user.id}`;
@@ -201,8 +201,18 @@ const AdminShiftManagement = () => {
         .order('name');
 
       if (error) throw error;
-      console.log('Employees loaded:', data?.length || 0);
-      setEmployees(data || []);
+      
+      // Filter employees for Content & Creative Manager
+      let filteredEmployees = data || [];
+      if (user?.role === 'content_creative_manager') {
+        filteredEmployees = (data || []).filter(emp => 
+          emp.team === 'Content & Creative Department' && 
+          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+        );
+      }
+      
+      console.log('Employees loaded:', filteredEmployees?.length || 0);
+      setEmployees(filteredEmployees);
     } catch (error) {
       console.error('Error loading employees:', error);
       throw error;
@@ -270,8 +280,18 @@ const AdminShiftManagement = () => {
         shiftName: item.shifts?.name
       }));
 
-      console.log('Assignments loaded:', formattedAssignments.length);
-      setAssignments(formattedAssignments);
+      // Filter assignments for Content & Creative Manager
+      let filteredAssignments = formattedAssignments;
+      if (user?.role === 'content_creative_manager') {
+        const teamEmployeeIds = employees.map(emp => emp.id);
+        filteredAssignments = formattedAssignments.filter(assignment => 
+          teamEmployeeIds.includes(assignment.employeeId)
+        );
+        console.log('🎯 Content & Creative Shift Assignments:', filteredAssignments.length);
+      }
+      
+      console.log('Assignments loaded:', filteredAssignments.length);
+      setAssignments(filteredAssignments);
     } catch (error) {
       console.error('Error loading assignments:', error);
       throw error;
@@ -535,7 +555,7 @@ const AdminShiftManagement = () => {
     ? employees 
     : employees.filter(emp => emp.id === selectedEmployee);
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
     return (
       <div className="flex items-center justify-center min-h-[50vh] p-4">
         <Card className="max-w-md w-full">

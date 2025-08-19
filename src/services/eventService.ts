@@ -96,9 +96,11 @@ export const eventService = {
 
     // If Q&A is requested, fetch Q&A for all events
     if (includeQA) {
+      console.log('🔍 Fetching Q&A for', events.length, 'events...');
       for (const event of events) {
         try {
           event.qa = await this.getEventQA(event.id);
+          console.log(`📝 Event "${event.title}" (${event.id}): ${event.qa?.length || 0} Q&A items`);
         } catch (error) {
           console.error(`Error fetching Q&A for event ${event.id}:`, error);
           event.qa = [];
@@ -227,6 +229,8 @@ export const eventService = {
 
   // Get Q&A for a specific event
   async getEventQA(eventId: string): Promise<EventQA[]> {
+    console.log(`🔍 Fetching Q&A for event ${eventId}...`);
+    
     const { data, error } = await supabase
       .from('event_qa_with_users')
       .select(`
@@ -251,7 +255,12 @@ export const eventService = {
       .order('order_index')
       .order('created_at');
 
-    if (error) throw error;
+    if (error) {
+      console.error(`❌ Error fetching Q&A for event ${eventId}:`, error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} Q&A items for event ${eventId}`);
     return data as EventQA[];
   },
 

@@ -1,7 +1,7 @@
 {
-  "name": "noorhub-daily-pulse",
+  "name": "vnq-system",
   "private": true,
-  "version": "5.0.1",
+  "version": "6.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

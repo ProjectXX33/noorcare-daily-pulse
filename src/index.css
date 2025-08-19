@@ -15,16 +15,24 @@
   scrollbar-gutter: stable;
 }
 
-/* Global scrollbar styling */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--primary), 0.3) transparent;
-}
 
 /* Prevent horizontal scroll globally */
 html, body {
   max-width: 100%;
   overflow-x: hidden;
+}
+
+/* Gradient border for selected menu items */
+.border-gradient-to-r {
+  background: linear-gradient(white, white) padding-box,
+              linear-gradient(to right, #3b82f6, #8b5cf6, #ec4899) border-box;
+  border: 2px solid transparent;
+}
+
+.dark .border-gradient-to-r {
+  background: linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+              linear-gradient(to right, #3b82f6, #8b5cf6, #ec4899) border-box;
+  border: 2px solid transparent;
 }
 
 /* Webkit scrollbar styling */
@@ -46,20 +54,124 @@ html, body {
   background: linear-gradient(45deg, hsl(var(--primary)/0.4), hsl(var(--primary)/0.6));
 }
 
-/* Dark mode scrollbar */
-.dark *,
-[data-theme="dark"] * {
-  scrollbar-color: rgba(var(--primary), 0.5) transparent;
+/* Override for dropdown menus to force blue scrollbar - but not in dark mode */
+.user-profile-dropdown:not(.dark)::-webkit-scrollbar-thumb,
+[data-radix-popper-content-wrapper]:not(.dark)::-webkit-scrollbar-thumb,
+.DropdownMenuContent:not(.dark)::-webkit-scrollbar-thumb,
+[role="menu"]:not(.dark)::-webkit-scrollbar-thumb {
+  background: #1e40af !important;
+  border-radius: 100px;
 }
+
+.user-profile-dropdown:not(.dark)::-webkit-scrollbar-thumb:hover,
+[data-radix-popper-content-wrapper]:not(.dark)::-webkit-scrollbar-thumb:hover,
+.DropdownMenuContent:not(.dark)::-webkit-scrollbar-thumb:hover,
+[role="menu"]:not(.dark)::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a !important;
+}
+
+
 
 .dark ::-webkit-scrollbar-thumb,
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: linear-gradient(45deg, hsl(var(--primary)/0.4), hsl(var(--primary)/0.6));
+  background: #ffffff; /* White for dark mode */
 }
 
 .dark ::-webkit-scrollbar-thumb:hover,
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(45deg, hsl(var(--primary)/0.5), hsl(var(--primary)/0.7));
+  background: #e5e7eb; /* Light gray on hover for dark mode */
+}
+
+/* Firebox blue scrollbar for dropdown menus */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+
+
+.scrollbar-thumb-blue-500::-webkit-scrollbar-thumb {
+  background: #1e40af !important;
+  border-radius: 100px;
+}
+
+.scrollbar-thumb-blue-500::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a !important;
+}
+
+
+
+.scrollbar-track-gray-100::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 100px;
+}
+
+
+
+.user-profile-dropdown::-webkit-scrollbar-thumb {
+  background: #1e40af !important;
+  border-radius: 100px;
+}
+
+.user-profile-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a !important;
+}
+
+.user-profile-dropdown::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 100px;
+}
+
+
+
+[data-radix-popper-content-wrapper]::-webkit-scrollbar-thumb {
+  background: #1e40af !important;
+  border-radius: 100px;
+}
+
+[data-radix-popper-content-wrapper]::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a !important;
+}
+
+[data-radix-popper-content-wrapper]::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 100px;
+}
+
+
+.DropdownMenuContent::-webkit-scrollbar-thumb,
+[role="menu"]::-webkit-scrollbar-thumb {
+  background: #1e40af !important;
+  border-radius: 100px;
+}
+
+.DropdownMenuContent::-webkit-scrollbar-thumb:hover,
+[role="menu"]::-webkit-scrollbar-thumb:hover {
+  background: #1e3a8a !important;
+}
+
+.DropdownMenuContent::-webkit-scrollbar-track,
+[role="menu"]::-webkit-scrollbar-track {
+  background: #f3f4f6 !important;
+  border-radius: 100px;
+}
+
+/* Fix dropdown menu blank space issue */
+.user-profile-dropdown {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+}
+
+.user-profile-dropdown > * {
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+.user-profile-dropdown .dropdown-content {
+  width: 100% !important;
+  min-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 /* Enhanced Emoji Menu Styles with Higher Z-Index */
@@ -1413,11 +1525,7 @@ body.modal-open {
   background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--secondary)/0.6));
 }
 
-/* Firefox */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--primary)/0.8) transparent;
-}
+
 
 /* Global Scrollbar Styles */
 ::-webkit-scrollbar {
@@ -1450,12 +1558,13 @@ body.modal-open {
 /* Firefox global scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--primary)/0.8) transparent;
+  scrollbar-color: #3d40f3 transparent;
 }
 
 /* Dark mode Firefox */
 .dark * {
-  scrollbar-color: hsl(var(--primary)/0.6) transparent;
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff transparent;
 }
 
 /* Custom sidebar scrollbar - keeping it for specific sidebar customization if needed */
@@ -1485,10 +1594,6 @@ body.modal-open {
   background: linear-gradient(45deg, hsl(var(--primary)/0.8), hsl(var(--secondary)/0.6));
 }
 
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--primary)/0.8) transparent;
-}
 
 /* Dark mode cards for mobile */
 .dark .mobile-card,

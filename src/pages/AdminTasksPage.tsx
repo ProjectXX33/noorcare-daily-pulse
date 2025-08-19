@@ -51,7 +51,7 @@ import RateTaskModal from '@/components/RateTaskModal';
 import StarRating from '@/components/StarRating';
 import { supabase } from '@/lib/supabase';
 import { uploadFile, getFileUrl, isImageFile } from '@/lib/fileUpload';
-import { Star, MoreVertical, Palette, Smartphone, Globe, Award, FileText, Zap, FolderOpen, Plus, Users, TrendingUp, Clock, Calendar, Filter, Edit, Eye, Trash2 } from 'lucide-react';
+import { Star, MoreVertical, Palette, Smartphone, Globe, Award, FileText, Zap, FolderOpen, Plus, Users, TrendingUp, Clock, Calendar, Filter, Edit, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 
 // Enhanced Task interface with creator information
@@ -125,6 +125,11 @@ const AdminTasksPage = () => {
 
   // Filter states
   const [filteredTasks, setFilteredTasks] = useState<EnhancedTask[]>([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [tasksPerPage] = useState(6);
+  
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [selectedTaskForDetails, setSelectedTaskForDetails] = useState<EnhancedTask | null>(null);
@@ -272,6 +277,21 @@ const AdminTasksPage = () => {
     setFilteredTasks(filtered);
   };
 
+  // Pagination logic
+  const indexOfLastTask = currentPage * tasksPerPage;
+  const indexOfFirstTask = indexOfLastTask - tasksPerPage;
+  const currentTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
+  const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredTasks]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -279,6 +299,28 @@ const AdminTasksPage = () => {
         fetchTasks(),
         fetchEmployees()
       ]);
+
+      // Filter employees for Content & Creative Manager
+      let filteredEmployees = employeesData;
+      let teamMemberIds: string[] = [];
+      
+      if (user?.role === 'content_creative_manager') {
+        // Find team members by team name OR by specific positions
+        const teamMembers = employeesData.filter(emp => 
+          emp.team === 'Content & Creative Department' || 
+          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+        );
+        
+        teamMemberIds = teamMembers.map(emp => emp.id);
+        
+        // RESTRICT: Content & Creative Manager can only assign to their team
+        filteredEmployees = teamMembers;
+        
+        console.log('👥 Content & Creative Team Filter:');
+        console.log('  📋 Total Employees:', employeesData.length);
+        console.log('  🎯 Team Members:', teamMembers.length);
+        console.log('  📝 Available for Assignment:', filteredEmployees.map(e => `${e.name} (${e.position})`));
+      }
       
       // Load rating data for each task
       const tasksWithRatings = await Promise.all(
@@ -301,8 +343,42 @@ const AdminTasksPage = () => {
         })
       );
       
-      setTasks(tasksWithRatings);
-      setEmployees(employeesData);
+      // Filter tasks for Content & Creative Manager
+      let filteredTasks = tasksWithRatings;
+      if (user?.role === 'content_creative_manager') {
+        console.log('🎯 CONTENT & CREATIVE MANAGER TASK FILTER:');
+        console.log('👥 Team Member Count:', teamMemberIds.length);
+        console.log('👥 Team Member IDs:', teamMemberIds);
+        console.log('📋 Total System Tasks:', tasksWithRatings.length);
+        
+        if (teamMemberIds.length > 0) {
+          // ONLY show tasks related to Content & Creative team
+          filteredTasks = tasksWithRatings.filter(task => {
+            const isAssignedToTeam = teamMemberIds.includes(task.assignedTo);
+            const isCreatedByManager = task.createdBy === user.id;
+            
+            return isAssignedToTeam || isCreatedByManager;
+          });
+          
+          const assignedToTeam = filteredTasks.filter(t => teamMemberIds.includes(t.assignedTo));
+          const createdByManager = filteredTasks.filter(t => t.createdBy === user.id);
+          
+          console.log('📊 Content & Creative Tasks Only:');
+          console.log('  ✅ Assigned to team:', assignedToTeam.length);
+          console.log('  ✅ Created by manager:', createdByManager.length);
+          console.log('  🎯 Total visible:', filteredTasks.length);
+          
+        } else {
+          console.log('⚠️ No team members found - manager has no tasks to see');
+          filteredTasks = [];
+        }
+        
+        console.log('✅ FINAL: Content & Creative Manager sees', filteredTasks.length, 'tasks');
+        console.log('📝 Task titles:', filteredTasks.slice(0, 5).map(t => `"${t.title}" (assigned to: ${t.assignedToName})`));
+      }
+
+      setTasks(filteredTasks);
+      setEmployees(filteredEmployees);
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Failed to load data");
@@ -796,7 +872,7 @@ const AdminTasksPage = () => {
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
     return null;
   }
 
@@ -1015,7 +1091,7 @@ const AdminTasksPage = () => {
                       <TableCell colSpan={8} className="text-center py-4">{t.noTasks}</TableCell>
                         </TableRow>
                       ) : (
-                    filteredTasks.map(task => (
+                    currentTasks.map(task => (
                           <TableRow 
                             key={task.id}
                         className={`border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all duration-200 ${isMediaBuyerToDesignerTask(task) 
@@ -1042,13 +1118,11 @@ const AdminTasksPage = () => {
                           <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
                               <span className="font-medium text-slate-800 dark:text-slate-200">{task.assignedToName}</span>
-                                {isMediaBuyerToDesignerTask(task) && (
-                                <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                                  By: {task.createdByName}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
+                              <span className="text-xs text-purple-600 dark:text-purple-400">
+                                By: <span className="font-medium">{task.createdByName || 'Unknown'}</span>
+                              </span>
+                            </div>
+                          </TableCell>
                           <TableCell className="hidden xl:table-cell py-4 pr-6">
                             {task.priority && (
                               <span className={`inline-block px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-300 transform hover:scale-105 whitespace-nowrap min-w-fit ${getPriorityColor(task.priority)}`}>
@@ -1143,6 +1217,8 @@ const AdminTasksPage = () => {
                     </TableBody>
                   </Table>
                 </div>
+                
+
             </div>
             {/* Card layout for mobile - Enhanced */}
                 <div className="block md:hidden space-y-4">
@@ -1154,7 +1230,7 @@ const AdminTasksPage = () => {
               ) : filteredTasks.length === 0 ? (
                     <div className="text-center py-8">{t.noTasks}</div>
                   ) : (
-                filteredTasks.map(task => (
+                currentTasks.map(task => (
                       <Card 
                         key={task.id} 
                     className={`p-4 sm:p-5 border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white dark:bg-slate-800 rounded-xl ${isMediaBuyerToDesignerTask(task) 
@@ -1201,11 +1277,9 @@ const AdminTasksPage = () => {
                             <span className="text-xs">
                               {t.assignedTo}: <span className="font-medium">{task.assignedToName}</span>
                             </span>
-                            {isMediaBuyerToDesignerTask(task) && (
-                              <span className="text-xs text-purple-600 dark:text-purple-400">
-                                Assigned by: {task.createdByName}
-                              </span>
-                            )}
+                            <span className="text-xs text-purple-600 dark:text-purple-400">
+                              By: <span className="font-medium">{task.createdByName || 'Unknown'}</span>
+                            </span>
                         <div className="flex items-center gap-3">
                           <Progress value={task.progressPercentage} className="h-2.5 flex-1 bg-slate-200 dark:bg-slate-700" />
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 min-w-[35px]">{task.progressPercentage}%</span>
@@ -1277,6 +1351,45 @@ const AdminTasksPage = () => {
                     ))
                   )}
                 </div>
+                
+                {/* Pagination Component for Mobile */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center space-x-2 mt-3 mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          className={currentPage === page ? "bg-blue-600 text-white" : ""}
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
                   </div>
@@ -1328,7 +1441,7 @@ const AdminTasksPage = () => {
                   <SelectContent>
                     {employees.map(employee => (
                       <SelectItem key={employee.id} value={employee.id}>
-                        {employee.name} ({employee.department})
+                        {employee.name} ({employee.position || employee.department})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1718,7 +1831,7 @@ const AdminTasksPage = () => {
                     <SelectContent className="max-h-[200px] overflow-y-auto">
                         {employees.map(employee => (
                         <SelectItem key={employee.id} value={employee.id} className="text-sm sm:text-base">
-                            {employee.name} ({employee.department})
+                            {employee.name} ({employee.position || employee.department})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -2102,7 +2215,7 @@ const AdminTasksPage = () => {
                     <SelectContent>
                       {employees.map(employee => (
                         <SelectItem key={employee.id} value={employee.id}>
-                          {employee.name} ({employee.department})
+                          {employee.name} ({employee.position || employee.department})
                         </SelectItem>
                       ))}
                     </SelectContent>

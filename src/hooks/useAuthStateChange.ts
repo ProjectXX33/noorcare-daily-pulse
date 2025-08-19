@@ -64,7 +64,20 @@ export const useAuthStateChange = ({
                 if (currentPath === '/login' || currentPath === '/') {
                   navigationInProgress = true;
                   console.log('Navigating from', currentPath, 'to dashboard');
-                  const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+                  let targetPath = '/employee-dashboard';
+                  
+                  if (appUser.role === 'admin') {
+                    targetPath = '/dashboard';
+                  } else if (appUser.role === 'warehouse') {
+                    targetPath = '/warehouse-dashboard';
+                  } else if (appUser.role === 'content_creative_manager') {
+                    targetPath = '/content-creative-dashboard';
+                  } else if (appUser.role === 'customer_retention_manager') {
+                    targetPath = '/employee-dashboard'; // Will create specific dashboard later
+                  } else if (appUser.role === 'digital_solution_manager') {
+                    targetPath = '/employee-dashboard'; // Will create specific dashboard later
+                  }
+                  
                   navigate(targetPath, { replace: true });
                   // Reset navigation flag after a short delay
                   setTimeout(() => {
@@ -123,7 +136,20 @@ export const useAuthStateChange = ({
             if ((currentPath === '/login' || currentPath === '/') && !navigationInProgress) {
               navigationInProgress = true;
               console.log('Navigating from', currentPath, 'to dashboard on initial check');
-              const targetPath = appUser.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+              let targetPath = '/employee-dashboard';
+              
+              if (appUser.role === 'admin') {
+                targetPath = '/dashboard';
+              } else if (appUser.role === 'warehouse') {
+                targetPath = '/warehouse-dashboard';
+              } else if (appUser.role === 'content_creative_manager') {
+                targetPath = '/content-creative-dashboard';
+              } else if (appUser.role === 'customer_retention_manager') {
+                targetPath = '/employee-dashboard'; // Will create specific dashboard later
+              } else if (appUser.role === 'digital_solution_manager') {
+                targetPath = '/employee-dashboard'; // Will create specific dashboard later
+              }
+              
               navigate(targetPath, { replace: true });
               // Reset navigation flag after a short delay
               setTimeout(() => {

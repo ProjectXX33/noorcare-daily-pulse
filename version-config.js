@@ -3,8 +3,8 @@
 
 const VERSION_CONFIG = {
   // Change these values manually for each release
-  major: 5,
-  minor: 1,
+  major: 6,
+  minor: 0,
   patch: 0,
   
   // Optional: add build suffix (leave empty for clean versions)
@@ -12,12 +12,16 @@ const VERSION_CONFIG = {
   
   // Release notes for this version
   releaseNotes: [
-    "🎉 Extended Check-in/Check-out to ALL Employee Roles",
-    "✅ Copywriting, Media Buyer, and Web Developer can now check in/out",
-    "📊 Monthly shift tracking now includes all employee positions",
-    "🔧 Added default shifts for all roles with flexible scheduling options",
-    "📈 Performance analytics extended to cover all employee positions",
-    "🚀 Universal attendance system across all departments"
+    "🎉 Enhanced Task Management with Pagination (6 tasks per page)",
+    "✅ Fixed Team Assignment - 'No team assigned' now works correctly",
+    "🎨 Beautiful Gradient Menu Borders matching the logo colors",
+    "📱 Improved Mobile Experience with better responsive design",
+    "🔧 Enhanced User Profile Dropdown with position and team display",
+    "📊 Content & Creative Manager Dashboard with team-specific views",
+    "⚡ Real-time Analytics from order submissions table",
+    "🎯 Advanced Team Management with proper role-based access",
+    "🔒 Enhanced Security with better access control",
+    "🚀 Performance improvements and bug fixes"
   ],
   
   // Update settings

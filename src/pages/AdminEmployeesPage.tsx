@@ -26,7 +26,8 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { User, Department, Position } from '@/types';
+import { User, Department, Position, Team, ManagerRole } from '@/types';
+import { getTeamBadgeColor } from '@/lib/teamsApi';
 import { fetchEmployees, createEmployee, updateEmployee, resetEmployeePassword, assignDiamondRank, removeDiamondRank, deleteEmployee } from '@/lib/employeesApi';
 import { getEmployeeAverageRating, getLatestEmployeeRating } from '@/lib/ratingsApi';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
@@ -54,10 +55,10 @@ const AdminEmployeesPage = () => {
     username: '',
     name: '',
     email: '',
-    department: 'Engineering' as Department,
     position: 'Designer' as Position,
+    team: undefined as Team | undefined,
     password: '',
-    role: 'employee' as 'admin' | 'employee' | 'warehouse'
+    role: 'employee' as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'
   });
   const [newPassword, setNewPassword] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -74,6 +75,7 @@ const AdminEmployeesPage = () => {
       username: "Username",
       department: "Department",
       position: "Position",
+      team: "Team",
       lastCheckIn: "Last Check-in",
       rating: "Rating",
       actions: "Actions",
@@ -95,9 +97,12 @@ const AdminEmployeesPage = () => {
       fillAllFields: "Please fill all required fields",
       email: "Email",
       role: "Role",
-      admin: "Admin",
+      admin: "Executive Director",
       employee: "Employee",
       warehouse: "Warehouse",
+      contentCreativeManager: "Content & Creative Manager",
+      customerRetentionManager: "Customer Retention Manager",
+      digitalSolutionManager: "Digital Solution Manager",
       noRating: "No rating",
       employeeManagement: "Employee Management",
       manageAllEmployees: "Manage all employees and their access",
@@ -122,6 +127,7 @@ const AdminEmployeesPage = () => {
       username: "اسم المستخدم",
       department: "القسم",
       position: "المنصب",
+      team: "الفريق",
       lastCheckIn: "آخر تسجيل دخول",
       rating: "التقييم",
       actions: "الإجراءات",
@@ -143,9 +149,12 @@ const AdminEmployeesPage = () => {
       fillAllFields: "يرجى ملء جميع الحقول المطلوبة",
       email: "البريد الإلكتروني",
       role: "الدور",
-      admin: "مدير",
+      admin: "المدير التنفيذي",
       employee: "موظف",
       warehouse: "مستودع",
+      contentCreativeManager: "مدير المحتوى والإبداع",
+      customerRetentionManager: "مدير الاحتفاظ بالعملاء",
+      digitalSolutionManager: "مدير الحلول الرقمية",
       noRating: "لا يوجد تقييم",
       employeeManagement: "إدارة الموظفين",
       manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول",
@@ -180,6 +189,20 @@ const AdminEmployeesPage = () => {
   };
 
   const t = translations[language as keyof typeof translations];
+
+  // Helper function to determine department from team
+  const getDepartmentFromTeam = (team?: Team): Department => {
+    switch (team) {
+      case 'Content & Creative Department':
+        return 'Creative';
+      case 'Customer Retention Department':
+        return 'Customer Service';
+      case 'IT Department':
+        return 'IT & Development';
+      default:
+        return 'General';
+    }
+  };
 
   useEffect(() => {
     loadEmployees();
@@ -264,8 +287,9 @@ const AdminEmployeesPage = () => {
         name: newEmployee.name,
         email: newEmployee.email,
         password: newEmployee.password,
-        department: newEmployee.department,
+        department: getDepartmentFromTeam(newEmployee.team),
         position: newEmployee.position,
+        team: newEmployee.team,
         role: newEmployee.role
       });
       
@@ -280,8 +304,8 @@ const AdminEmployeesPage = () => {
         username: '',
         name: '',
         email: '',
-        department: 'Engineering',
         position: 'Designer',
+        team: undefined,
         password: '',
         role: 'employee'
       });
@@ -301,7 +325,14 @@ const AdminEmployeesPage = () => {
 
     setIsLoading(true);
     try {
-      await updateEmployee(selectedEmployee.id, selectedEmployee);
+      // Update department based on team
+      const updatedEmployee = {
+        ...selectedEmployee,
+        department: getDepartmentFromTeam(selectedEmployee.team),
+        // Ensure team is explicitly set to null when undefined
+        team: selectedEmployee.team === undefined ? null : selectedEmployee.team
+      };
+      await updateEmployee(selectedEmployee.id, updatedEmployee);
       
       if (showEditPassword && editPassword) {
         await resetEmployeePassword(selectedEmployee.email, editPassword);
@@ -458,9 +489,8 @@ const AdminEmployeesPage = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px] sm:w-auto min-w-[120px]">{t.name}</TableHead>
-                      <TableHead className="hidden sm:table-cell min-w-[100px]">{t.username}</TableHead>
-                      <TableHead className="hidden md:table-cell min-w-[120px]">{t.department}</TableHead>
                       <TableHead className="hidden md:table-cell min-w-[120px]">{t.position}</TableHead>
+                      <TableHead className="hidden lg:table-cell min-w-[150px]">{t.team}</TableHead>
                       <TableHead className="hidden lg:table-cell min-w-[100px]">Active Today</TableHead>
                       <TableHead className="hidden lg:table-cell min-w-[140px]">Last Seen</TableHead>
                       <TableHead className="hidden xl:table-cell min-w-[140px]">{t.rating}</TableHead>
@@ -471,7 +501,7 @@ const AdminEmployeesPage = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">
+                        <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                           </div>
@@ -479,7 +509,7 @@ const AdminEmployeesPage = () => {
                       </TableRow>
                     ) : employees.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8">No employees found</TableCell>
+                        <TableCell colSpan={8} className="text-center py-8">No employees found</TableCell>
                       </TableRow>
                     ) : (
                       employees.map(employee => (
@@ -487,19 +517,22 @@ const AdminEmployeesPage = () => {
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
                               <span className="font-medium truncate">{employee.name}</span>
-                              <span className="text-xs text-muted-foreground sm:hidden truncate">@{employee.username}</span>
+                              <span className="text-xs text-muted-foreground md:hidden truncate">@{employee.username}</span>
                             </div>
-                          </TableCell>
-                          <TableCell className="hidden sm:table-cell">{employee.username}</TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-muted">
-                              {employee.department}
-                            </span>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
                               {employee.position}
                             </span>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {employee.team ? (
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${getTeamBadgeColor(employee.team)}`}>
+                                {employee.team}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No team assigned</span>
+                            )}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
                             {(() => {
@@ -689,25 +722,7 @@ const AdminEmployeesPage = () => {
                 className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="department" className="text-right">
-                {t.department}
-              </Label>
-              <Select
-                value={newEmployee.department}
-                onValueChange={(value) => setNewEmployee(prev => ({...prev, department: value as Department}))}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={t.department} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Engineering">Engineering</SelectItem>
-                  <SelectItem value="Medical">Medical</SelectItem>
-                  <SelectItem value="General">General</SelectItem>
-                  <SelectItem value="Management">Management</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="position" className="text-right">
                 {t.position}
@@ -720,6 +735,10 @@ const AdminEmployeesPage = () => {
                   <SelectValue placeholder={t.position} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Executive Director">Executive Director</SelectItem>
+                  <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
+                  <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
+                  <SelectItem value="IT Manager">IT Manager</SelectItem>
                   <SelectItem value="Customer Service">Customer Service</SelectItem>
                   <SelectItem value="Designer">Designer</SelectItem>
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
@@ -730,12 +749,31 @@ const AdminEmployeesPage = () => {
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="team" className="text-right">
+                {t.team}
+              </Label>
+                              <Select
+                  value={newEmployee.team || 'none'}
+                  onValueChange={(value) => setNewEmployee(prev => ({...prev, team: value === 'none' ? undefined : value as Team}))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select team (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No team assigned</SelectItem>
+                  <SelectItem value="Content & Creative Department">Content & Creative Department</SelectItem>
+                  <SelectItem value="Customer Retention Department">Customer Retention Department</SelectItem>
+                  <SelectItem value="IT Department">IT Department</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="role" className="text-right">
                 {t.role}
               </Label>
               <Select
                 value={newEmployee.role}
-                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee' | 'warehouse'}))}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.role} />
@@ -744,6 +782,9 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="admin">{t.admin}</SelectItem>
                   <SelectItem value="employee">{t.employee}</SelectItem>
                   <SelectItem value="warehouse">{t.warehouse}</SelectItem>
+                  <SelectItem value="content_creative_manager">{t.contentCreativeManager}</SelectItem>
+                  <SelectItem value="customer_retention_manager">{t.customerRetentionManager}</SelectItem>
+                  <SelectItem value="digital_solution_manager">{t.digitalSolutionManager}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -804,25 +845,7 @@ const AdminEmployeesPage = () => {
                   className="col-span-3"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-department" className="text-right">
-                  {t.department}
-                </Label>
-                <Select
-                  value={selectedEmployee.department}
-                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, department: value as Department} : null)}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder={t.department} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="Medical">Medical</SelectItem>
-                    <SelectItem value="General">General</SelectItem>
-                    <SelectItem value="Management">Management</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-position" className="text-right">
                   {t.position}
@@ -835,6 +858,10 @@ const AdminEmployeesPage = () => {
                     <SelectValue placeholder={t.position} />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Executive Director">Executive Director</SelectItem>
+                    <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
+                    <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
+                    <SelectItem value="IT Manager">IT Manager</SelectItem>
                     <SelectItem value="Customer Service">Customer Service</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
@@ -845,12 +872,31 @@ const AdminEmployeesPage = () => {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-team" className="text-right">
+                  {t.team}
+                </Label>
+                <Select
+                  value={selectedEmployee.team || 'none'}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, team: value === 'none' ? undefined : value as Team} : null)}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select team (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No team assigned</SelectItem>
+                    <SelectItem value="Content & Creative Department">Content & Creative Department</SelectItem>
+                    <SelectItem value="Customer Retention Department">Customer Retention Department</SelectItem>
+                    <SelectItem value="IT Department">IT Department</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-role" className="text-right">
                   {t.role}
                 </Label>
                 <Select
                   value={selectedEmployee.role}
-                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee' | 'warehouse'} : null)}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'} : null)}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder={t.role} />
@@ -859,6 +905,9 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="admin">{t.admin}</SelectItem>
                     <SelectItem value="employee">{t.employee}</SelectItem>
                     <SelectItem value="warehouse">{t.warehouse}</SelectItem>
+                    <SelectItem value="content_creative_manager">{t.contentCreativeManager}</SelectItem>
+                    <SelectItem value="customer_retention_manager">{t.customerRetentionManager}</SelectItem>
+                    <SelectItem value="digital_solution_manager">{t.digitalSolutionManager}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1023,3 +1072,4 @@ const AdminEmployeesPage = () => {
 };
 
 export default AdminEmployeesPage;
+

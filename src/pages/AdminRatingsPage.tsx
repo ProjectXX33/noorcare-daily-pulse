@@ -49,7 +49,6 @@ const AdminRatingsPage = () => {
   const [isRateEmployeeOpen, setIsRateEmployeeOpen] = useState(false);
   const [employeeToRate, setEmployeeToRate] = useState<User | null>(null);
   const [language, setLanguage] = useState('en');
-  const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [filterRating, setFilterRating] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -146,7 +145,15 @@ const AdminRatingsPage = () => {
     setIsLoading(true);
     try {
       const data = await fetchEmployees();
-      const filteredEmployees = data.filter(u => u.id !== user?.id); // Exclude current user
+      let filteredEmployees = data.filter(u => u.id !== user?.id); // Exclude current user
+      
+      // Filter employees for Content & Creative Manager
+      if (user?.role === 'content_creative_manager') {
+        filteredEmployees = filteredEmployees.filter(emp => 
+          emp.team === 'Content & Creative Department' && 
+          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+        );
+      }
       
       // Load rating data for each employee
       const employeesWithRatings = await Promise.all(
@@ -193,8 +200,6 @@ const AdminRatingsPage = () => {
     const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          employee.username.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesDepartment = filterDepartment === 'all' || employee.department === filterDepartment;
-    
     let matchesRating = true;
     if (filterRating !== 'all') {
       const rating = employee.averageRating || 0;
@@ -214,7 +219,7 @@ const AdminRatingsPage = () => {
       }
     }
     
-    return matchesSearch && matchesDepartment && matchesRating;
+    return matchesSearch && matchesRating;
   });
 
   // Calculate statistics
@@ -235,7 +240,7 @@ const AdminRatingsPage = () => {
     return ratingDate.toDateString() === today.toDateString();
   };
 
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
     return null;
   }
 
@@ -332,21 +337,7 @@ const AdminRatingsPage = () => {
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">{t.department}</Label>
-                      <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                        <SelectTrigger className="h-11">
-                          <SelectValue placeholder={t.allDepartments} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">{t.allDepartments}</SelectItem>
-                          <SelectItem value="Engineering">Engineering</SelectItem>
-                          <SelectItem value="Medical">Medical</SelectItem>
-                          <SelectItem value="General">General</SelectItem>
-                          <SelectItem value="Management">Management</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">{t.filterByRating}</Label>
                       <Select value={filterRating} onValueChange={setFilterRating}>
@@ -366,7 +357,6 @@ const AdminRatingsPage = () => {
                       variant="outline" 
                       onClick={() => {
                         setSearchTerm('');
-                        setFilterDepartment('all');
                         setFilterRating('all');
                       }}
                       className="w-full h-11"
@@ -395,21 +385,7 @@ const AdminRatingsPage = () => {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-medium text-muted-foreground">{t.department}</Label>
-                    <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder={t.allDepartments} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t.allDepartments}</SelectItem>
-                        <SelectItem value="Engineering">Engineering</SelectItem>
-                        <SelectItem value="Medical">Medical</SelectItem>
-                        <SelectItem value="General">General</SelectItem>
-                        <SelectItem value="Management">Management</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-muted-foreground">{t.filterByRating}</Label>
                     <Select value={filterRating} onValueChange={setFilterRating}>
@@ -430,7 +406,6 @@ const AdminRatingsPage = () => {
                       variant="outline" 
                       onClick={() => {
                         setSearchTerm('');
-                        setFilterDepartment('all');
                         setFilterRating('all');
                       }}
                       className="w-full h-9 text-xs"
@@ -483,9 +458,6 @@ const AdminRatingsPage = () => {
                                 </div>
                                 <p className="text-xs text-muted-foreground">@{employee.username}</p>
                                 <div className="flex items-center gap-1 mt-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    {employee.department}
-                                  </Badge>
                                   <Badge variant="secondary" className="text-xs">
                                     {employee.position}
                                   </Badge>
@@ -545,7 +517,6 @@ const AdminRatingsPage = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">{t.employee}</TableHead>
-                        <TableHead className="min-w-[120px]">{t.department}</TableHead>
                         <TableHead className="min-w-[120px]">{t.position}</TableHead>
                         <TableHead className="min-w-[120px]">{t.currentRating}</TableHead>
                         <TableHead className="min-w-[100px]">{t.lastRated}</TableHead>
@@ -555,7 +526,7 @@ const AdminRatingsPage = () => {
                     <TableBody>
                       {isLoading ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
+                          <TableCell colSpan={5} className="text-center py-8">
                             <div className="flex items-center justify-center">
                               <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                               <span className="ml-2 text-sm">{t.loadingEmployees}</span>
@@ -564,7 +535,7 @@ const AdminRatingsPage = () => {
                         </TableRow>
                       ) : filteredEmployees.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
+                          <TableCell colSpan={5} className="text-center py-8">
                             <span className="text-sm">{t.noEmployeesFound}</span>
                           </TableCell>
                         </TableRow>
@@ -583,11 +554,6 @@ const AdminRatingsPage = () => {
                                   </Badge>
                                 )}
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {employee.department}
-                              </Badge>
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary" className="text-xs">

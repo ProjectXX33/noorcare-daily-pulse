@@ -1598,4 +1598,92 @@ export const mockProducts: WooCommerceProduct[] = [
     menu_order: 0,
     meta_data: []
   }
-]; 
+];
+
+// NEW: Get WooCommerce Analytics for a specific month
+export async function getWooCommerceAnalytics(year: number, month: number) {
+  try {
+    console.log(`📊 Fetching WooCommerce analytics for ${year}-${month.toString().padStart(2, '0')}`);
+    
+    // Create date range for the month
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+    
+    // Fetch orders for the month - get all statuses separately
+    const allOrders = [];
+    
+    // Fetch completed orders
+    const completedOrdersData = await wooCommerceAPI.fetchOrders({
+      after: startDate,
+      before: endDate,
+      status: 'completed',
+      per_page: 1000
+    });
+    allOrders.push(...completedOrdersData);
+    
+    // Fetch processing orders
+    const processingOrdersData = await wooCommerceAPI.fetchOrders({
+      after: startDate,
+      before: endDate,
+      status: 'processing',
+      per_page: 1000
+    });
+    allOrders.push(...processingOrdersData);
+    
+    // Fetch pending orders
+    const pendingOrdersData = await wooCommerceAPI.fetchOrders({
+      after: startDate,
+      before: endDate,
+      status: 'pending',
+      per_page: 1000
+    });
+    allOrders.push(...pendingOrdersData);
+    
+    // Fetch on-hold orders
+    const onHoldOrdersData = await wooCommerceAPI.fetchOrders({
+      after: startDate,
+      before: endDate,
+      status: 'on-hold',
+      per_page: 1000
+    });
+    allOrders.push(...onHoldOrdersData);
+    
+    const orders = allOrders;
+    
+    // Calculate analytics
+    const totalOrders = orders.length;
+    const totalSales = orders.reduce((sum, order) => {
+      const orderTotal = parseFloat(order.total) || 0;
+      return sum + orderTotal;
+    }, 0);
+    
+    // Get completed orders count
+    const completedOrdersCount = orders.filter(order => order.status === 'completed').length;
+    
+    // Get processing orders count
+    const processingOrdersCount = orders.filter(order => order.status === 'processing').length;
+    
+    // Get pending orders count
+    const pendingOrdersCount = orders.filter(order => ['pending', 'on-hold'].includes(order.status)).length;
+    
+    console.log(`✅ WooCommerce Analytics for ${year}-${month}:`, {
+      total_orders: totalOrders,
+      total_sales: totalSales,
+      completed_orders: completedOrdersCount,
+      processing_orders: processingOrdersCount,
+      pending_orders: pendingOrdersCount
+    });
+    
+    return {
+      total_orders: totalOrders,
+      total_sales: totalSales,
+      completed_orders: completedOrdersCount,
+      processing_orders: processingOrdersCount,
+      pending_orders: pendingOrdersCount
+    };
+    
+  } catch (error) {
+    console.error('❌ Error fetching WooCommerce analytics:', error);
+    return null;
+  }
+}

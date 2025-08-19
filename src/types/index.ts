@@ -2,9 +2,10 @@ export type User = {
   id: string;
   username: string;
   name: string;
-  role: 'admin' | 'employee' | 'warehouse';
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
   department: Department;
   position: Position;
+  team?: Team;
   lastCheckin?: Date;
   email: string;
   preferences?: UserPreferences;
@@ -15,9 +16,13 @@ export type User = {
   diamondRankAssignedAt?: Date;
 };
 
-export type Department = 'Engineering' | 'Medical' | 'General' | 'Management';
+export type Department = 'Engineering' | 'Medical' | 'General' | 'Management' | 'Creative' | 'Customer Service' | 'IT & Development';
 
-export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer' | 'Warehouse Staff';
+export type Team = 'Content & Creative Department' | 'Customer Retention Department' | 'IT Department';
+
+export type ManagerRole = 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
+
+export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer' | 'Warehouse Staff' | 'Executive Director' | 'Content & Creative Manager' | 'Customer Retention Manager' | 'IT Manager';
 
 export type CheckIn = {
   id: string;
@@ -199,6 +204,9 @@ export type Tables = {
   monthly_shifts: MonthlyShiftRecord;
   employee_ratings: EmployeeRatingRecord;
   task_ratings: TaskRatingRecord;
+  teams: TeamRecord;
+  manager_roles: ManagerRoleRecord;
+  team_assignments_audit: TeamAssignmentAudit;
 };
 
 export type UserRecord = {
@@ -206,9 +214,10 @@ export type UserRecord = {
   username: string;
   name: string;
   email: string;
-  role: 'admin' | 'employee' | 'warehouse';
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
   department: Department;
   position: Position;
+  team?: Team;
   last_checkin: string | null;
   created_at: string;
   updated_at: string;
@@ -387,4 +396,56 @@ export type ShippingMethod = {
   name: string;
   displayName: string;
   isActive: boolean;
+};
+
+// Team Management Types
+export type TeamRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  manager_role: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ManagerRoleRecord = {
+  id: string;
+  role_name: string;
+  display_name: string;
+  description: string | null;
+  team_id: string | null;
+  permissions: any; // JSONB
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamAssignmentAudit = {
+  id: string;
+  user_id: string;
+  old_team: string | null;
+  new_team: string | null;
+  assigned_by: string | null;
+  assigned_at: string;
+  reason: string | null;
+};
+
+export type TeamMember = {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+  user_position: string;
+  team?: string;
+};
+
+export type TeamManagerInfo = {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
 };

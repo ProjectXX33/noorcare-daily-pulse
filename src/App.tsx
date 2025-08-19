@@ -13,9 +13,12 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import CheckInPage from "./pages/CheckInPage";
 import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
+import ContentCreativeDashboard from "./pages/ContentCreativeDashboard";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
 import AdminRatingsPage from "./pages/AdminRatingsPage";
+import TeamReportsPage from "./pages/TeamReportsPage";
+import TeamShiftsPage from "./pages/TeamShiftsPage";
 import EmployeeTasksPage from "./pages/EmployeeTasksPage";
 import EmployeeRatingsPage from "./pages/EmployeeRatingsPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -37,7 +40,7 @@ import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
 import AdminShiftManagement from "./pages/AdminShiftManagement";
 import AdminBugReportsPage from "./pages/AdminBugReportsPage";
-import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
+
 import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
 import MyOrdersPage from "./pages/MyOrdersPage";
@@ -143,6 +146,12 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
       return <Navigate to="/dashboard" replace />;
     } else if (user.role === 'warehouse') {
       return <Navigate to="/warehouse-dashboard" replace />;
+    } else if (user.role === 'content_creative_manager') {
+      return <Navigate to="/content-creative-dashboard" replace />;
+    } else if (user.role === 'customer_retention_manager') {
+      return <Navigate to="/employee-dashboard" replace />; // Will create this later
+    } else if (user.role === 'digital_solution_manager') {
+      return <Navigate to="/employee-dashboard" replace />; // Will create this later
     } else {
       return <Navigate to="/employee-dashboard" replace />;
     }
@@ -163,7 +172,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 // Employee route component to protect routes that require employee role
 const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   return (
-    <PrivateRoute allowedRoles={['employee']}>
+    <PrivateRoute allowedRoles={['employee', 'content_creative_manager']}>
       {children}
     </PrivateRoute>
   );
@@ -420,6 +429,16 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/content-creative-dashboard" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <ContentCreativeDashboard />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
           path="/reports" 
           element={
             <AdminRoute>
@@ -432,23 +451,43 @@ const AppContent = () => {
         <Route 
           path="/tasks" 
           element={
-            <AdminRoute>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
               <SidebarNavigation>
                 <AdminTasksPage />
               </SidebarNavigation>
-            </AdminRoute>
+            </PrivateRoute>
           } 
         />
         <Route 
           path="/admin-ratings" 
           element={
-            <AdminRoute>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
               <SidebarNavigation>
                 <AdminRatingsPage />
               </SidebarNavigation>
-            </AdminRoute>
-          } 
+            </PrivateRoute>
+          }
         />
+              <Route
+        path="/team-reports"
+        element={
+          <PrivateRoute allowedRoles={['content_creative_manager']}>
+            <SidebarNavigation>
+              <TeamReportsPage />
+            </SidebarNavigation>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/team-shifts"
+        element={
+          <PrivateRoute allowedRoles={['content_creative_manager']}>
+            <SidebarNavigation>
+              <TeamShiftsPage />
+            </SidebarNavigation>
+          </PrivateRoute>
+        }
+      />
         <Route 
           path="/employee-tasks" 
           element={
@@ -502,11 +541,11 @@ const AppContent = () => {
         <Route 
           path="/admin-shift-management" 
           element={
-            <AdminRoute>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
               <SidebarNavigation>
                 <AdminShiftManagement />
               </SidebarNavigation>
-            </AdminRoute>
+            </PrivateRoute>
           } 
         />
         <Route 
@@ -529,16 +568,7 @@ const AppContent = () => {
             </PrivateRoute>
           } 
         />
-        <Route 
-          path="/analytics" 
-          element={
-            <AdminRoute>
-              <SidebarNavigation>
-                <AdminAnalyticsPage />
-              </SidebarNavigation>
-            </AdminRoute>
-          } 
-        />
+
         <Route 
           path="/admin-bug-reports" 
           element={

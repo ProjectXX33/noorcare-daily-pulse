@@ -54,7 +54,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
         if (permission === 'granted') {
           await notificationManager.showGeneralNotification(
             'Notifications Enabled!',
-            'You will now receive push notifications from NoorHub'
+            'You will now receive push notifications from VNQ system'
           );
           handleClose();
         }

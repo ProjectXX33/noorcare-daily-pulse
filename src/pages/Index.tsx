@@ -28,7 +28,20 @@ const Index = () => {
         setRedirectAttempted(true);
         
         if (isAuthenticated && user) {
-          const targetPath = user.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+          let targetPath = '/employee-dashboard';
+          
+          if (user.role === 'admin') {
+            targetPath = '/dashboard';
+          } else if (user.role === 'warehouse') {
+            targetPath = '/warehouse-dashboard';
+          } else if (user.role === 'content_creative_manager') {
+            targetPath = '/content-creative-dashboard';
+          } else if (user.role === 'customer_retention_manager') {
+            targetPath = '/employee-dashboard'; // Will create specific dashboard later
+          } else if (user.role === 'digital_solution_manager') {
+            targetPath = '/employee-dashboard'; // Will create specific dashboard later
+          }
+          
           console.log('User is authenticated, redirecting to', targetPath);
           navigate(targetPath, { replace: true });
         } else {
@@ -56,7 +69,7 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
               <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-primary">NoorHub</h1>
+        <h1 className="text-4xl font-bold mb-4 text-primary">VNQ System</h1>
         <div className="flex justify-center items-center mt-4">
           <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
         </div>
@@ -70,8 +83,8 @@ const Index = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4 text-primary">NoorHub</h1>
-        <p className="text-xl text-gray-600 mb-8">Employee Management System</p>
+        <h1 className="text-4xl font-bold mb-4 text-primary">VNQ System</h1>
+        <p className="text-xl text-gray-600 mb-8">Warehouse Management System</p>
         <div className="space-x-4">
           <button 
             onClick={() => navigate('/login')}

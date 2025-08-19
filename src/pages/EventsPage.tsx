@@ -62,12 +62,12 @@ const EventsPage = () => {
     status: 'active'
   });
 
-  // Only Admins and Media Buyers can edit events - all other employees are view-only
-  const canEditEvents = user && (user.role === 'admin' || user.position === 'Media Buyer');
+  // Only Admins and Content & Creative Managers can edit events - all other employees are view-only
+  const canEditEvents = user && (user.role === 'admin' || user.role === 'content_creative_manager');
   
-  // ALL employees can VIEW Q&A, but only admin and copy writing can edit/add/delete
-  const canViewQA = user && user.role === 'employee'; // All employees can view
-  const canEditQA = user && (user.role === 'admin' || user.position === 'Copy Writing'); // Only admin and copy writing can edit
+  // ALL employees can VIEW Q&A, but only admin, copy writing, and content creative manager can edit/add/delete
+  const canViewQA = user && (user.role === 'employee' || user.role === 'admin' || user.role === 'content_creative_manager'); // All team members can view
+  const canEditQA = user && (user.role === 'admin' || user.position === 'Copy Writing' || user.role === 'content_creative_manager'); // Only admin, copy writing, and content creative manager can edit
   
   // Mobile detection
   useEffect(() => {
@@ -138,6 +138,12 @@ const EventsPage = () => {
   const loadEvents = async () => {
     try {
       const eventsData = await eventService.getEvents(true); // Include Q&A
+      console.log('📅 Events loaded with Q&A:', eventsData.map(event => ({
+        id: event.id,
+        title: event.title,
+        qaCount: event.qa?.length || 0,
+        hasQA: !!event.qa && event.qa.length > 0
+      })));
       setEvents(eventsData);
     } catch (error) {
       console.error('Error loading events:', error);
@@ -159,8 +165,8 @@ const EventsPage = () => {
       
       // BULLETPROOF: Force view-only mode for non-privileged users
       const isAdmin = user?.role === 'admin';
-      const isMediaBuyer = user?.position === 'Media Buyer';
-      const shouldBeViewOnly = !isAdmin && !isMediaBuyer;
+      const isContentCreativeManager = user?.role === 'content_creative_manager';
+      const shouldBeViewOnly = !isAdmin && !isContentCreativeManager;
       
       console.log('🔍 Event Click Debug:', {
         canEditEvents,
@@ -168,7 +174,7 @@ const EventsPage = () => {
         userRole: user?.role,
         userPosition: user?.position,
         isAdmin,
-        isMediaBuyer,
+        isContentCreativeManager,
         finalViewOnlyState: shouldBeViewOnly
       });
       
@@ -227,7 +233,7 @@ const EventsPage = () => {
 
     // Additional role check as safety - only Admins and Media Buyers
     if (user.role !== 'admin' && user.position !== 'Media Buyer') {
-      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
       console.log('❌ Form submission blocked - not an Admin or Media Buyer');
       return;
     }
@@ -276,7 +282,7 @@ const EventsPage = () => {
     }
 
     // Additional role check as safety - only Admins and Media Buyers
-    if (user?.role !== 'admin' && user?.position !== 'Media Buyer') {
+    if (user?.role !== 'admin' && user?.role !== 'content_creative_manager') {
       toast.error('Access denied: Only Admins and Media Buyers can delete events');
       return;
     }
@@ -495,7 +501,7 @@ const EventsPage = () => {
                 <span className="text-sm font-medium">View-Only Mode</span>
               </div>
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                You can view events but cannot create, edit, or delete them. Contact an admin or media buyer for changes.
+                You can view events but cannot create, edit, or delete them. Contact an admin or Content & Creative Manager for changes.
               </p>
             </div>
           )}
@@ -1117,7 +1123,7 @@ const EventsPage = () => {
                       </div>
                       
                       {/* Activity / Status Badges */}
-                      <div className="flex justify-start">
+                      <div className="flex justify-start gap-2">
                         <span className={`px-3 py-1.5 rounded-full text-xs font-bold w-fit border transition-all duration-200 hover:scale-105 ${
                           event.status === 'active'
                             ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-slate-800 dark:text-white dark:border-slate-600 shadow-sm'
@@ -1127,6 +1133,13 @@ const EventsPage = () => {
                         }`}>
                           {event.status === 'active' ? 'Active' : event.status === 'finished' ? 'Finished' : 'Paused'}
                         </span>
+                        
+                        {/* Q&A Indicator */}
+                        {event.qa && event.qa.length > 0 && (
+                          <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-600 shadow-sm transition-all duration-200 hover:scale-105">
+                            💬 Q&A ({event.qa.length})
+                          </span>
+                        )}
                       </div>
                     </CardHeader>
                     
@@ -1175,7 +1188,7 @@ const EventsPage = () => {
                             }}
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            {canEditEvents && (user?.role === 'admin' || user?.position === 'Media Buyer') ? 'Edit Details' : 'View Details'}
+                            {canEditEvents && (user?.role === 'admin' || user?.role === 'content_creative_manager') ? 'Edit Details' : 'View Details'}
                           </Button>
                         </div>
                       </div>
@@ -1220,7 +1233,7 @@ const EventsPage = () => {
             return null;
           })()}
 
-          {(isViewOnly || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) ? (
+          {(isViewOnly || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) ? (
             /* View-Only Display */
             <div className="space-y-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border">
               <div className="space-y-3">
@@ -1267,12 +1280,12 @@ const EventsPage = () => {
                   <span className="text-sm font-medium">View-Only Access</span>
                 </div>
                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  You can view this event but cannot make changes. Only Admins and Media Buyers can edit events.
+                  You can view this event but cannot make changes. Only Admins and Content & Creative Managers can edit events.
                 </p>
               </div>
 
-              {/* Q&A Section for View-Only */}
-              {selectedEvent && canViewQA && (
+              {/* Q&A Section for View-Only - Show to all team members */}
+              {selectedEvent && (
                 <div className="border-t pt-6">
                   <div className="mb-3">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1306,25 +1319,25 @@ const EventsPage = () => {
               onSubmit={(e) => {
                 e.preventDefault();
                 // Bulletproof permission check
-                if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
-                  toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
+                  toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                   return;
                 }
                 handleEventSubmit(e);
               }}
               onKeyDown={(e) => {
                 // Block ALL keyboard interactions for non-privileged users
-                if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                   e.preventDefault();
                   e.stopPropagation();
-                  toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                  toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                   return;
                 }
                 // Block Enter key submission for non-privileged users
-                if (e.key === 'Enter' && (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer'))) {
+                if (e.key === 'Enter' && (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager'))) {
                   e.preventDefault();
                   e.stopPropagation();
-                  toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                  toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                   return;
                 }
               }}
@@ -1336,31 +1349,31 @@ const EventsPage = () => {
                   id="title"
                   value={eventForm.title}
                   onChange={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.preventDefault();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       return;
                     }
                     setEventForm(prev => ({ ...prev, title: e.target.value }));
                   }}
                   onKeyDown={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.preventDefault();
                       e.stopPropagation();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                     }
                   }}
                   onFocus={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.target.blur();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                     }
                   }}
                   placeholder="Enter event title"
                   className="min-h-[44px]"
                   required
-                  disabled={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
-                  readOnly={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
+                  disabled={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
+                  readOnly={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
                 />
               </div>
 
@@ -1370,30 +1383,30 @@ const EventsPage = () => {
                   id="description"
                   value={eventForm.description}
                   onChange={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.preventDefault();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       return;
                     }
                     setEventForm(prev => ({ ...prev, description: e.target.value }));
                   }}
                   onKeyDown={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.preventDefault();
                       e.stopPropagation();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                     }
                   }}
                   onFocus={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                       e.target.blur();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                     }
                   }}
                   placeholder="Enter event description"
                   rows={3}
-                  disabled={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
-                  readOnly={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
+                  disabled={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
+                  readOnly={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
                 />
               </div>
 
@@ -1405,30 +1418,30 @@ const EventsPage = () => {
                     type="datetime-local"
                     value={eventForm.start}
                     onChange={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.preventDefault();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                         return;
                       }
                       setEventForm(prev => ({ ...prev, start: e.target.value }));
                     }}
                     onKeyDown={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.preventDefault();
                         e.stopPropagation();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       }
                     }}
                     onFocus={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.target.blur();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       }
                     }}
                     className="min-h-[44px]"
                     required
-                    disabled={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
-                    readOnly={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
+                    disabled={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
+                    readOnly={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
                   />
                 </div>
 
@@ -1439,29 +1452,29 @@ const EventsPage = () => {
                     type="datetime-local"
                     value={eventForm.end}
                     onChange={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.preventDefault();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                         return;
                       }
                       setEventForm(prev => ({ ...prev, end: e.target.value }));
                     }}
                     onKeyDown={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.preventDefault();
                         e.stopPropagation();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       }
                     }}
                     onFocus={(e) => {
-                      if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')) {
+                      if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')) {
                         e.target.blur();
-                        toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                        toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       }
                     }}
                     className="min-h-[44px]"
-                    disabled={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
-                    readOnly={!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
+                    disabled={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
+                    readOnly={!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
                   />
                 </div>
               </div>
@@ -1495,8 +1508,8 @@ const EventsPage = () => {
                 </div>
               )}
 
-              {/* Q&A Section for Edit Mode */}
-              {selectedEvent && canEditQA && (
+              {/* Q&A Section for Edit Mode - Show to all team members */}
+              {selectedEvent && (
                 <div className="border-t pt-6">
                   <div className="mb-3">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1553,12 +1566,12 @@ const EventsPage = () => {
                 
                 <Button
                   type="submit"
-                  disabled={isLoading || !canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer')}
+                  disabled={isLoading || !canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager')}
                   className="min-h-[44px] w-full sm:w-auto"
                   onClick={(e) => {
-                    if (!canEditEvents || (user?.role !== 'admin' && user?.position !== 'Media Buyer') || isViewOnly) {
+                    if (!canEditEvents || (user?.role !== 'admin' && user?.role !== 'content_creative_manager') || isViewOnly) {
                       e.preventDefault();
-                      toast.error('Access denied: Only Admins and Media Buyers can edit events');
+                      toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
                       return;
                     }
                     handleEventSubmit(e);

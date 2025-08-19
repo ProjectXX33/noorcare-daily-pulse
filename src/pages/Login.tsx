@@ -134,7 +134,20 @@ const Login = () => {
       console.log('User is authenticated, redirecting to dashboard');
       setRedirectAttempted(true);
       
-      const targetPath = user.role === 'admin' ? '/dashboard' : '/employee-dashboard';
+      let targetPath = '/employee-dashboard';
+      
+      if (user.role === 'admin') {
+        targetPath = '/dashboard';
+      } else if (user.role === 'warehouse') {
+        targetPath = '/warehouse-dashboard';
+      } else if (user.role === 'content_creative_manager') {
+        targetPath = '/content-creative-dashboard';
+      } else if (user.role === 'customer_retention_manager') {
+        targetPath = '/employee-dashboard'; // Will create specific dashboard later
+      } else if (user.role === 'digital_solution_manager') {
+        targetPath = '/employee-dashboard'; // Will create specific dashboard later
+      }
+      
       navigate(targetPath, { replace: true });
     } else if (!isAuthenticated && sessionChecked) {
       setIsLoading(false);

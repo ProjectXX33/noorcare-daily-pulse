@@ -147,10 +147,16 @@ const WarehouseDashboard: React.FC = () => {
   const [newNote, setNewNote] = useState('');
   const [shippingMethod, setShippingMethod] = useState<string>('SMSA');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [policyNumber, setPolicyNumber] = useState('');
+  const [warehouseName, setWarehouseName] = useState('');
   const [orderNotes, setOrderNotes] = useState<OrderNote[]>([]);
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 20;
 
   const [shippingStats, setShippingStats] = useState<ShippingStats[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -268,42 +274,61 @@ const WarehouseDashboard: React.FC = () => {
     };
   }, []);
 
-  // Set up 5-minute auto-check for new orders
+  // Set up 2-minute auto-check for new orders (enhanced for 100% capture)
   useEffect(() => {
-    console.log('⏰ Setting up 5-minute auto-check for new orders...');
+    console.log('⏰ Setting up 2-minute auto-check for 100% order capture...');
     
-    // Start auto-check after 2 minutes to allow initial setup to complete
+    // Start auto-check after 1 minute to allow initial setup to complete
     const startDelay = setTimeout(() => {
-      console.log('🤖 Starting 5-minute auto-check cycle...');
+      console.log('🤖 Starting 2-minute auto-check cycle for complete order capture...');
       
-      // Run the first auto-check
+      // Run the enhanced auto-check
       const runAutoCheck = async () => {
         if (!isSyncing) {
-          console.log('🤖 Auto-check: Checking for new orders...');
-          toast.info('🤖 Auto-check: Scanning for new orders...', {
-            description: 'Automatic 5-minute check'
+          console.log('🤖 Enhanced Auto-check: Ensuring 100% order capture...');
+          toast.info('🤖 Enhanced Auto-check: Scanning all orders...', {
+            description: 'Automatic 2-minute comprehensive check'
           });
           setLastAutoCheckTime(new Date());
-          await fetchMonthlyOrdersFromWooCommerce();
+          
+          try {
+            // First check for new orders quickly
+            await syncNewOrdersFromWooCommerce();
+            
+            // Then run full monthly sync every 6th check (every 12 minutes)
+            const checkCount = Math.floor(Date.now() / (2 * 60 * 1000)) % 6;
+            if (checkCount === 0) {
+              console.log('🔄 Running comprehensive monthly sync...');
+              await fetchMonthlyOrdersFromWooCommerce();
+            }
+          } catch (error) {
+            console.error('❌ Enhanced auto-check failed, will retry:', error);
+            // Retry after 30 seconds on failure
+            setTimeout(() => {
+              if (!isSyncing) {
+                syncNewOrdersFromWooCommerce().catch(console.error);
+              }
+            }, 30000);
+          }
         } else {
           console.log('🤖 Auto-check skipped: sync already in progress');
         }
       };
       
-      // Run immediately, then every 5 minutes
+      // Run immediately, then every 2 minutes
       runAutoCheck();
       
-      // Set up 5-minute interval
-      autoCheckIntervalRef.current = setInterval(runAutoCheck, 5 * 60 * 1000); // 5 minutes
+      // Set up 2-minute interval for faster detection
+      autoCheckIntervalRef.current = setInterval(runAutoCheck, 2 * 60 * 1000); // 2 minutes
       
-      console.log('✅ 5-minute auto-check cycle activated');
-    }, 2 * 60 * 1000); // 2-minute delay before starting
+      console.log('✅ 2-minute enhanced auto-check cycle activated for 100% order capture');
+    }, 1 * 60 * 1000); // 1-minute delay before starting
     
     return () => {
       clearTimeout(startDelay);
       if (autoCheckIntervalRef.current) {
         clearInterval(autoCheckIntervalRef.current);
-        console.log('🛑 5-minute auto-check cycle stopped');
+        console.log('🛑 Enhanced auto-check cycle stopped');
       }
     };
   }, []);
@@ -411,7 +436,27 @@ const WarehouseDashboard: React.FC = () => {
   // Filter orders when search term or status filter changes
   useEffect(() => {
     filterOrders();
+    setCurrentPage(1); // Reset to first page when filters change
   }, [orders, searchTerm, statusFilter]);
+
+  // Calculate pagination
+  const totalOrders = filteredOrders.length;
+  const totalPages = Math.ceil(totalOrders / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+
+  const goToNextPage = () => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
 
   // Enhanced intelligent sync system with better performance and error handling
   const startIntelligentSyncSystem = () => {
@@ -517,10 +562,12 @@ const WarehouseDashboard: React.FC = () => {
         return;
       }
 
-             // Get recent orders from WooCommerce (all statuses, last 20 orders)
+             // Get recent orders from WooCommerce (all statuses, last 50 orders for better coverage)
        const recentWooOrders = await wooCommerceAPI.fetchOrders({
-         per_page: 20,
-         status: 'any' // Fetch all statuses to catch new orders
+         per_page: 50, // Increased from 20 to 50 for better coverage
+         status: 'any', // Fetch all statuses to catch new orders
+         orderby: 'date',
+         order: 'desc' // Get newest orders first
        });
 
       let newOrdersFound = 0;
@@ -1165,6 +1212,15 @@ const WarehouseDashboard: React.FC = () => {
         if (trackingNumber.trim()) {
           updateData.tracking_number = trackingNumber.trim();
         }
+        
+        if (policyNumber.trim()) {
+          updateData.policy_number = policyNumber.trim();
+        }
+        
+        // Add warehouse name for all shipping methods
+        if (warehouseName.trim()) {
+          updateData.warehouse_name = warehouseName.trim();
+        }
       }
 
       const { error } = await supabase
@@ -1226,6 +1282,8 @@ const WarehouseDashboard: React.FC = () => {
       setIsStatusUpdateOpen(false);
       setStatusReason('');
       setTrackingNumber('');
+      setPolicyNumber('');
+      setWarehouseName('');
       loadOrders(); // Refresh orders
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -1332,17 +1390,18 @@ const WarehouseDashboard: React.FC = () => {
       let hasMorePages = true;
       let totalFetched = 0;
 
-      // Use a more reliable approach - fetch all orders regardless of status
-      while (hasMorePages && totalFetched < 10000) { // Safety limit
+      // Enhanced approach - fetch ALL orders with maximum coverage
+      while (hasMorePages && totalFetched < 20000) { // Increased safety limit
         try {
           console.log(`📄 Fetching page ${page} (fetched ${totalFetched} so far)...`);
           
-          // Use 'any' status to get all orders, with proper date filtering
+          // Use 'any' status to get all orders, with comprehensive date filtering
           const orders = await wooCommerceAPI.fetchOrders({
-            per_page: 100,
+            per_page: 100, // Maximum per page
             page: page,
             status: 'any', // This gets ALL statuses in one request
-            modified_after: startOfCurrentMonth.toISOString(), // Use modified_after for better results
+            after: startOfCurrentMonth.toISOString(), // Use 'after' for creation date
+            before: endOfCurrentMonth.toISOString(), // Ensure we don't go beyond current month
             orderby: 'date',
             order: 'desc'
           });
@@ -1365,13 +1424,14 @@ const WarehouseDashboard: React.FC = () => {
               });
             }
             
-            // Check if we should continue - if we got less than 100 orders or no monthly orders
+            // Check if we should continue - if we got less than 100 orders
             if (orders.length < 100) {
               hasMorePages = false;
+              console.log(`📄 Reached end of data at page ${page} (${orders.length} orders returned)`);
             } else {
               page++;
               // Small delay between requests to avoid rate limiting
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 300)); // Reduced delay for faster sync
             }
           } else {
             hasMorePages = false;
@@ -1385,14 +1445,73 @@ const WarehouseDashboard: React.FC = () => {
         } catch (error) {
           console.error(`❌ Error fetching page ${page}:`, error);
           
-          // If the 'any' status method fails, fall back to individual status fetching
-          if (page === 1) {
-            console.log('🔄 Falling back to individual status fetching...');
-            toast.info('🔄 Switching to fallback method...');
-            break;
-          } else {
-            // For later pages, just log the error and continue
-            hasMorePages = false;
+          // Enhanced retry logic for failed pages
+          let retrySuccess = false;
+          
+          for (let retryAttempt = 1; retryAttempt <= 3; retryAttempt++) {
+            console.log(`🔄 Retrying page ${page} (attempt ${retryAttempt}/3)...`);
+            
+            try {
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryAttempt)); // Exponential backoff
+              
+              const retryOrders = await wooCommerceAPI.fetchOrders({
+                per_page: 100,
+                page: page,
+                status: 'any',
+                after: startOfCurrentMonth.toISOString(),
+                before: endOfCurrentMonth.toISOString(),
+                orderby: 'date',
+                order: 'desc'
+              });
+              
+              console.log(`✅ Retry successful for page ${page} - got ${retryOrders?.length || 0} orders`);
+              
+              if (retryOrders && retryOrders.length >= 0) {
+                const monthlyOrders = retryOrders.filter(order => {
+                  const orderDate = new Date(order.date_created);
+                  return orderDate >= startOfCurrentMonth && orderDate <= endOfCurrentMonth;
+                });
+
+                if (monthlyOrders.length > 0) {
+                  allWooOrders.push(...monthlyOrders);
+                  totalFetched += monthlyOrders.length;
+                  
+                  monthlyOrders.forEach(order => {
+                    syncStats.statusBreakdown[order.status] = (syncStats.statusBreakdown[order.status] || 0) + 1;
+                  });
+                }
+                
+                if (retryOrders.length < 100) {
+                  hasMorePages = false;
+                } else {
+                  page++;
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                }
+                
+                retrySuccess = true;
+                break;
+              }
+            } catch (retryError) {
+              console.error(`❌ Retry attempt ${retryAttempt} failed:`, retryError);
+            }
+          }
+          
+          if (!retrySuccess) {
+            console.error(`❌ All retry attempts failed for page ${page}`);
+            // If the 'any' status method fails on page 1, fall back to individual status fetching
+            if (page === 1) {
+              console.log('🔄 Falling back to individual status fetching...');
+              toast.info('🔄 Switching to fallback method...');
+              break;
+            } else {
+              // For later pages, skip to next page or stop
+              if (page < 50) {
+                page++;
+                console.log(`📄 Skipping to page ${page} after failures`);
+              } else {
+                hasMorePages = false;
+              }
+            }
           }
         }
       }
@@ -2623,7 +2742,7 @@ const WarehouseDashboard: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredOrders.map((order) => (
+                      {currentOrders.map((order) => (
                         <TableRow 
                           key={order.id} 
                           className={`
@@ -2683,6 +2802,11 @@ const WarehouseDashboard: React.FC = () => {
                                 </div>
                               ) : (
                                 <span className="text-gray-400 text-xs">Not set</span>
+                              )}
+                              {(order as any).warehouse_name && (
+                                <div className="text-xs text-blue-600 mt-1 font-medium">
+                                  📦 {(order as any).warehouse_name}
+                                </div>
                               )}
                               {(order as any).tracking_number && (
                                 <div className="text-xs text-gray-600 mt-1 font-mono">
@@ -2752,9 +2876,67 @@ const WarehouseDashboard: React.FC = () => {
                 </Table>
                 </div>
 
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span>
+                        Showing {startIndex + 1} to {Math.min(endIndex, totalOrders)} of {totalOrders} orders
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 7) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 4) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 3) {
+                            pageNum = totalPages - 6 + i;
+                          } else {
+                            pageNum = currentPage - 3 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => goToPage(pageNum)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Mobile Card View */}
                 <div className="lg:hidden space-y-3">
-                  {filteredOrders.map((order) => (
+                  {currentOrders.map((order) => (
                     <Card 
                       key={order.id} 
                       className={`
@@ -2899,6 +3081,39 @@ const WarehouseDashboard: React.FC = () => {
                     </Card>
                   ))}
                 </div>
+
+                {/* Mobile Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="lg:hidden mt-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="text-center text-sm text-gray-600 mb-3">
+                      Page {currentPage} of {totalPages} ({totalOrders} total orders)
+                    </div>
+                    
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      
+                      <span className="px-3 py-1 text-sm font-medium">
+                        {currentPage} / {totalPages}
+                      </span>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>
@@ -3019,6 +3234,22 @@ const WarehouseDashboard: React.FC = () => {
                             <div className="flex justify-between">
                               <span>Shipped:</span>
                               <span>{formatDateTime((selectedOrder as any).shipped_at)}</span>
+                            </div>
+                          )}
+                          {(selectedOrder as any).policy_number && (
+                            <div className="flex justify-between">
+                              <span>Policy Number:</span>
+                              <span className="font-mono text-xs bg-blue-100 px-2 py-1 rounded">
+                                {(selectedOrder as any).policy_number}
+                              </span>
+                            </div>
+                          )}
+                          {(selectedOrder as any).warehouse_name && (
+                            <div className="flex justify-between">
+                              <span>Warehouse:</span>
+                              <span className="font-medium">
+                                {(selectedOrder as any).warehouse_name}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -3238,11 +3469,31 @@ const WarehouseDashboard: React.FC = () => {
                 </div>
 
                 <div>
+                  <Label>Warehouse Name</Label>
+                  <Input
+                    placeholder="Enter warehouse name..."
+                    value={warehouseName}
+                    onChange={(e) => setWarehouseName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
                   <Label>Tracking Number (Optional)</Label>
                   <Input
                     placeholder="Enter tracking number..."
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label>Policy Number (For Product)</Label>
+                  <Input
+                    placeholder="Enter policy number for product..."
+                    value={policyNumber}
+                    onChange={(e) => setPolicyNumber(e.target.value)}
+                    required
                   />
                 </div>
               </>

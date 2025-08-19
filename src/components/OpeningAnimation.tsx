@@ -30,7 +30,7 @@ const OpeningAnimation: React.FC = () => {
           transition={{ delay: 0.4, duration: 0.5 }}
           className="text-2xl font-bold mb-2"
         >
-          Welcome to NoorHub
+          Welcome to VNQ System
         </motion.h1>
         <motion.p
           initial={{ y: 20, opacity: 0 }}
@@ -38,7 +38,7 @@ const OpeningAnimation: React.FC = () => {
           transition={{ delay: 0.6, duration: 0.5 }}
           className="text-muted-foreground"
         >
-          Your daily work management platform
+          Your VNQ Management System
         </motion.p>
       </motion.div>
     </motion.div>
