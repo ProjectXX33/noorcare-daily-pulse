@@ -71,7 +71,7 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as Position,
+    position: 'Junior CRM Specialist' as Position,
     allTimeOvertime: false
   });
 
@@ -82,7 +82,7 @@ const AdminShiftManagement = () => {
     name: '',
     startTime: '',
     endTime: '',
-    position: 'Customer Service' as Position,
+    position: 'Junior CRM Specialist' as Position,
     allTimeOvertime: false
   });
 
@@ -107,7 +107,7 @@ const AdminShiftManagement = () => {
       bestPerformers: "🏆 Best Performers",
       mostDelays: "⏰ Most Delays",
       mostOvertime: "💪 Most Overtime",
-      customerServiceDesigners: "(Customer Service & Designers)",
+      customerServiceDesigners: "(Junior CRM Specialist & Designers)",
       assignShiftsTrackPerformance: "Assign shifts and manage employee work schedules",
       weeklyShiftAssignments: "Weekly Shift Assignments",
       previousWeek: "Previous",
@@ -134,14 +134,14 @@ const AdminShiftManagement = () => {
 
   useEffect(() => {
     console.log('AdminShiftManagement: Component mounted', { user });
-    if (user?.role === 'admin' || user?.role === 'content_creative_manager') {
+    if (user?.role === 'admin' || user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager') {
       loadData();
     }
   }, [user, selectedWeekStart]);
 
   // Add real-time subscription for shift assignments
   useEffect(() => {
-    if (!user?.id || (user.role !== 'admin' && user.role !== 'content_creative_manager')) return;
+    if (!user?.id || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) return;
 
     // Create unique channel name to avoid conflicts
     const channelName = `shift-assignments-${user.id}`;
@@ -173,7 +173,7 @@ const AdminShiftManagement = () => {
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
-    console.log('AdminShiftManagement: Loading data...');
+    console.log('🔍 AdminShiftManagement: Loading data for user:', user?.role);
     
     try {
       await Promise.all([
@@ -193,22 +193,43 @@ const AdminShiftManagement = () => {
 
   const loadEmployees = async () => {
     try {
-      console.log('Loading employees...');
+      console.log('🔍 Loading employees for user role:', user?.role);
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('role', 'employee')
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error loading employees:', error);
+        throw error;
+      }
       
-      // Filter employees for Content & Creative Manager
+      console.log('🔍 Raw employee data from database:', data);
+      
+      // Filter employees for Content & Creative Manager and Customer Retention Manager
       let filteredEmployees = data || [];
       if (user?.role === 'content_creative_manager') {
         filteredEmployees = (data || []).filter(emp => 
           emp.team === 'Content & Creative Department' && 
-          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+          ['Content Creator', 'Designer', 'Media Buyer'].includes(emp.position)
         );
+      } else if (user?.role === 'customer_retention_manager') {
+        // More flexible filtering for Customer Retention Manager
+        filteredEmployees = (data || []).filter(emp => 
+          (emp.team === 'Customer Retention Department' || emp.team === null) && 
+          ['Junior CRM Specialist'].includes(emp.position)
+        );
+        console.log('🔍 Customer Retention Manager - All employees:', data);
+        console.log('🔍 Customer Retention Manager - Filtered employees:', filteredEmployees);
+        
+        // If no team-specific employees found, show all Junior CRM Specialists
+        if (filteredEmployees.length === 0) {
+          filteredEmployees = (data || []).filter(emp => 
+            ['Junior CRM Specialist'].includes(emp.position)
+          );
+          console.log('🔍 Customer Retention Manager - Fallback to all Junior CRM Specialists:', filteredEmployees);
+        }
       }
       
       console.log('Employees loaded:', filteredEmployees?.length || 0);
@@ -221,15 +242,19 @@ const AdminShiftManagement = () => {
 
   const loadShifts = async () => {
     try {
-      console.log('Loading shifts...');
+      console.log('🔍 Loading shifts...');
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
         .eq('is_active', true)
         .order('start_time');
 
-      if (error) throw error;
-      console.log('Shifts loaded:', data?.length || 0);
+      if (error) {
+        console.error('❌ Error loading shifts:', error);
+        throw error;
+      }
+      console.log('🔍 Shifts loaded:', data?.length || 0);
+      console.log('🔍 Shifts data:', data);
       
       // Map database fields to Shift type
       const mappedShifts = (data || []).map(item => ({
@@ -280,7 +305,7 @@ const AdminShiftManagement = () => {
         shiftName: item.shifts?.name
       }));
 
-      // Filter assignments for Content & Creative Manager
+      // Filter assignments for Content & Creative Manager and Customer Retention Manager
       let filteredAssignments = formattedAssignments;
       if (user?.role === 'content_creative_manager') {
         const teamEmployeeIds = employees.map(emp => emp.id);
@@ -288,6 +313,13 @@ const AdminShiftManagement = () => {
           teamEmployeeIds.includes(assignment.employeeId)
         );
         console.log('🎯 Content & Creative Shift Assignments:', filteredAssignments.length);
+      } else if (user?.role === 'customer_retention_manager') {
+        const teamEmployeeIds = employees.map(emp => emp.id);
+        filteredAssignments = formattedAssignments.filter(assignment => 
+          teamEmployeeIds.includes(assignment.employeeId)
+        );
+        console.log('🎯 Customer Retention Shift Assignments:', filteredAssignments.length);
+        console.log('🎯 Customer Retention Employee IDs:', teamEmployeeIds);
       }
       
       console.log('Assignments loaded:', filteredAssignments.length);
@@ -444,7 +476,7 @@ const AdminShiftManagement = () => {
         name: '',
         startTime: '',
         endTime: '',
-        position: 'Customer Service',
+        position: 'Junior CRM Specialist',
         allTimeOvertime: false
       });
       setIsCustomShiftDialogOpen(false);
@@ -502,7 +534,7 @@ const AdminShiftManagement = () => {
         name: '',
         startTime: '',
         endTime: '',
-        position: 'Customer Service',
+        position: 'Junior CRM Specialist',
         allTimeOvertime: false
       });
       setIsEditShiftDialogOpen(false);
@@ -555,7 +587,7 @@ const AdminShiftManagement = () => {
     ? employees 
     : employees.filter(emp => emp.id === selectedEmployee);
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
     return (
       <div className="flex items-center justify-center min-h-[50vh] p-4">
         <Card className="max-w-md w-full">
@@ -679,7 +711,7 @@ const AdminShiftManagement = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Customer Service">Customer Service</SelectItem>
+                          <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                           <SelectItem value="Designer">Designer</SelectItem>
                         </SelectContent>
                       </Select>
@@ -815,7 +847,7 @@ const AdminShiftManagement = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Customer Service">Customer Service</SelectItem>
+                    <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                   </SelectContent>
                 </Select>

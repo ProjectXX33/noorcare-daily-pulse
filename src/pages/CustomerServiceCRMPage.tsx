@@ -49,7 +49,7 @@ const CustomerServiceCRMPage = () => {
       return;
     }
 
-    if (user.position !== 'Customer Service') {
+    if (user.position !== 'Junior CRM Specialist') {
       console.warn('Access denied: User is not Customer Service');
       navigate('/dashboard');
       return;
@@ -63,7 +63,7 @@ const CustomerServiceCRMPage = () => {
   };
 
   // Don't render page content if user is not Customer Service
-  if (!user || user.position !== 'Customer Service') {
+      if (!user || user.position !== 'Junior CRM Specialist') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

@@ -1,5 +1,5 @@
 // App version and cache configuration
-const APP_VERSION = '6.0.0'; // Enhanced cache clearing with auth preservation
+const APP_VERSION = '7.0.0'; // Enhanced cache clearing with auth preservation
 const CACHE_NAME = `vnq-system-v${APP_VERSION}-${Date.now()}`;
 const CACHE_VERSION_KEY = 'vnq-system-cache-version';
 

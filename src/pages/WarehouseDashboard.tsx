@@ -49,6 +49,7 @@ import {
   Download,
   CreditCard
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { OrderStatus, OrderNote, OrderStatusHistory } from '@/types';
 import { OrderSubmission, OrderItem, getAllOrderSubmissions } from '@/lib/orderSubmissionsApi';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +59,7 @@ import { useAutoSync } from '@/hooks/useAutoShiftsCalculation';
 import NotificationsMenu from '@/components/NotificationsMenu';
 import { createNotification } from '@/lib/notifications';
 import { playNotificationSound } from '@/lib/notifications';
-import Lottie from 'lottie-react';
+
 
 // Riyal SVG Icon
 const RiyalIcon = ({ className }: { className?: string }) => (
@@ -167,7 +168,7 @@ const WarehouseDashboard: React.FC = () => {
   const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [lastAutoCheckTime, setLastAutoCheckTime] = useState<Date | null>(null);
   const [isFixingImages, setIsFixingImages] = useState(false);
-  const [syncAnimationData, setSyncAnimationData] = useState<any>(null);
+
   
   // New order highlighting system
   const [newOrderHighlights, setNewOrderHighlights] = useState<Map<number, number>>(new Map());
@@ -333,16 +334,7 @@ const WarehouseDashboard: React.FC = () => {
     };
   }, []);
 
-  // Load animation data for sync box
-  useEffect(() => {
-    fetch('/animation/box.json')
-      .then(response => response.json())
-      .then(data => setSyncAnimationData(data))
-      .catch(error => {
-        console.error('Failed to load box.json:', error);
-        setSyncAnimationData(null);
-      });
-  }, []);
+
 
   // Set up real-time subscription for order updates
   useEffect(() => {
@@ -689,7 +681,7 @@ const WarehouseDashboard: React.FC = () => {
       status: wooOrder.status === 'completed' ? 'delivered' : 
              wooOrder.status === 'processing' ? 'processing' : 
              wooOrder.status === 'shipped' ? 'shipped' :
-             wooOrder.status === 'cancelled' ? 'cancelled' : 'pending',
+             wooOrder.status === 'cancelled' || wooOrder.status === 'tamara-o-canceled' ? 'cancelled' : 'pending',
       woocommerce_status: truncateString(wooOrder.status, 50), // WooCommerce status limit
       order_items: await Promise.all(
         (wooOrder.line_items || []).map(async (item: any) => {
@@ -1781,16 +1773,19 @@ const WarehouseDashboard: React.FC = () => {
   };
 
   const getStatusBadge = (status: string = 'pending') => {
-    // Map 'completed' to 'delivered' for display
-    const displayStatus = status === 'completed' ? 'delivered' : status;
+    // Map 'completed' to 'delivered' and 'tamara-o-canceled' to 'cancelled' for display
+    let displayStatus = status;
+    if (status === 'completed') displayStatus = 'delivered';
+    if (status === 'tamara-o-canceled') displayStatus = 'cancelled';
+    
     const statusColors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      shipped: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800',
-      'on-hold': 'bg-orange-100 text-orange-800'
+      pending: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200',
+      processing: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200',
+      shipped: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200',
+      delivered: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200',
+      cancelled: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200',
+      refunded: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
+      'on-hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200'
     };
 
     return (
@@ -1801,8 +1796,11 @@ const WarehouseDashboard: React.FC = () => {
   };
 
   const getStatusIcon = (status: string = 'pending') => {
-    // Map 'completed' to 'delivered' for icon
-    const displayStatus = status === 'completed' ? 'delivered' : status;
+    // Map 'completed' to 'delivered' and 'tamara-o-canceled' to 'cancelled' for icon
+    let displayStatus = status;
+    if (status === 'completed') displayStatus = 'delivered';
+    if (status === 'tamara-o-canceled') displayStatus = 'cancelled';
+    
     switch (displayStatus) {
       case 'pending': return <Clock className="w-4 h-4" />;
       case 'processing': return <Package className="w-4 h-4" />;
@@ -2321,16 +2319,16 @@ const WarehouseDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-3 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-            <Package className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />
+            <Package className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-white flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Warehouse Dashboard</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">Warehouse Dashboard</h1>
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                <p className="text-xs sm:text-sm text-gray-600">Order Management</p>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Order Management</p>
                 <div className="flex items-center gap-1">
                   <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-yellow-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`}></div>
                   <span className={`text-xs font-medium ${isSyncing ? 'text-yellow-600' : 'text-blue-600'}`}>
@@ -2351,26 +2349,6 @@ const WarehouseDashboard: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
-            {/* Sync Box */}
-            <div
-              onClick={() => {
-                console.log('🚀 Box logo clicked - checking for new orders...');
-                fetchMonthlyOrdersFromWooCommerce();
-              }}
-              className="cursor-pointer transition-all duration-300 flex items-center justify-center hover:scale-105"
-              title={isSyncing ? "Checking for new orders..." : "Click to check for new orders"}
-            >
-              {syncAnimationData ? (
-                <Lottie
-                  animationData={syncAnimationData}
-                  loop={isSyncing}
-                  autoplay={isSyncing}
-                  style={{ width: '66px', height: '66px' }}
-                />
-              ) : (
-                <div className="w-8 h-8 bg-gray-200 rounded"></div>
-              )}
-            </div>
             
             {/* Enhanced Refresh Button */}
             <Button
@@ -2385,12 +2363,17 @@ const WarehouseDashboard: React.FC = () => {
               <span className="hidden sm:inline">Refresh</span>
             </Button>
             
+            {/* Theme Toggle */}
+            <div className="flex items-center">
+              <ThemeToggle />
+            </div>
+            
             {/* Notifications */}
             <div className="flex items-center">
               <NotificationsMenu />
             </div>
             {/* User Menu */}
-            <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+            <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
               <span className="truncate max-w-20 lg:max-w-none">Welcome, {user.name}</span>
               <Button
                 variant="ghost"
@@ -2417,14 +2400,14 @@ const WarehouseDashboard: React.FC = () => {
       </div>
 
       {/* Mobile-Optimized Main Content */}
-      <div className="p-3 sm:p-6">
+      <div className="p-3 sm:p-6 bg-gray-50 dark:bg-gray-900">
         {/* Real-Time Dashboard Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Total Orders */}
-          <Card className="p-3 sm:p-4">
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
                 <p className="text-xl sm:text-2xl font-bold text-blue-600">{orders.length}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-blue-700">
@@ -2438,10 +2421,10 @@ const WarehouseDashboard: React.FC = () => {
           </Card>
 
           {/* Pending Orders */}
-          <Card className="p-3 sm:p-4">
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Pending</p>
                 <p className="text-xl sm:text-2xl font-bold text-orange-600">
                   {orders.filter(o => o.status === 'pending' || o.status === 'processing').length}
                 </p>
@@ -2457,10 +2440,10 @@ const WarehouseDashboard: React.FC = () => {
           </Card>
 
           {/* Shipped Orders */}
-          <Card className="p-3 sm:p-4">
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Shipped</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Shipped</p>
                 <p className="text-xl sm:text-2xl font-bold text-blue-600">
                   {orders.filter(o => o.status === 'shipped').length}
                 </p>
@@ -2476,10 +2459,10 @@ const WarehouseDashboard: React.FC = () => {
           </Card>
 
           {/* Delivered Orders */}
-          <Card className="p-3 sm:p-4">
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Delivered</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Delivered</p>
                 <p className="text-xl sm:text-2xl font-bold text-green-600">
                   {orders.filter(o => o.status === 'delivered' || o.status === 'completed').length}
                 </p>
@@ -2495,16 +2478,16 @@ const WarehouseDashboard: React.FC = () => {
           </Card>
 
           {/* Cancelled Orders */}
-          <Card className="p-3 sm:p-4">
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Cancelled</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Cancelled</p>
                 <p className="text-xl sm:text-2xl font-bold text-red-600">
-                  {orders.filter(o => o.status === 'cancelled').length}
+                  {orders.filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').length}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs sm:text-sm font-semibold text-red-700">
-                    {formatPrice(orders.filter(o => o.status === 'cancelled').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                  <span className="text-xs sm:text-sm font-semibold text-red-700 dark:text-red-400">
+                    {formatPrice(orders.filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-red-500" />
                 </div>
@@ -2515,14 +2498,14 @@ const WarehouseDashboard: React.FC = () => {
         </div>
 
         {/* Enhanced Shipping Methods Overview */}
-        <Card className="mb-4 sm:mb-6">
+        <Card className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-3 sm:pb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-900 dark:text-white">
                 <Truck className="w-5 h-5" />
                 Shipping Performance Dashboard
               </CardTitle>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span>Live Data</span>
@@ -2536,56 +2519,56 @@ const WarehouseDashboard: React.FC = () => {
             {/* Real Summary Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
               {/* Total Revenue */}
-              <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-blue-700">Total Revenue</p>
-                    <p className="text-xl sm:text-2xl font-bold text-blue-900">{formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0))}</p>
+                    <p className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-300">Total Revenue</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">{formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0))}</p>
                   </div>
-                  <div className="flex items-center justify-center rounded-full bg-blue-100 p-2 shadow-sm">
+                  <div className="flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-800 p-2 shadow-sm">
                     <RiyalIcon className="w-6 h-6 text-blue-500" />
                   </div>
                 </div>
               </div>
 
               {/* Average Order Value */}
-              <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="p-3 sm:p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-green-700">Avg Order Value</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-900">{orders.length > 0 ? formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0) / orders.length) : formatPrice(0)}</p>
+                    <p className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-300">Avg Order Value</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">{orders.length > 0 ? formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0) / orders.length) : formatPrice(0)}</p>
                   </div>
-                  <div className="flex items-center justify-center rounded-full bg-green-100 p-2 shadow-sm">
+                  <div className="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-800 p-2 shadow-sm">
                     <BarChart2 className="w-6 h-6 text-green-500" />
                   </div>
                 </div>
               </div>
 
               {/* Today's Orders */}
-              <div className="p-3 sm:p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-purple-700">Today's Orders</p>
-                    <p className="text-xl sm:text-2xl font-bold text-purple-900">{orders.filter(order => {
+                    <p className="text-xs sm:text-sm font-medium text-purple-700 dark:text-purple-300">Today's Orders</p>
+                    <p className="text-xl sm:text-2xl font-bold text-purple-900 dark:text-purple-100">{orders.filter(order => {
                         const orderDate = new Date(order.created_at);
                         const today = new Date();
                         return orderDate.toDateString() === today.toDateString();
                     }).length}</p>
                   </div>
-                  <div className="flex items-center justify-center rounded-full bg-purple-100 p-2 shadow-sm">
+                  <div className="flex items-center justify-center rounded-full bg-purple-100 dark:bg-purple-800 p-2 shadow-sm">
                     <LucideCalendar className="w-6 h-6 text-purple-500" />
                   </div>
                 </div>
               </div>
 
               {/* Completion Rate */}
-              <div className="p-3 sm:p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="p-3 sm:p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-orange-700">Completion Rate</p>
-                    <p className="text-xl sm:text-2xl font-bold text-orange-900">{completionRate}%</p>
+                    <p className="text-xs sm:text-sm font-medium text-orange-700 dark:text-orange-300">Completion Rate</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-900 dark:text-orange-100">{completionRate}%</p>
                   </div>
-                  <div className="flex items-center justify-center rounded-full bg-orange-100 p-2 shadow-sm">
+                  <div className="flex items-center justify-center rounded-full bg-orange-100 dark:bg-orange-800 p-2 shadow-sm">
                     <Target className="w-6 h-6 text-orange-500" />
                   </div>
                 </div>
@@ -2599,9 +2582,9 @@ const WarehouseDashboard: React.FC = () => {
         </Card>
 
         {/* Filters & Search */}
-        <Card className="mb-4 sm:mb-6">
+        <Card className="mb-4 sm:mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-900 dark:text-white">
               <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
               Filters & Search
             </CardTitle>
@@ -2646,7 +2629,7 @@ const WarehouseDashboard: React.FC = () => {
                 <Button
                   onClick={clearDatabaseHighlights}
                   variant="outline"
-                  className="w-full sm:w-auto bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300"
+                  className="w-full sm:w-auto bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:border-purple-300 dark:hover:border-purple-600"
                   disabled={isLoading}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -2663,7 +2646,7 @@ const WarehouseDashboard: React.FC = () => {
                     fetchMonthlyOrdersFromWooCommerce();
                   }}
                   variant="outline"
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 hover:from-blue-100 hover:to-blue-150 hover:border-blue-300 font-medium shadow-sm"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:from-blue-100 hover:to-blue-150 dark:hover:from-blue-900/30 dark:hover:to-blue-800/30 hover:border-blue-300 dark:hover:border-blue-600 font-medium shadow-sm"
                   disabled={isLoading || isSyncing}
                 >
                   {isSyncing ? (
@@ -2674,7 +2657,7 @@ const WarehouseDashboard: React.FC = () => {
                   <span className="hidden sm:inline">Check New Orders</span>
                   <span className="sm:hidden">Check</span>
                 </Button>
-                <div className="text-xs text-blue-600 hidden sm:block">
+                <div className="text-xs text-blue-600 dark:text-blue-400 hidden sm:block">
                 </div>
               </div>
 
@@ -2683,14 +2666,14 @@ const WarehouseDashboard: React.FC = () => {
                 <Button
                   onClick={exportOrdersToCSV}
                   variant="outline"
-                  className="w-full sm:w-auto bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300"
+                  className="w-full sm:w-auto bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 hover:border-green-300 dark:hover:border-green-600"
                   disabled={isLoading}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   <span className="hidden sm:inline">Export CSV</span>
                   <span className="sm:hidden">Export</span>
                   {filteredOrders.length !== orders.length && (
-                    <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800">
+                    <Badge variant="secondary" className="ml-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                       {filteredOrders.length}
                     </Badge>
                   )}
@@ -2701,10 +2684,10 @@ const WarehouseDashboard: React.FC = () => {
         </Card>
 
         {/* Mobile-Optimized Orders List */}
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-3">
             <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-base sm:text-lg">Orders ({filteredOrders.length})</span>
+              <span className="text-base sm:text-lg text-gray-900 dark:text-white">Orders ({filteredOrders.length})</span>
               <Badge variant="outline" className="self-start sm:self-auto">
                 {isLoading ? 'Loading...' : 'Live Updates'}
               </Badge>
@@ -2714,13 +2697,13 @@ const WarehouseDashboard: React.FC = () => {
             {isLoading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600">Loading orders...</p>
+                <p className="mt-2 text-gray-600 dark:text-gray-300">Loading orders...</p>
               </div>
             ) : filteredOrders.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
                 <p className="text-sm">No orders found</p>
-                <p className="text-xs text-gray-400 mt-1">Try adjusting your search or filters</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try adjusting your search or filters</p>
               </div>
             ) : (
               <>
@@ -2746,8 +2729,8 @@ const WarehouseDashboard: React.FC = () => {
                         <TableRow 
                           key={order.id} 
                           className={`
-                            ${order.copied_by_warehouse ? 'bg-purple-50' : ''}
-                            ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-r from-yellow-50 via-amber-100 to-yellow-50 border-2 border-yellow-400 animate-pulse shadow-xl ring-4 ring-yellow-200/50 relative overflow-visible before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-yellow-200/30 before:to-transparent before:animate-pulse' : ''}
+                            ${order.copied_by_warehouse ? 'bg-purple-50 dark:bg-purple-900/20' : ''}
+                            ${isOrderHighlighted(order.id!) ? 'bg-gradient-to-r from-yellow-50 via-amber-100 to-yellow-50 dark:from-yellow-900/20 dark:via-amber-900/30 dark:to-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-500 animate-pulse shadow-xl ring-4 ring-yellow-200/50 dark:ring-yellow-500/30 relative overflow-visible before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-yellow-200/30 dark:before:via-yellow-500/20 before:to-transparent before:animate-pulse' : ''}
                             transition-all duration-500
                           `}
                         >
@@ -2770,7 +2753,7 @@ const WarehouseDashboard: React.FC = () => {
                                 {order.customer_first_name} {order.customer_last_name}
                               </div>
                               {order.customer_email && (
-                                <div className="text-sm text-gray-600">{order.customer_email}</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-300">{order.customer_email}</div>
                               )}
                             </div>
                           </TableCell>
@@ -2861,10 +2844,10 @@ const WarehouseDashboard: React.FC = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 hover:from-purple-100 hover:to-purple-150 hover:border-purple-400 font-medium shadow-sm"
+                                className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:from-purple-100 hover:to-purple-150 dark:hover:from-purple-900/30 dark:hover:to-purple-800/30 hover:border-purple-400 dark:hover:border-purple-600 font-medium shadow-sm"
                                 onClick={() => copyOrderInArabic(order)}
                               >
-                                <Copy className="h-4 w-4 mr-1 text-purple-600" />
+                                <Copy className="h-4 w-4 mr-1 text-purple-600 dark:text-purple-400" />
                                 
                                 <span className="sm:hidden">📋 نسخ</span>
                             </Button>
@@ -2878,8 +2861,8 @@ const WarehouseDashboard: React.FC = () => {
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center justify-between mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                       <span>
                         Showing {startIndex + 1} to {Math.min(endIndex, totalOrders)} of {totalOrders} orders
                       </span>
@@ -3069,10 +3052,10 @@ const WarehouseDashboard: React.FC = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 hover:from-purple-100 hover:to-purple-150 hover:border-purple-400 font-medium shadow-sm flex-1"
+                            className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700 hover:from-purple-100 hover:to-purple-150 dark:hover:from-purple-900/30 dark:hover:to-purple-800/30 hover:border-purple-400 dark:hover:border-purple-600 font-medium shadow-sm flex-1"
                             onClick={() => copyOrderInArabic(order)}
                           >
-                            <Copy className="h-4 w-4 mr-1 text-purple-600" />
+                            <Copy className="h-4 w-4 mr-1 text-purple-600 dark:text-purple-400" />
                             <span className="hidden sm:inline">Copy Arabic</span>
                             
                           </Button>
@@ -3084,8 +3067,8 @@ const WarehouseDashboard: React.FC = () => {
 
                 {/* Mobile Pagination Controls */}
                 {totalPages > 1 && (
-                  <div className="lg:hidden mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="text-center text-sm text-gray-600 mb-3">
+                  <div className="lg:hidden mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="text-center text-sm text-gray-600 dark:text-gray-300 mb-3">
                       Page {currentPage} of {totalPages} ({totalOrders} total orders)
                     </div>
                     
@@ -3424,7 +3407,7 @@ const WarehouseDashboard: React.FC = () => {
 
       {/* Status Update Modal */}
       <Dialog open={isStatusUpdateOpen} onOpenChange={setIsStatusUpdateOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Update Order Status</DialogTitle>
             <DialogDescription>
@@ -3530,7 +3513,7 @@ const WarehouseDashboard: React.FC = () => {
 
       {/* Add Note Modal */}
       <Dialog open={isAddNoteOpen} onOpenChange={setIsAddNoteOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Order Note</DialogTitle>
             <DialogDescription>

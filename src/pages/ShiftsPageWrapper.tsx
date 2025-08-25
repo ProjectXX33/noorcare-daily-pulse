@@ -8,7 +8,7 @@ const ShiftsPageWrapper = () => {
   const { user } = useAuth();
   
   // Check access before any other hooks are called
-  const hasAccess = ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user?.position) || user?.role === 'admin';
+  const hasAccess = ['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user?.position) || user?.role === 'admin';
   
   // Early return if no access - prevents hooks violations
   if (!hasAccess) {

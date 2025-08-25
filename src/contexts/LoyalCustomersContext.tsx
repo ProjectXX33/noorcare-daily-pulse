@@ -26,6 +26,7 @@ interface LoyalCustomersContextType {
   details: string;
   startFetching: () => void;
   clearData: () => void;
+  forceRefresh: () => void;
 }
 
 const LoyalCustomersContext = createContext<LoyalCustomersContextType | undefined>(undefined);
@@ -37,6 +38,67 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState('');
   const [details, setDetails] = useState('');
+
+  // Local storage keys
+  const STORAGE_KEY = 'loyal_customers_data';
+  const TIMESTAMP_KEY = 'loyal_customers_timestamp';
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  // Local storage functions
+  const saveToLocalStorage = (data: LoyalCustomer[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(TIMESTAMP_KEY, Date.now().toString());
+      console.log('💾 Saved loyal customers data to localStorage:', data.length, 'customers');
+    } catch (error) {
+      console.error('❌ Error saving to localStorage:', error);
+    }
+  };
+
+  const loadFromLocalStorage = (): LoyalCustomer[] | null => {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      const timestamp = localStorage.getItem(TIMESTAMP_KEY);
+      
+      if (!data || !timestamp) {
+        console.log('📭 No cached data found in localStorage');
+        return null;
+      }
+
+      const parsedData = JSON.parse(data);
+      const cacheAge = Date.now() - parseInt(timestamp);
+      
+      if (cacheAge > CACHE_DURATION) {
+        console.log('⏰ Cached data is expired (age:', Math.round(cacheAge / (1000 * 60 * 60)), 'hours)');
+        return null;
+      }
+
+      console.log('📂 Loaded loyal customers data from localStorage:', parsedData.length, 'customers');
+      return parsedData;
+    } catch (error) {
+      console.error('❌ Error loading from localStorage:', error);
+      return null;
+    }
+  };
+
+  const clearLocalStorage = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TIMESTAMP_KEY);
+      console.log('🗑️ Cleared loyal customers data from localStorage');
+    } catch (error) {
+      console.error('❌ Error clearing localStorage:', error);
+    }
+  };
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const cachedData = loadFromLocalStorage();
+    if (cachedData && cachedData.length > 0) {
+      setCustomers(cachedData);
+      console.log('✅ Loaded cached loyal customers data on mount');
+    }
+  }, []);
 
   // Determine loyalty tier based on spending amount only
   const determineLoyaltyTier = (totalSpent: number, ordersCount: number): LoyalCustomer['loyalty_tier'] => {
@@ -218,6 +280,9 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
 
       setCustomers(sortedCustomers);
 
+      // Save to localStorage
+      saveToLocalStorage(sortedCustomers);
+
       if (sortedCustomers.length > 0) {
         toast.success(`Loaded top ${sortedCustomers.length} loyal customers from latest 5000 customers`);
       } else {
@@ -264,6 +329,15 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
       return;
     }
 
+    // Check for cached data first
+    const cachedData = loadFromLocalStorage();
+    if (cachedData && cachedData.length > 0) {
+      console.log('📂 Using cached data, skipping API call');
+      setCustomers(cachedData);
+      toast.success(`Loaded ${cachedData.length} loyal customers from cache`);
+      return;
+    }
+
     console.log('🚀 Starting fresh customer fetch process...');
     
     // Test API connection first
@@ -289,6 +363,38 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
     setProgress(0);
     setStage('');
     setDetails('');
+    clearLocalStorage();
+  };
+
+  const forceRefresh = () => {
+    if (!isWooCommerceConfigured()) {
+      setError('WooCommerce API is not configured. Please check your settings.');
+      return;
+    }
+
+    // Prevent multiple simultaneous requests
+    if (loading) {
+      console.log('🚫 Fetch already in progress, ignoring duplicate request');
+      return;
+    }
+
+    console.log('🔄 Force refreshing customer data...');
+    
+    // Test API connection first
+    wooCommerceAPI.testConnection()
+      .then((isConnected) => {
+        if (!isConnected) {
+          setError('Unable to connect to WooCommerce API. Please check your internet connection and try again.');
+          return;
+        }
+        
+        // If connection test passes, start fetching
+        fetchAllCustomers();
+      })
+      .catch((error) => {
+        console.error('🔥 WooCommerce connection test failed:', error);
+        setError(`Connection test failed: ${error.message}`);
+      });
   };
 
   const contextValue: LoyalCustomersContextType = {
@@ -299,7 +405,8 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
     stage,
     details,
     startFetching,
-    clearData
+    clearData,
+    forceRefresh
   };
 
   return (

@@ -26,7 +26,14 @@ import {
   BarChart3,
   Users,
   Award,
-  Copy
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Settings,
+  CheckCircle,
+  XCircle,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -38,7 +45,7 @@ import {
   OrderSubmissionFilters 
 } from '@/lib/orderSubmissionsApi';
 import wooCommerceAPI from '@/lib/woocommerceApi';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { syncOrderFromWooCommerce } from '@/lib/orderSubmissionsApi';
 // Remove date-fns dependency and use built-in date formatting
 
@@ -76,7 +83,9 @@ const AdminTotalOrdersPage: React.FC = () => {
     total_revenue: 0,
     pending_orders: 0,
     processing_orders: 0,
-    completed_orders: 0
+    completed_orders: 0,
+    shipped_orders: 0,
+    cancelled_orders: 0
   });
   const [customerServiceStats, setCustomerServiceStats] = useState<{
     user_id: string;
@@ -97,16 +106,23 @@ const AdminTotalOrdersPage: React.FC = () => {
   // View mode
   const [viewMode, setViewMode] = useState<'orders' | 'stats'>('orders');
 
-  // Access control - Admin and Media Buyer only
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 20;
+
+  // Access control - Admin, Customer Retention Manager, Media Buyer, and Customer Service
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
       return;
     }
     
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    
     // Only redirect if user is loaded and doesn't have access
-    if (user.id && user.role !== 'admin' && user.position !== 'Media Buyer') {
-      console.warn('Access denied: User is not admin or media buyer');
+    if (user.id && !allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) {
+      console.warn('Access denied: User is not authorized');
       navigate('/dashboard', { replace: true });
       return;
     }
@@ -312,7 +328,7 @@ const AdminTotalOrdersPage: React.FC = () => {
 
       // Fetch orders with all statuses (WooCommerce doesn't support 'any', so we need multiple calls)
       console.log('📦 Fetching orders with multiple status calls...');
-      const statusesToSync = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'];
+      const statusesToSync = ['pending', 'processing', 'on-hold', 'completed', 'shipped', 'cancelled', 'refunded', 'failed'];
       let allWooOrders: any[] = [];
       
       for (const status of statusesToSync) {
@@ -343,59 +359,60 @@ const AdminTotalOrdersPage: React.FC = () => {
       for (const wooOrder of wooOrders) {
         try {
           // Check if order already exists in our system
-                      const { data: existingOrder, error: checkError } = await supabase
-              .from('order_submissions')
-              .select('id, order_number, status, total_amount, updated_at, created_at')
-              .eq('woocommerce_order_id', wooOrder.id)
-              .maybeSingle();
+          const { data: existingOrder, error: checkError } = await supabase
+            .from('order_submissions')
+            .select('id, order_number, status, total_amount, updated_at, created_at')
+            .eq('woocommerce_order_id', wooOrder.id)
+            .maybeSingle();
 
-            if (checkError) {
-              console.error(`❌ Error checking existing order ${wooOrder.id}:`, checkError);
-              syncStats.errors++;
-              continue;
-            }
+          if (checkError) {
+            console.error(`❌ Error checking existing order ${wooOrder.id}:`, checkError);
+            syncStats.errors++;
+            continue;
+          }
 
-            if (existingOrder) {
-              // Order exists - check if it needs updating
-              const wooStatus = wooOrder.status === 'completed' ? 'completed' : 
-                               wooOrder.status === 'processing' ? 'processing' : 
-                               wooOrder.status === 'cancelled' ? 'cancelled' : 'pending';
+          if (existingOrder) {
+            // Order exists - check if it needs updating
+            const wooStatus = wooOrder.status === 'completed' ? 'completed' : 
+                             wooOrder.status === 'processing' ? 'processing' : 
+                             wooOrder.status === 'shipped' ? 'shipped' :
+                             wooOrder.status === 'cancelled' || wooOrder.status === 'tamara-o-canceled' ? 'cancelled' : 'pending';
+            
+            const wooTotal = parseFloat(wooOrder.total);
+            const lastModified = new Date(wooOrder.date_modified);
+            const localLastUpdate = new Date(existingOrder.updated_at || existingOrder.created_at);
+
+            if (existingOrder.status !== wooStatus || 
+                Math.abs(existingOrder.total_amount - wooTotal) > 0.01 ||
+                lastModified > localLastUpdate) {
               
-              const wooTotal = parseFloat(wooOrder.total);
-              const lastModified = new Date(wooOrder.date_modified);
-              const localLastUpdate = new Date(existingOrder.updated_at || existingOrder.created_at);
+              console.log(`🔄 Updating existing order: ${wooOrder.number}`);
+              
+              const { error: updateError } = await supabase
+                .from('order_submissions')
+                .update({
+                  status: wooStatus,
+                  total_amount: wooTotal,
+                  subtotal: wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
+                  shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
+                  payment_method: wooOrder.payment_method_title,
+                  updated_at: new Date().toISOString(),
+                  is_synced_to_woocommerce: true
+                })
+                .eq('id', existingOrder.id);
 
-                          if (existingOrder.status !== wooStatus || 
-                  Math.abs(existingOrder.total_amount - wooTotal) > 0.01 ||
-                  lastModified > localLastUpdate) {
-                
-                console.log(`🔄 Updating existing order: ${wooOrder.number}`);
-                
-                const { error: updateError } = await supabase
-                  .from('order_submissions')
-                  .update({
-                    status: wooStatus,
-                    total_amount: wooTotal,
-                    subtotal: wooTotal - parseFloat(wooOrder.shipping_total || '0') - parseFloat(wooOrder.total_tax || '0'),
-                    shipping_amount: parseFloat(wooOrder.shipping_total || '0'),
-                    payment_method: wooOrder.payment_method_title,
-                    updated_at: new Date().toISOString(),
-                    is_synced_to_woocommerce: true
-                  })
-                  .eq('id', existingOrder.id);
-
-                if (updateError) {
-                  console.error(`❌ Failed to update order ${wooOrder.number}:`, updateError);
-                  syncStats.errors++;
-                } else {
-                  console.log(`✅ Updated order ${wooOrder.number}`);
-                  syncStats.updated++;
-                }
+              if (updateError) {
+                console.error(`❌ Failed to update order ${wooOrder.number}:`, updateError);
+                syncStats.errors++;
               } else {
-                console.log(`⚠️ Order ${wooOrder.number} is already up to date`);
-                syncStats.skipped++;
+                console.log(`✅ Updated order ${wooOrder.number}`);
+                syncStats.updated++;
               }
-              continue;
+            } else {
+              console.log(`⚠️ Order ${wooOrder.number} is already up to date`);
+              syncStats.skipped++;
+            }
+            continue;
           }
 
           console.log(`🆕 New order found: ${wooOrder.number} (WooCommerce ID: ${wooOrder.id})`);
@@ -420,7 +437,8 @@ const AdminTotalOrdersPage: React.FC = () => {
             payment_method: wooOrder.payment_method_title,
             status: wooOrder.status === 'completed' ? 'completed' : 
                    wooOrder.status === 'processing' ? 'processing' : 
-                   wooOrder.status === 'cancelled' ? 'cancelled' : 'pending',
+                   wooOrder.status === 'shipped' ? 'shipped' :
+                   wooOrder.status === 'cancelled' || wooOrder.status === 'tamara-o-canceled' ? 'cancelled' : 'pending',
             order_items: wooOrder.line_items.map(item => ({
               product_id: item.product_id,
               product_name: item.name,
@@ -439,42 +457,42 @@ const AdminTotalOrdersPage: React.FC = () => {
             .insert(orderData)
             .select();
 
-                      if (insertError) {
-              console.error(`❌ Failed to import order ${wooOrder.number}:`, insertError);
-              syncStats.errors++;
-            } else {
-              console.log(`✅ Successfully imported order ${wooOrder.number}`);
-              syncStats.new++;
-            }
-
-            // Small delay to prevent overwhelming the database
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-          } catch (orderError) {
-            console.error(`❌ Error processing WooCommerce order ${wooOrder.id}:`, orderError);
+          if (insertError) {
+            console.error(`❌ Failed to import order ${wooOrder.number}:`, insertError);
             syncStats.errors++;
+          } else {
+            console.log(`✅ Successfully imported order ${wooOrder.number}`);
+            syncStats.new++;
           }
+
+          // Small delay to prevent overwhelming the database
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+        } catch (orderError) {
+          console.error(`❌ Error processing WooCommerce order ${wooOrder.id}:`, orderError);
+          syncStats.errors++;
         }
+      }
 
-        // Final status report
-        const totalNew = syncStats.new;
-        const totalUpdated = syncStats.updated;
-        const totalSkipped = syncStats.skipped;
-        const totalErrors = syncStats.errors;
+      // Final status report
+      const totalNew = syncStats.new;
+      const totalUpdated = syncStats.updated;
+      const totalSkipped = syncStats.skipped;
+      const totalErrors = syncStats.errors;
 
-        let message = `🎉 WooCommerce Import Complete!\n`;
-        if (totalNew > 0) message += `📥 ${totalNew} new orders imported\n`;
-        if (totalUpdated > 0) message += `🔄 ${totalUpdated} orders updated\n`;
-        if (totalSkipped > 0) message += `⏭️ ${totalSkipped} orders already up to date\n`;
-        if (totalErrors > 0) message += `⚠️ ${totalErrors} errors occurred`;
+      let message = `🎉 WooCommerce Import Complete!\n`;
+      if (totalNew > 0) message += `📥 ${totalNew} new orders imported\n`;
+      if (totalUpdated > 0) message += `🔄 ${totalUpdated} orders updated\n`;
+      if (totalSkipped > 0) message += `⏭️ ${totalSkipped} orders already up to date\n`;
+      if (totalErrors > 0) message += `⚠️ ${totalErrors} errors occurred`;
 
-        if (totalErrors > 0) {
-          toast.warning(message);
-        } else {
-          toast.success(message);
-        }
+      if (totalErrors > 0) {
+        toast.warning(message);
+      } else {
+        toast.success(message);
+      }
 
-        console.log('📊 Import Statistics:', syncStats);
+      console.log('📊 Import Statistics:', syncStats);
 
       // Update last sync time
       setLastSyncTime(new Date());
@@ -492,7 +510,9 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Auto-sync functionality
   useEffect(() => {
-    if (!autoSyncEnabled || !user || (user.role !== 'admin' && user.position !== 'Media Buyer')) return;
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    if (!autoSyncEnabled || !user || (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position))) return;
 
     const autoSyncInterval = setInterval(() => {
       console.log('🔄 Auto-sync triggered');
@@ -504,7 +524,9 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Initial data load
   useEffect(() => {
-    if (user && (user.role === 'admin' || user.position === 'Media Buyer')) {
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    if (user && (allowedRoles.includes(user.role as string) || allowedPositions.includes(user.position))) {
       fetchData();
     }
   }, [user]);
@@ -528,7 +550,12 @@ const AdminTotalOrdersPage: React.FC = () => {
     
     // Status filter
     if (filters.status && filters.status !== 'all') {
-      filtered = filtered.filter(order => order.status === filters.status);
+      filtered = filtered.filter(order => {
+        if (filters.status === 'cancelled') {
+          return order.status === 'cancelled' || order.status === 'tamara-o-canceled';
+        }
+        return order.status === filters.status;
+      });
     }
     
     // Customer service filter
@@ -552,7 +579,46 @@ const AdminTotalOrdersPage: React.FC = () => {
     }
     
     setFilteredOrders(filtered);
+    // Reset to first page when filters change
+    setCurrentPage(1);
   }, [orders, filters]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+  const startIndex = (currentPage - 1) * ordersPerPage;
+  const endIndex = startIndex + ordersPerPage;
+  const currentOrders = filteredOrders.slice(startIndex, endIndex);
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll to top of orders section
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle statistics card click to filter by status
+  const handleStatsCardClick = (status: string) => {
+    setFilters(prev => ({
+      ...prev,
+      status: status
+    }));
+    // Switch to orders view if currently in stats view
+    if (viewMode === 'stats') {
+      setViewMode('orders');
+    }
+    // Scroll to orders section
+    setTimeout(() => {
+      const ordersSection = document.querySelector('[data-section="orders"]');
+      if (ordersSection) {
+        ordersSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  // Check if a status card is currently selected
+  const isStatusCardSelected = (status: string) => {
+    return filters.status === status;
+  };
 
   // Handle filter changes
   const handleFilterChange = (key: keyof OrderSubmissionFilters, value: string) => {
@@ -588,65 +654,139 @@ const AdminTotalOrdersPage: React.FC = () => {
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Processing</Badge>;
       case 'completed':
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
+      case 'shipped':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Shipped</Badge>;
       case 'cancelled':
+      case 'tamara-o-canceled':
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Cancelled</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  // Get payment method in Arabic
+  const getPaymentMethodArabic = (method: string) => {
+    switch (method?.toLowerCase()) {
+      case 'cod':
+        return 'الدفع عند الاستلام (COD)';
+      case 'bank_transfer':
+        return 'تحويل بنكي';
+      case 'credit_card':
+        return 'بطاقة ائتمان';
+      default:
+        return 'الدفع عند الاستلام (COD)';
+    }
+  };
+
   // Copy order information in Arabic format
   const copyOrderInArabic = async (order: OrderSubmission) => {
     try {
-      // Get payment method in Arabic
-      const getPaymentMethodArabic = (method: string) => {
-        switch (method?.toLowerCase()) {
-          case 'cod':
-            return 'الدفع عند الاستلام (COD)';
-          case 'bank_transfer':
-            return 'تحويل بنكي';
-          case 'credit_card':
-            return 'بطاقة ائتمان';
-          default:
-            return 'الدفع عند الاستلام (COD)';
-        }
-      };
+      // Debug: Log order data to check structure
+      console.log('📋 Copying order details:', {
+        orderNumber: order.order_number,
+        customerName: `${order.customer_first_name} ${order.customer_last_name}`,
+        phone: order.customer_phone,
+        itemsCount: order.order_items?.length || 0,
+        totalAmount: order.total_amount
+      });
 
-      // Format the Arabic order invoice
+      // Format the Arabic order invoice with safety checks
       const arabicOrderText = `🌙 نور القمر – فاتورة الطلب
 
-رقم الطلب: #${order.order_number}
-اسم العميل: ${order.customer_first_name} ${order.customer_last_name}
-رقم الهاتف: ${order.customer_phone}
-العنوان: ${order.billing_address_1}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
-المدينة: ${order.billing_city}
-الدولة: ${order.billing_country}
+رقم الطلب: #${order.order_number || order.id || 'N/A'}
+اسم العميل: ${order.customer_first_name || ''} ${order.customer_last_name || ''}
+رقم الهاتف: ${order.customer_phone || 'N/A'}
+العنوان: ${order.billing_address_1 || 'N/A'}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
+المدينة: ${order.billing_city || 'N/A'}
+الدولة: ${order.billing_country || 'N/A'}
 طريقة الدفع: ${getPaymentMethodArabic(order.payment_method)}
 
 🛒 تفاصيل الطلب:
-${order.order_items.map(item => 
-`المنتج: ${item.product_name}
-الكمية: ${item.quantity}`
+${(order.order_items || []).map(item => 
+`المنتج: ${item.product_name || 'N/A'}
+الكمية: ${item.quantity || 0}`
 ).join('\n\n')}
 
 💰 إجمالي الطلب:
-${order.total_amount.toFixed(0)} ريال سعودي`;
+${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
 
-      // Copy to clipboard
-      await navigator.clipboard.writeText(arabicOrderText);
-      toast.success('تم نسخ تفاصيل الطلب بالعربية!', {
-        description: 'Order details copied in Arabic format',
-      });
+      // Try modern clipboard API first
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        try {
+          // Check if we have clipboard permission
+          const permission = await navigator.permissions.query({ name: 'clipboard-write' as PermissionName });
+          if (permission.state === 'denied') {
+            throw new Error('Clipboard permission denied');
+          }
+          
+          await navigator.clipboard.writeText(arabicOrderText);
+          toast.success('تم نسخ تفاصيل الطلب بالعربية! 📋', {
+            description: 'Order details copied in Arabic format',
+          });
+        } catch (clipboardError) {
+          console.warn('Modern clipboard API failed, trying fallback:', clipboardError);
+          throw clipboardError; // This will trigger the fallback
+        }
+      } else {
+        // Fallback: legacy execCommand
+        const textarea = document.createElement('textarea');
+        textarea.value = arabicOrderText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            toast.success('تم نسخ تفاصيل الطلب بالعربية! 📋', {
+              description: 'Order details copied in Arabic format (legacy method)',
+            });
+          } else {
+            throw new Error('execCommand copy failed');
+          }
+        } catch (execError) {
+          throw new Error('Legacy copy method failed');
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      }
     } catch (error) {
       console.error('Failed to copy order details:', error);
-      toast.error('فشل في نسخ تفاصيل الطلب', {
-        description: 'Failed to copy order details',
+      
+      // Last resort: Show the text in a dialog for manual copy
+      const manualCopyText = `🌙 نور القمر – فاتورة الطلب
+
+رقم الطلب: #${order.order_number || order.id || 'N/A'}
+اسم العميل: ${order.customer_first_name || ''} ${order.customer_last_name || ''}
+رقم الهاتف: ${order.customer_phone || 'N/A'}
+العنوان: ${order.billing_address_1 || 'N/A'}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
+المدينة: ${order.billing_city || 'N/A'}
+الدولة: ${order.billing_country || 'N/A'}
+طريقة الدفع: ${getPaymentMethodArabic(order.payment_method)}
+
+🛒 تفاصيل الطلب:
+${(order.order_items || []).map(item => 
+`المنتج: ${item.product_name || 'N/A'}
+الكمية: ${item.quantity || 0}`
+).join('\n\n')}
+
+💰 إجمالي الطلب:
+${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
+
+      // Show alert with the text for manual copy
+      alert('فشل في النسخ التلقائي. يرجى نسخ النص التالي يدوياً:\n\n' + manualCopyText);
+      
+      toast.error('فشل في نسخ تفاصيل الطلب ❌', {
+        description: 'Clipboard API not supported. Text shown in alert for manual copy.',
       });
     }
   };
 
   // Don't render if user doesn't have access
-  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
+      const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    if (!user || (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -679,7 +819,8 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
               Total Orders - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h1>
             <p className="mt-1 md:mt-2 text-purple-100 dark:text-purple-200 text-sm md:text-base">
-              Admin dashboard - Current month order submissions ({orders.length} orders)
+              Admin dashboard - Current month order submissions ({filteredOrders.length} orders)
+              {totalPages > 1 && ` • Page ${currentPage} of ${totalPages}`}
             </p>
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:gap-2 w-full sm:w-auto sm:items-center sm:justify-end mt-3 sm:mt-0">
@@ -766,7 +907,7 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
       </Card>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -789,36 +930,83 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('pending') ? 'ring-2 ring-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('pending')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.pending_orders}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('processing') ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('processing')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Processing</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.processing_orders}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
+              <Settings className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('completed') ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('completed')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
                 <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
               </div>
-              <TrendingDown className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('shipped') ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('shipped')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Shipped</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.shipped_orders}</p>
+              </div>
+              <Truck className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('cancelled') ? 'ring-2 ring-red-500 bg-red-50 dark:bg-red-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('cancelled')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Cancelled</p>
+                <p className="text-2xl font-bold text-red-600">{stats.cancelled_orders}</p>
+              </div>
+              <XCircle className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -937,6 +1125,7 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="processing">Processing</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="shipped">Shipped</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -978,7 +1167,7 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
           </Card>
 
           {/* Orders List */}
-          <Card>
+          <Card data-section="orders">
             <CardHeader>
               <CardTitle>All Orders ({filteredOrders.length})</CardTitle>
               <CardDescription>
@@ -989,7 +1178,7 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {filteredOrders.length === 0 ? (
+              {currentOrders.length === 0 ? (
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground mb-2">No orders found</p>
@@ -1002,7 +1191,7 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {filteredOrders.map((order) => (
+                  {currentOrders.map((order) => (
                     <Card key={order.id} className="border border-gray-200 hover:shadow-md transition-shadow">
                       <CardContent className="p-3 sm:p-4">
                         {/* Mobile-First Layout */}
@@ -1134,6 +1323,65 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
               )}
             </CardContent>
           </Card>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1235,21 +1483,112 @@ ${order.total_amount.toFixed(0)} ريال سعودي`;
               {/* Order Items */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Order Items</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Order Items</CardTitle>
+                    {selectedOrder.order_items.some(item => !item.image_url) && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            toast.info('🖼️ Fetching missing product images...');
+                            
+                            const updatedItems = await Promise.all(
+                              selectedOrder.order_items.map(async (item) => {
+                                if (item.image_url) {
+                                  return item; // Already has image
+                                }
+
+                                try {
+                                  // Fetch product details from WooCommerce
+                                  const productDetails = await wooCommerceAPI.fetchProduct(item.product_id);
+                                  const imageUrl = productDetails?.images?.[0]?.src || null;
+                                  
+                                  return {
+                                    ...item,
+                                    image_url: imageUrl
+                                  };
+                                } catch (err) {
+                                  console.warn(`⚠️ Failed to fetch image for product ${item.product_id}:`, err);
+                                  return item;
+                                }
+                              })
+                            );
+
+                            // Update the order in database
+                            const { error: updateError } = await supabase
+                              .from('order_submissions')
+                              .update({ 
+                                order_items: updatedItems,
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', selectedOrder.id);
+
+                            if (updateError) {
+                              toast.error('❌ Failed to update order with images');
+                            } else {
+                              toast.success('✅ Product images updated successfully!');
+                              // Refresh the selected order data
+                              const { data: updatedOrder } = await supabase
+                                .from('order_submissions')
+                                .select('*')
+                                .eq('id', selectedOrder.id)
+                                .single();
+                              if (updatedOrder) {
+                                setSelectedOrder(updatedOrder);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error updating images:', error);
+                            toast.error('❌ Failed to update product images');
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Fix Missing Images
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {selectedOrder.order_items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{item.product_name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            SKU: {item.sku || 'N/A'} | Quantity: {item.quantity}
-                          </p>
+                      <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                        {/* Product Image */}
+                        <div className="flex-shrink-0 w-16 h-16 rounded bg-white border flex items-center justify-center overflow-hidden">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.product_name}
+                              className="object-contain w-full h-full"
+                              loading="lazy"
+                              onLoad={() => console.log(`✅ Image loaded for ${item.product_name}`)}
+                              onError={(e) => {
+                                console.log(`❌ Image failed to load for ${item.product_name}:`, e);
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className="text-gray-300 text-2xl" style={{ display: item.image_url ? 'none' : 'flex' }}>
+                            🛒
+                          </div>
                         </div>
+                        
+                        {/* Product Info */}
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.product_name}</h4>
+                          {item.sku && <p className="text-sm text-gray-600">SKU: {item.sku}</p>}
+                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                        </div>
+                        
+                        {/* Price Info */}
                         <div className="text-right">
                           <p className="font-medium">{parseFloat(item.price).toFixed(2)} SAR</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-gray-600">
                             Total: {(parseFloat(item.price) * item.quantity).toFixed(2)} SAR
                           </p>
                         </div>

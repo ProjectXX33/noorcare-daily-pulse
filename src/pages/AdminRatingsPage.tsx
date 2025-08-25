@@ -147,11 +147,17 @@ const AdminRatingsPage = () => {
       const data = await fetchEmployees();
       let filteredEmployees = data.filter(u => u.id !== user?.id); // Exclude current user
       
-      // Filter employees for Content & Creative Manager
+      // Filter employees for Content & Creative Manager and Customer Retention Manager
       if (user?.role === 'content_creative_manager') {
         filteredEmployees = filteredEmployees.filter(emp => 
           emp.team === 'Content & Creative Department' && 
-          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+          ['Content Creator', 'Designer', 'Media Buyer'].includes(emp.position)
+        );
+      } else if (user?.role === 'customer_retention_manager') {
+        filteredEmployees = filteredEmployees.filter(emp => 
+          (emp.team === 'Customer Retention Department' && 
+          ['Junior CRM Specialist', 'Customer Retention Specialist'].includes(emp.position)) ||
+          emp.position === 'Warehouse Staff'
         );
       }
       
@@ -240,7 +246,7 @@ const AdminRatingsPage = () => {
     return ratingDate.toDateString() === today.toDateString();
   };
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
     return null;
   }
 

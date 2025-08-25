@@ -39,7 +39,8 @@ const LoyalCustomersPage = () => {
     stage, 
     details, 
     startFetching,
-    clearData 
+    clearData,
+    forceRefresh
   } = useLoyalCustomers();
 
   // Debug logging to understand the issue
@@ -68,6 +69,31 @@ const LoyalCustomersPage = () => {
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<{ hasData: boolean; age: number | null }>({ hasData: false, age: null });
+      
+  // Check cache status
+  const checkCacheStatus = () => {
+    try {
+      const data = localStorage.getItem('loyal_customers_data');
+      const timestamp = localStorage.getItem('loyal_customers_timestamp');
+      
+      if (data && timestamp) {
+        const age = Date.now() - parseInt(timestamp);
+        const hours = Math.round(age / (1000 * 60 * 60));
+        setCacheStatus({ hasData: true, age: hours });
+      } else {
+        setCacheStatus({ hasData: false, age: null });
+      }
+    } catch (error) {
+      console.error('Error checking cache status:', error);
+      setCacheStatus({ hasData: false, age: null });
+    }
+  };
+
+  // Check cache status on mount and when customers change
+  React.useEffect(() => {
+    checkCacheStatus();
+  }, [customers]);
       
   const tiers = [
     { value: 'all', label: 'All Tiers', icon: Users, color: 'text-gray-600' },
@@ -355,7 +381,7 @@ const LoyalCustomersPage = () => {
               Top 100 Loyal Customers
             </h1>
             <p className="text-gray-600 mt-1">
-              Ranked by total spending from latest 5000 customers • Real WooCommerce data
+              Ranked by total spending from latest 5000 customers • Real WooCommerce data • Cached for 24 hours
             </p>
           </div>
         
@@ -364,8 +390,19 @@ const LoyalCustomersPage = () => {
               <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 rounded-lg">
                 <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm text-amber-700">Updating...</span>
-            </div>
+              </div>
             )}
+            
+            {/* Cache Status */}
+            {cacheStatus.hasData && !loading && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 rounded-lg">
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                <span className="text-sm text-blue-700">
+                  Cached ({cacheStatus.age}h ago)
+                </span>
+              </div>
+            )}
+            
             <Button 
               onClick={startFetching} 
               variant="outline" 
@@ -373,8 +410,20 @@ const LoyalCustomersPage = () => {
               disabled={loading}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              {loading ? 'Processing...' : 'Refresh Data'}
+              {loading ? 'Processing...' : 'Load Data'}
             </Button>
+            
+            <Button 
+              onClick={forceRefresh} 
+              variant="outline" 
+              size="sm"
+              disabled={loading}
+              className="border-orange-300 text-orange-700 hover:bg-orange-50"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Force Refresh
+            </Button>
+            
             <Button 
               onClick={exportToExcel} 
               className="bg-green-600 hover:bg-green-700"

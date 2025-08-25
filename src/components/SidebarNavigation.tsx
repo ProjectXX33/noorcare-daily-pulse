@@ -34,7 +34,9 @@ import {
   Target,
   Medal,
   Award,
-  Gem
+  Gem,
+  Bell,
+  Building2
 } from 'lucide-react';
 import { GrowthStrategyIcon } from './GrowthStrategyIcon';
 import { 
@@ -55,6 +57,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import NotificationsMenu from '@/components/NotificationsMenu';
+import ManagerNotificationPanel from '@/components/AdminNotificationPanel';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -71,6 +74,59 @@ import WorkShiftTimer from '@/components/WorkShiftTimer';
 import VersionDisplay from '@/components/VersionDisplay';
 import UserRankingProfile, { useUserRankingTheme, useUserRanking } from '@/components/UserRankingProfile';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { getUnreadNotificationCount } from '@/lib/notificationApi';
+
+// Manager Notification Bell Component
+const ManagerNotificationBell: React.FC = () => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Load unread count
+  useEffect(() => {
+    const loadUnreadCount = async () => {
+      if (user?.id) {
+        try {
+          const count = await getUnreadNotificationCount(user.id);
+          setUnreadCount(count);
+        } catch (error) {
+          console.error('Error loading unread count:', error);
+        }
+      }
+    };
+
+    loadUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsPanelOpen(true)}
+        className="relative h-8 w-8 p-0"
+      >
+        <Bell className="h-4 w-4" />
+        {unreadCount > 0 && (
+          <Badge 
+            variant="destructive" 
+            className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Badge>
+        )}
+      </Button>
+      
+      <ManagerNotificationPanel 
+        isOpen={isPanelOpen} 
+        onClose={() => setIsPanelOpen(false)} 
+      />
+    </>
+  );
+};
 
 // SAR Icon Component
 const SARIcon = ({ className }: { className?: string }) => (
@@ -93,10 +149,9 @@ interface SidebarNavigationProps {
 
 // Special effects component for ranked headers
 const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
-  if (effectType === 'none') return null;
-
-  // Add custom CSS for ULTRA-PREMIUM Diamond effects
-  React.useEffect(() => {
+  // Add custom CSS for ULTRA-PREMIUM Diamond effects and moving border animation
+  useEffect(() => {
+    if (effectType === 'none') return;
     const style = document.createElement('style');
     style.textContent = `
       @keyframes flashPulse {
@@ -465,6 +520,8 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
         scrollbar-width: thin;
         scrollbar-color: #cbd5e1 #f1f5f9;
       }
+      
+
     `;
     document.head.appendChild(style);
     return () => {
@@ -677,6 +734,64 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
     );
   }
 
+  if (effectType === 'customer_retention') {
+    return (
+      <>
+        {/* 💚 CUSTOMER RETENTION MANAGER - GREEN PROFESSIONAL EFFECTS 💚 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          
+          {/* 💚 GREEN CORNER ACCENTS - PROFESSIONAL PLACEMENT */}
+          <div className="absolute top-2 left-8 w-3 h-3 bg-gradient-to-br from-green-400/70 to-emerald-500/70 rounded-full animate-pulse shadow-md opacity-70"></div>
+          <div className="absolute bottom-2 right-8 w-3 h-3 bg-gradient-to-br from-emerald-400/70 to-green-500/70 rounded-full animate-pulse shadow-md animation-delay-1000 opacity-70"></div>
+          
+          {/* 💚 GREEN FLOATING PARTICLES - ELEGANT MOVEMENT */}
+          <div className="absolute top-4 left-24 w-2 h-2 bg-green-400/70 rounded-full animate-pulse animation-delay-500 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-4 right-24 w-2 h-2 bg-emerald-400/70 rounded-full animate-pulse animation-delay-1500 shadow-sm opacity-70"></div>
+          <div className="absolute top-6 left-40 w-1.5 h-1.5 bg-green-300/70 rounded-full animate-pulse animation-delay-2000 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-6 right-40 w-1.5 h-1.5 bg-emerald-300/70 rounded-full animate-pulse animation-delay-2500 shadow-sm opacity-70"></div>
+          
+          {/* 💚 GREEN SPARKLES - PROFESSIONAL TOUCH */}
+          <div className="absolute top-3 left-56 w-1 h-1 bg-green-500/70 rounded-full animate-pulse animation-delay-300 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-3 right-56 w-1 h-1 bg-emerald-500/70 rounded-full animate-pulse animation-delay-1800 shadow-sm opacity-70"></div>
+          <div className="absolute top-5 left-72 w-1 h-1 bg-green-400/70 rounded-full animate-pulse animation-delay-1200 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-5 right-72 w-1 h-1 bg-emerald-400/70 rounded-full animate-pulse animation-delay-2100 shadow-sm opacity-70"></div>
+          
+          {/* 💚 GREEN ATMOSPHERE - SUBTLE BACKGROUND */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-50/10 via-emerald-50/15 to-green-50/10 animate-pulse opacity-35"></div>
+        </div>
+      </>
+    );
+  }
+
+  if (effectType === 'content_creative') {
+    return (
+      <>
+        {/* 🔵 CONTENT & CREATIVE MANAGER - BLUE PROFESSIONAL EFFECTS 🔵 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          
+          {/* 🔵 BLUE CORNER ACCENTS - PROFESSIONAL PLACEMENT */}
+          <div className="absolute top-2 left-8 w-3 h-3 bg-gradient-to-br from-blue-400/70 to-indigo-500/70 rounded-full animate-pulse shadow-md opacity-70"></div>
+          <div className="absolute bottom-2 right-8 w-3 h-3 bg-gradient-to-br from-indigo-400/70 to-blue-500/70 rounded-full animate-pulse shadow-md animation-delay-1000 opacity-70"></div>
+          
+          {/* 🔵 BLUE FLOATING PARTICLES - ELEGANT MOVEMENT */}
+          <div className="absolute top-4 left-24 w-2 h-2 bg-blue-400/70 rounded-full animate-pulse animation-delay-500 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-4 right-24 w-2 h-2 bg-indigo-400/70 rounded-full animate-pulse animation-delay-1500 shadow-sm opacity-70"></div>
+          <div className="absolute top-6 left-40 w-1.5 h-1.5 bg-blue-300/70 rounded-full animate-pulse animation-delay-2000 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-6 right-40 w-1.5 h-1.5 bg-indigo-300/70 rounded-full animate-pulse animation-delay-2500 shadow-sm opacity-70"></div>
+          
+          {/* 🔵 BLUE SPARKLES - PROFESSIONAL TOUCH */}
+          <div className="absolute top-3 left-56 w-1 h-1 bg-blue-500/70 rounded-full animate-pulse animation-delay-300 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-3 right-56 w-1 h-1 bg-indigo-500/70 rounded-full animate-pulse animation-delay-1800 shadow-sm opacity-70"></div>
+          <div className="absolute top-5 left-72 w-1 h-1 bg-blue-400/70 rounded-full animate-pulse animation-delay-1200 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-5 right-72 w-1 h-1 bg-indigo-400/70 rounded-full animate-pulse animation-delay-2100 shadow-sm opacity-70"></div>
+          
+          {/* 🔵 BLUE ATMOSPHERE - SUBTLE BACKGROUND */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-50/70 via-indigo-50/70 to-blue-50/70 animate-pulse opacity-70"></div>
+        </div>
+      </>
+    );
+  }
+
   return null;
 };
 
@@ -716,13 +831,14 @@ const HeaderContent = ({ children, themeColors, language }: {
         }
       >
         {/* Special effects for top 3 performers */}
-        <HeaderEffects effectType={themeColors.effects} />
+        <HeaderEffects effectType={themeColors.effects || 'none'} />
         
         <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-2' : 'order-1'} relative z-10`}>
           <SidebarTrigger />
           <WorkShiftTimer />
         </div>
         <div className={`flex items-center gap-2 md:gap-4 ${language === 'ar' ? 'order-1' : 'order-2'} relative z-10`}>
+          {/* General Notifications Menu - For all users */}
           <NotificationsMenu />
           <ThemeToggle />
           <DropdownMenu>
@@ -823,6 +939,147 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const userRankingTheme = useUserRankingTheme();
   const { userRanking } = useUserRanking();
+  
+  // Add moving border CSS
+  React.useEffect(() => {
+          const style = document.createElement('style');
+      style.textContent = `
+       /**
+         Browser should support Houdini API
+       */
+       
+       @property --gradient-angle {
+         syntax: "<angle>";
+         initial-value: 90deg;
+         inherits: false;
+       }
+       
+       :root {
+         
+         --clr-card:rgb(0, 102, 246);
+         --clr-1: #6420aa;
+         --clr-2: #ff3ea5;
+         --clr-3: #ff7ed4;
+       }
+       
+       @keyframes rotate {
+         0% {
+           --gradient-angle: 0deg;
+         }
+         100% {
+           --gradient-angle: 360deg;
+         }
+       }
+       
+               .moving-border {
+          position: relative;
+          border-radius: 8px;
+          padding: 2px;
+          display: block;
+          margin: 1px;
+          background-color: var(--clr-card);
+          z-index: 1;
+          transition: all 0.2s ease-out;
+        }
+       
+               .moving-border::after,
+        .moving-border::before {
+          content: " ";
+          position: absolute;
+          z-index: -1;
+          inset: -0.08rem;
+          background: conic-gradient(
+            from var(--gradient-angle),
+            var(--clr-card),
+            var(--clr-1),
+            var(--clr-2),
+            var(--clr-3),
+            var(--clr-2),
+            var(--clr-1),
+            var(--clr-card)
+          );
+          border-radius: inherit;
+          animation: rotate 2.5s linear infinite;
+        }
+       
+               .moving-border::after {
+          filter: blur(0.2rem);
+        }
+      
+             .moving-border > * {
+         background: #dbeafe !important;
+         border-radius: 6px;
+         width: 100%;
+         display: flex;
+         align-items: center;
+         transition: all 0.2s ease-out;
+       }
+       
+       .dark .moving-border > * {
+         background: #1e3a8a !important;
+       }
+       
+       /* Force blue background for selected items */
+       .moving-border button {
+         background: #dbeafe !important;
+       }
+       
+       .dark .moving-border button {
+         background: #1e3a8a !important;
+       }
+       
+       /* Force black text color for selected items but keep icon original color */
+       .moving-border span {
+         color: #000000 !important;
+       }
+       
+       .dark .moving-border span {
+         color: #ffffff !important;
+       }
+       
+       /* Keep icon in original color - force override any active icon colors */
+       .moving-border svg {
+         color: inherit !important;
+       }
+       
+       /* Override any active icon color classes - prevent color changes */
+       .moving-border .text-blue-600,
+       .moving-border .text-green-600,
+       .moving-border .text-purple-600,
+       .moving-border .text-yellow-600,
+       .moving-border .text-orange-600,
+       .moving-border .text-red-600,
+       .moving-border .text-indigo-600,
+       .moving-border .text-cyan-600,
+       .moving-border .text-pink-600,
+       .moving-border .text-violet-600,
+       .moving-border .text-teal-600,
+       .moving-border .text-amber-600,
+       .moving-border .text-blue-500,
+       .moving-border .text-green-500,
+       .moving-border .text-purple-500,
+       .moving-border .text-yellow-500,
+       .moving-border .text-orange-500,
+       .moving-border .text-red-500,
+       .moving-border .text-indigo-500,
+       .moving-border .text-cyan-500,
+       .moving-border .text-pink-500,
+       .moving-border .text-violet-500,
+       .moving-border .text-teal-500,
+       .moving-border .text-amber-500 {
+         color: inherit !important;
+       }
+       
+       /* Additional override for any potential active icon classes */
+       .moving-border [class*="text-"] {
+         color: inherit !important;
+       }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   
   // Ref to track sidebar scroll position
   const sidebarContentRef = useRef<HTMLDivElement>(null);
@@ -935,9 +1192,14 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     };
   }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
 
-  // Helper function to get the correct dashboard path based on user role
+  // Helper function to get the correct dashboard path based on user role and position
   const getDashboardPath = (user: any) => {
     if (!user) return '/employee-dashboard';
+    
+    // Check position first for Content Creator
+    if (user.position === 'Content Creator') {
+      return '/copy-writing-dashboard';
+    }
     
     switch (user.role) {
       case 'admin':
@@ -973,9 +1235,13 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     excludeDesigner?: boolean;
     excludeManagers?: boolean;
     excludeCopyWriting?: boolean;
+    excludeCustomerRetentionManager?: boolean;
+    excludeContentCreator?: boolean;
+    excludeContentCreativeManager?: boolean;
     copyWritingOnly?: boolean;
     hasCounter?: boolean;
     adminAndMediaBuyerOnly?: boolean;
+    customerRetentionManagerOnly?: boolean;
   }
 
   // Organize navigation items into groups with colors
@@ -984,7 +1250,12 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Overview',
       color: 'blue',
       items: [
-        { name: 'Copy Writing Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
+        { name: 'Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
+        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, adminOnly: true, color: 'blue' },
+        { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, designerOnly: true, color: 'blue' },
+        { name: 'Content & Creative Dashboard', path: '/content-creative-dashboard', icon: Users, managerRole: 'content_creative_manager', excludeContentCreator: true, color: 'purple' },
+        { name: 'Customer Retention Dashboard', path: '/customer-retention-dashboard', icon: Users, customerRetentionManagerOnly: true, color: 'blue' },
+        { name: 'VNQ Team', path: '/our-team', icon: Building2, color: 'indigo' },
 
       ] as NavItem[]
     },
@@ -993,10 +1264,11 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'green',
       items: [
         { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true, color: 'green' },
-        { name: 'Content & Creative Dashboard', path: '/content-creative-dashboard', icon: Users, managerRole: 'content_creative_manager', color: 'purple' },
+        { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, employeeOnly: true, excludeContentCreator: true, excludeContentCreativeManager: true, excludeCustomerRetentionManager: true, color: 'blue' },
         { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true, color: 'yellow' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true, color: 'teal' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, managerRole: 'content_creative_manager', color: 'teal' },
+        { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, customerRetentionManagerOnly: true, color: 'teal' },
         { name: 'Performance', path: '/performance-dashboard', icon: TrendingUp, adminOnly: true, color: 'purple' },
       ] as NavItem[]
     },
@@ -1004,10 +1276,12 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Task Management',
       color: 'orange',
       items: [
-        { name: t('tasks') as string, path: user?.role === 'admin' || user?.role === 'content_creative_manager' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
+        { name: t('tasks') as string, path: user?.role === 'admin' || user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager' ? '/tasks' : '/employee-tasks', icon: CheckSquare, color: 'orange', excludeDesigner: true },
         { name: 'Media Buyer Dashboard', path: '/media-buyer-tasks', icon: TrendingUp, mediaBuyerOnly: true, color: 'amber' },
+        { name: 'Designer Tasks', path: '/content-creator-tasks', icon: CheckSquare, copyWritingOnly: true, color: 'purple' },
         { name: 'Design Studio', path: '/designer-dashboard', icon:  Brush, designerOnly: true, color: 'purple' },
         { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, managerRole: 'content_creative_manager', color: 'yellow' },
+        { name: 'My Ratings', path: '/my-ratings', icon: Star, customerRetentionManagerOnly: true, color: 'yellow' },
       ] as NavItem[]
     },
     {
@@ -1016,12 +1290,16 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       items: [
         { name: t('reports') as string, path: '/reports', icon: ClipboardList, adminOnly: true, color: 'indigo' },
         { name: 'Bug Reports', path: '/admin-bug-reports', icon: Bug, adminOnly: true, color: 'red' },
-        { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, adminOnly: true, color: 'purple' },
         { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, adminOnly: true, color: 'purple' },
         { name: t('dailyReport') as string, path: '/report', icon: ClipboardList, employeeOnly: true, color: 'blue' },
         { name: 'Team Reports', path: '/team-reports', icon: BarChart3, managerRole: 'content_creative_manager', color: 'purple' },
+        { name: 'Team Reports', path: '/customer-retention-team-reports', icon: BarChart3, customerRetentionManagerOnly: true, color: 'blue' },
         { name: 'Team Shifts', path: '/team-shifts', icon: Calendar, managerRole: 'content_creative_manager', color: 'teal' },
+        { name: 'Team Shifts', path: '/team-shifts', icon: Calendar, customerRetentionManagerOnly: true, color: 'teal' },
         { name: 'Team Ratings', path: '/admin-ratings', icon: Star, managerRole: 'content_creative_manager', color: 'yellow' },
+        { name: 'Team Ratings', path: '/admin-ratings', icon: Star, customerRetentionManagerOnly: true, color: 'yellow' },
+        { name: 'My Ratings', path: '/my-ratings', icon: Star, copyWritingOnly: true, color: 'yellow' },
+        
       ] as NavItem[]
     },
     {
@@ -1029,7 +1307,6 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'purple',
       items: [
         { name: 'Campaign Strategy', path: '/strategy', icon: GrowthStrategyIcon, mediaBuyerOnly: true, color: 'purple' },
-        { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, mediaBuyerOnly: true, color: 'purple' },
       ] as NavItem[]
     },
     {
@@ -1037,7 +1314,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'cyan',
       items: [
         { name: t('checkIn') as string, path: '/check-in', icon: User, employeeOnly: true, excludeManagers: true, color: 'cyan' },
-        { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true, color: 'slate' },
+        { name: 'Shifts', path: '/shifts', icon: Clock, shiftsAccess: true, excludeCustomerRetentionManager: true, color: 'slate' },
       ] as NavItem[]
     },
     {
@@ -1052,9 +1329,9 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Customer Service Tools',
       color: 'emerald',
       items: [
-        { name: 'Social Media CRM', path: '/customer-service-crm', icon: Globe, customerServiceOnly: true, color: 'emerald' },
         { name: 'Create Order', path: '/create-order', icon: ShoppingCart, customerServiceOnly: true, color: 'emerald' },
-        { name: 'My Orders', path: '/my-orders', icon: SARIcon, customerServiceOnly: true, color: 'blue' },
+        { name: 'My Orders', path: '/my-orders', icon: SARIcon, customerServiceOnly: true, excludeCustomerRetentionManager: true, color: 'blue' },
+        { name: 'Total Orders', path: '/admin-total-orders', icon: SARIcon, customerServiceOnly: true, color: 'purple' },
         { name: 'Loyal Customers', path: '/loyal-customers', icon: Crown, customerServiceOnly: true, color: 'amber' },
       ] as NavItem[]
     },
@@ -1067,8 +1344,30 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     }
   ];
 
-  // Get theme colors based on user ranking
-  const getThemeColors = (theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default') => {
+  // Get theme colors based on user ranking and role
+  const getThemeColors = (theme: 'diamond' | 'gold' | 'silver' | 'bronze' | 'default', userRole?: string) => {
+    // Special blue header for Content & Creative Managers
+    if (userRole === 'content_creative_manager') {
+      return {
+        header: 'bg-gradient-to-r from-blue-50/70 via-indigo-50/70 to-blue-100/70 dark:from-blue-900/70 dark:via-indigo-900/70 dark:to-blue-800/70 backdrop-blur-md supports-[backdrop-filter]:bg-blue-50/70 dark:supports-[backdrop-filter]:bg-blue-900/70 border-blue-200/70 dark:border-blue-700/70 transition-all duration-300 ease-in-out',
+        sidebar: 'bg-background',
+        text: 'text-foreground',
+        accent: 'text-muted-foreground',
+        effects: 'content_creative'
+      };
+    }
+    
+    // Special green header for Customer Retention Managers
+    if (userRole === 'customer_retention_manager') {
+      return {
+        header: 'bg-gradient-to-r from-green-50/70 via-emerald-50/70 to-green-100/70 dark:from-green-900/70 dark:via-emerald-900/70 dark:to-green-800/70 backdrop-blur-md supports-[backdrop-filter]:bg-green-50/40 dark:supports-[backdrop-filter]:bg-green-900/50 border-green-200/70 dark:border-green-700/70 transition-all duration-300 ease-in-out',
+        sidebar: 'bg-background',
+        text: 'text-foreground',
+        accent: 'text-muted-foreground',
+        effects: 'customer_retention'
+      };
+    }
+    
     switch (theme) {
       case 'diamond':
         return {
@@ -1132,9 +1431,9 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       green: { 
         icon: 'text-green-500', 
         text: 'text-green-700', 
-        activeIcon: 'text-green-600', 
-        activeText: 'text-green-800', 
-        activeBg: 'bg-green-50 border-green-200' 
+        activeIcon: 'text-green-500', 
+        activeText: 'text-blue-800', 
+        activeBg: 'bg-blue-50 border-blue-200' 
       },
       yellow: { 
         icon: 'text-yellow-500', 
@@ -1225,32 +1524,51 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.adminOnly && user?.role !== 'admin') return false;
       if (item.employeeOnly && user?.role === 'admin') return false;
       if (item.managerRole && user?.role !== item.managerRole) return false;
-      if (item.customerServiceAndDesignerOnly && user?.position !== 'Customer Service' && user?.position !== 'Designer') return false;
-      if (item.customerServiceOnly && user?.position !== 'Customer Service') return false;
-      if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee')) return false;
+      if (item.customerServiceAndDesignerOnly && user?.position !== 'Junior CRM Specialist' && user?.position !== 'Designer') return false;
+      if (item.customerServiceOnly && user?.position !== 'Junior CRM Specialist' && user?.role !== 'customer_retention_manager') return false;
+      if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee' || user?.role === 'customer_retention_manager')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.designerOnly && user?.position !== 'Designer') return false;
-      if (item.copyWritingOnly && user?.position !== 'Copy Writing') return false;
+      if (item.copyWritingOnly && user?.position !== 'Content Creator') return false;
       if (item.adminAndMediaBuyerOnly && !(user?.role === 'admin' || user?.position === 'Media Buyer')) return false;
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
       if (item.excludeDesigner && user?.position === 'Designer') return false;
-      if (item.excludeCopyWriting && user?.position === 'Copy Writing') return false;
+      if (item.excludeCopyWriting && user?.position === 'Content Creator') return false;
       if (item.excludeManagers && ['content_creative_manager', 'customer_retention_manager', 'digital_solution_manager'].includes(user?.role)) return false;
+      if (item.excludeCustomerRetentionManager && user?.role === 'customer_retention_manager') return false;
+      if (item.excludeContentCreator && user?.position === 'Content Creator') return false;
+      if (item.excludeContentCreativeManager && user?.role === 'content_creative_manager') return false;
+      if (item.excludeCustomerRetentionManager && user?.role === 'customer_retention_manager') return false;
+      if (item.customerRetentionManagerOnly && user?.role !== 'customer_retention_manager') return false;
+      // Hide regular Dashboard for Content & Creative Manager (they have their own dashboard)
+      if (item.name === 'Dashboard' && item.path === '/dashboard' && user?.role === 'content_creative_manager') return false;
       return true;
     })
-      })).filter(group => group.items.length > 0); // Only show groups that have items
+      })).filter(group => {
+        // Hide Employee Management group for Designer users
+        if (group.label === 'Employee Management' && user?.position === 'Designer') {
+          return false;
+        }
+        return group.items.length > 0; // Only show groups that have items
+      });
 
   // Get theme colors with memoization to prevent unnecessary re-renders
-  const themeColors = useMemo(() => getThemeColors(userRankingTheme), [userRankingTheme]);
+  const themeColors = useMemo(() => getThemeColors(userRankingTheme, user?.role as string), [userRankingTheme, user?.role]);
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full no-overflow-fix" dir={language === 'ar' ? 'rtl' : 'ltr'}>
         <Sidebar
-          className="bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-500 ease-in-out"
+          className={`${user?.role === 'content_creative_manager' 
+            ? 'bg-gradient-to-b from-blue-50/70 via-indigo-50/70 to-blue-50/70 dark:from-blue-950/70 dark:via-indigo-950/70 dark:to-blue-950/70' 
+            : 'bg-background/80'} backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-500 ease-in-out`}
           side={language === 'ar' ? 'right' : 'left'}
         >
-          <SidebarHeader className="flex h-16 items-center border-b px-4 md:px-6">
+          <SidebarHeader className={`flex h-16 items-center border-b px-4 md:px-6 ${
+            user?.role === 'content_creative_manager' 
+              ? 'border-blue-200 dark:border-blue-700' 
+              : ''
+          }`}>
             <div className="flex items-center gap-3">
               <img src="/NQ-ICON.png" alt="Logo" className="h-8 w-8 md:h-10 md:w-10 rounded-full shadow" />
               <VersionDisplay variant="sidebar" />
@@ -1277,31 +1595,35 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
                         
                         return (
                           <SidebarMenuItem key={item.name}>
-                            <SidebarMenuButton
-                              data-path={item.path}
-                              onClick={() => handleNavigation(item.path)}
-                              tooltip={item.name}
-                              isActive={isActive}
-                              onMouseDown={(e) => e.preventDefault()}
-                              className={`w-full px-2 md:px-3 py-2 rounded-lg transition-all duration-300 ease-in-out ${
-                                isActive 
-                                  ? `${colorClasses.activeBg} ${colorClasses.activeText} font-semibold shadow-sm border-2 border-gradient-to-r from-blue-500 via-purple-500 to-pink-500` 
-                                  : `${colorClasses.text} border border-transparent`
-                              } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
-                            >
-                              <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${
-                                isActive ? colorClasses.activeIcon : colorClasses.icon
-                              }`} />
-                              <span className="w-full text-sm md:text-base">{item.name}</span>
-                              {item.hasCounter && unreadCount > 0 && (
-                                <Badge 
-                                  variant="destructive" 
-                                  className="text-xs animate-pulse ml-auto flex-shrink-0"
-                                >
-                                  {unreadCount}
-                                </Badge>
-                              )}
-                            </SidebarMenuButton>
+                            <div className={`w-full transition-all duration-200 ease-out group ${
+                              isActive ? 'moving-border' : ''
+                            }`}>
+                              <SidebarMenuButton
+                                data-path={item.path}
+                                onClick={() => handleNavigation(item.path)}
+                                tooltip={item.name}
+                                isActive={isActive}
+                                onMouseDown={(e) => e.preventDefault()}
+                                className={`w-full transition-all duration-200 ease-out ${
+                                  isActive 
+                                    ? `${colorClasses.activeText} font-semibold bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-700` 
+                                    : `${colorClasses.text} border border-transparent rounded-lg px-2 md:px-3 py-2 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 dark:hover:bg-blue-950/20 dark:hover:text-blue-300`
+                                } ${language === 'ar' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
+                              >
+                                <item.icon className={`h-4 w-4 md:h-5 md:w-5 mr-2 md:mr-3 ${
+                                  colorClasses.icon
+                                }`} />
+                                <span className="w-full text-sm md:text-base">{item.name}</span>
+                                {item.hasCounter && unreadCount > 0 && (
+                                  <Badge 
+                                    variant="destructive" 
+                                    className="text-xs animate-pulse ml-auto flex-shrink-0"
+                                  >
+                                    {unreadCount}
+                                  </Badge>
+                                )}
+                              </SidebarMenuButton>
+                            </div>
                           </SidebarMenuItem>
                         );
                       })}

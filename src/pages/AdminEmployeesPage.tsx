@@ -739,10 +739,10 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
                   <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
                   <SelectItem value="IT Manager">IT Manager</SelectItem>
-                  <SelectItem value="Customer Service">Customer Service</SelectItem>
+                  <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                   <SelectItem value="Designer">Designer</SelectItem>
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
-                  <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                  <SelectItem value="Content Creator">Content Creator</SelectItem>
                   <SelectItem value="Web Developer">Web Developer</SelectItem>
                   <SelectItem value="Warehouse Staff">Warehouse Staff</SelectItem>
                 </SelectContent>
@@ -862,10 +862,10 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
                     <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
                     <SelectItem value="IT Manager">IT Manager</SelectItem>
-                    <SelectItem value="Customer Service">Customer Service</SelectItem>
+                    <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
-                    <SelectItem value="Copy Writing">Copy Writing</SelectItem>
+                    <SelectItem value="Content Creator">Content Creator</SelectItem>
                     <SelectItem value="Web Developer">Web Developer</SelectItem>
                     <SelectItem value="Warehouse Staff">Warehouse Staff</SelectItem>
                   </SelectContent>

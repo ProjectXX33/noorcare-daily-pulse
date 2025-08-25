@@ -359,12 +359,30 @@ const ShiftsPage = () => {
         lastCheckin: item.last_checkin ? new Date(item.last_checkin) : undefined
       }));
 
-      setCustomerServiceEmployees(employees);
+      // Filter employees for Customer Retention Manager
+      let filteredEmployees = employees;
+      if (user?.role === 'customer_retention_manager') {
+        // Find team members by team name OR by specific positions
+        const teamMembers = employees.filter(emp => 
+          emp.team === 'Customer Retention Department' || 
+          ['Junior CRM Specialist', 'Customer Retention Specialist'].includes(emp.position)
+        );
+        
+        // RESTRICT: Customer Retention Manager can only see their team
+        filteredEmployees = teamMembers;
+        
+        console.log('👥 Customer Retention Team Filter (Shifts):');
+        console.log('  📋 Total Employees:', employees.length);
+        console.log('  🎯 Team Members:', teamMembers.length);
+        console.log('  📝 Available for Viewing:', filteredEmployees.map(e => `${e.name} (${e.position})`));
+      }
+
+      setCustomerServiceEmployees(filteredEmployees);
     } catch (error) {
       console.error('Error loading employees:', error);
       toast.error('Failed to load employees');
     }
-  }, []);
+  }, [user]);
 
   const loadMonthlyShifts = useCallback(async (showLoadingState = true) => {
     
@@ -399,7 +417,7 @@ const ShiftsPage = () => {
 
       if (selectedEmployee !== 'all') {
         query = query.eq('user_id', selectedEmployee);
-      } else if (user?.role !== 'admin') {
+      } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') {
         query = query.eq('user_id', user.id);
       }
 
@@ -414,7 +432,7 @@ const ShiftsPage = () => {
 
       // Fetch break time data separately for the same date range and users
       const userIds = selectedEmployee !== 'all' ? [selectedEmployee] : 
-                     user?.role !== 'admin' ? [user.id] : 
+                     user?.role !== 'admin' && user?.role !== 'customer_retention_manager' ? [user.id] : 
                      data.map(item => item.user_id).filter((id, index, self) => self.indexOf(id) === index);
 
       let breakTimeData = null;
@@ -578,7 +596,7 @@ const ShiftsPage = () => {
     let finalOvertimeHours = 0;
     let finalDelayToFinishHours = 0;
     
-    if (user?.role !== 'admin') {
+    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') {
       // EMPLOYEE VIEW: Apply smart offsetting directly to displayed values
       if (actualOvertimeHours > rawDelayToFinishHours) {
         // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
@@ -596,7 +614,7 @@ const ShiftsPage = () => {
     }
 
     // Smart offsetting metadata (only for employees)
-    const hasSmartOffsetting = user?.role !== 'admin' && actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
+    const hasSmartOffsetting = user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
     const offsettingType = actualOvertimeHours > rawDelayToFinishHours ? 'overtime_covers_delay' : 'delay_covers_overtime';
     
     console.log('📊 Summary with Smart Offsetting Logic (Employee View):', {
@@ -610,11 +628,11 @@ const ShiftsPage = () => {
       finalDelayToFinishHours: finalDelayToFinishHours.toFixed(2),
       hasSmartOffsetting,
       offsettingType,
-      smartOffsetingApplied: user?.role !== 'admin',
-      logic: user?.role !== 'admin' 
+      smartOffsetingApplied: user?.role !== 'admin' && user?.role !== 'customer_retention_manager',
+      logic: user?.role !== 'admin' && user?.role !== 'customer_retention_manager'
         ? (actualOvertimeHours > rawDelayToFinishHours ? 'EMPLOYEE: Overtime covers delay' : 'EMPLOYEE: Delay remains after overtime offset')
         : 'ADMIN: Raw values displayed',
-      formula: user?.role !== 'admin' 
+      formula: user?.role !== 'admin' && user?.role !== 'customer_retention_manager'
         ? `EMPLOYEE SMART: ${actualOvertimeHours.toFixed(2)}h OT - ${rawDelayToFinishHours.toFixed(2)}h Delay = OT:${finalOvertimeHours.toFixed(2)}h, Delay:${finalDelayToFinishHours.toFixed(2)}h`
         : `ADMIN RAW: OT=${finalOvertimeHours.toFixed(2)}h, Delay=${finalDelayToFinishHours.toFixed(2)}h`
     });
@@ -673,7 +691,7 @@ const ShiftsPage = () => {
 
   // Handle shift change for admin
   const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
-    if (user?.role !== 'admin') return;
+    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') return;
 
     const updateKey = `${userId}-${format(workDate, 'yyyy-MM-dd')}`;
     
@@ -893,12 +911,12 @@ const ShiftsPage = () => {
                   <Button
                     onClick={() => {
                       // Generate CSV data
-                      const headers = user?.role === 'admin' 
+                      const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                         ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                         : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                       
                       const csvData = monthlyShifts.map(shift => {
-                        const row = user?.role === 'admin'
+                        const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                           ? [
                               format(shift.workDate, 'dd/MM/yyyy'),
                               shift.userName,
@@ -1004,14 +1022,14 @@ const ShiftsPage = () => {
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
                   {t.totalOvertimeHours}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && user?.role !== 'admin' && (
+                  {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
                     <span className="ml-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">✨ SMART</span>
                   )}
                 </p>
                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
                   {summary.totalOvertime > 0 ? formatHoursAndMinutes(summary.totalOvertime) : '0h 0min'}
                   {/* DEBUG: Show if smart offsetting is detected */}
-                  {user?.role !== 'admin' && (
+                  {user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
                     <span className="text-xs bg-yellow-200 px-1 py-0.5 rounded ml-2">
                       DEBUG: Role={user?.role}, Smart={summary.hasSmartOffsetting ? 'YES' : 'NO'}
                     </span>
@@ -1036,19 +1054,19 @@ const ShiftsPage = () => {
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
                   {t.delayToFinish}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && (
+                  {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
                     <span className="ml-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">✨ SMART</span>
                   )}
                 </p>
                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {summary.delayToFinish > 0 ? formatHoursAndMinutes(summary.delayToFinish) : 'All Clear'}
                 </div>
-                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && (
+                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
                   <p className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                     ✨ After {formatHoursAndMinutes(summary.actualOvertimeHours)} overtime offset
                   </p>
                 )}
-                {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && summary.delayToFinish === 0 && user?.role !== 'admin' && (
+                {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && summary.delayToFinish === 0 && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
                   <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
                     ✨ Covered by overtime
                   </p>
@@ -1088,7 +1106,7 @@ const ShiftsPage = () => {
         </div>
 
         {/* Smart Offsetting Summary - Only for Employees */}
-        {summary.hasSmartOffsetting && user?.role !== 'admin' && (
+        {summary.hasSmartOffsetting && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
           <Card className="border-2 border-dashed border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10">
             <CardContent className="p-4">
               <div className="text-center space-y-3">
@@ -1132,10 +1150,10 @@ const ShiftsPage = () => {
         )}
 
         {/* Admin Recalculation Tools */}
-        {user?.role === 'admin' && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
+        {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
 
         {/* Enhanced mobile filters with better UX - Only show for admin */}
-        {user?.role === 'admin' && (
+        {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
           <div className="space-y-3 w-full">
             {/* Mobile filters sheet with improved design */}
             <div className="block lg:hidden w-full">
@@ -1260,12 +1278,12 @@ const ShiftsPage = () => {
                     <Button
                       onClick={() => {
                         // Generate CSV data
-                        const headers = user?.role === 'admin' 
+                        const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                           ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                           : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                         
                         const csvData = monthlyShifts.map(shift => {
-                          const row = user?.role === 'admin'
+                          const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                             ? [
                                 format(shift.workDate, 'dd/MM/yyyy'),
                                 shift.userName,
@@ -1318,7 +1336,7 @@ const ShiftsPage = () => {
         )}
 
         {/* Month filter for employees - simplified version */}
-        {user?.role !== 'admin' && (
+        {user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
           <div className="w-full">
             <Card className="border border-border/50 shadow-sm w-full">
             <CardContent className="p-4">
@@ -1347,7 +1365,7 @@ const ShiftsPage = () => {
                 )}
 
         {/* Customer Service and Designer Schedule with enhanced mobile design */}
-        {(user.position === 'Customer Service' || user.position === 'Designer') && (
+        {(user.position === 'Junior CRM Specialist' || user.position === 'Designer') && (
           <Card className="border border-border/50 shadow-sm w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -1369,7 +1387,7 @@ const ShiftsPage = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base sm:text-lg font-bold truncate">{t.monthlyShifts}</CardTitle>
               <div className="flex items-center gap-2">
-                {user?.role === 'admin' && (
+                {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
                   <Badge variant="secondary" className="text-xs">
                     Admin: Click shifts to edit
                   </Badge>
@@ -1377,12 +1395,12 @@ const ShiftsPage = () => {
                 <Button
                   onClick={() => {
                     // Generate CSV data
-                    const headers = user?.role === 'admin' 
+                    const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                       ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                       : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                     
                     const csvData = monthlyShifts.map(shift => {
-                      const row = user?.role === 'admin'
+                      const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
                         ? [
                             format(shift.workDate, 'dd/MM/yyyy'),
                             shift.userName,

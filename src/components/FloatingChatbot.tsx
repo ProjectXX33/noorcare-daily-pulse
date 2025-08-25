@@ -89,11 +89,6 @@ const FloatingChatbot: React.FC = () => {
   const { language } = useLanguage();
   const location = useLocation();
   
-  // Early return before any other hooks to prevent hook count mismatch
-  if (isAuthLoading || !user || location.pathname === '/login' || location.pathname === '/') {
-    return null;
-  }
-  
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isHovered, setIsHovered] = useState(false);
@@ -438,7 +433,7 @@ const FloatingChatbot: React.FC = () => {
     }
 
     switch (user?.position) {
-      case 'Copy Writing':
+      case 'Content Creator':
         return {
           gradient: 'from-purple-500 to-purple-600',
           hoverGradient: 'hover:from-purple-600 hover:to-purple-700',
@@ -471,7 +466,7 @@ const FloatingChatbot: React.FC = () => {
           bgColor: 'bg-teal-700',
           textColor: 'text-teal-700'
         };
-      case 'Customer Service':
+      case 'Junior CRM Specialist':
         return {
           gradient: 'from-sky-400 to-sky-500',
           hoverGradient: 'hover:from-sky-500 hover:to-sky-600',
@@ -493,6 +488,7 @@ const FloatingChatbot: React.FC = () => {
           bgColor: 'bg-amber-500',
           textColor: 'text-amber-600'
         };
+
       default:
         return {
           gradient: 'from-blue-500 to-blue-600',
@@ -550,7 +546,7 @@ const FloatingChatbot: React.FC = () => {
     const isArabic = currentLang === 'ar';
     
     switch (user?.position) {
-      case 'Copy Writing':
+      case 'Content Creator':
         return isArabic 
           ? `${arabicGreeting}\n\n✨ يمكنني مساعدتك في:\n• الكتابة الإبداعية\n• إنشاء المحتوى\n• أفكار الحملات\n• رسائل العلامة التجارية\n\nبماذا تريد أن تعمل اليوم؟`
           : `${greeting}\n\n✨ I can help you with:\n• Creative copywriting\n• Content creation\n• Campaign ideas\n• Brand messaging\n\nWhat would you like to work on today?`;
@@ -562,7 +558,7 @@ const FloatingChatbot: React.FC = () => {
         return isArabic
           ? `${arabicGreeting}\n\n📊 يمكنني المساعدة في تحسين:\n• تحليل أداء الحملات\n• البحث والرؤى حول المنتجات\n• إنشاء الاستراتيجيات بالذكاء الاصطناعي\n• تحسين تخصيص الميزانية\n• توصيات استهداف الجمهور\n• تتبع مقاييس الأداء\n\nما هي الحملات التي تعمل عليها؟`
           : `${greeting}\n\n📊 I can help optimize:\n• Campaign performance analysis\n• Product research and insights\n• AI-powered strategy creation\n• Budget allocation optimization\n• Audience targeting recommendations\n• Performance metrics tracking\n\nWhat campaigns are you working on?`;
-      case 'Customer Service':
+      case 'Junior CRM Specialist':
         return isArabic
           ? `👋 أهلاً وسهلاً ${user?.name}!\n\n🤖 **مساعد خدمة العملاء الذكي**\n\nمخصص للبحث السريع عن المنتجات وإنشاء الطلبات:\n\n🔍 **البحث الفوري:**\n• اكتب اسم أي منتج (مثل: "فيتامين د")\n• معلومات كاملة: الأسعار، المخزون، الوصف\n• دعم البحث بالعربية والإنجليزية\n\n🛒 **إنشاء الطلبات:**\n• ربط مباشر مع WooCommerce\n• تفاصيل العملاء والمنتجات\n\n📦 **دعم العملاء:**\n• إرشادات الشحن والأسعار\n• نصائح خدمة العملاء\n\n💡 **جرب الآن:** اكتب اسم أي منتج أو استخدم ⚡ الإجراءات السريعة!`
           : `👋 Welcome ${user?.name}!\n\n🤖 **Customer Service AI Assistant**\n\nSpecialized for fast product search and order creation:\n\n🔍 **Instant Search:**\n• Type any product name (e.g., "vitamin D")\n• Complete info: prices, stock, descriptions\n• Arabic & English search support\n\n🛒 **Order Creation:**\n• Direct WooCommerce integration\n• Customer and product details\n\n📦 **Customer Support:**\n• Shipping info and pricing\n• Customer service guidelines\n\n💡 **Try now:** Type any product name or use ⚡ Quick Actions!`;
@@ -3507,6 +3503,11 @@ Would you like help implementing any of these recommendations?`;
     }, 200);
   };
 
+  // Early return after all hooks to prevent hook count mismatch
+  if (isAuthLoading || !user || location.pathname === '/login' || location.pathname === '/') {
+    return null;
+  }
+
   return (
     <div className={`${isFullScreen ? 'fixed inset-0 z-[1000]' : 'fixed bottom-4 right-4 z-[1000]'}`}>
       <AnimatePresence mode="wait">
@@ -3822,31 +3823,31 @@ Would you like help implementing any of these recommendations?`;
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
               onMouseEnter={() => {
-                // Allow hover effects for Customer Service and Media Buyer users
-                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
+                // Allow hover effects for Junior CRM Specialist and Media Buyer users
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
                   setIsHovered(true);
                 }
               }}
               onMouseLeave={() => {
-                // Allow hover effects for Customer Service and Media Buyer users
-                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
+                // Allow hover effects for Junior CRM Specialist and Media Buyer users
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
                   setIsHovered(false);
                 }
               }}
               onClick={() => {
-                // Allow Customer Service and Media Buyer users to open the chatbot
-                if (user?.position === 'Customer Service' || user?.position === 'Media Buyer') {
+                // Allow Junior CRM Specialist and Media Buyer users to open the chatbot
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
                   setIsOpen(true);
                 } else {
                   // Show a toast notification for other users
-                  toast.info('🤖 Chatbot is only available for Customer Service and Media Buyer users.', {
+                  toast.info('🤖 Chatbot is only available for Junior CRM Specialist and Media Buyer users.', {
                     description: 'This chatbot is designed for product search, customer support, and marketing activities. Please contact your administrator if you need access.',
                     duration: 3000,
                   });
                 }
               }}
               className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r ${roleColors.gradient} shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 border-2 border-white ${
-                user?.position === 'Customer Service' || user?.position === 'Media Buyer'
+                user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer'
                   ? 'cursor-pointer hover:scale-110' 
                   : 'cursor-not-allowed opacity-60'
               }`}

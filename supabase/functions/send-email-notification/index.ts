@@ -1,9 +1,14 @@
+// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @deno-types="https://esm.sh/@supabase/supabase-js@2"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+  'Access-Control-Allow-Credentials': 'true',
 }
 
 interface EmailRequest {
@@ -14,26 +19,91 @@ interface EmailRequest {
 }
 
 serve(async (req) => {
-  // Handle CORS
+  // Handle CORS preflight requests with more comprehensive headers
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { 
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Content-Length': '0'
+      }
+    })
   }
 
   try {
-    const { to, subject, message, from = 'notifications@noorcare.com' }: EmailRequest = await req.json()
+    // Validate request method
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Parse request body
+    let body: EmailRequest
+    try {
+      body = await req.json()
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const { to, subject, message, from = 'notifications@noorcare.com' } = body
+
+    // Validate required fields
+    if (!to || !subject || !message) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: to, subject, message' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
     // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing Supabase environment variables')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
 
     // Get user from auth header
-    const authHeader = req.headers.get('Authorization')!
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user } } = await supabaseClient.auth.getUser(token)
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
 
-    if (!user) {
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError)
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { 
@@ -52,11 +122,16 @@ serve(async (req) => {
       status: 'pending'
     }
 
-    const { data: logEntry } = await supabaseClient
+    const { data: logEntry, error: logError } = await supabaseClient
       .from('email_logs')
       .insert([emailLogData])
       .select()
       .single()
+
+    if (logError) {
+      console.error('Error logging email attempt:', logError)
+      // Continue without logging, but don't fail the request
+    }
 
     // Here you would integrate with your email service provider
     // For now, we'll simulate email sending and log it
@@ -120,13 +195,20 @@ serve(async (req) => {
     */
 
     // For now, just simulate successful email sending
-    await supabaseClient
-      .from('email_logs')
-      .update({ 
-        status: 'sent', 
-        sent_at: new Date().toISOString() 
-      })
-      .eq('id', logEntry?.id)
+    if (logEntry?.id) {
+      try {
+        await supabaseClient
+          .from('email_logs')
+          .update({ 
+            status: 'sent', 
+            sent_at: new Date().toISOString() 
+          })
+          .eq('id', logEntry.id)
+      } catch (updateError) {
+        console.error('Error updating email log:', updateError)
+        // Continue without failing the request
+      }
+    }
 
     console.log(`📧 Email notification simulated for ${to}: ${subject}`)
 
@@ -145,10 +227,27 @@ serve(async (req) => {
   } catch (error) {
     console.error('Email sending error:', error)
     
+    // Update log entry as failed if we have a log entry
+    if (logEntry?.id) {
+      try {
+        await supabaseClient
+          .from('email_logs')
+          .update({ 
+            status: 'failed', 
+            error_message: error.message,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', logEntry.id)
+      } catch (updateError) {
+        console.error('Error updating email log with failure:', updateError)
+      }
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: 'Failed to send email',
-        details: error.message 
+        details: error.message,
+        emailId: logEntry?.id 
       }),
       { 
         status: 500,

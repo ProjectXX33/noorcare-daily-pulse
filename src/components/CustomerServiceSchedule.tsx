@@ -33,7 +33,7 @@ const CustomerServiceSchedule = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user?.position)) {
+    if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user?.position)) {
       loadSchedule();
     }
   }, [user]);
@@ -102,7 +102,8 @@ const CustomerServiceSchedule = () => {
     return <CheckCircle className="w-4 h-4 shrink-0 text-blue-600" />;
   };
 
-  if (!user || !['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user.position)) {
+  // Check if user has access to this component
+  if (!user || !['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user.position)) {
     return null;
   }
 

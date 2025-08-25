@@ -79,7 +79,12 @@ const sendEmailNotification = async (userEmail: string, title: string, message: 
     console.log('✅ Email notification sent successfully to:', userEmail);
     return true;
   } catch (error) {
-    console.warn('Email notification failed, but system notification will still be created:', error);
+    // Handle CORS and other network errors gracefully
+    if (error.message?.includes('CORS') || error.message?.includes('ERR_FAILED')) {
+      console.warn('Email notification service temporarily unavailable (CORS/network issue), but system notification will still be created');
+    } else {
+      console.warn('Email notification failed, but system notification will still be created:', error);
+    }
     return false;
   }
 };

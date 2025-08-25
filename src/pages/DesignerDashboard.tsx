@@ -551,10 +551,10 @@ const DesignerDashboard = () => {
                           </div>
                           <div className="relative group cursor-pointer" onClick={(e) => {
                             e.stopPropagation(); // Prevent opening task dialog
-                            handleImageClick(getFileUrl(task.visualFeeding));
+                            handleImageClick(task.visualFeeding);
                           }}>
                             <img 
-                              src={getFileUrl(task.visualFeeding)} 
+                              src={task.visualFeeding} 
                               alt="Visual Reference Preview" 
                               className="w-full h-20 sm:h-24 object-cover rounded border-2 border-pink-200 transition-all duration-200 group-hover:border-pink-400 group-hover:shadow-lg"
                               onError={(e) => {
@@ -674,12 +674,12 @@ const DesignerDashboard = () => {
                     {task.visualFeeding && isImageFile(task.visualFeeding) && (
                       <div className="flex-shrink-0">
                         <img 
-                          src={getFileUrl(task.visualFeeding)} 
+                          src={task.visualFeeding} 
                           alt="Visual Reference" 
                           className="w-12 h-12 object-cover rounded border-2 border-pink-200 cursor-pointer hover:border-pink-400 transition-all duration-200"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleImageClick(getFileUrl(task.visualFeeding));
+                            handleImageClick(task.visualFeeding);
                           }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
@@ -745,6 +745,9 @@ const DesignerDashboard = () => {
                     <DialogTitle className="text-base sm:text-lg lg:text-xl break-words overflow-wrap-anywhere pr-8">
                       {selectedTask.title}
                     </DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">
+                      View project details, update progress, and manage comments for this design task.
+                    </DialogDescription>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline" className={`text-xs ${getProjectTypeColor(selectedTask.projectType)}`}>
                         <div className="flex items-center gap-1">
@@ -995,34 +998,36 @@ const DesignerDashboard = () => {
                                     <span className="text-pink-600">🖼️</span> Visual Feeding
                                   </Label>
                                   <div className="p-3 bg-gradient-to-r from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-lg border border-pink-200 dark:border-pink-700">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-pink-600">📷</span>
-                                      <span className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.visualFeeding}</span>
-                                    </div>
-                                                                         {/* Image Preview - if it's an image file */}
-                                     {selectedTask.visualFeeding && isImageFile(selectedTask.visualFeeding) && (
-                                       <div className="mt-2">
-                                                                                    <div className="relative group cursor-pointer" onClick={() => handleImageClick(getFileUrl(selectedTask.visualFeeding))}>
-                                             <img 
-                                               src={getFileUrl(selectedTask.visualFeeding)} 
-                                               alt="Visual Reference" 
-                                             className="max-w-full h-auto max-h-32 rounded border transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
-                                             onError={(e) => {
-                                               e.currentTarget.style.display = 'none';
-                                             }}
-                                           />
-                                           {/* Overlay to indicate it's clickable */}
-                                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
-                                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                               <div className="bg-white bg-opacity-90 rounded-full p-2">
-                                                 <Eye className="w-4 h-4 text-gray-700" />
-                                               </div>
-                                             </div>
-                                           </div>
-                                         </div>
-                                         <p className="text-xs text-slate-500 mt-1 text-center">Click to view full size</p>
-                                       </div>
-                                     )}
+                                    {/* Image Preview - if it's an image file */}
+                                    {selectedTask.visualFeeding && isImageFile(selectedTask.visualFeeding) ? (
+                                      <div className="space-y-2">
+                                        <div className="relative group cursor-pointer" onClick={() => handleImageClick(selectedTask.visualFeeding)}>
+                                          <img 
+                                            src={selectedTask.visualFeeding} 
+                                            alt="Visual Reference" 
+                                            className="w-full h-auto max-h-48 rounded border transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                            }}
+                                          />
+                                          {/* Overlay to indicate it's clickable */}
+                                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
+                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                              <div className="bg-white bg-opacity-90 rounded-full p-2">
+                                                <Eye className="w-4 h-4 text-gray-700" />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 text-center">Click to view full size</p>
+                                      </div>
+                                    ) : (
+                                      /* Show as link if not an image */
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-pink-600">📷</span>
+                                        <span className="text-sm text-slate-700 dark:text-slate-300">{selectedTask.visualFeeding}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )}
@@ -1162,6 +1167,10 @@ const DesignerDashboard = () => {
       {/* Image Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none">
+                      <DialogHeader className="sr-only">
+              <DialogTitle>Visual Reference Image</DialogTitle>
+              <DialogDescription>View the full-size visual reference image.</DialogDescription>
+            </DialogHeader>
           <div className="relative flex items-center justify-center">
             {selectedImage && (
               <img 

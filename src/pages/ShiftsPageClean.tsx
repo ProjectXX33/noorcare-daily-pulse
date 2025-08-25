@@ -326,7 +326,7 @@ const ShiftsPage = () => {
         name: item.name,
         startTime: item.start_time,
         endTime: item.end_time,
-        position: item.position as 'Customer Service' | 'Designer',
+        position: item.position as 'Junior CRM Specialist' | 'Designer',
         isActive: item.is_active,
         createdAt: new Date(item.created_at),
         updatedAt: new Date(item.updated_at)
@@ -344,7 +344,7 @@ const ShiftsPage = () => {
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .in('position', ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'])
+        .in('position', ['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'])
         .eq('role', 'employee')
         .order('name');
 
@@ -363,7 +363,7 @@ const ShiftsPage = () => {
 
       setCustomerServiceEmployees(employees);
     } catch (error) {
-      console.error('Error loading Customer Service and Designer employees:', error);
+      console.error('Error loading Junior CRM Specialist and Designer employees:', error);
       toast.error('Failed to load employees');
     }
   }, []);
@@ -1235,7 +1235,7 @@ const ShiftsPage = () => {
         )}
 
         {/* Employee Schedule with enhanced mobile design */}
-        {(['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user.position)) && (
+        {(['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user.position)) && (
           <Card className="border border-border/50 shadow-sm w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">

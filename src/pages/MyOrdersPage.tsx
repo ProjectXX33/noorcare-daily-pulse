@@ -22,7 +22,11 @@ import {
   RefreshCw,
   TrendingUp,
   TrendingDown,
-  Edit3
+  // Edit3, // Removed - Edit functionality disabled
+  Copy,
+  Clock,
+  Settings,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +40,9 @@ import {
   OrderSubmissionFilters,
   syncOrderFromWooCommerce
 } from '@/lib/orderSubmissionsApi';
-import EditOrderModal from '@/components/EditOrderModal';
+import wooCommerceAPI from '@/lib/woocommerceApi';
+import { supabase } from '@/integrations/supabase/client';
+// EditOrderModal import removed - Edit functionality disabled
 // Remove date-fns dependency and use built-in date formatting
 
 // SAR Icon Component
@@ -67,8 +73,7 @@ const MyOrdersPage: React.FC = () => {
   const [syncingOrderId, setSyncingOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderSubmission | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
-  const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
-  const [orderToEdit, setOrderToEdit] = useState<OrderSubmission | null>(null);
+  // Edit order state variables removed - Edit functionality disabled
   const [stats, setStats] = useState({
     total_orders: 0,
     total_revenue: 0,
@@ -92,10 +97,19 @@ const MyOrdersPage: React.FC = () => {
       return;
     }
     
-    // Allow both Customer Service users and admins
-    if (user.position !== 'Customer Service' && user.role !== 'admin') {
-      console.warn('Access denied: User is not Customer Service or Admin');
-      navigate('/employee-dashboard', { replace: true });
+    // Allow Junior CRM Specialist users, Customer Retention Managers, and admins
+    const allowedPositions = ['Junior CRM Specialist'];
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    
+    if (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string)) {
+      console.warn('Access denied: User is not authorized');
+              if (user.role === 'admin') {
+          navigate('/dashboard', { replace: true });
+        } else if ((user as any).position === 'Content Creator') {
+          navigate('/copy-writing-dashboard', { replace: true });
+        } else {
+          navigate('/employee-dashboard', { replace: true });
+        }
       return;
     }
   }, [user, navigate]);
@@ -137,7 +151,10 @@ const MyOrdersPage: React.FC = () => {
 
   // Initial data load
   useEffect(() => {
-    if (user && (user.position === 'Customer Service' || user.role === 'admin')) {
+    const allowedPositions = ['Junior CRM Specialist'];
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    
+    if (user && (allowedPositions.includes(user.position) || allowedRoles.includes(user.role as string))) {
       fetchData();
     } else if (user) {
       // User is loaded but doesn't have access
@@ -309,15 +326,130 @@ const MyOrdersPage: React.FC = () => {
     setIsOrderDetailsOpen(true);
   };
 
-  // Edit order
-  const editOrder = (order: OrderSubmission) => {
-    setOrderToEdit(order);
-    setIsEditOrderOpen(true);
-  };
+  // Edit order function removed - Edit functionality disabled
 
   // Handle order updated
   const handleOrderUpdated = () => {
     fetchData(true);
+  };
+
+  // Get payment method in Arabic
+  const getPaymentMethodArabic = (method: string) => {
+    switch (method?.toLowerCase()) {
+      case 'cod':
+        return 'الدفع عند الاستلام (COD)';
+      case 'bank_transfer':
+        return 'تحويل بنكي';
+      case 'credit_card':
+        return 'بطاقة ائتمان';
+      default:
+        return 'الدفع عند الاستلام (COD)';
+    }
+  };
+
+  // Copy order information in Arabic format
+  const copyOrderInArabic = async (order: OrderSubmission) => {
+    try {
+      // Debug: Log order data to check structure
+      console.log('📋 Copying order details:', {
+        orderNumber: order.order_number,
+        customerName: `${order.customer_first_name} ${order.customer_last_name}`,
+        phone: order.customer_phone,
+        itemsCount: order.order_items?.length || 0,
+        totalAmount: order.total_amount
+      });
+
+      // Format the Arabic order invoice with safety checks
+      const arabicOrderText = `🌙 نور القمر – فاتورة الطلب
+
+رقم الطلب: #${order.order_number || order.id || 'N/A'}
+اسم العميل: ${order.customer_first_name || ''} ${order.customer_last_name || ''}
+رقم الهاتف: ${order.customer_phone || 'N/A'}
+العنوان: ${order.billing_address_1 || 'N/A'}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
+المدينة: ${order.billing_city || 'N/A'}
+الدولة: ${order.billing_country || 'N/A'}
+طريقة الدفع: ${getPaymentMethodArabic(order.payment_method)}
+
+🛒 تفاصيل الطلب:
+${(order.order_items || []).map(item => 
+`المنتج: ${item.product_name || 'N/A'}
+الكمية: ${item.quantity || 0}`
+).join('\n\n')}
+
+💰 إجمالي الطلب:
+${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
+
+      // Try modern clipboard API first
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        try {
+          // Check if we have clipboard permission
+          const permission = await navigator.permissions.query({ name: 'clipboard-write' as PermissionName });
+          if (permission.state === 'denied') {
+            throw new Error('Clipboard permission denied');
+          }
+          
+          await navigator.clipboard.writeText(arabicOrderText);
+          toast.success('تم نسخ تفاصيل الطلب بالعربية! 📋', {
+            description: 'Order details copied in Arabic format',
+          });
+        } catch (clipboardError) {
+          console.warn('Modern clipboard API failed, trying fallback:', clipboardError);
+          throw clipboardError; // This will trigger the fallback
+        }
+      } else {
+        // Fallback: legacy execCommand
+        const textarea = document.createElement('textarea');
+        textarea.value = arabicOrderText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            toast.success('تم نسخ تفاصيل الطلب بالعربية! 📋', {
+              description: 'Order details copied in Arabic format (legacy method)',
+            });
+          } else {
+            throw new Error('execCommand copy failed');
+          }
+        } catch (execError) {
+          throw new Error('Legacy copy method failed');
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy order details:', error);
+      
+      // Last resort: Show the text in a dialog for manual copy
+      const manualCopyText = `🌙 نور القمر – فاتورة الطلب
+
+رقم الطلب: #${order.order_number || order.id || 'N/A'}
+اسم العميل: ${order.customer_first_name || ''} ${order.customer_last_name || ''}
+رقم الهاتف: ${order.customer_phone || 'N/A'}
+العنوان: ${order.billing_address_1 || 'N/A'}${order.billing_address_2 ? ` - ${order.billing_address_2}` : ''}
+المدينة: ${order.billing_city || 'N/A'}
+الدولة: ${order.billing_country || 'N/A'}
+طريقة الدفع: ${getPaymentMethodArabic(order.payment_method)}
+
+🛒 تفاصيل الطلب:
+${(order.order_items || []).map(item => 
+`المنتج: ${item.product_name || 'N/A'}
+الكمية: ${item.quantity || 0}`
+).join('\n\n')}
+
+💰 إجمالي الطلب:
+${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
+
+      // Show alert with the text for manual copy
+      alert('فشل في النسخ التلقائي. يرجى نسخ النص التالي يدوياً:\n\n' + manualCopyText);
+      
+      toast.error('فشل في نسخ تفاصيل الطلب ❌', {
+        description: 'Clipboard API not supported. Text shown in alert for manual copy.',
+      });
+    }
   };
 
   // Get status badge color
@@ -337,7 +469,9 @@ const MyOrdersPage: React.FC = () => {
   };
 
   // Don't render if user doesn't have access
-  if (!user || (user.position !== 'Customer Service' && user.role !== 'admin')) {
+  const allowedPositions = ['Junior CRM Specialist'];
+  const allowedRoles = ['admin', 'customer_retention_manager'];
+  if (!user || (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -435,7 +569,7 @@ const MyOrdersPage: React.FC = () => {
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.pending_orders}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-yellow-600" />
+              <Clock className="h-8 w-8 text-yellow-600" />
             </div>
           </CardContent>
         </Card>
@@ -446,7 +580,7 @@ const MyOrdersPage: React.FC = () => {
                 <p className="text-sm font-medium text-muted-foreground">Processing</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.processing_orders}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-blue-600" />
+              <Settings className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
@@ -457,7 +591,7 @@ const MyOrdersPage: React.FC = () => {
                 <p className="text-sm font-medium text-muted-foreground">Completed</p>
                 <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
               </div>
-              <TrendingDown className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -640,15 +774,17 @@ const MyOrdersPage: React.FC = () => {
                           <span className="sm:hidden">Details</span>
                         </Button>
 
+                        {/* Edit Order button removed - Edit functionality disabled */}
+
                         <Button
-                          onClick={() => editOrder(order)}
+                          onClick={() => copyOrderInArabic(order)}
                           variant="outline"
                           size="sm"
-                          className="flex-1 sm:flex-none bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                          className="flex-1 sm:flex-none bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700"
                         >
-                          <Edit3 className="h-4 w-4 mr-2" />
-                          <span className="hidden sm:inline">Edit Order</span>
-                          <span className="sm:hidden">Edit</span>
+                          <Copy className="h-4 w-4 mr-2" />
+                          <span className="hidden sm:inline">Copy Details</span>
+                          <span className="sm:hidden">Copy</span>
                         </Button>
                         
                         {order.woocommerce_order_id && (
@@ -815,21 +951,112 @@ const MyOrdersPage: React.FC = () => {
               {/* Order Items */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Order Items</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Order Items</CardTitle>
+                    {selectedOrder.order_items.some(item => !item.image_url) && (
+                      <Button
+                        onClick={async () => {
+                          try {
+                            toast.info('🖼️ Fetching missing product images...');
+                            
+                            const updatedItems = await Promise.all(
+                              selectedOrder.order_items.map(async (item) => {
+                                if (item.image_url) {
+                                  return item; // Already has image
+                                }
+
+                                try {
+                                  // Fetch product details from WooCommerce
+                                  const productDetails = await wooCommerceAPI.fetchProduct(item.product_id);
+                                  const imageUrl = productDetails?.images?.[0]?.src || null;
+                                  
+                                  return {
+                                    ...item,
+                                    image_url: imageUrl
+                                  };
+                                } catch (err) {
+                                  console.warn(`⚠️ Failed to fetch image for product ${item.product_id}:`, err);
+                                  return item;
+                                }
+                              })
+                            );
+
+                            // Update the order in database
+                            const { error: updateError } = await supabase
+                              .from('order_submissions')
+                              .update({ 
+                                order_items: updatedItems,
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', selectedOrder.id);
+
+                            if (updateError) {
+                              toast.error('❌ Failed to update order with images');
+                            } else {
+                              toast.success('✅ Product images updated successfully!');
+                              // Refresh the selected order data
+                              const { data: updatedOrder } = await supabase
+                                .from('order_submissions')
+                                .select('*')
+                                .eq('id', selectedOrder.id)
+                                .single();
+                              if (updatedOrder) {
+                                setSelectedOrder(updatedOrder);
+                              }
+                            }
+                          } catch (error) {
+                            console.error('Error updating images:', error);
+                            toast.error('❌ Failed to update product images');
+                          }
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Fix Missing Images
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {selectedOrder.order_items.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{item.product_name}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            SKU: {item.sku || 'N/A'} | Quantity: {item.quantity}
-                          </p>
+                      <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                        {/* Product Image */}
+                        <div className="flex-shrink-0 w-16 h-16 rounded bg-white border flex items-center justify-center overflow-hidden">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.product_name}
+                              className="object-contain w-full h-full"
+                              loading="lazy"
+                              onLoad={() => console.log(`✅ Image loaded for ${item.product_name}`)}
+                              onError={(e) => {
+                                console.log(`❌ Image failed to load for ${item.product_name}:`, e);
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className="text-gray-300 text-2xl" style={{ display: item.image_url ? 'none' : 'flex' }}>
+                            🛒
+                          </div>
                         </div>
+                        
+                        {/* Product Info */}
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.product_name}</h4>
+                          {item.sku && <p className="text-sm text-gray-600">SKU: {item.sku}</p>}
+                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                        </div>
+                        
+                        {/* Price Info */}
                         <div className="text-right">
                           <p className="font-medium">{parseFloat(item.price).toFixed(2)} SAR</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-gray-600">
                             Total: {(parseFloat(item.price) * item.quantity).toFixed(2)} SAR
                           </p>
                         </div>
@@ -881,13 +1108,7 @@ const MyOrdersPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Order Modal */}
-      <EditOrderModal
-        order={orderToEdit}
-        isOpen={isEditOrderOpen}
-        onClose={() => setIsEditOrderOpen(false)}
-        onOrderUpdated={handleOrderUpdated}
-      />
+      {/* Edit Order Modal removed - Edit functionality disabled */}
     </div>
   );
 };

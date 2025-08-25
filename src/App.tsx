@@ -14,6 +14,8 @@ import CheckInPage from "./pages/CheckInPage";
 import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import ContentCreativeDashboard from "./pages/ContentCreativeDashboard";
+import CustomerRetentionDashboard from "./pages/CustomerRetentionDashboard";
+import CustomerRetentionTeamReportsPage from "./pages/CustomerRetentionTeamReportsPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
 import AdminRatingsPage from "./pages/AdminRatingsPage";
@@ -35,6 +37,7 @@ import SidebarNavigation from "./components/SidebarNavigation";
 import "./styles/rtl.css";
 import EventsPage from '@/pages/EventsPage';
 import MediaBuyerTasksPage from "./pages/MediaBuyerTasksPage";
+import ContentCreatorTasksPage from "./pages/ContentCreatorTasksPage";
 import DesignerDashboard from "./pages/DesignerDashboard";
 import WorkspacePage from '@/pages/WorkspacePage';
 import React, { useState, useEffect } from 'react';
@@ -45,6 +48,7 @@ import AdminPerformancePage from "./pages/AdminPerformancePage";
 import CreateOrderPage from "./pages/CreateOrderPage";
 import MyOrdersPage from "./pages/MyOrdersPage";
 import AdminTotalOrdersPage from "./pages/AdminTotalOrdersPage";
+import OurTeamPage from "./pages/OurTeamPage";
 import LoyalCustomersPage from "./pages/LoyalCustomersPage";
 import CustomerServiceCRMPage from "./pages/CustomerServiceCRMPage";
 import CopyWritingDashboard from "./pages/CopyWritingDashboard";
@@ -148,10 +152,14 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
       return <Navigate to="/warehouse-dashboard" replace />;
     } else if (user.role === 'content_creative_manager') {
       return <Navigate to="/content-creative-dashboard" replace />;
+    } else if (user.position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
     } else if (user.role === 'customer_retention_manager') {
-      return <Navigate to="/employee-dashboard" replace />; // Will create this later
+      return <Navigate to="/customer-retention-dashboard" replace />;
     } else if (user.role === 'digital_solution_manager') {
       return <Navigate to="/employee-dashboard" replace />; // Will create this later
+    } else if ((user as any).position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
     } else {
       return <Navigate to="/employee-dashboard" replace />;
     }
@@ -172,19 +180,23 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 // Employee route component to protect routes that require employee role
 const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   return (
-    <PrivateRoute allowedRoles={['employee', 'content_creative_manager']}>
+    <PrivateRoute allowedRoles={['employee', 'content_creative_manager', 'customer_retention_manager']}>
       {children}
     </PrivateRoute>
   );
 };
 
-// Employee Dashboard route - redirects Copy Writing users to their dashboard
+// Employee Dashboard route - for regular employees (not Junior CRM Specialist)
 const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  // Redirect Copy Writing users to their dedicated dashboard
-  if (user && user.position === 'Copy Writing') {
-    return <Navigate to="/copy-writing-dashboard" replace />;
+  // Junior CRM Specialist users should stay on this dashboard
+  if (!user || user.position === 'Junior CRM Specialist') {
+    return (
+      <PrivateRoute allowedRoles={['employee']}>
+        {children}
+      </PrivateRoute>
+    );
   }
   
   return (
@@ -198,8 +210,34 @@ const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => 
 const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || user.position !== 'Customer Service') {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  if (!user || user.position !== 'Junior CRM Specialist') {
+    if (user?.role === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    } else if ((user as any).position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
+    } else {
+      return <Navigate to="/employee-dashboard" replace />;
+    }
+  }
+  
+  return <>{children}</>;
+};
+
+// Customer Service and Customer Retention Manager route component
+const CustomerServiceAndRetentionRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  const allowedPositions = ['Junior CRM Specialist'];
+  const allowedRoles = ['admin', 'customer_retention_manager'];
+  
+  if (!user || (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string))) {
+    if (user?.role === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    } else if ((user as any).position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
+    } else {
+      return <Navigate to="/employee-dashboard" replace />;
+    }
   }
   
   return <>{children}</>;
@@ -210,7 +248,13 @@ const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
   if (!user || user.position !== 'Media Buyer') {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+    if (user?.role === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    } else if ((user as any).position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
+    } else {
+      return <Navigate to="/employee-dashboard" replace />;
+    }
   }
   
   return <>{children}</>;
@@ -220,19 +264,33 @@ const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
 const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || user.position !== 'Designer') {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position !== 'Designer') {
+    if ((user as any).role === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    } else if (user.position === 'Content Creator') {
+      return <Navigate to="/copy-writing-dashboard" replace />;
+    } else {
+      return <Navigate to="/employee-dashboard" replace />;
+    }
   }
   
   return <>{children}</>;
 };
 
-// Copy Writing route component for copy writing-only access
+// Content Creator route component for content creator-only access
 const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || user.position !== 'Copy Writing') {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position !== 'Content Creator') {
+    return <Navigate to={(user as any).role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
   }
   
   return <>{children}</>;
@@ -242,8 +300,12 @@ const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
 const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if ((user as any).role !== 'admin' && user.position !== 'Media Buyer') {
+    return <Navigate to={(user as any).role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
   }
   
   return <>{children}</>;
@@ -253,8 +315,12 @@ const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
 const AdminAndMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
-    return <Navigate to={user?.role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if ((user as any).role !== 'admin' && user.role !== 'customer_retention_manager' && user.position !== 'Media Buyer') {
+    return <Navigate to={(user as any).role === 'admin' ? '/dashboard' : '/employee-dashboard'} replace />;
   }
   
   return <>{children}</>;
@@ -429,11 +495,31 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/our-team" 
+          element={
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'employee']}>
+              <SidebarNavigation>
+                <OurTeamPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
           path="/content-creative-dashboard" 
           element={
             <PrivateRoute>
               <SidebarNavigation>
                 <ContentCreativeDashboard />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/customer-retention-dashboard" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <CustomerRetentionDashboard />
               </SidebarNavigation>
             </PrivateRoute>
           } 
@@ -451,7 +537,7 @@ const AppContent = () => {
         <Route 
           path="/tasks" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
               <SidebarNavigation>
                 <AdminTasksPage />
               </SidebarNavigation>
@@ -461,27 +547,37 @@ const AppContent = () => {
         <Route 
           path="/admin-ratings" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
               <SidebarNavigation>
                 <AdminRatingsPage />
               </SidebarNavigation>
             </PrivateRoute>
           }
         />
-              <Route
-        path="/team-reports"
-        element={
-          <PrivateRoute allowedRoles={['content_creative_manager']}>
-            <SidebarNavigation>
-              <TeamReportsPage />
-            </SidebarNavigation>
-          </PrivateRoute>
-        }
-      />
+                      <Route 
+          path="/team-reports" 
+          element={
+            <PrivateRoute allowedRoles={['content_creative_manager']}>
+              <SidebarNavigation>
+                <TeamReportsPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/customer-retention-team-reports" 
+          element={
+            <PrivateRoute allowedRoles={['customer_retention_manager']}>
+              <SidebarNavigation>
+                <CustomerRetentionTeamReportsPage />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
       <Route
         path="/team-shifts"
         element={
-          <PrivateRoute allowedRoles={['content_creative_manager']}>
+          <PrivateRoute allowedRoles={['content_creative_manager', 'customer_retention_manager']}>
             <SidebarNavigation>
               <TeamShiftsPage />
             </SidebarNavigation>
@@ -539,9 +635,19 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/content-creator-tasks" 
+          element={
+            <CopyWritingRoute>
+              <SidebarNavigation>
+                <ContentCreatorTasksPage />
+              </SidebarNavigation>
+            </CopyWritingRoute>
+          } 
+        />
+        <Route 
           path="/admin-shift-management" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
               <SidebarNavigation>
                 <AdminShiftManagement />
               </SidebarNavigation>
@@ -592,41 +698,41 @@ const AppContent = () => {
         <Route 
           path="/create-order" 
           element={
-            <CustomerServiceRoute>
+            <CustomerServiceAndRetentionRoute>
               <SidebarNavigation>
                 <CreateOrderPage />
               </SidebarNavigation>
-            </CustomerServiceRoute>
+            </CustomerServiceAndRetentionRoute>
           } 
         />
         <Route 
           path="/my-orders" 
           element={
-            <CustomerServiceRoute>
+            <CustomerServiceAndRetentionRoute>
               <SidebarNavigation>
                 <MyOrdersPage />
               </SidebarNavigation>
-            </CustomerServiceRoute>
+            </CustomerServiceAndRetentionRoute>
           } 
         />
         <Route 
           path="/admin-total-orders" 
           element={
-            <AdminAndMediaBuyerRoute>
+            <CustomerServiceAndRetentionRoute>
               <SidebarNavigation>
                 <AdminTotalOrdersPage />
               </SidebarNavigation>
-            </AdminAndMediaBuyerRoute>
+            </CustomerServiceAndRetentionRoute>
           } 
         />
         <Route 
           path="/loyal-customers" 
           element={
-            <CustomerServiceRoute>
+            <CustomerServiceAndRetentionRoute>
               <SidebarNavigation>
                 <LoyalCustomersPage />
               </SidebarNavigation>
-            </CustomerServiceRoute>
+            </CustomerServiceAndRetentionRoute>
           } 
         />
         <Route 

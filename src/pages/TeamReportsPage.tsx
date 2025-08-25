@@ -117,7 +117,7 @@ const TeamReportsPage = () => {
              // Filter Content & Creative team members (exclude managers)
        const teamEmployees = employeesData.filter(emp => 
          (emp.team === 'Content & Creative Department' || 
-         ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)) &&
+         ['Content Creator', 'Designer', 'Media Buyer'].includes(emp.position)) &&
          !['Executive Director', 'Content & Creative Manager'].includes(emp.position)
        );
       

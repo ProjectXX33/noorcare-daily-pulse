@@ -109,20 +109,23 @@ const EmployeeDashboard = () => {
 
   const t = translations[language as keyof typeof translations];
 
-  if (!user) return null;
+  // Redirect Content Creative Managers and Content Creator employees to their dedicated dashboards
+  useEffect(() => {
+    if (user && user.role === 'content_creative_manager') {
+      navigate('/content-creative-dashboard', { replace: true });
+    } else if (user && user.position === 'Content Creator') {
+      navigate('/copy-writing-dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
-  // Redirect Copy Writing users to their dedicated dashboard
-  if (user.position === 'Copy Writing') {
-    navigate('/copy-writing-dashboard', { replace: true });
-    return null;
-  }
+  if (!user) return null;
 
   const userCheckIns = getUserCheckIns(user.id);
   const userReports = getUserWorkReports(user.id);
   const checkedInToday = hasCheckedInToday(user.id);
   
   // Check if user has check-in access (Customer Service and Designer)
-  const hasCheckInAccess = ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(user.position);
+  const hasCheckInAccess = ['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user.position);
   
   // Get today's reports
   const today = new Date();
@@ -281,10 +284,10 @@ const EmployeeDashboard = () => {
           {/* Only show check-in history for Customer Service and Designer */}
           {hasCheckInAccess && (
             <div className="bg-card rounded-lg p-3 sm:p-4 border shadow-sm">
-              <CheckInHistory 
-                checkIns={userCheckIns.slice(0, 5)} 
-                title={t.recentCheckins} 
-              />
+                          <CheckInHistory 
+              checkIns={userCheckIns.slice(0, 5) as any} 
+              title={t.recentCheckins} 
+            />
             </div>
           )}
           

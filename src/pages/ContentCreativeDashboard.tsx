@@ -21,6 +21,22 @@ import {
   CalendarDays,
   Trash2
 } from 'lucide-react';
+import { toast } from "sonner";
+import { User, Task } from '@/types';
+import { getTeamMembers } from '@/lib/teamsApi';
+import { fetchEmployees } from '@/lib/employeesApi';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  getContentCreativeTeamMembers, 
+  getContentCreativeStats, 
+  getContentCreativeShifts, 
+  getContentCreativeTasks,
+  getContentCreativePerformance,
+  ContentCreativeStats,
+  TeamShiftData,
+  TeamPerformanceData
+} from '@/lib/contentCreativeApi';
+import { getUserStatus } from '@/lib/chatUtils';
 
 // Riyal SVG Icon Component
 const RiyalIcon = ({ className }: { className?: string }) => (
@@ -36,22 +52,6 @@ const RiyalIcon = ({ className }: { className?: string }) => (
     <path fill="currentColor" d="M1085.73,895.8c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.33v-135.2l292.27-62.11c20.06-44.47,33.32-92.75,38.4-143.37l-330.68,70.27V66.13c-50.67,28.45-95.67,66.32-132.25,110.99v403.35l-132.25,28.11V0c-50.67,28.44-95.67,66.32-132.25,110.99v525.69l-295.91,62.88c-20.06,44.47-33.33,92.75-38.42,143.37l334.33-71.05v170.26l-358.3,76.14c-20.06,44.47-33.32,92.75-38.4,143.37l375.04-79.7c30.53-6.35,56.77-24.4,73.83-49.24l68.78-101.97v-.02c7.14-10.55,11.3-23.27,11.3-36.97v-149.98l132.25-28.11v270.4l424.53-90.28Z"></path>
   </svg>
 );
-import { toast } from "sonner";
-import { User, Task } from '@/types';
-import { getTeamMembers } from '@/lib/teamsApi';
-import { fetchEmployees } from '@/lib/employeesApi';
-import { supabase } from '@/lib/supabase';
-import { 
-  getContentCreativeTeamMembers, 
-  getContentCreativeStats, 
-  getContentCreativeShifts, 
-  getContentCreativeTasks,
-  getContentCreativePerformance,
-  ContentCreativeStats,
-  TeamShiftData,
-  TeamPerformanceData
-} from '@/lib/contentCreativeApi';
-import { getUserStatus } from '@/lib/chatUtils';
 
 interface TeamStats {
   totalMembers: number;
@@ -61,7 +61,6 @@ interface TeamStats {
   pendingTasks: number;
   totalRevenue: number;
   totalOrders: number;
-  // NEW: Comprehensive order overview
   completedOrders?: number;
   processingOrders?: number;
   pendingOrders?: number;
@@ -129,7 +128,7 @@ const ContentCreativeDashboard = () => {
       assignTask: "Assign Task",
       viewPerformance: "View Performance",
       manageShift: "Manage Shift",
-      copyWriting: "Copy Writing",
+      copyWriting: "Content Creator",
       designer: "Designer",
       mediaBuyer: "Media Buyer"
     },
@@ -157,60 +156,18 @@ const ContentCreativeDashboard = () => {
       assignTask: "تعيين مهمة",
       viewPerformance: "عرض الأداء",
       manageShift: "إدارة المناوبة",
-      copyWriting: "كتابة المحتوى",
+      copyWriting: "مبدع المحتوى",
       designer: "مصمم",
       mediaBuyer: "مشتري الإعلانات"
     }
   };
 
-  useEffect(() => {
-    const storedLang = localStorage.getItem('preferredLanguage');
-    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
-      setLanguage(storedLang);
-    }
-    loadDashboardData();
-  }, []);
-
-  const t = translations[language as keyof typeof translations];
-
-  // Check if user has access to this dashboard
-  if (!user || user.role !== 'content_creative_manager') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground">
-              You don't have permission to access this dashboard.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const loadDashboardData = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([
-        loadTeamMembers(),
-        loadTeamStats(),
-        loadShifts(),
-        loadTasks()
-      ]);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-      toast.error("Failed to load dashboard data");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Function definitions - moved before useEffect
   const loadTeamMembers = async () => {
     try {
+      console.log('🚀 Starting to load team members...');
       const members = await getContentCreativeTeamMembers();
+      console.log('👥 Team members received:', members.length, members.map(m => ({ name: m.name, position: m.position })));
       setTeamMembers(members);
       
       // Fetch online status for team members from users table
@@ -226,16 +183,19 @@ const ContentCreativeDashboard = () => {
         setOnlineUsers(activityData || []);
       }
     } catch (error) {
-      console.error("Error loading team members:", error);
+      console.error("❌ Error loading team members:", error);
     }
   };
 
   const loadTeamStats = async () => {
     try {
+      console.log('🚀 Starting to load team stats...');
       const stats = await getContentCreativeStats();
+      console.log('📊 Received stats:', stats);
       setTeamStats(stats);
+      console.log('✅ Team stats set successfully');
     } catch (error) {
-      console.error("Error loading team stats:", error);
+      console.error("❌ Error loading team stats:", error);
     }
   };
 
@@ -257,13 +217,26 @@ const ContentCreativeDashboard = () => {
     }
   };
 
-
-
-
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        loadTeamMembers(),
+        loadTeamStats(),
+        loadShifts(),
+        loadTasks()
+      ]);
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getPositionBadge = (position: string) => {
     const colorMap = {
-      'Copy Writing': 'bg-purple-100 text-purple-800',
+      'Content Creator': 'bg-purple-100 text-purple-800',
       'Designer': 'bg-blue-100 text-blue-800', 
       'Media Buyer': 'bg-green-100 text-green-800',
       'Content & Creative Manager': 'bg-indigo-100 text-indigo-800',
@@ -301,27 +274,59 @@ const ContentCreativeDashboard = () => {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Header */}
-      <div className="border-b border-border/50 bg-background/98 w-full">
-        <div className="safe-area-padding px-4 py-6 w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex-1 min-w-0 space-y-2">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">
-                {t.dashboard}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Team Management Dashboard: Copy Writing, Designers & Media Buyers
-              </p>
-            </div>
-          </div>
+  // useEffect hooks
+  useEffect(() => {
+    const storedLang = localStorage.getItem('preferredLanguage');
+    if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
+      setLanguage(storedLang);
+    }
+    loadDashboardData();
+  }, []);
+
+  const t = translations[language as keyof typeof translations];
+
+  // Check if user has access to this dashboard
+  if (!user || (user.role !== 'content_creative_manager' && user.position !== 'Content Creator')) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground">
+              You don't have permission to access this dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="safe-area-padding px-4 py-6 space-y-6 w-full">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 w-full" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <div className="container mx-auto py-6 space-y-6">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white">
+          <h1 className="text-3xl font-bold">{t.dashboard}</h1>
+          <p className="mt-2 text-purple-100">
+            Manage Content Creator, Designers, and Media Buyers
+          </p>
+        </div>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -329,7 +334,7 @@ const ContentCreativeDashboard = () => {
                   <p className="text-sm font-medium text-muted-foreground">{t.totalMembers}</p>
                   <p className="text-2xl font-bold">{teamStats.totalMembers}</p>
                 </div>
-                <Users className="h-8 w-8 text-muted-foreground" />
+                <Users className="h-8 w-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
@@ -351,10 +356,12 @@ const ContentCreativeDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Total Orders ({new Date().toLocaleString('default', { month: 'long' })})
+                    Completed Orders ({new Date().toLocaleString('default', { month: 'long' })})
                   </p>
-                  <p className="text-2xl font-bold text-blue-600">{teamStats.totalOrders}</p>
-                  <p className="text-xs text-muted-foreground">All orders (Real-time Overview)</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {teamStats.totalOrders.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Orders from order submissions</p>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-blue-600" />
               </div>
@@ -366,12 +373,12 @@ const ContentCreativeDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Total Revenue ({new Date().toLocaleString('default', { month: 'long' })})
+                    Completed Revenue ({new Date().toLocaleString('default', { month: 'long' })})
                   </p>
                   <p className="text-2xl font-bold text-purple-600">
                     <RiyalIcon className="inline mr-1" />{teamStats.totalRevenue.toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Net sales (Real-time WooCommerce)</p>
+                  <p className="text-xs text-muted-foreground">Revenue from completed orders</p>
                 </div>
                 <RiyalIcon className="h-8 w-8 text-purple-600" />
               </div>
@@ -393,8 +400,8 @@ const ContentCreativeDashboard = () => {
                   <Users className="h-5 w-5" />
                   {t.members}
                 </CardTitle>
-              <CardDescription>
-                  Manage Copy Writing, Designers, and Media Buyers
+                <CardDescription>
+                  Manage Content Creator, Designers, and Media Buyers
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -418,7 +425,7 @@ const ContentCreativeDashboard = () => {
                             <TableCell className="font-medium">{member.name}</TableCell>
                             <TableCell>{getPositionBadge(member.position)}</TableCell>
                             <TableCell>{getStatusBadge(lastSeen)}</TableCell>
-                                                        <TableCell className="text-right">
+                            <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button 
                                   size="sm" 
@@ -438,23 +445,15 @@ const ContentCreativeDashboard = () => {
                                 </Button>
                               </div>
                             </TableCell>
-                                                     </TableRow>
-                         );
-                       })}
-                      </TableBody>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
                   </Table>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
-
-
-
-
-
-
-
-
         </Tabs>
       </div>
     </div>

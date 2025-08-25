@@ -147,10 +147,33 @@ export const getFileUrl = (fileName: string): string => {
 };
 
 /**
- * Check if a string is a valid image file
+ * Check if a file or filename is a valid image file
  */
-export const isImageFile = (fileName: string): boolean => {
+export const isImageFile = (fileOrName: File | string): boolean => {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+  
+  let fileName: string;
+  if (fileOrName instanceof File) {
+    fileName = fileOrName.name;
+  } else {
+    fileName = fileOrName;
+  }
+  
   const lowerFileName = fileName.toLowerCase();
+  
+  // Handle URLs - extract filename from URL
+  if (lowerFileName.startsWith('http')) {
+    try {
+      const url = new URL(lowerFileName);
+      const pathParts = url.pathname.split('/');
+      const filename = pathParts[pathParts.length - 1];
+      return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+    } catch (error) {
+      // If URL parsing fails, try the original logic
+      return imageExtensions.some(ext => lowerFileName.endsWith(ext));
+    }
+  }
+  
+  // Handle regular filenames
   return imageExtensions.some(ext => lowerFileName.endsWith(ext));
 }; 

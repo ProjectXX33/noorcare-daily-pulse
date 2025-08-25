@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -263,8 +263,8 @@ const MediaBuyerTasksPage = () => {
     setIsUploadingVisualFeeding(true);
     try {
       const result = await uploadFile(file, 'visual-feeding');
-      if (result.success && result.fileName) {
-        setTaskForm({...taskForm, visualFeeding: result.fileName});
+      if (result.success && result.publicUrl) {
+        setTaskForm({...taskForm, visualFeeding: result.publicUrl});
         toast.success('Visual feeding uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -380,8 +380,8 @@ const MediaBuyerTasksPage = () => {
     setIsUploadingEditVisualFeeding(true);
     try {
       const result = await uploadFile(file, 'visual-feeding');
-      if (result.success && result.fileName) {
-        setEditingTask(prev => ({ ...prev, visualFeeding: result.fileName }));
+      if (result.success && result.publicUrl) {
+        setEditingTask(prev => ({ ...prev, visualFeeding: result.publicUrl }));
         toast.success('Visual feeding uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -1032,16 +1032,12 @@ const MediaBuyerTasksPage = () => {
                             <span className="text-pink-600">🖼️</span> Visual Feeding
                           </Label>
                           <div className="p-3 bg-pink-50 rounded-md dark:bg-pink-900/20 border border-pink-200 dark:border-pink-700">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-pink-600">📷</span>
-                              <span className="text-sm text-pink-800 dark:text-pink-200">{selectedTaskForDetail.visualFeeding.split('/').pop()}</span>
-                            </div>
                             {/* Image Preview - if it's an image file */}
-                            {isImageFile(selectedTaskForDetail.visualFeeding) && (
-                              <div className="mt-2">
-                                <div className="relative group cursor-pointer" onClick={() => handleImageClick(getFileUrl(selectedTaskForDetail.visualFeeding))}>
+                            {isImageFile(selectedTaskForDetail.visualFeeding) ? (
+                              <div className="space-y-2">
+                                <div className="relative group cursor-pointer" onClick={() => handleImageClick(selectedTaskForDetail.visualFeeding)}>
                                   <img 
-                                    src={getFileUrl(selectedTaskForDetail.visualFeeding)} 
+                                    src={selectedTaskForDetail.visualFeeding} 
                                     alt="Visual Reference" 
                                     className="max-w-full h-auto max-h-32 rounded border shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
                                     onError={(e) => {
@@ -1057,19 +1053,22 @@ const MediaBuyerTasksPage = () => {
                                     </div>
                                   </div>
                                 </div>
-                                <p className="text-xs text-pink-500 mt-1 text-center">Click to view full size</p>
+                                <p className="text-xs text-pink-500 text-center">Click to view full size</p>
                               </div>
-                            )}
-                            {/* If not an image, show download link */}
-                            {!isImageFile(selectedTaskForDetail.visualFeeding) && (
-                              <a 
-                                href={getFileUrl(selectedTaskForDetail.visualFeeding)} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-800 dark:hover:text-pink-200 underline flex items-center gap-1"
-                              >
-                                📎 View File
-                              </a>
+                            ) : (
+                              /* Show as link if not an image */
+                              <div className="flex items-center gap-2">
+                                <span className="text-pink-600">📷</span>
+                                <span className="text-sm text-pink-800 dark:text-pink-200">{selectedTaskForDetail.visualFeeding.split('/').pop()}</span>
+                                <a 
+                                  href={selectedTaskForDetail.visualFeeding} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-pink-600 dark:text-pink-400 hover:text-pink-800 dark:hover:text-pink-200 underline flex items-center gap-1"
+                                >
+                                  📎 View File
+                                </a>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1453,6 +1452,10 @@ const MediaBuyerTasksPage = () => {
         {/* Image Modal */}
         <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Visual Reference Image</DialogTitle>
+              <DialogDescription>View the full-size visual reference image.</DialogDescription>
+            </DialogHeader>
             <div className="relative flex items-center justify-center">
               {selectedImage && (
                 <img 

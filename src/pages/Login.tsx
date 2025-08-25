@@ -142,6 +142,8 @@ const Login = () => {
         targetPath = '/warehouse-dashboard';
       } else if (user.role === 'content_creative_manager') {
         targetPath = '/content-creative-dashboard';
+      } else if (user.position === 'Content Creator') {
+        targetPath = '/copy-writing-dashboard';
       } else if (user.role === 'customer_retention_manager') {
         targetPath = '/employee-dashboard'; // Will create specific dashboard later
       } else if (user.role === 'digital_solution_manager') {

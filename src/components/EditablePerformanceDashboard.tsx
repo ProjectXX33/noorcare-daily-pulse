@@ -606,7 +606,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         let daysWorked = employeeShifts.length;
         
         // FALLBACK: If no monthly_shifts but has check-ins, use check-ins count for Customer Service/Designer
-        if (daysWorked === 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+        if (daysWorked === 0 && ['Junior CRM Specialist', 'Designer'].includes(employee.position)) {
           const employeeCheckInsInMonth = employeeCheckIns.filter(checkIn => {
             const checkInDate = new Date(checkIn.timestamp);
             return checkInDate >= startDate && checkInDate <= endDate && checkIn.checkout_time;
@@ -623,7 +623,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
         let totalOvertime = employeeShifts.reduce((sum, shift) => sum + (shift.overtime_hours || 0), 0);
         
         // FALLBACK: If no monthly_shifts delay data but has check-ins, estimate delays for Customer Service/Designer
-        if (totalDelay === 0 && daysWorked > 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+        if (totalDelay === 0 && daysWorked > 0 && ['Junior CRM Specialist', 'Designer'].includes(employee.position)) {
           // This is a simplified estimation - actual delay calculation requires shift start times
           // For now, we'll assume minimal delay if they're working but no monthly_shifts tracking
           console.warn(`⚠️ ${employee.name}: No delay data available - monthly_shifts missing. Using default estimates.`);
@@ -632,7 +632,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
         // Calculate work time based on role with enhanced fallbacks
         let totalWorkTime = 0;
-        const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Copy Writing', 'Content Creator', 'Social Media Manager'].includes(employee.position);
+        const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Content Creator', 'Social Media Manager'].includes(employee.position);
         
         if (isRemoteRole) {
           // For remote roles, estimate work time based on tasks and reports
@@ -650,7 +650,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           });
           
           // FALLBACK: If no monthly_shifts but has check-ins with checkout, calculate from check-ins
-          if (totalWorkTime === 0 && daysWorked > 0 && ['Customer Service', 'Designer'].includes(employee.position)) {
+          if (totalWorkTime === 0 && daysWorked > 0 && ['Junior CRM Specialist', 'Designer'].includes(employee.position)) {
             const employeeCheckInsInMonth = employeeCheckIns.filter(checkIn => {
               const checkInDate = new Date(checkIn.timestamp);
               return checkInDate >= startDate && checkInDate <= endDate && checkIn.checkout_time;
@@ -1422,7 +1422,7 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
           }
 
           // Check if this is a remote worker
-          const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Copy Writing', 'Content Creator', 'Social Media Manager'].includes(userRecord.position);
+          const isRemoteRole = ['Media Buyer', 'Copywriter', 'Copy Writer', 'Content Creator', 'Social Media Manager'].includes(userRecord.position);
 
           // **NEW ENHANCED PERFORMANCE CALCULATION** - Based on User Requirements!
           const averagePerformanceScore = calcImprovedPerformanceScore(
@@ -1757,12 +1757,12 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
       console.log(`📦 Found ${checkInsData?.length || 0} complete check-ins to analyze`);
 
-      // Filter for Customer Service and Designer only
+      // Filter for Junior CRM Specialist and Designer only
       const trackableCheckIns = checkInsData?.filter(checkIn => 
-        ['Customer Service', 'Designer'].includes(checkIn.users?.position)
+        ['Junior CRM Specialist', 'Designer'].includes(checkIn.users?.position)
       ) || [];
 
-      console.log(`🎯 Found ${trackableCheckIns.length} trackable check-ins (Customer Service + Designer)`);
+      console.log(`🎯 Found ${trackableCheckIns.length} trackable check-ins (Junior CRM Specialist + Designer)`);
 
       let repairedCount = 0;
       let skippedCount = 0;

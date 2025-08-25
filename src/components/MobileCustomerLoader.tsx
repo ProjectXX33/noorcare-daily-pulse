@@ -15,7 +15,7 @@ const CustomerLoader = () => {
   };
 
   // Only show for Customer Service and Admin users
-  if (!user || (user.position !== 'Customer Service' && user.role !== 'admin')) {
+      if (!user || (user.position !== 'Junior CRM Specialist' && user.role !== 'admin')) {
     return null;
   }
 

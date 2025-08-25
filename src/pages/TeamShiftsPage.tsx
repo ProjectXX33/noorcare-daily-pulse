@@ -151,6 +151,7 @@ const TeamShiftsPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isDataInitialized, setIsDataInitialized] = useState(false);
   const [language] = useState<string>('en');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -228,15 +229,23 @@ const TeamShiftsPage = () => {
     }
   }, []);
 
-  // Load team employees (Content & Creative Department)
+  // Load team employees (Content & Creative Department or Customer Retention Department)
   const loadTeamEmployees = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
         .select('*')
-        .or('team.eq.Content & Creative Department,position.in.(Copy Writing,Designer,Media Buyer)')
         .eq('role', 'employee')
         .order('name');
+
+      // Filter by team based on user role
+      if (user?.role === 'content_creative_manager') {
+        query = query.or('team.eq.Content & Creative Department,position.in.(Copy Writing,Designer,Media Buyer)');
+      } else if (user?.role === 'customer_retention_manager') {
+        query = query.or('team.eq.Customer Retention Department,position.in.(Junior CRM Specialist,Customer Retention Specialist)');
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -256,7 +265,7 @@ const TeamShiftsPage = () => {
       console.error('Error loading team employees:', error);
       toast.error('Failed to load team employees');
     }
-  }, []);
+  }, [user?.role]);
 
   // Load monthly shifts for team
   const loadMonthlyShifts = useCallback(async (showLoadingState = true) => {
@@ -305,12 +314,13 @@ const TeamShiftsPage = () => {
         checkInTime: item.check_in_time ? new Date(item.check_in_time) : null,
         checkOutTime: item.check_out_time ? new Date(item.check_out_time) : null,
         delayMinutes: item.delay_minutes || 0,
-        breakTimeMinutes: item.break_time_minutes || 0,
+        totalBreakMinutes: item.break_time_minutes || 0,
         regularHours: item.regular_hours || 0,
         overtimeHours: item.overtime_hours || 0,
         isDayOff: item.is_day_off || false,
-        assignedBy: item.assigned_by,
-        employeeName: item.users?.name || 'Unknown',
+        createdAt: new Date(item.created_at || new Date()),
+        updatedAt: new Date(item.updated_at || new Date()),
+        userName: item.users?.name || 'Unknown',
         shiftName: item.shifts?.name || 'No Shift',
         shiftStartTime: item.shifts?.start_time,
         shiftEndTime: item.shifts?.end_time,
@@ -329,18 +339,33 @@ const TeamShiftsPage = () => {
 
   // Load data on component mount
   useEffect(() => {
-    if (user?.role === 'content_creative_manager') {
-      loadShifts();
-      loadTeamEmployees();
+    if (user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager') {
+      const initializeData = async () => {
+        try {
+          setIsLoading(true);
+          setIsDataInitialized(false);
+          await Promise.all([
+            loadShifts(),
+            loadTeamEmployees()
+          ]);
+          setIsDataInitialized(true);
+        } catch (error) {
+          console.error('Error initializing data:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      initializeData();
     }
   }, [user, loadShifts, loadTeamEmployees]);
 
   // Load monthly shifts when dependencies change
   useEffect(() => {
-    if (teamEmployees.length > 0) {
-      loadMonthlyShifts();
+    if (teamEmployees.length > 0 && isDataInitialized) {
+      loadMonthlyShifts(false); // Don't show loading state since we're already loading
     }
-  }, [selectedDate, selectedEmployee, teamEmployees, loadMonthlyShifts]);
+  }, [selectedDate, selectedEmployee, teamEmployees, loadMonthlyShifts, isDataInitialized]);
 
   // Handle refresh
   const handleRefresh = async () => {
@@ -351,6 +376,7 @@ const TeamShiftsPage = () => {
         loadTeamEmployees(),
         loadMonthlyShifts(false)
       ]);
+      setIsDataInitialized(true);
       toast.success('Team shifts refreshed successfully');
     } catch (error) {
       console.error('Error refreshing team shifts:', error);
@@ -359,6 +385,14 @@ const TeamShiftsPage = () => {
       setIsRefreshing(false);
     }
   };
+
+  // Force load monthly shifts if they haven't loaded yet
+  useEffect(() => {
+    if (isDataInitialized && teamEmployees.length > 0 && monthlyShifts.length === 0) {
+      console.log('🔄 Force loading monthly shifts - no data found');
+      loadMonthlyShifts(false);
+    }
+  }, [isDataInitialized, teamEmployees.length, monthlyShifts.length, loadMonthlyShifts]);
 
   const handleExportCSV = () => {
     try {
@@ -410,8 +444,8 @@ const TeamShiftsPage = () => {
           formatHoursAndMinutes(shift.regularHours * 60),
           formatHoursAndMinutes(shift.overtimeHours * 60),
           formatDelayHoursAndMinutes(shift.delayMinutes),
-          formatBreakTime(shift.breakTimeMinutes),
-          shift.status || 'Unknown',
+          formatBreakTime(shift.totalBreakMinutes || 0),
+          shift.isDayOff ? 'Day Off' : 'Working',
           formatHoursAndMinutes(netHours * 60)
         ]);
       });
@@ -452,7 +486,7 @@ const TeamShiftsPage = () => {
     const totalRegularHours = workedShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
     const totalOvertimeHours = workedShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
     const totalDelayMinutes = workedShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
-    const totalBreakMinutes = workedShifts.reduce((sum, shift) => sum + shift.breakTimeMinutes, 0);
+    const totalBreakMinutes = workedShifts.reduce((sum, shift) => sum + (shift.totalBreakMinutes || 0), 0);
     const totalWorkingDays = workedShifts.length;
     const averageHoursPerDay = totalWorkingDays > 0 ? (totalRegularHours + totalOvertimeHours) / totalWorkingDays : 0;
 
@@ -485,12 +519,12 @@ const TeamShiftsPage = () => {
     return monthlyShifts.filter(shift => shift.userId === selectedEmployee);
   }, [monthlyShifts, selectedEmployee]);
 
-  if (!user || user.role !== 'content_creative_manager') {
+      if (!user || (user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
-          <p className="text-gray-600 mt-2">This page is only accessible to Content & Creative Managers.</p>
+          <p className="text-gray-600 mt-2">This page is only accessible to Content & Creative Managers and Customer Retention Managers.</p>
         </div>
       </div>
     );
@@ -512,7 +546,10 @@ const TeamShiftsPage = () => {
                 </h1>
               </div>
               <p className="text-slate-600 dark:text-slate-400 mt-2">
-                Content & Creative Department Shift Management
+                {user?.role === 'customer_retention_manager' 
+                  ? 'Customer Retention Department Shift Management'
+                  : 'Content & Creative Department Shift Management'
+                }
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -731,7 +768,7 @@ const TeamShiftsPage = () => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{shift.employeeName}</div>
+                            <div className="font-medium">{shift.userName}</div>
                             <div className="text-sm text-muted-foreground">
                               {teamEmployees.find(emp => emp.id === shift.userId)?.position}
                             </div>
@@ -752,7 +789,7 @@ const TeamShiftsPage = () => {
                           {formatDelayHoursAndMinutes(shift.delayMinutes)}
                         </TableCell>
                         <TableCell>
-                          {formatBreakTime(shift.breakTimeMinutes)}
+                          {formatBreakTime(shift.totalBreakMinutes || 0)}
                         </TableCell>
                         <TableCell>
                           {formatHoursAndMinutes(shift.regularHours)}
@@ -764,7 +801,7 @@ const TeamShiftsPage = () => {
                           <Badge 
                             variant={
                               calculateDelayToFinish(
-                                shift.breakTimeMinutes,
+                                shift.totalBreakMinutes || 0,
                                 shift.delayMinutes,
                                 shift.regularHours,
                                 shift.overtimeHours,
@@ -777,7 +814,7 @@ const TeamShiftsPage = () => {
                             }
                           >
                             {calculateDelayToFinish(
-                              shift.breakTimeMinutes,
+                              shift.totalBreakMinutes || 0,
                               shift.delayMinutes,
                               shift.regularHours,
                               shift.overtimeHours,

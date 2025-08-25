@@ -555,7 +555,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       // For all employee positions, check shift timing and day off BEFORE check-in
-      if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
+      if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
         try {
           const { checkIfDayOff } = await import('@/lib/performanceApi');
           // Use work day start as the reference date for day-off check
@@ -677,7 +677,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .eq('id', userId);
       
       // For all employee positions, handle shift tracking and performance  
-      if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
+      if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
         try {
           console.log('🔄 Starting shift tracking for user:', userId);
           
@@ -812,7 +812,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
           
           // Real-time performance recording for check-in
-          if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
+          if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
             try {
               const shifts = await fetchShifts();
               const detectedShift = await determineShift(new Date(data[0].timestamp), shifts, userId);
@@ -935,7 +935,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
 
           // Update monthly shift record for all employee positions
-          if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
+          if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
             try {
               await updateMonthlyShiftCheckout(
                 userId,
@@ -1016,7 +1016,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       // Send notification to admins about check-out
-      if (['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
+      if (['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(userData.position)) {
         await sendNotificationToAdmins(
           'Employee Check-out',
           `${userData.name} checked out at ${format(checkOutTime, 'HH:mm')}`,
@@ -1394,7 +1394,7 @@ export const CheckInProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     } catch (error) {
       console.error('❌ Error refreshing check-ins:', error);
-      toast.error('Failed to refresh check-in data');
+      // Removed error toast to prevent popup messages
     }
   };
   

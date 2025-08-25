@@ -30,7 +30,8 @@ import {
   CreditCard,
   Link,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -179,27 +180,39 @@ const CreateOrderPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Strict access control - redirect if not Customer Service
+  // Access control - allow Junior CRM Specialist and Customer Retention Managers
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
       return;
     }
     
-    if (user.position !== 'Customer Service') {
-      console.warn('Access denied: User is not Customer Service');
-      navigate(user.role === 'admin' ? '/dashboard' : '/employee-dashboard', { replace: true });
+    const allowedPositions = ['Junior CRM Specialist'];
+    const allowedRoles = ['admin', 'customer_retention_manager'];
+    
+    if (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string)) {
+      console.warn('Access denied: User is not authorized');
+              if (user.role === 'admin') {
+          navigate('/dashboard', { replace: true });
+        } else if ((user as any).position === 'Content Creator') {
+          navigate('/copy-writing-dashboard', { replace: true });
+        } else {
+          navigate('/employee-dashboard', { replace: true });
+        }
       return;
     }
   }, [user, navigate]);
 
-  // Don't render page content if user is not Customer Service
-  if (!user || user.position !== 'Customer Service') {
+  // Don't render page content if user is not authorized
+  if (!user || (!['Junior CRM Specialist'].includes(user.position) && !['admin', 'customer_retention_manager'].includes(user.role as string))) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking permissions...</p>
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Access Restricted</h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            This page is only accessible to Junior CRM Specialist representatives.
+          </p>
         </div>
       </div>
     );
@@ -869,7 +882,7 @@ const CreateOrderPage: React.FC = () => {
               meta_data: [
                 {
                   key: '_created_by_customer_service',
-                  value: user?.name || 'Customer Service'
+                  value: user?.name || 'Junior CRM Specialist'
                 },
                 {
                   key: '_payment_collection_mode',
@@ -1037,7 +1050,7 @@ const CreateOrderPage: React.FC = () => {
         meta_data: [
           {
             key: '_created_by_customer_service',
-            value: user?.name || 'Customer Service'
+            value: user?.name || 'Junior CRM Specialist'
           },
           {
             key: '_created_at',
@@ -1164,19 +1177,17 @@ const CreateOrderPage: React.FC = () => {
     }
   };
 
-  // Check if user has Customer Service access
-  // Temporarily allow all users for testing
-  if (false && user?.position !== 'Customer Service') {
+  // Check if user has Junior CRM Specialist access
+  if (false && user?.position !== 'Junior CRM Specialist') {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-red-600">Access Denied</CardTitle>
-            <CardDescription>
-              This page is only accessible to Customer Service representatives.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Access Restricted</h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            This page is only accessible to Junior CRM Specialist representatives.
+          </p>
+        </div>
       </div>
     );
   }
@@ -1869,23 +1880,19 @@ const CreateOrderPage: React.FC = () => {
                 </Button>
 
                 <Button
-                  onClick={handleCollectPayment}
-                  disabled={isGeneratingPaymentLink || orderItems.length === 0 || !billingInfo.first_name || !billingInfo.last_name || !billingInfo.phone}
+                  onClick={() => toast.info('Payment collection feature coming soon! 🚀', {
+                    description: 'This feature is currently under development and will be available soon.'
+                  })}
+                  disabled={true}
                   variant="outline"
-                  className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
+                  className="w-full border-gray-300 text-gray-500 hover:bg-gray-50 cursor-not-allowed opacity-60"
                   size="lg"
                 >
-                  {isGeneratingPaymentLink ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Payment Page...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Collect Payment
-                    </>
-                  )}
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Collect Payment
+                  <Badge variant="secondary" className="ml-2 text-xs bg-orange-100 text-orange-700 border-orange-200">
+                    Coming Soon
+                  </Badge>
                 </Button>
 
                 {lastCreatedOrder && (

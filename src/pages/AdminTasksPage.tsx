@@ -300,7 +300,7 @@ const AdminTasksPage = () => {
         fetchEmployees()
       ]);
 
-      // Filter employees for Content & Creative Manager
+      // Filter employees for Content & Creative Manager and Customer Retention Manager
       let filteredEmployees = employeesData;
       let teamMemberIds: string[] = [];
       
@@ -308,7 +308,7 @@ const AdminTasksPage = () => {
         // Find team members by team name OR by specific positions
         const teamMembers = employeesData.filter(emp => 
           emp.team === 'Content & Creative Department' || 
-          ['Copy Writing', 'Designer', 'Media Buyer'].includes(emp.position)
+          ['Content Creator', 'Designer', 'Media Buyer'].includes(emp.position)
         );
         
         teamMemberIds = teamMembers.map(emp => emp.id);
@@ -317,6 +317,22 @@ const AdminTasksPage = () => {
         filteredEmployees = teamMembers;
         
         console.log('👥 Content & Creative Team Filter:');
+        console.log('  📋 Total Employees:', employeesData.length);
+        console.log('  🎯 Team Members:', teamMembers.length);
+        console.log('  📝 Available for Assignment:', filteredEmployees.map(e => `${e.name} (${e.position})`));
+      } else if (user?.role === 'customer_retention_manager') {
+        // Find team members by team name OR by specific positions
+        const teamMembers = employeesData.filter(emp => 
+          emp.team === 'Customer Retention Department' || 
+          ['Junior CRM Specialist', 'Customer Retention Specialist'].includes(emp.position)
+        );
+        
+        teamMemberIds = teamMembers.map(emp => emp.id);
+        
+        // RESTRICT: Customer Retention Manager can only assign to their team
+        filteredEmployees = teamMembers;
+        
+        console.log('👥 Customer Retention Team Filter:');
         console.log('  📋 Total Employees:', employeesData.length);
         console.log('  🎯 Team Members:', teamMembers.length);
         console.log('  📝 Available for Assignment:', filteredEmployees.map(e => `${e.name} (${e.position})`));
@@ -343,7 +359,7 @@ const AdminTasksPage = () => {
         })
       );
       
-      // Filter tasks for Content & Creative Manager
+      // Filter tasks for Content & Creative Manager and Customer Retention Manager
       let filteredTasks = tasksWithRatings;
       if (user?.role === 'content_creative_manager') {
         console.log('🎯 CONTENT & CREATIVE MANAGER TASK FILTER:');
@@ -374,6 +390,36 @@ const AdminTasksPage = () => {
         }
         
         console.log('✅ FINAL: Content & Creative Manager sees', filteredTasks.length, 'tasks');
+        console.log('📝 Task titles:', filteredTasks.slice(0, 5).map(t => `"${t.title}" (assigned to: ${t.assignedToName})`));
+      } else if (user?.role === 'customer_retention_manager') {
+        console.log('🎯 CUSTOMER RETENTION MANAGER TASK FILTER:');
+        console.log('👥 Team Member Count:', teamMemberIds.length);
+        console.log('👥 Team Member IDs:', teamMemberIds);
+        console.log('📋 Total System Tasks:', tasksWithRatings.length);
+        
+        if (teamMemberIds.length > 0) {
+          // ONLY show tasks related to Customer Retention team
+          filteredTasks = tasksWithRatings.filter(task => {
+            const isAssignedToTeam = teamMemberIds.includes(task.assignedTo);
+            const isCreatedByManager = task.createdBy === user.id;
+            
+            return isAssignedToTeam || isCreatedByManager;
+          });
+          
+          const assignedToTeam = filteredTasks.filter(t => teamMemberIds.includes(t.assignedTo));
+          const createdByManager = filteredTasks.filter(t => t.createdBy === user.id);
+          
+          console.log('📊 Customer Retention Tasks Only:');
+          console.log('  ✅ Assigned to team:', assignedToTeam.length);
+          console.log('  ✅ Created by manager:', createdByManager.length);
+          console.log('  🎯 Total visible:', filteredTasks.length);
+          
+        } else {
+          console.log('⚠️ No team members found - manager has no tasks to see');
+          filteredTasks = [];
+        }
+        
+        console.log('✅ FINAL: Customer Retention Manager sees', filteredTasks.length, 'tasks');
         console.log('📝 Task titles:', filteredTasks.slice(0, 5).map(t => `"${t.title}" (assigned to: ${t.assignedToName})`));
       }
 
@@ -588,8 +634,8 @@ const AdminTasksPage = () => {
     setIsUploadingVisualFeeding(true);
     try {
       const result = await uploadFile(file, 'visual-feeding');
-      if (result.success && result.fileName) {
-        setNewTask({...newTask, visualFeeding: result.fileName});
+      if (result.success && result.publicUrl) {
+        setNewTask({...newTask, visualFeeding: result.publicUrl});
         toast.success('Visual feeding uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -606,8 +652,8 @@ const AdminTasksPage = () => {
     setIsUploadingAttachment(true);
     try {
       const result = await uploadFile(file, 'attachments');
-      if (result.success && result.fileName) {
-        setNewTask({...newTask, attachmentFile: result.fileName});
+      if (result.success && result.publicUrl) {
+        setNewTask({...newTask, attachmentFile: result.publicUrl});
         toast.success('Attachment uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -624,8 +670,8 @@ const AdminTasksPage = () => {
     setIsUploadingEditVisualFeeding(true);
     try {
       const result = await uploadFile(file, 'visual-feeding');
-      if (result.success && result.fileName) {
-        setEditingTask({...editingTask, visualFeeding: result.fileName});
+      if (result.success && result.publicUrl) {
+        setEditingTask({...editingTask, visualFeeding: result.publicUrl});
         toast.success('Visual feeding uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -642,8 +688,8 @@ const AdminTasksPage = () => {
     setIsUploadingEditAttachment(true);
     try {
       const result = await uploadFile(file, 'attachments');
-      if (result.success && result.fileName) {
-        setEditingTask({...editingTask, attachmentFile: result.fileName});
+      if (result.success && result.publicUrl) {
+        setEditingTask({...editingTask, attachmentFile: result.publicUrl});
         toast.success('Attachment uploaded successfully!');
       } else {
         toast.error(`Upload failed: ${result.error}`);
@@ -736,9 +782,9 @@ const AdminTasksPage = () => {
     return selectedEmployee?.position === 'Designer';
   };
 
-  // Check if current user can create Creative Briefs (Admins and Media Buyers)
+  // Check if current user can create Creative Briefs (Admins, Media Buyers, and Customer Retention Managers)
   const canCreateCreativeBrief = () => {
-    return user?.role === 'admin' || user?.position === 'Media Buyer';
+    return user?.role === 'admin' || user?.position === 'Media Buyer' || user?.role === 'customer_retention_manager';
   };
 
   // Helper function to check if editing task is for a Designer
@@ -872,7 +918,7 @@ const AdminTasksPage = () => {
     }
   };
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager')) {
+      if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
     return null;
   }
 
@@ -2460,37 +2506,39 @@ const AdminTasksPage = () => {
                             <span>🖼️</span> Visual Feeding (Reference Image)
                           </Label>
                           <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-pink-600">📷</span>
-                              <span className="text-sm">{selectedTaskForDetails.visualFeeding}</span>
-                            </div>
-                                                        {/* Image Preview - if it's an image file */}
-                             {selectedTaskForDetails.visualFeeding && isImageFile(selectedTaskForDetails.visualFeeding) && (
-                               <div className="mt-2">
-                                 <div className="relative group cursor-pointer" onClick={() => handleImageClick(getFileUrl(selectedTaskForDetails.visualFeeding))}>
-                                   <img 
-                                     src={getFileUrl(selectedTaskForDetails.visualFeeding)} 
-                                     alt="Visual Reference" 
-                                     className="max-w-full h-auto max-h-48 rounded border shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
-                                     onError={(e) => {
-                                       e.currentTarget.style.display = 'none';
-                                     }}
-                                   />
-                                   {/* Overlay to indicate it's clickable */}
-                                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
-                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                       <div className="bg-white bg-opacity-90 rounded-full p-2">
-                                         <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                         </svg>
-                                       </div>
-                                     </div>
-                                   </div>
-                                 </div>
-                                 <p className="text-xs text-slate-500 mt-1 text-center">Click to view full size</p>
-                               </div>
-                             )}
+                            {/* Image Preview - if it's an image file */}
+                            {selectedTaskForDetails.visualFeeding && isImageFile(selectedTaskForDetails.visualFeeding) ? (
+                              <div className="space-y-2">
+                                <div className="relative group cursor-pointer" onClick={() => handleImageClick(selectedTaskForDetails.visualFeeding)}>
+                                  <img 
+                                    src={selectedTaskForDetails.visualFeeding} 
+                                    alt="Visual Reference" 
+                                    className="max-w-full h-auto max-h-48 rounded border shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-lg"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                  {/* Overlay to indicate it's clickable */}
+                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded border flex items-center justify-center">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                      <div className="bg-white bg-opacity-90 rounded-full p-2">
+                                        <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-500 text-center">Click to view full size</p>
+                              </div>
+                            ) : (
+                              /* Show as link if not an image */
+                              <div className="flex items-center gap-2">
+                                <span className="text-pink-600">📷</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">{selectedTaskForDetails.visualFeeding}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2574,6 +2622,10 @@ const AdminTasksPage = () => {
         {/* Image Modal */}
         <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] p-2 bg-black/90 border-none">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Visual Reference Image</DialogTitle>
+              <DialogDescription>View the full-size visual reference image.</DialogDescription>
+            </DialogHeader>
             <div className="relative flex items-center justify-center">
               {selectedImage && (
                 <img 

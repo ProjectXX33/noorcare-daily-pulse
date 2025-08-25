@@ -22,7 +22,7 @@ export type Team = 'Content & Creative Department' | 'Customer Retention Departm
 
 export type ManagerRole = 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
 
-export type Position = 'Customer Service' | 'Designer' | 'Media Buyer' | 'Copy Writing' | 'Web Developer' | 'Warehouse Staff' | 'Executive Director' | 'Content & Creative Manager' | 'Customer Retention Manager' | 'IT Manager';
+export type Position = 'Junior CRM Specialist' | 'Designer' | 'Media Buyer' | 'Content Creator' | 'Web Developer' | 'Warehouse Staff' | 'Executive Director' | 'Content & Creative Manager' | 'Customer Retention Manager' | 'IT Manager';
 
 export type CheckIn = {
   id: string;

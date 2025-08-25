@@ -329,7 +329,7 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, name, position')
-        .in('position', ['Customer Service', 'Designer', 'Copy Writing', 'Media Buyer', 'Web Developer']);
+        .in('position', ['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer']);
 
       if (usersError) {
         console.error('❌ Error fetching users:', usersError);

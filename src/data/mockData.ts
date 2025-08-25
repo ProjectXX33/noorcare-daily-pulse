@@ -17,7 +17,7 @@ export const mockUsers: User[] = [
     name: 'John Doe',
     role: 'employee',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     lastCheckin: new Date(2025, 4, 13, 9, 15), // Yesterday
     email: 'john@noorcare.com'
   },
@@ -27,7 +27,7 @@ export const mockUsers: User[] = [
     name: 'Sarah Smith',
     role: 'employee',
     department: 'Doctor',
-    position: 'Copy Writing',
+    position: 'Junior CRM Specialist',
     email: 'sarah@noorcare.com'
   },
   {
@@ -36,7 +36,7 @@ export const mockUsers: User[] = [
     name: 'Ahmed Ali',
     role: 'employee',
     department: 'Manager',
-    position: 'Customer Service',
+    position: 'Junior CRM Specialist',
     lastCheckin: new Date(2025, 4, 14, 8, 30), // Today
     email: 'ahmed@noorcare.com'
   }
@@ -49,7 +49,7 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 13, 9, 15), // Yesterday
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     checkOutTime: new Date(2025, 4, 13, 17, 30) // Added checkout time for yesterday
   },
   {
@@ -58,7 +58,7 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 14, 8, 30), // Today
     userName: 'Ahmed Ali',
     department: 'Manager',
-    position: 'Customer Service',
+    position: 'Junior CRM Specialist',
     checkOutTime: null // Hasn't checked out yet today
   },
   {
@@ -67,7 +67,7 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 12, 9, 45), // Day before yesterday
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     checkOutTime: new Date(2025, 4, 12, 18, 15) // Added checkout time
   },
   {
@@ -76,7 +76,7 @@ export const mockCheckIns: CheckIn[] = [
     timestamp: new Date(2025, 4, 11, 8, 50), // 3 days ago
     userName: 'John Doe',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     checkOutTime: new Date(2025, 4, 11, 17, 45) // Added checkout time
   }
 ];
@@ -91,7 +91,7 @@ export const mockWorkReports: WorkReport[] = [
     issuesFaced: 'Some compatibility issues with older browsers that needed adjustments.',
     plansForTomorrow: 'Start working on the mobile responsive design and implement the changes requested by the marketing team.',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     createdAt: new Date(2025, 4, 13, 17, 0) // Added createdAt property
   },
   {
@@ -104,7 +104,7 @@ export const mockWorkReports: WorkReport[] = [
     plansForTomorrow: 'Follow up on escalated issues and finalize the customer service improvement plan.',
     fileAttachments: ['customer_feedback.pdf'],
     department: 'Manager',
-    position: 'Customer Service',
+    position: 'Junior CRM Specialist',
     createdAt: new Date(2025, 4, 13, 16, 30) // Added createdAt property
   },
   {
@@ -116,7 +116,7 @@ export const mockWorkReports: WorkReport[] = [
     issuesFaced: 'Unclear requirements for one of the features.',
     plansForTomorrow: 'Meet with product team to clarify requirements and continue working on wireframes.',
     department: 'Engineering',
-    position: 'Designer',
+    position: 'Junior CRM Specialist',
     createdAt: new Date(2025, 4, 12, 17, 15) // Added createdAt property
   }
 ];
