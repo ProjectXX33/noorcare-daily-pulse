@@ -109,8 +109,8 @@ const calculateDelayToFinish = (
     return 'Not Worked';
   }
   
-  // Calculate total delay time (initial delay + break time)
-  const totalDelayMinutes = delayMinutes + breakMinutes;
+  // Calculate total delay time (break time excluded because work hours freeze during breaks)
+  const totalDelayMinutes = delayMinutes;
   const totalDelayHours = totalDelayMinutes / 60;
   
   // If delay is less than 15 minutes, return All Clear
@@ -154,6 +154,7 @@ const TeamShiftsPage = () => {
   const [isDataInitialized, setIsDataInitialized] = useState(false);
   const [language] = useState<string>('en');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const translations = {
     en: {
@@ -306,26 +307,74 @@ const TeamShiftsPage = () => {
 
       if (error) throw error;
 
-      const formattedShifts: MonthlyShift[] = data.map(item => ({
-        id: item.id,
-        userId: item.user_id,
-        workDate: new Date(item.work_date),
-        shiftId: item.shift_id,
-        checkInTime: item.check_in_time ? new Date(item.check_in_time) : null,
-        checkOutTime: item.check_out_time ? new Date(item.check_out_time) : null,
-        delayMinutes: item.delay_minutes || 0,
-        totalBreakMinutes: item.break_time_minutes || 0,
-        regularHours: item.regular_hours || 0,
-        overtimeHours: item.overtime_hours || 0,
-        isDayOff: item.is_day_off || false,
-        createdAt: new Date(item.created_at || new Date()),
-        updatedAt: new Date(item.updated_at || new Date()),
-        userName: item.users?.name || 'Unknown',
-        shiftName: item.shifts?.name || 'No Shift',
-        shiftStartTime: item.shifts?.start_time,
-        shiftEndTime: item.shifts?.end_time,
-        allTimeOvertime: item.shifts?.all_time_overtime || false
-      }));
+      console.log('Team monthly shifts data received:', data);
+
+      // Fetch break time data separately for the same date range and users (matching ShiftsPageClean)
+      const userIds = teamEmployees.map(emp => emp.id);
+      let breakTimeData = null;
+      let breakTimeError = null;
+      
+      // Only fetch break time data if we have user IDs
+      if (userIds.length > 0) {
+        const breakTimeResult = await supabase
+          .from('check_ins')
+          .select('user_id, timestamp, total_break_minutes, break_sessions')
+          .in('user_id', userIds)
+          .gte('timestamp', format(startDate, 'yyyy-MM-dd') + 'T00:00:00')
+          .lte('timestamp', format(endDate, 'yyyy-MM-dd') + 'T23:59:59');
+        
+        breakTimeData = breakTimeResult.data;
+        breakTimeError = breakTimeResult.error;
+
+        if (breakTimeError) {
+          console.warn('Error fetching break time data:', breakTimeError);
+        }
+
+        console.log('Team break time data received:', breakTimeData);
+      }
+
+      // Create a map of break time data by user and date
+      const breakTimeMap = new Map();
+      if (breakTimeData) {
+        breakTimeData.forEach(item => {
+          const dateKey = format(new Date(item.timestamp), 'yyyy-MM-dd');
+          const key = `${item.user_id}-${dateKey}`;
+          if (!breakTimeMap.has(key) || (breakTimeMap.get(key).totalBreakMinutes || 0) < (item.total_break_minutes || 0)) {
+            breakTimeMap.set(key, {
+              totalBreakMinutes: item.total_break_minutes || 0,
+              breakSessions: item.break_sessions || []
+            });
+          }
+        });
+      }
+
+      const formattedShifts: MonthlyShift[] = data.map(item => {
+        const dateKey = format(new Date(item.work_date), 'yyyy-MM-dd');
+        const breakKey = `${item.user_id}-${dateKey}`;
+        const breakData = breakTimeMap.get(breakKey) || { totalBreakMinutes: 0, breakSessions: [] };
+
+        return {
+          id: item.id,
+          userId: item.user_id,
+          workDate: new Date(item.work_date),
+          shiftId: item.shift_id,
+          checkInTime: item.check_in_time ? new Date(item.check_in_time) : null,
+          checkOutTime: item.check_out_time ? new Date(item.check_out_time) : null,
+          delayMinutes: item.delay_minutes || 0,
+          totalBreakMinutes: breakData.totalBreakMinutes,
+          breakSessions: breakData.breakSessions,
+          regularHours: item.regular_hours || 0,
+          overtimeHours: item.overtime_hours || 0,
+          isDayOff: item.is_day_off && !item.shift_id && !item.shifts?.name,
+          createdAt: new Date(item.created_at || new Date()),
+          updatedAt: new Date(item.updated_at || new Date()),
+          userName: item.users?.name || 'Unknown',
+          shiftName: item.shifts?.name || (item.is_day_off && !item.shift_id && !item.shifts?.name ? 'Day Off' : 'No Shift'),
+          shiftStartTime: item.shifts?.start_time,
+          shiftEndTime: item.shifts?.end_time,
+          allTimeOvertime: item.shifts?.all_time_overtime || false
+        };
+      });
 
       setMonthlyShifts(formattedShifts);
       console.log('Team monthly shifts loaded:', formattedShifts.length);
@@ -394,27 +443,24 @@ const TeamShiftsPage = () => {
     }
   }, [isDataInitialized, teamEmployees.length, monthlyShifts.length, loadMonthlyShifts]);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    setIsExporting(true);
     try {
+      console.log('Starting CSV export...');
+      console.log('Filtered shifts:', filteredShifts);
+      console.log('Team employees:', teamEmployees);
+      console.log('Summary stats:', summaryStats);
+      
+      // Check if we have data to export
+      if (filteredShifts.length === 0) {
+        toast.error('No data available to export');
+        return;
+      }
+
       // Prepare CSV data with summary
       const csvData = [];
       
-      // Add summary section
-      csvData.push(['TEAM SHIFTS SUMMARY REPORT']);
-      csvData.push([`Month: ${format(selectedDate, 'MMMM yyyy')}`]);
-      csvData.push([`Generated: ${new Date().toLocaleString()}`]);
-      csvData.push([]);
-      
-      // Summary statistics
-      csvData.push(['SUMMARY STATISTICS']);
-      csvData.push(['Total Regular Hours', formatHoursAndMinutes(summaryStats.totalRegularHours)]);
-      csvData.push(['Total Overtime Hours', formatHoursAndMinutes(summaryStats.totalOvertimeHours)]);
-      csvData.push(['Total Delay Time', formatDelayHoursAndMinutes(summaryStats.totalDelayMinutes)]);
-      csvData.push(['Total Break Time', formatBreakTime(summaryStats.totalBreakMinutes)]);
-      csvData.push(['Total Working Days', summaryStats.totalWorkingDays.toString()]);
-      csvData.push(['Average Hours Per Day', formatHoursAndMinutes(summaryStats.averageHoursPerDay)]);
-      csvData.push(['Smart Offsetting Net Result', formatHoursAndMinutes(summaryStats.smartOffsetting.netResult)]);
-      csvData.push([]);
+
       
       // Add detailed shifts data
       csvData.push(['DETAILED SHIFTS DATA']);
@@ -423,41 +469,98 @@ const TeamShiftsPage = () => {
         'Position', 
         'Date',
         'Shift Name',
+        'Check In',
+        'Check Out',
+        'Delay',
+        'Break Time',
         'Regular Hours',
         'Overtime Hours',
-        'Delay Time',
-        'Break Time',
-        'Status',
-        'Net Hours'
+        'Delay to Finish'
       ]);
       
-      // Add shift data
-      filteredShifts.forEach(shift => {
-        const employee = teamEmployees.find(emp => emp.id === shift.userId);
-        const netHours = calculateNetHours(shift.regularHours + shift.overtimeHours, shift.delayMinutes);
-        
-        csvData.push([
-          employee?.name || 'Unknown',
-          employee?.position || 'Unknown',
-          format(new Date(shift.workDate), 'yyyy-MM-dd'),
-          shift.shiftName || 'No Shift',
-          formatHoursAndMinutes(shift.regularHours * 60),
-          formatHoursAndMinutes(shift.overtimeHours * 60),
-          formatDelayHoursAndMinutes(shift.delayMinutes),
-          formatBreakTime(shift.totalBreakMinutes || 0),
-          shift.isDayOff ? 'Day Off' : 'Working',
-          formatHoursAndMinutes(netHours * 60)
-        ]);
+      // Add shift data - matching ShiftsPageClean format exactly
+      filteredShifts.forEach((shift, index) => {
+        try {
+          const employee = teamEmployees.find(emp => emp.id === shift.userId);
+          
+          // Use the same format as ShiftsPageClean
+          const row = [
+            employee?.name || 'Unknown',
+            employee?.position || 'Unknown',
+            format(new Date(shift.workDate), 'dd/MM/yyyy'),
+            shift.isDayOff ? 'Day Off' : (shift.shiftName || 'No Shift'),
+            shift.isDayOff ? '-' : (shift.checkInTime ? format(shift.checkInTime, 'HH:mm') : '-'),
+            shift.isDayOff ? '-' : (shift.checkOutTime ? format(shift.checkOutTime, 'HH:mm') : '-'),
+            shift.isDayOff ? '0' : formatDelayHoursAndMinutes(shift.delayMinutes || 0),
+            shift.isDayOff ? '0' : formatBreakTime(shift.totalBreakMinutes || 0),
+            shift.isDayOff ? '0' : formatHoursAndMinutes(shift.regularHours || 0),
+            shift.isDayOff ? '0' : formatHoursAndMinutes(shift.overtimeHours || 0),
+            shift.isDayOff ? 'All Clear' : calculateDelayToFinish(
+              shift.totalBreakMinutes || 0,
+              shift.delayMinutes || 0,
+              shift.regularHours || 0,
+              shift.overtimeHours || 0,
+              shift.shiftName,
+              shift.shiftStartTime,
+              shift.shiftEndTime,
+              shift.allTimeOvertime,
+              shift.isDayOff
+            )
+          ];
+          
+          csvData.push(row);
+        } catch (rowError) {
+          console.error(`Error processing row ${index}:`, rowError, shift);
+          // Add a placeholder row with error info
+          csvData.push([
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR',
+            'ERROR'
+          ]);
+        }
       });
+      
+      // Add summary section - matching ShiftsPageClean format
+      csvData.push(['']); // Empty line for separation
+      csvData.push(['Summary', '', '', '', '', '', '', '', '', '', '']);
+      csvData.push([t.totalRegularHours, formatHoursAndMinutes(summaryStats.totalRegularHours), '', '', '', '', '', '', '', '', '']);
+      csvData.push([t.totalOvertimeHours, formatHoursAndMinutes(summaryStats.totalOvertimeHours) + ' (After covering delay)', '', '', '', '', '', '', '', '', '']);
+      csvData.push([t.delayToFinish, formatDelayHoursAndMinutes(summaryStats.totalDelayMinutes), '', '', '', '', '', '', '', '', '']);
+      csvData.push([t.totalWorkingDays, summaryStats.totalWorkingDays + ' days', '', '', '', '', '', '', '', '', '']);
+      csvData.push([t.averageHoursPerDay, formatHoursAndMinutes(summaryStats.averageHoursPerDay), '', '', '', '', '', '', '', '', '']);
+      
+      // Add Smart Offsetting Summary
+      csvData.push(['']);
+      csvData.push(['Smart Offsetting Summary', '', '', '', '', '', '', '', '', '', '']);
+      csvData.push(['Raw Overtime', formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime), '', '', '', '', '', '', '', '', '']);
+      csvData.push(['Raw Delay', formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay), '', '', '', '', '', '', '', '', '']);
+      csvData.push(['Net Result', summaryStats.totalOvertimeHours > 0 
+        ? `+${formatHoursAndMinutes(summaryStats.totalOvertimeHours)} OT`
+        : `${formatHoursAndMinutes(summaryStats.delayToFinish)} Delay`, '', '', '', '', '', '', '', '', '']);
+      csvData.push(['Smart Logic', `${formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime)} Overtime - ${formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay)} Delay = ${
+        summaryStats.totalOvertimeHours > 0 
+          ? `+${formatHoursAndMinutes(summaryStats.totalOvertimeHours)} Net OT`
+          : `${formatHoursAndMinutes(summaryStats.delayToFinish)} Net Delay`
+      }`, '', '', '', '', '', '', '', '', '']);
       
       // Convert to CSV string
       const csvContent = csvData.map(row => 
-        row.map(cell => `"${cell}"`).join(',')
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
       ).join('\n');
       
       // Add BOM for Arabic support
       const BOM = '\uFEFF';
       const csvWithBOM = BOM + csvContent;
+      
+      console.log('CSV content length:', csvWithBOM.length);
       
       // Create and download file
       const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
@@ -470,37 +573,79 @@ const TeamShiftsPage = () => {
       link.click();
       document.body.removeChild(link);
       
+      // Clean up the URL object
+      URL.revokeObjectURL(url);
+      
       toast.success('Team shifts exported successfully!');
+      console.log('CSV export completed successfully');
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      toast.error('Failed to export CSV');
+      toast.error('Failed to export CSV: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  // Calculate summary statistics
+  // Calculate summary statistics - matching ShiftsPageClean logic
   const summaryStats = useMemo(() => {
-    const workedShifts = monthlyShifts.filter(shift => 
-      shift.regularHours > 0 || shift.overtimeHours > 0
-    );
+    // Exclude day-off records from calculations (matching ShiftsPageClean)
+    const workingShifts = monthlyShifts.filter(shift => !shift.isDayOff);
+    const totalRegularHours = workingShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
+    const actualOvertimeHours = workingShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
+    const totalDelayMinutes = workingShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
+    const totalBreakMinutes = workingShifts.reduce((sum, shift) => sum + (shift.totalBreakMinutes || 0), 0);
+    const totalWorkingDays = workingShifts.filter(shift => shift.checkInTime).length;
+    const averageHoursPerDay = totalWorkingDays > 0 ? (totalRegularHours + actualOvertimeHours) / totalWorkingDays : 0;
 
-    const totalRegularHours = workedShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
-    const totalOvertimeHours = workedShifts.reduce((sum, shift) => sum + shift.overtimeHours, 0);
-    const totalDelayMinutes = workedShifts.reduce((sum, shift) => sum + shift.delayMinutes, 0);
-    const totalBreakMinutes = workedShifts.reduce((sum, shift) => sum + (shift.totalBreakMinutes || 0), 0);
-    const totalWorkingDays = workedShifts.length;
-    const averageHoursPerDay = totalWorkingDays > 0 ? (totalRegularHours + totalOvertimeHours) / totalWorkingDays : 0;
+    // Calculate smart offsetting using the same logic as ShiftsPageClean
+    const rawDelayToFinishHours = totalDelayMinutes / 60; // Convert to hours
+    
+    // Apply smart offsetting logic: Total Overtime Hours - Delay to Finish
+    let finalOvertimeHours = 0;
+    let finalDelayToFinishHours = 0;
+    
+    if (actualOvertimeHours > rawDelayToFinishHours) {
+      // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
+      finalOvertimeHours = actualOvertimeHours - rawDelayToFinishHours;
+      finalDelayToFinishHours = 0; // All Clear
+    } else {
+      // If Delay >= Overtime: Show remaining delay, overtime becomes 0
+      finalDelayToFinishHours = rawDelayToFinishHours - actualOvertimeHours;
+      finalOvertimeHours = 0;
+    }
 
-    // Calculate smart offsetting
-    const smartOffsetting = calculateSmartOffsetting(monthlyShifts);
+    // Smart offsetting metadata
+    const hasSmartOffsetting = actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
+    const offsettingType = actualOvertimeHours > rawDelayToFinishHours ? 'overtime_covers_delay' : 'delay_covers_overtime';
+
+    console.log('📊 Team Summary with Smart Offsetting Logic:', {
+      totalDelayMinutes,
+      rawDelayToFinishHours: rawDelayToFinishHours.toFixed(2),
+      actualOvertimeHours: actualOvertimeHours.toFixed(2),
+      finalOvertimeHours: finalOvertimeHours.toFixed(2),
+      finalDelayToFinishHours: finalDelayToFinishHours.toFixed(2),
+      hasSmartOffsetting,
+      offsettingType
+    });
 
     return {
       totalRegularHours,
-      totalOvertimeHours,
+      totalOvertimeHours: finalOvertimeHours, // Smart overtime after offsetting delay
+      actualOvertimeHours, // Keep the actual overtime for internal calculations
       totalDelayMinutes,
       totalBreakMinutes,
       totalWorkingDays,
       averageHoursPerDay,
-      smartOffsetting
+      delayToFinish: finalDelayToFinishHours, // Smart delay after offsetting overtime
+      // Smart offsetting metadata
+      rawDelayHours: rawDelayToFinishHours,
+      hasSmartOffsetting,
+      offsettingType,
+      smartOffsetting: {
+        rawOvertime: actualOvertimeHours,
+        rawDelay: rawDelayToFinishHours,
+        netResult: finalOvertimeHours
+      }
     };
   }, [monthlyShifts]);
 
@@ -553,9 +698,18 @@ const TeamShiftsPage = () => {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={handleExportCSV} variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
+              <Button onClick={handleExportCSV} variant="outline" disabled={isExporting}>
+                {isExporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export CSV
+                  </>
+                )}
               </Button>
               <Button onClick={handleRefresh} disabled={isRefreshing}>
                 {isRefreshing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
@@ -614,116 +768,197 @@ const TeamShiftsPage = () => {
         </Card>
 
                  {/* Summary Cards */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">{t.totalRegularHours}</CardTitle>
-               <Clock className="h-4 w-4 text-muted-foreground" />
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold">{formatHoursAndMinutes(summaryStats.totalRegularHours)}</div>
-               <p className="text-xs text-muted-foreground">
-                 Regular working hours
-               </p>
-             </CardContent>
-           </Card>
-
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">{t.totalOvertimeHours}</CardTitle>
-               <div className="flex items-center gap-1">
-                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">SMART</Badge>
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4 mb-6">
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                     <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalRegularHours}</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground">{formatHoursAndMinutes(summaryStats.totalRegularHours)}</div>
                </div>
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-orange-600">{formatHoursAndMinutes(summaryStats.smartOffsetting.netResult)}</div>
-               <p className="text-xs text-green-600">
-                 After covering delay
-               </p>
              </CardContent>
            </Card>
 
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">{t.delayToFinish}</CardTitle>
-               <div className="flex items-center gap-1">
-                 <Clock className="h-4 w-4 text-muted-foreground" />
-                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">SMART</Badge>
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                     <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-yellow-600 dark:text-yellow-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.breakTime}</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-foreground">{formatBreakTime(summaryStats.totalBreakMinutes)}</div>
                </div>
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-green-600">All Clear</div>
-               <p className="text-xs text-muted-foreground">
-                 Smart offsetting applied
-               </p>
              </CardContent>
            </Card>
 
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">{t.totalWorkingDays}</CardTitle>
-               <Users className="h-4 w-4 text-muted-foreground" />
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold">{summaryStats.totalWorkingDays}</div>
-               <p className="text-xs text-muted-foreground">
-                 days
-               </p>
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className={`p-2 sm:p-3 rounded-full ${summaryStats.totalOvertimeHours > 0 ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-gray-100 dark:bg-gray-900/30'}`}>
+                     <TrendingUp className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summaryStats.totalOvertimeHours > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'}`} />
+                   </div>
+                 </div>
+                 <div className="flex items-center justify-center gap-2">
+                   <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalOvertimeHours}</p>
+                   <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">✨ SMART</span>
+                 </div>
+                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summaryStats.totalOvertimeHours > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
+                   {summaryStats.totalOvertimeHours > 0 ? formatHoursAndMinutes(summaryStats.totalOvertimeHours) : '0h 0min'}
+                 </div>
+                 {summaryStats.hasSmartOffsetting && summaryStats.offsettingType === 'overtime_covers_delay' && (
+                   <p className="text-xs text-green-600 font-medium">After covering delay</p>
+                 )}
+               </div>
              </CardContent>
            </Card>
 
-           <Card>
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">{t.averageHoursPerDay}</CardTitle>
-               <TrendingUp className="h-4 w-4 text-muted-foreground" />
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-purple-600">{formatHoursAndMinutes(summaryStats.averageHoursPerDay)}</div>
-               <p className="text-xs text-muted-foreground">
-                 Average per day
-               </p>
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className={`p-2 sm:p-3 rounded-full ${summaryStats.totalDelayMinutes > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                     <Clock className={`h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 ${summaryStats.totalDelayMinutes > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} />
+                   </div>
+                 </div>
+                 <div className="flex items-center justify-center gap-2">
+                   <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.delayToFinish}</p>
+                   <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">✨ SMART</span>
+                 </div>
+                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summaryStats.delayToFinish > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                   {summaryStats.delayToFinish > 0 ? formatHoursAndMinutes(summaryStats.delayToFinish) : 'All Clear'}
+                 </div>
+                 {summaryStats.hasSmartOffsetting && summaryStats.offsettingType === 'delay_covers_overtime' && (
+                   <p className="text-xs text-red-600 font-medium">After overtime offset</p>
+                 )}
+               </div>
+             </CardContent>
+           </Card>
+
+         </div>
+
+         {/* Team Statistics */}
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
+                     <Users className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-indigo-600 dark:text-indigo-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">Team Members</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-indigo-600">{teamEmployees.length}</div>
+                 <p className="text-xs sm:text-sm text-muted-foreground">active employees</p>
+               </div>
+             </CardContent>
+           </Card>
+
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-cyan-100 dark:bg-cyan-900/30">
+                     <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-cyan-600 dark:text-cyan-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">Total Shifts</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-cyan-600">{filteredShifts.length}</div>
+                 <p className="text-xs sm:text-sm text-muted-foreground">this month</p>
+               </div>
+             </CardContent>
+           </Card>
+
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-green-100 dark:bg-green-900/30">
+                     <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-600 dark:text-green-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.totalWorkingDays}</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-green-600">{summaryStats.totalWorkingDays}</div>
+                 <p className="text-xs sm:text-sm text-muted-foreground">days</p>
+               </div>
+             </CardContent>
+           </Card>
+
+           <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full">
+             <CardContent className="p-3 sm:p-4 md:p-5">
+               <div className="text-center space-y-2 sm:space-y-3">
+                 <div className="flex justify-center">
+                   <div className="p-2 sm:p-3 rounded-full bg-purple-100 dark:bg-purple-900/30">
+                     <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-600 dark:text-purple-400" />
+                   </div>
+                 </div>
+                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">{t.averageHoursPerDay}</p>
+                 <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-600">{formatHoursAndMinutes(summaryStats.averageHoursPerDay)}</div>
+               </div>
              </CardContent>
            </Card>
          </div>
 
          {/* Smart Offsetting Summary */}
-         <Card className="mb-6 border-green-200 bg-green-50/50">
-           <CardHeader>
-             <CardTitle className="flex items-center gap-2 text-green-800">
-               <TrendingUp className="h-5 w-5" />
-               Smart Offsetting Summary
-             </CardTitle>
-           </CardHeader>
-           <CardContent>
-             <div className="grid grid-cols-3 gap-4">
-               <div className="text-center">
-                 <div className="text-lg font-semibold text-orange-600">
-                   {formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime)}
+         <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-900/20 shadow-sm w-full mb-6">
+           <CardContent className="p-4">
+             <div className="text-center space-y-3">
+               <div className="flex items-center justify-center gap-2">
+                 <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/30">
+                   <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
                  </div>
-                 <div className="text-sm text-muted-foreground">Raw Overtime</div>
+                 <h3 className="text-lg font-bold text-green-700 dark:text-green-300">
+                   Smart Offsetting Summary
+                   {selectedEmployee !== 'all' && (
+                     <span className="text-sm font-normal text-muted-foreground ml-2">
+                       - {teamEmployees.find(emp => emp.id === selectedEmployee)?.name || 'Selected Employee'}
+                     </span>
+                   )}
+                 </h3>
                </div>
-               <div className="text-center">
-                 <div className="text-lg font-semibold text-orange-600">
-                   {formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay)}
+               
+               <div className="bg-white dark:bg-gray-800 rounded-lg p-3 space-y-2">
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                   <div className="text-center">
+                     <p className="text-muted-foreground font-medium">Raw Overtime</p>
+                     <p className="font-bold text-orange-600">{formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime)}</p>
+                   </div>
+                   <div className="text-center">
+                     <p className="text-muted-foreground font-medium">Raw Delay</p>
+                     <p className="font-bold text-red-600">{formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay)}</p>
+                   </div>
+                   <div className="text-center">
+                     <p className="text-muted-foreground font-medium">Net Result</p>
+                     <p className={`font-bold ${summaryStats.totalOvertimeHours > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                       {summaryStats.totalOvertimeHours > 0 
+                         ? `+${formatHoursAndMinutes(summaryStats.totalOvertimeHours)} OT`
+                         : `${formatHoursAndMinutes(summaryStats.delayToFinish)} Delay`
+                       }
+                     </p>
+                   </div>
                  </div>
-                 <div className="text-sm text-muted-foreground">Raw Delay</div>
-               </div>
-               <div className="text-center">
-                 <div className="text-lg font-semibold text-green-600">
-                   +{formatHoursAndMinutes(summaryStats.smartOffsetting.netResult)} OT
+                 
+                 <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700 rounded text-xs">
+                   <span className="font-medium">Smart Logic:</span> {formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime)} Overtime - {formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay)} Delay = {
+                     summaryStats.totalOvertimeHours > 0 
+                       ? `+${formatHoursAndMinutes(summaryStats.totalOvertimeHours)} Net OT`
+                       : `${formatHoursAndMinutes(summaryStats.delayToFinish)} Net Delay`
+                   }
                  </div>
-                 <div className="text-sm text-muted-foreground">Net Result</div>
                </div>
-             </div>
-             <div className="mt-4 p-3 bg-white rounded-lg border">
-               <div className="text-sm text-muted-foreground">
-                 <strong>Smart Logic:</strong> {formatHoursAndMinutes(summaryStats.smartOffsetting.rawOvertime)} Overtime - {formatHoursAndMinutes(summaryStats.smartOffsetting.rawDelay)} Delay = {formatHoursAndMinutes(summaryStats.smartOffsetting.netResult)} Net Overtime
-               </div>
-             </div>
-             <div className="mt-3 flex items-center gap-2 text-blue-600 text-sm">
-               <div className="w-4 h-4">ℹ️</div>
-               <span>This shows combined totals. Select individual employees to see their smart offsetting calculations.</span>
+               
+               {selectedEmployee === 'all' && (
+                 <div className="flex items-center gap-2 text-blue-600 text-sm">
+                   <div className="w-4 h-4">ℹ️</div>
+                   <span>This shows combined totals. Select individual employees to see their smart offsetting calculations.</span>
+                 </div>
+               )}
              </div>
            </CardContent>
          </Card>

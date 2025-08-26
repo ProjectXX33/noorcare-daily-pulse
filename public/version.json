@@ -1,22 +1,21 @@
 {
-  "version": "7.0.0",
+  "version": "7.1.0",
   "buildTime": "2025-08-25T23:58:06.551Z",
   "buildTimestamp": "1756166286552",
   "buildDate": "8/26/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "🚀 Performance improvements and bug fixes",
-    "🔄 Customer Service → Junior CRM Specialist System-wide Update",
-    "📝 Copy Writing → Content Creator Complete Migration",
-    "👥 Customer Retention Manager Dashboard in Overview Group",
-    "🎨 Content & Creative Manager Dashboard in Overview Group",
-    "🔧 Fixed Shift Management Access for Customer Retention Manager",
-    "📧 Enhanced Email Notification System with CORS Fixes",
-    "🖼️ Improved Image Display in Task Pages (Hidden URLs)",
-    "🎯 Designer Dashboard for Designer Users",
-    "📊 Warehouse Dashboard Dark Mode Support",
-    "🔔 Enhanced Notification System for All Managers"
+    "🎉 Enhanced Team Shifts Management with comprehensive dashboard",
+    "✅ Fixed Break Time calculation - now properly excludes from delay calculations",
+    "📊 Added Break Time count display to team shifts summary",
+    "🔧 Improved CSV Export for team shifts - matches main shifts page format",
+    "🎨 Reorganized team shifts layout - 4 cards per row for better organization",
+    "📱 Enhanced Team Statistics with proper count displays",
+    "⚡ Smart Offsetting Summary with detailed breakdown",
+    "🎯 Fixed unrealistic hour calculations in CSV exports",
+    "🔒 Enhanced data validation and error handling",
+    "🚀 Performance improvements and bug fixes"
   ],
   "minimumSupportedVersion": "5.0.0",
   "forceUpdate": false

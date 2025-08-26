@@ -204,7 +204,21 @@ const CreateOrderPage: React.FC = () => {
   }, [user, navigate]);
 
   // Don't render page content if user is not authorized
-  if (!user || (!['Junior CRM Specialist'].includes(user.position) && !['admin', 'customer_retention_manager'].includes(user.role as string))) {
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Access Restricted</h3>
+          <p className="text-gray-500 dark:text-gray-400">
+            Please log in to access this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!['Junior CRM Specialist'].includes(user.position) && !['admin', 'customer_retention_manager'].includes(user.role as string)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">

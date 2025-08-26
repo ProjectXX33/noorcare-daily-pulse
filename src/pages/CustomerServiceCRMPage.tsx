@@ -63,7 +63,28 @@ const CustomerServiceCRMPage = () => {
   };
 
   // Don't render page content if user is not Customer Service
-      if (!user || user.position !== 'Junior CRM Specialist') {
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+                  <h3 className="text-lg font-semibold">Access Restricted</h3>
+                  <p className="text-gray-600">
+                    Please log in to access this page.
+                  </p>
+                  <Button onClick={() => navigate('/login')} className="w-full">
+                    Go to Login
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
+      
+      if (user.position !== 'Junior CRM Specialist') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

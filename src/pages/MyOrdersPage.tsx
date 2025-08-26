@@ -26,7 +26,9 @@ import {
   Copy,
   Clock,
   Settings,
-  CheckCircle
+  CheckCircle,
+  Truck,
+  XCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -180,7 +182,12 @@ const MyOrdersPage: React.FC = () => {
     
     // Status filter
     if (filters.status && filters.status !== 'all') {
-      filtered = filtered.filter(order => order.status === filters.status);
+      filtered = filtered.filter(order => {
+        if (filters.status === 'completed_and_delivered' || filters.status === 'completed') {
+          return order.status === 'completed' || order.status === 'delivered';
+        }
+        return order.status === filters.status;
+      });
     }
     
     // Date range filter
@@ -205,6 +212,47 @@ const MyOrdersPage: React.FC = () => {
       ...prev,
       [key]: value
     }));
+  };
+
+  // Calculate revenue for each status category
+  const calculateStatusRevenue = (status: string) => {
+    return orders
+      .filter(order => {
+        if (status === 'completed_and_delivered') {
+          return order.status === 'completed' || order.status === 'delivered';
+        }
+        if (status === 'cancelled') {
+          return order.status === 'cancelled' || order.status === 'tamara-o-canceled';
+        }
+        return order.status === status;
+      })
+      .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+  };
+
+  // Calculate count for each status category
+  const calculateStatusCount = (status: string) => {
+    return orders.filter(order => {
+      if (status === 'completed_and_delivered') {
+        return order.status === 'completed' || order.status === 'delivered';
+      }
+      if (status === 'cancelled') {
+        return order.status === 'cancelled' || order.status === 'tamara-o-canceled';
+      }
+      return order.status === status;
+    }).length;
+  };
+
+  // Handle card clicks to filter orders
+  const handleCardClick = (status: string) => {
+    setFilters(prev => ({
+      ...prev,
+      status: status
+    }));
+  };
+
+  // Check if a status card is selected
+  const isStatusCardSelected = (status: string) => {
+    return filters.status === status;
   };
 
   // Clear filters
@@ -471,7 +519,18 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
   // Don't render if user doesn't have access
   const allowedPositions = ['Junior CRM Specialist'];
   const allowedRoles = ['admin', 'customer_retention_manager'];
-  if (!user || (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string))) {
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -539,59 +598,94 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('all') ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+          onClick={() => handleCardClick('all')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">{stats.total_orders}</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.total_orders}</p>
+                <p className="text-sm font-medium text-blue-600">{stats.total_revenue.toFixed(2)} SAR</p>
               </div>
-              <Package className="h-8 w-8 text-emerald-600" />
+              <Package className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('completed_and_delivered') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}
+          onClick={() => handleCardClick('completed_and_delivered')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{stats.total_revenue.toFixed(2)} SAR</p>
+                <p className="text-sm font-medium text-muted-foreground">Delivered</p>
+                <p className="text-2xl font-bold text-green-600">{calculateStatusCount('completed_and_delivered')}</p>
+                <p className="text-sm font-medium text-green-600">{calculateStatusRevenue('completed_and_delivered').toFixed(2)} SAR</p>
               </div>
-              <SARIcon className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending_orders}</p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('processing') ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+          onClick={() => handleCardClick('processing')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Processing</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.processing_orders}</p>
+                <p className="text-2xl font-bold text-blue-600">{calculateStatusCount('processing')}</p>
+                <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('processing').toFixed(2)} SAR</p>
               </div>
               <Settings className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('pending') ? 'ring-2 ring-orange-500 bg-orange-50' : ''}`}
+          onClick={() => handleCardClick('pending')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
+                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold text-orange-600">{calculateStatusCount('pending')}</p>
+                <p className="text-sm font-medium text-orange-600">{calculateStatusRevenue('pending').toFixed(2)} SAR</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <Clock className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('shipped') ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+          onClick={() => handleCardClick('shipped')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Shipped</p>
+                <p className="text-2xl font-bold text-blue-600">{calculateStatusCount('shipped')}</p>
+                <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('shipped').toFixed(2)} SAR</p>
+              </div>
+              <Truck className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isStatusCardSelected('cancelled') ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
+          onClick={() => handleCardClick('cancelled')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Cancelled</p>
+                <p className="text-2xl font-bold text-red-600">{calculateStatusCount('cancelled')}</p>
+                <p className="text-sm font-medium text-red-600">{calculateStatusRevenue('cancelled').toFixed(2)} SAR</p>
+              </div>
+              <XCircle className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -630,7 +724,8 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="shipped">Shipped</SelectItem>
+                    <SelectItem value="completed_and_delivered">Completed & Delivered</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                   </SelectContent>
               </Select>

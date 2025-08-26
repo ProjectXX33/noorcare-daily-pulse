@@ -311,7 +311,7 @@ export const getOrderStatistics = async (userId: string, isAdmin: boolean = fals
       total_revenue: orders.reduce((sum, order) => sum + Number(order.total_amount), 0),
       pending_orders: orders.filter(order => order.status === 'pending').length,
       processing_orders: orders.filter(order => order.status === 'processing').length,
-      completed_orders: orders.filter(order => order.status === 'completed').length,
+      completed_orders: orders.filter(order => order.status === 'completed' || order.status === 'delivered').length,
       shipped_orders: orders.filter(order => order.status === 'shipped').length,
       cancelled_orders: orders.filter(order => order.status === 'cancelled' || order.status === 'tamara-o-canceled').length,
     };

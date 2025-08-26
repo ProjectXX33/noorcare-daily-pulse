@@ -191,7 +191,11 @@ const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => 
   const { user } = useAuth();
   
   // Junior CRM Specialist users should stay on this dashboard
-  if (!user || user.position === 'Junior CRM Specialist') {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position === 'Junior CRM Specialist') {
     return (
       <PrivateRoute allowedRoles={['employee']}>
         {children}
@@ -210,7 +214,11 @@ const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => 
 const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || user.position !== 'Junior CRM Specialist') {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position !== 'Junior CRM Specialist') {
     if (user?.role === 'admin') {
       return <Navigate to="/dashboard" replace />;
     } else if ((user as any).position === 'Content Creator') {
@@ -228,9 +236,13 @@ const CustomerServiceAndRetentionRoute = ({ children }: { children: React.ReactN
   const { user } = useAuth();
   
   const allowedPositions = ['Junior CRM Specialist'];
-  const allowedRoles = ['admin', 'customer_retention_manager'];
+  const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
   
-  if (!user || (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string))) {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string)) {
     if (user?.role === 'admin') {
       return <Navigate to="/dashboard" replace />;
     } else if ((user as any).position === 'Content Creator') {
@@ -247,7 +259,11 @@ const CustomerServiceAndRetentionRoute = ({ children }: { children: React.ReactN
 const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  if (!user || user.position !== 'Media Buyer') {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.position !== 'Media Buyer') {
     if (user?.role === 'admin') {
       return <Navigate to="/dashboard" replace />;
     } else if ((user as any).position === 'Content Creator') {
@@ -344,7 +360,11 @@ const AuthenticatedNotificationBanner = () => {
   const hideOnPages = ['/', '/login'];
   
   // Only show if user is authenticated and not on excluded pages
-  if (!user || hideOnPages.includes(location.pathname)) {
+  if (!user) {
+    return null;
+  }
+  
+  if (hideOnPages.includes(location.pathname)) {
     return null;
   }
   

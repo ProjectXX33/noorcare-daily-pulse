@@ -1657,8 +1657,8 @@ export async function getWooCommerceAnalytics(year: number, month: number) {
       return sum + orderTotal;
     }, 0);
     
-    // Get completed orders count
-    const completedOrdersCount = orders.filter(order => order.status === 'completed').length;
+    // Get completed orders count (including delivered)
+    const completedOrdersCount = orders.filter(order => order.status === 'completed' || order.status === 'delivered').length;
     
     // Get processing orders count
     const processingOrdersCount = orders.filter(order => order.status === 'processing').length;

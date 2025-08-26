@@ -207,7 +207,7 @@ export const LoyalCustomersProvider: React.FC<{ children: React.ReactNode }> = (
             
             allOrders = orders; // Use only the most recent 100 orders for faster processing
 
-            const completedOrders = allOrders.filter(order => order.status === 'completed');
+            const completedOrders = allOrders.filter(order => order.status === 'completed' || order.status === 'delivered');
             const totalSpent = completedOrders.reduce((sum, order) => sum + parseFloat(order.total || '0'), 0);
             const ordersCount = completedOrders.length;
             const avgOrderValue = ordersCount > 0 ? totalSpent / ordersCount : 0;

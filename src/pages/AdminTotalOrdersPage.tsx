@@ -110,14 +110,14 @@ const AdminTotalOrdersPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 20;
 
-  // Access control - Admin, Customer Retention Manager, Media Buyer, and Customer Service
+  // Access control - Admin, Customer Retention Manager, Executive Director, Media Buyer, and Customer Service
   useEffect(() => {
     if (!user) {
       navigate('/login', { replace: true });
       return;
     }
     
-    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
     const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
     
     // Only redirect if user is loaded and doesn't have access
@@ -510,9 +510,11 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Auto-sync functionality
   useEffect(() => {
-    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
     const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
-    if (!autoSyncEnabled || !user || (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position))) return;
+    if (!autoSyncEnabled || !user) return;
+    
+    if (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) return;
 
     const autoSyncInterval = setInterval(() => {
       console.log('🔄 Auto-sync triggered');
@@ -524,7 +526,7 @@ const AdminTotalOrdersPage: React.FC = () => {
 
   // Initial data load
   useEffect(() => {
-    const allowedRoles = ['admin', 'customer_retention_manager'];
+    const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
     const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
     if (user && (allowedRoles.includes(user.role as string) || allowedPositions.includes(user.position))) {
       fetchData();
@@ -553,6 +555,9 @@ const AdminTotalOrdersPage: React.FC = () => {
       filtered = filtered.filter(order => {
         if (filters.status === 'cancelled') {
           return order.status === 'cancelled' || order.status === 'tamara-o-canceled';
+        }
+        if (filters.status === 'completed_and_delivered' || filters.status === 'completed') {
+          return order.status === 'completed' || order.status === 'delivered';
         }
         return order.status === filters.status;
       });
@@ -615,8 +620,26 @@ const AdminTotalOrdersPage: React.FC = () => {
     }, 100);
   };
 
+  // Calculate revenue for each status category
+  const calculateStatusRevenue = (status: string) => {
+    return orders
+      .filter(order => {
+        if (status === 'completed_and_delivered') {
+          return order.status === 'completed' || order.status === 'delivered';
+        }
+        if (status === 'cancelled') {
+          return order.status === 'cancelled' || order.status === 'tamara-o-canceled';
+        }
+        return order.status === status;
+      })
+      .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+  };
+
   // Check if a status card is currently selected
   const isStatusCardSelected = (status: string) => {
+    if (status === 'completed') {
+      return filters.status === 'completed' || filters.status === 'completed_and_delivered';
+    }
     return filters.status === status;
   };
 
@@ -784,9 +807,20 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
   };
 
   // Don't render if user doesn't have access
-      const allowedRoles = ['admin', 'customer_retention_manager'];
+      const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
     const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
-    if (!user || (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position))) {
+    if (!user) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Checking permissions...</p>
+          </div>
+        </div>
+      );
+    }
+    
+    if (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -906,43 +940,34 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
         </CardContent>
       </Card>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+            {/* Statistics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">{stats.total_orders}</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.total_orders}</p>
+                <p className="text-sm font-medium text-blue-600">{stats.total_revenue.toFixed(2)} SAR</p>
               </div>
-              <Package className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{stats.total_revenue.toFixed(2)} SAR</p>
-              </div>
-              <SARIcon className="h-8 w-8 text-green-600" />
+              <Package className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
         <Card 
           className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-            isStatusCardSelected('pending') ? 'ring-2 ring-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' : ''
+            isStatusCardSelected('completed') ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-950/20' : ''
           }`}
-          onClick={() => handleStatsCardClick('pending')}
+          onClick={() => handleStatsCardClick('completed_and_delivered')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending_orders}</p>
+                <p className="text-sm font-medium text-muted-foreground">Delivered</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
+                <p className="text-sm font-medium text-green-600">{calculateStatusRevenue('completed_and_delivered').toFixed(2)} SAR</p>
               </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+              <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -957,6 +982,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Processing</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.processing_orders}</p>
+                <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('processing').toFixed(2)} SAR</p>
               </div>
               <Settings className="h-8 w-8 text-blue-600" />
             </div>
@@ -964,17 +990,18 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
         </Card>
         <Card 
           className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
-            isStatusCardSelected('completed') ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-950/20' : ''
+            isStatusCardSelected('pending') ? 'ring-2 ring-orange-500 bg-orange-50 dark:bg-orange-950/20' : ''
           }`}
-          onClick={() => handleStatsCardClick('completed')}
+          onClick={() => handleStatsCardClick('pending')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
+                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.pending_orders}</p>
+                <p className="text-sm font-medium text-orange-600">{calculateStatusRevenue('pending').toFixed(2)} SAR</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <Clock className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
@@ -989,6 +1016,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Shipped</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.shipped_orders}</p>
+                <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('shipped').toFixed(2)} SAR</p>
               </div>
               <Truck className="h-8 w-8 text-blue-600" />
             </div>
@@ -1005,6 +1033,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Cancelled</p>
                 <p className="text-2xl font-bold text-red-600">{stats.cancelled_orders}</p>
+                <p className="text-sm font-medium text-red-600">{calculateStatusRevenue('cancelled').toFixed(2)} SAR</p>
               </div>
               <XCircle className="h-8 w-8 text-red-600" />
             </div>
@@ -1124,7 +1153,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="completed_and_delivered">Completed & Delivered</SelectItem>
                       <SelectItem value="shipped">Shipped</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>

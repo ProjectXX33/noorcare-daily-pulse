@@ -1253,6 +1253,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         { name: 'Dashboard', path: '/copy-writing-dashboard', icon: Edit3, copyWritingOnly: true, color: 'blue' },
         { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, adminOnly: true, color: 'blue' },
         { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, designerOnly: true, color: 'blue' },
+        { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, customerServiceOnly: true, color: 'blue' },
         { name: 'Content & Creative Dashboard', path: '/content-creative-dashboard', icon: Users, managerRole: 'content_creative_manager', excludeContentCreator: true, color: 'purple' },
         { name: 'Customer Retention Dashboard', path: '/customer-retention-dashboard', icon: Users, customerRetentionManagerOnly: true, color: 'blue' },
         { name: 'VNQ Team', path: '/our-team', icon: Building2, color: 'indigo' },
@@ -1525,7 +1526,11 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.employeeOnly && user?.role === 'admin') return false;
       if (item.managerRole && user?.role !== item.managerRole) return false;
       if (item.customerServiceAndDesignerOnly && user?.position !== 'Junior CRM Specialist' && user?.position !== 'Designer') return false;
-      if (item.customerServiceOnly && user?.position !== 'Junior CRM Specialist' && user?.role !== 'customer_retention_manager') return false;
+      if (item.customerServiceOnly && user?.position !== 'Junior CRM Specialist' && user?.role !== 'customer_retention_manager' && user?.position !== 'Executive Director') return false;
+      // For Executive Director, only show Total Orders, hide other customer service tools
+      if (user?.position === 'Executive Director' && item.customerServiceOnly && item.name !== 'Total Orders') return false;
+      // Hide Dashboard for Customer Retention Manager only
+      if (item.name === 'Dashboard' && user?.role === 'customer_retention_manager') return false;
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee' || user?.role === 'customer_retention_manager')) return false;
       if (item.mediaBuyerOnly && user?.position !== 'Media Buyer') return false;
       if (item.designerOnly && user?.position !== 'Designer') return false;
@@ -1545,8 +1550,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       return true;
     })
       })).filter(group => {
-        // Hide Employee Management group for Designer users
-        if (group.label === 'Employee Management' && user?.position === 'Designer') {
+        // Hide Employee Management group for Designer users and Junior CRM Specialist
+        if (group.label === 'Employee Management' && (user?.position === 'Designer' || user?.position === 'Junior CRM Specialist')) {
           return false;
         }
         return group.items.length > 0; // Only show groups that have items

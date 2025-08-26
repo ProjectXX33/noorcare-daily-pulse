@@ -326,7 +326,24 @@ const DesignerDashboard = () => {
     urgent: tasks.filter(t => t.priority === 'urgent').length
   };
 
-  if (!user || user.position !== 'Designer') {
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground">
+              Please log in to access this page.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (user.position !== 'Designer') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
         <Card className="w-full max-w-md">

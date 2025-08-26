@@ -3,8 +3,8 @@
 
 const VERSION_CONFIG = {
   // Change these values manually for each release
-  major: 6,
-  minor: 0,
+  major: 7,
+  minor: 1,
   patch: 0,
   
   // Optional: add build suffix (leave empty for clean versions)
@@ -12,15 +12,15 @@ const VERSION_CONFIG = {
   
   // Release notes for this version
   releaseNotes: [
-    "🎉 Enhanced Task Management with Pagination (6 tasks per page)",
-    "✅ Fixed Team Assignment - 'No team assigned' now works correctly",
-    "🎨 Beautiful Gradient Menu Borders matching the logo colors",
-    "📱 Improved Mobile Experience with better responsive design",
-    "🔧 Enhanced User Profile Dropdown with position and team display",
-    "📊 Content & Creative Manager Dashboard with team-specific views",
-    "⚡ Real-time Analytics from order submissions table",
-    "🎯 Advanced Team Management with proper role-based access",
-    "🔒 Enhanced Security with better access control",
+    "🎉 Enhanced Team Shifts Management with comprehensive dashboard",
+    "✅ Fixed Break Time calculation - now properly excludes from delay calculations",
+    "📊 Added Break Time count display to team shifts summary",
+    "🔧 Improved CSV Export for team shifts - matches main shifts page format",
+    "🎨 Reorganized team shifts layout - 4 cards per row for better organization",
+    "📱 Enhanced Team Statistics with proper count displays",
+    "⚡ Smart Offsetting Summary with detailed breakdown",
+    "🎯 Fixed unrealistic hour calculations in CSV exports",
+    "🔒 Enhanced data validation and error handling",
     "🚀 Performance improvements and bug fixes"
   ],
   
