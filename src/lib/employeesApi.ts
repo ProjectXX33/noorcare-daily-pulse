@@ -41,7 +41,7 @@ export async function createEmployee(employee: {
   department: Department;
   position: Position;
   team?: Team;
-  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager';
 }): Promise<User> {
   try {
     console.log('Creating employee with data:', { ...employee, password: '[REDACTED]' });

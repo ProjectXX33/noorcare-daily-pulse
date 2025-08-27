@@ -134,14 +134,14 @@ const AdminShiftManagement = () => {
 
   useEffect(() => {
     console.log('AdminShiftManagement: Component mounted', { user });
-    if (user?.role === 'admin' || user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager') {
+    if (user?.role === 'admin' || user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager' || user?.role === 'ecommerce_manager') {
       loadData();
     }
   }, [user, selectedWeekStart]);
 
   // Add real-time subscription for shift assignments
   useEffect(() => {
-    if (!user?.id || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) return;
+    if (!user?.id || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) return;
 
     // Create unique channel name to avoid conflicts
     const channelName = `shift-assignments-${user.id}`;
@@ -587,7 +587,7 @@ const AdminShiftManagement = () => {
     ? employees 
     : employees.filter(emp => emp.id === selectedEmployee);
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
     return (
       <div className="flex items-center justify-center min-h-[50vh] p-4">
         <Card className="max-w-md w-full">

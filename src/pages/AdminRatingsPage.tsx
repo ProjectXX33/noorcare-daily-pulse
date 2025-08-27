@@ -246,7 +246,7 @@ const AdminRatingsPage = () => {
     return ratingDate.toDateString() === today.toDateString();
   };
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
+      if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
     return null;
   }
 

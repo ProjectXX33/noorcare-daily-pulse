@@ -58,7 +58,7 @@ const AdminEmployeesPage = () => {
     position: 'Designer' as Position,
     team: undefined as Team | undefined,
     password: '',
-    role: 'employee' as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'
+            role: 'employee' as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager'
   });
   const [newPassword, setNewPassword] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -103,6 +103,7 @@ const AdminEmployeesPage = () => {
       contentCreativeManager: "Content & Creative Manager",
       customerRetentionManager: "Customer Retention Manager",
       digitalSolutionManager: "Digital Solution Manager",
+      ecommerceManager: "E-commerce Manager",
       noRating: "No rating",
       employeeManagement: "Employee Management",
       manageAllEmployees: "Manage all employees and their access",
@@ -155,6 +156,7 @@ const AdminEmployeesPage = () => {
       contentCreativeManager: "مدير المحتوى والإبداع",
       customerRetentionManager: "مدير الاحتفاظ بالعملاء",
       digitalSolutionManager: "مدير الحلول الرقمية",
+      ecommerceManager: "مدير التجارة الإلكترونية",
       noRating: "لا يوجد تقييم",
       employeeManagement: "إدارة الموظفين",
       manageAllEmployees: "إدارة جميع الموظفين وتوفير الوصول",
@@ -199,6 +201,8 @@ const AdminEmployeesPage = () => {
         return 'Customer Service';
       case 'IT Department':
         return 'IT & Development';
+      case 'E-commerce Department':
+        return 'E-commerce';
       default:
         return 'General';
     }
@@ -739,6 +743,7 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
                   <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
                   <SelectItem value="IT Manager">IT Manager</SelectItem>
+                  <SelectItem value="E-commerce Manager">E-commerce Manager</SelectItem>
                   <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                   <SelectItem value="Designer">Designer</SelectItem>
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
@@ -764,6 +769,7 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="Content & Creative Department">Content & Creative Department</SelectItem>
                   <SelectItem value="Customer Retention Department">Customer Retention Department</SelectItem>
                   <SelectItem value="IT Department">IT Department</SelectItem>
+                  <SelectItem value="E-commerce Department">E-commerce Department</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -773,7 +779,7 @@ const AdminEmployeesPage = () => {
               </Label>
               <Select
                 value={newEmployee.role}
-                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'}))}
+                onValueChange={(value) => setNewEmployee(prev => ({...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager'}))}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={t.role} />
@@ -785,6 +791,7 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="content_creative_manager">{t.contentCreativeManager}</SelectItem>
                   <SelectItem value="customer_retention_manager">{t.customerRetentionManager}</SelectItem>
                   <SelectItem value="digital_solution_manager">{t.digitalSolutionManager}</SelectItem>
+                  <SelectItem value="ecommerce_manager">{t.ecommerceManager}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -862,6 +869,7 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="Content & Creative Manager">Content & Creative Manager</SelectItem>
                     <SelectItem value="Customer Retention Manager">Customer Retention Manager</SelectItem>
                     <SelectItem value="IT Manager">IT Manager</SelectItem>
+                    <SelectItem value="E-commerce Manager">E-commerce Manager</SelectItem>
                     <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
@@ -887,6 +895,7 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="Content & Creative Department">Content & Creative Department</SelectItem>
                     <SelectItem value="Customer Retention Department">Customer Retention Department</SelectItem>
                     <SelectItem value="IT Department">IT Department</SelectItem>
+                    <SelectItem value="E-commerce Department">E-commerce Department</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -896,7 +905,7 @@ const AdminEmployeesPage = () => {
                 </Label>
                 <Select
                   value={selectedEmployee.role}
-                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager'} : null)}
+                  onValueChange={(value) => setSelectedEmployee(prev => prev ? {...prev, role: value as 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager'} : null)}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder={t.role} />
@@ -908,6 +917,7 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="content_creative_manager">{t.contentCreativeManager}</SelectItem>
                     <SelectItem value="customer_retention_manager">{t.customerRetentionManager}</SelectItem>
                     <SelectItem value="digital_solution_manager">{t.digitalSolutionManager}</SelectItem>
+                    <SelectItem value="ecommerce_manager">{t.ecommerceManager}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

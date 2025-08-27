@@ -210,7 +210,6 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">{t.comments}</h3>
         <div className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-full">
           {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
         </div>

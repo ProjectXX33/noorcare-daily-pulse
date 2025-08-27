@@ -15,6 +15,7 @@ import ReportPage from "./pages/ReportPage";
 import AdminEmployeesPage from "./pages/AdminEmployeesPage";
 import ContentCreativeDashboard from "./pages/ContentCreativeDashboard";
 import CustomerRetentionDashboard from "./pages/CustomerRetentionDashboard";
+import EcommerceDashboard from "./pages/EcommerceDashboard";
 import CustomerRetentionTeamReportsPage from "./pages/CustomerRetentionTeamReportsPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminTasksPage from "./pages/AdminTasksPage";
@@ -156,6 +157,8 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
       return <Navigate to="/copy-writing-dashboard" replace />;
     } else if (user.role === 'customer_retention_manager') {
       return <Navigate to="/customer-retention-dashboard" replace />;
+    } else if (user.role === 'ecommerce_manager') {
+      return <Navigate to="/ecommerce-dashboard" replace />;
     } else if (user.role === 'digital_solution_manager') {
       return <Navigate to="/employee-dashboard" replace />; // Will create this later
     } else if ((user as any).position === 'Content Creator') {
@@ -180,7 +183,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 // Employee route component to protect routes that require employee role
 const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   return (
-    <PrivateRoute allowedRoles={['employee', 'content_creative_manager', 'customer_retention_manager']}>
+    <PrivateRoute allowedRoles={['employee', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
       {children}
     </PrivateRoute>
   );
@@ -517,7 +520,7 @@ const AppContent = () => {
         <Route 
           path="/our-team" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'employee']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager', 'employee']}>
               <SidebarNavigation>
                 <OurTeamPage />
               </SidebarNavigation>
@@ -545,6 +548,16 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/ecommerce-dashboard" 
+          element={
+            <PrivateRoute>
+              <SidebarNavigation>
+                <EcommerceDashboard />
+              </SidebarNavigation>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
           path="/reports" 
           element={
             <AdminRoute>
@@ -557,7 +570,7 @@ const AppContent = () => {
         <Route 
           path="/tasks" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
               <SidebarNavigation>
                 <AdminTasksPage />
               </SidebarNavigation>
@@ -567,7 +580,7 @@ const AppContent = () => {
         <Route 
           path="/admin-ratings" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
               <SidebarNavigation>
                 <AdminRatingsPage />
               </SidebarNavigation>
@@ -617,11 +630,11 @@ const AppContent = () => {
         <Route 
           path="/my-ratings" 
           element={
-            <EmployeeRoute>
+            <PrivateRoute allowedRoles={['admin', 'employee', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
               <SidebarNavigation>
                 <EmployeeRatingsPage />
               </SidebarNavigation>
-            </EmployeeRoute>
+            </PrivateRoute>
           } 
         />
         <Route 
@@ -667,7 +680,7 @@ const AppContent = () => {
         <Route 
           path="/admin-shift-management" 
           element={
-            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager']}>
+            <PrivateRoute allowedRoles={['admin', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
               <SidebarNavigation>
                 <AdminShiftManagement />
               </SidebarNavigation>

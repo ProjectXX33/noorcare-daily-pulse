@@ -91,6 +91,8 @@ const OurTeamPage: React.FC = () => {
       'Technical Support': Wrench,
       'IT': Laptop,
       'Sales': Zap,
+      'E-commerce Department': ShoppingCart,
+      'E-commerce': ShoppingCart,
       'default': Building2
     };
     
@@ -208,6 +210,16 @@ const OurTeamPage: React.FC = () => {
         darkText: 'dark:text-yellow-100',
         iconBg: 'bg-yellow-100 dark:bg-yellow-900/30',
         iconColor: 'text-yellow-600 dark:text-yellow-400'
+      },
+      'E-commerce Department': {
+        light: 'from-amber-50 to-amber-100',
+        dark: 'from-amber-900/20 to-amber-800/20',
+        bg: 'bg-amber-500',
+        border: 'border-amber-200 dark:border-amber-700',
+        text: 'text-amber-900',
+        darkText: 'dark:text-amber-100',
+        iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+        iconColor: 'text-amber-600 dark:text-amber-400'
       },
       'Technical Support Department': {
         light: 'from-gray-50 to-gray-100',
@@ -379,7 +391,7 @@ const OurTeamPage: React.FC = () => {
         </div>
 
         {/* Enhanced Department Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
           {filteredDepartments.map((department, index) => {
             const colors = getDepartmentColors(department.name);
             const DepartmentIcon = getDepartmentIcon(department.name);

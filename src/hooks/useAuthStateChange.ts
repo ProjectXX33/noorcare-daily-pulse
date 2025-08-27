@@ -145,7 +145,9 @@ export const useAuthStateChange = ({
               } else if (appUser.role === 'content_creative_manager') {
                 targetPath = '/content-creative-dashboard';
               } else if (appUser.role === 'customer_retention_manager') {
-                targetPath = '/employee-dashboard'; // Will create specific dashboard later
+                targetPath = '/customer-retention-dashboard';
+              } else if (appUser.role === 'ecommerce_manager') {
+                targetPath = '/ecommerce-dashboard';
               } else if (appUser.role === 'digital_solution_manager') {
                 targetPath = '/employee-dashboard'; // Will create specific dashboard later
               }

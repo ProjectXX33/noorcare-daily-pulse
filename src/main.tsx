@@ -14,16 +14,20 @@ if (typeof window !== 'undefined') {
   // Make notification cleanup available globally
   (window as any).cleanupNotifications = cleanupOldNotificationsForAllUsers
   
-  // Make cache clearing available globally (preserves auth)
-  (window as any).clearCacheKeepAuth = async () => {
-    const cacheManager = new CacheManager()
-    return await cacheManager.forceCacheClearKeepAuth()
+
+
+  // Add a placeholder for fixAllMissingImages to prevent errors
+  const fixAllMissingImages = async () => {
+    console.log('fixAllMissingImages function is not available in this context')
+    return Promise.resolve()
   }
+  ;(window as any).fixAllMissingImages = fixAllMissingImages
 
   console.log('🌟 Global utilities available:')
   console.log('  • recalculateOvertime() - Recalculate overtime hours')
   console.log('  • cleanupNotifications() - Clean old notifications for all users')  
-  console.log('  • clearCacheKeepAuth() - Clear all caches while preserving login')
+  console.log('  • clearCacheKeepAuth() - Clear all caches while preserving login (from CacheManager)')
+  console.log('  • fixAllMissingImages() - Placeholder function (not available)')
 }
 
 // Expose cache clearing function globally

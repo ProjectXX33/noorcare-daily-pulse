@@ -336,6 +336,22 @@ const AdminTasksPage = () => {
         console.log('  📋 Total Employees:', employeesData.length);
         console.log('  🎯 Team Members:', teamMembers.length);
         console.log('  📝 Available for Assignment:', filteredEmployees.map(e => `${e.name} (${e.position})`));
+      } else if (user?.role === 'ecommerce_manager') {
+        // Find team members by team name OR by specific positions
+        const teamMembers = employeesData.filter(emp => 
+          emp.team === 'E-commerce Department' || 
+          ['E-commerce Manager'].includes(emp.position)
+        );
+        
+        teamMemberIds = teamMembers.map(emp => emp.id);
+        
+        // RESTRICT: E-commerce Manager can only assign to their team
+        filteredEmployees = teamMembers;
+        
+        console.log('👥 E-commerce Team Filter:');
+        console.log('  📋 Total Employees:', employeesData.length);
+        console.log('  🎯 Team Members:', teamMembers.length);
+        console.log('  📝 Available for Assignment:', filteredEmployees.map(e => `${e.name} (${e.position})`));
       }
       
       // Load rating data for each task
@@ -420,6 +436,36 @@ const AdminTasksPage = () => {
         }
         
         console.log('✅ FINAL: Customer Retention Manager sees', filteredTasks.length, 'tasks');
+        console.log('📝 Task titles:', filteredTasks.slice(0, 5).map(t => `"${t.title}" (assigned to: ${t.assignedToName})`));
+      } else if (user?.role === 'ecommerce_manager') {
+        console.log('🎯 E-COMMERCE MANAGER TASK FILTER:');
+        console.log('👥 Team Member Count:', teamMemberIds.length);
+        console.log('👥 Team Member IDs:', teamMemberIds);
+        console.log('📋 Total System Tasks:', tasksWithRatings.length);
+        
+        if (teamMemberIds.length > 0) {
+          // ONLY show tasks related to E-commerce team
+          filteredTasks = tasksWithRatings.filter(task => {
+            const isAssignedToTeam = teamMemberIds.includes(task.assignedTo);
+            const isCreatedByManager = task.createdBy === user.id;
+            
+            return isAssignedToTeam || isCreatedByManager;
+          });
+          
+          const assignedToTeam = filteredTasks.filter(t => teamMemberIds.includes(t.assignedTo));
+          const createdByManager = filteredTasks.filter(t => t.createdBy === user.id);
+          
+          console.log('📊 E-commerce Tasks Only:');
+          console.log('  ✅ Assigned to team:', assignedToTeam.length);
+          console.log('  ✅ Created by manager:', createdByManager.length);
+          console.log('  🎯 Total visible:', filteredTasks.length);
+          
+        } else {
+          console.log('⚠️ No team members found - manager has no tasks to see');
+          filteredTasks = [];
+        }
+        
+        console.log('✅ FINAL: E-commerce Manager sees', filteredTasks.length, 'tasks');
         console.log('📝 Task titles:', filteredTasks.slice(0, 5).map(t => `"${t.title}" (assigned to: ${t.assignedToName})`));
       }
 
@@ -918,7 +964,7 @@ const AdminTasksPage = () => {
     }
   };
 
-      if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
+      if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
     return null;
   }
 

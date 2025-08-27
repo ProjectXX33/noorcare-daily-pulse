@@ -2,7 +2,7 @@ export type User = {
   id: string;
   username: string;
   name: string;
-  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager';
   department: Department;
   position: Position;
   team?: Team;
@@ -16,13 +16,13 @@ export type User = {
   diamondRankAssignedAt?: Date;
 };
 
-export type Department = 'Engineering' | 'Medical' | 'General' | 'Management' | 'Creative' | 'Customer Service' | 'IT & Development';
+export type Department = 'Engineering' | 'Medical' | 'General' | 'Management' | 'Creative' | 'Customer Service' | 'IT & Development' | 'E-commerce';
 
-export type Team = 'Content & Creative Department' | 'Customer Retention Department' | 'IT Department';
+export type Team = 'Content & Creative Department' | 'Customer Retention Department' | 'IT Department' | 'E-commerce Department';
 
-export type ManagerRole = 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
+export type ManagerRole = 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager';
 
-export type Position = 'Junior CRM Specialist' | 'Designer' | 'Media Buyer' | 'Content Creator' | 'Web Developer' | 'Warehouse Staff' | 'Executive Director' | 'Content & Creative Manager' | 'Customer Retention Manager' | 'IT Manager';
+export type Position = 'Junior CRM Specialist' | 'Designer' | 'Media Buyer' | 'Content Creator' | 'Web Developer' | 'Warehouse Staff' | 'Executive Director' | 'Content & Creative Manager' | 'Customer Retention Manager' | 'IT Manager' | 'E-commerce Manager';
 
 export type CheckIn = {
   id: string;
@@ -214,7 +214,7 @@ export type UserRecord = {
   username: string;
   name: string;
   email: string;
-  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager';
+  role: 'admin' | 'employee' | 'warehouse' | 'content_creative_manager' | 'customer_retention_manager' | 'digital_solution_manager' | 'ecommerce_manager';
   department: Department;
   position: Position;
   team?: Team;

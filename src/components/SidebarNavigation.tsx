@@ -792,6 +792,35 @@ const HeaderEffects: React.FC<{ effectType: string }> = ({ effectType }) => {
     );
   }
 
+  if (effectType === 'ecommerce') {
+    return (
+      <>
+        {/* 🟡 E-COMMERCE MANAGER - YELLOW/AMBER PROFESSIONAL EFFECTS 🟡 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          
+          {/* 🟡 YELLOW CORNER ACCENTS - PROFESSIONAL PLACEMENT */}
+          <div className="absolute top-2 left-8 w-3 h-3 bg-gradient-to-br from-amber-400/70 to-yellow-500/70 rounded-full animate-pulse shadow-md opacity-70"></div>
+          <div className="absolute bottom-2 right-8 w-3 h-3 bg-gradient-to-br from-yellow-400/70 to-amber-500/70 rounded-full animate-pulse shadow-md animation-delay-1000 opacity-70"></div>
+          
+          {/* 🟡 YELLOW FLOATING PARTICLES - ELEGANT MOVEMENT */}
+          <div className="absolute top-4 left-24 w-2 h-2 bg-amber-400/70 rounded-full animate-pulse animation-delay-500 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-4 right-24 w-2 h-2 bg-yellow-400/70 rounded-full animate-pulse animation-delay-1500 shadow-sm opacity-70"></div>
+          <div className="absolute top-6 left-40 w-1.5 h-1.5 bg-amber-300/70 rounded-full animate-pulse animation-delay-2000 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-6 right-40 w-1.5 h-1.5 bg-yellow-300/70 rounded-full animate-pulse animation-delay-2500 shadow-sm opacity-70"></div>
+          
+          {/* 🟡 YELLOW SPARKLES - PROFESSIONAL TOUCH */}
+          <div className="absolute top-3 left-56 w-1 h-1 bg-amber-500/70 rounded-full animate-pulse animation-delay-300 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-3 right-56 w-1 h-1 bg-yellow-500/70 rounded-full animate-pulse animation-delay-1800 shadow-sm opacity-70"></div>
+          <div className="absolute top-5 left-72 w-1 h-1 bg-amber-400/70 rounded-full animate-pulse animation-delay-1200 shadow-sm opacity-70"></div>
+          <div className="absolute bottom-5 right-72 w-1 h-1 bg-yellow-400/70 rounded-full animate-pulse animation-delay-2100 shadow-sm opacity-70"></div>
+          
+          {/* 🟡 YELLOW ATMOSPHERE - SUBTLE BACKGROUND */}
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-50/70 via-yellow-50/70 to-amber-50/70 animate-pulse opacity-70"></div>
+        </div>
+      </>
+    );
+  }
+
   return null;
 };
 
@@ -1238,10 +1267,12 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
     excludeCustomerRetentionManager?: boolean;
     excludeContentCreator?: boolean;
     excludeContentCreativeManager?: boolean;
+    excludeEcommerceManager?: boolean;
     copyWritingOnly?: boolean;
     hasCounter?: boolean;
     adminAndMediaBuyerOnly?: boolean;
     customerRetentionManagerOnly?: boolean;
+    ecommerceManagerOnly?: boolean;
   }
 
   // Organize navigation items into groups with colors
@@ -1256,6 +1287,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, customerServiceOnly: true, color: 'blue' },
         { name: 'Content & Creative Dashboard', path: '/content-creative-dashboard', icon: Users, managerRole: 'content_creative_manager', excludeContentCreator: true, color: 'purple' },
         { name: 'Customer Retention Dashboard', path: '/customer-retention-dashboard', icon: Users, customerRetentionManagerOnly: true, color: 'blue' },
+        { name: 'E-commerce Dashboard', path: '/ecommerce-dashboard', icon: ShoppingCart, ecommerceManagerOnly: true, color: 'green' },
         { name: 'VNQ Team', path: '/our-team', icon: Building2, color: 'indigo' },
 
       ] as NavItem[]
@@ -1265,7 +1297,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       color: 'green',
       items: [
         { name: t('employees') as string, path: '/employees', icon: Users, adminOnly: true, color: 'green' },
-        { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, employeeOnly: true, excludeContentCreator: true, excludeContentCreativeManager: true, excludeCustomerRetentionManager: true, color: 'blue' },
+        { name: 'Dashboard', path: '/employee-dashboard', icon: LayoutDashboard, employeeOnly: true, excludeContentCreator: true, excludeContentCreativeManager: true, excludeCustomerRetentionManager: true, excludeEcommerceManager: true, color: 'blue' },
         { name: 'Employee Ratings', path: '/admin-ratings', icon: Star, adminOnly: true, color: 'yellow' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, adminOnly: true, color: 'teal' },
         { name: 'Shift Management', path: '/admin-shift-management', icon: Calendar, managerRole: 'content_creative_manager', color: 'teal' },
@@ -1283,6 +1315,7 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         { name: 'Design Studio', path: '/designer-dashboard', icon:  Brush, designerOnly: true, color: 'purple' },
         { name: 'My Ratings', path: '/my-ratings', icon: Star, employeeOnly: true, managerRole: 'content_creative_manager', color: 'yellow' },
         { name: 'My Ratings', path: '/my-ratings', icon: Star, customerRetentionManagerOnly: true, color: 'yellow' },
+        { name: 'My Ratings', path: '/my-ratings', icon: Star, ecommerceManagerOnly: true, color: 'yellow' },
       ] as NavItem[]
     },
     {
@@ -1322,8 +1355,8 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       label: 'Communication',
       color: 'pink',
       items: [
-        { name: t('events') as string, path: '/events', icon: Calendar, color: 'pink' },
-        { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true, color: 'violet' },
+        { name: t('events') as string, path: '/events', icon: Calendar, excludeEcommerceManager: true, color: 'pink' },
+        { name: 'Workspace', path: '/workspace', icon: MessageSquare, hasCounter: true, excludeEcommerceManager: true, color: 'violet' },
       ] as NavItem[]
     },
     {
@@ -1366,6 +1399,17 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
         text: 'text-foreground',
         accent: 'text-muted-foreground',
         effects: 'customer_retention'
+      };
+    }
+    
+    // Special yellow header for E-commerce Managers
+    if (userRole === 'ecommerce_manager') {
+      return {
+        header: 'bg-gradient-to-r from-amber-50/70 via-yellow-50/70 to-amber-100/70 dark:from-amber-900/70 dark:via-yellow-900/70 dark:to-amber-800/70 backdrop-blur-md supports-[backdrop-filter]:bg-amber-50/40 dark:supports-[backdrop-filter]:bg-amber-900/50 border-amber-200/70 dark:border-amber-700/70 transition-all duration-300 ease-in-out',
+        sidebar: 'bg-background',
+        text: 'text-foreground',
+        accent: 'text-muted-foreground',
+        effects: 'ecommerce'
       };
     }
     
@@ -1539,19 +1583,25 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       if (item.excludeMediaBuyer && user?.position === 'Media Buyer') return false;
       if (item.excludeDesigner && user?.position === 'Designer') return false;
       if (item.excludeCopyWriting && user?.position === 'Content Creator') return false;
-      if (item.excludeManagers && ['content_creative_manager', 'customer_retention_manager', 'digital_solution_manager'].includes(user?.role)) return false;
+      if (item.excludeManagers && ['content_creative_manager', 'customer_retention_manager', 'digital_solution_manager', 'ecommerce_manager'].includes(user?.role)) return false;
       if (item.excludeCustomerRetentionManager && user?.role === 'customer_retention_manager') return false;
       if (item.excludeContentCreator && user?.position === 'Content Creator') return false;
       if (item.excludeContentCreativeManager && user?.role === 'content_creative_manager') return false;
+      if (item.excludeEcommerceManager && user?.role === 'ecommerce_manager') return false;
       if (item.excludeCustomerRetentionManager && user?.role === 'customer_retention_manager') return false;
       if (item.customerRetentionManagerOnly && user?.role !== 'customer_retention_manager') return false;
+      if (item.ecommerceManagerOnly && user?.role !== 'ecommerce_manager') return false;
       // Hide regular Dashboard for Content & Creative Manager (they have their own dashboard)
       if (item.name === 'Dashboard' && item.path === '/dashboard' && user?.role === 'content_creative_manager') return false;
       return true;
     })
       })).filter(group => {
-        // Hide Employee Management group for Designer users and Junior CRM Specialist
-        if (group.label === 'Employee Management' && (user?.position === 'Designer' || user?.position === 'Junior CRM Specialist')) {
+        // Hide Employee Management group for Designer users, Junior CRM Specialist, and E-commerce Manager
+        if (group.label === 'Employee Management' && (user?.position === 'Designer' || user?.position === 'Junior CRM Specialist' || user?.role === 'ecommerce_manager')) {
+          return false;
+        }
+        // Hide Communication group for E-commerce Manager
+        if (group.label === 'Communication' && user?.role === 'ecommerce_manager') {
           return false;
         }
         return group.items.length > 0; // Only show groups that have items
