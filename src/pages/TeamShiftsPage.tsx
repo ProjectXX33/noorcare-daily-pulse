@@ -139,6 +139,14 @@ const calculateSmartOffsetting = (shifts: MonthlyShift[]) => {
   };
 };
 
+// Helper function to calculate shift duration in hours
+const calculateShiftDuration = (startTime: string, endTime: string): number => {
+  const start = new Date(`2000-01-01 ${startTime}`);
+  const end = new Date(`2000-01-01 ${endTime}`);
+  const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+  return durationMinutes / 60; // Convert to hours
+};
+
 const TeamShiftsPage = () => {
   const { user } = useAuth();
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -155,6 +163,7 @@ const TeamShiftsPage = () => {
   const [language] = useState<string>('en');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [updatingShifts, setUpdatingShifts] = useState<Set<string>>(new Set());
 
   const translations = {
     en: {
@@ -442,6 +451,315 @@ const TeamShiftsPage = () => {
       loadMonthlyShifts(false);
     }
   }, [isDataInitialized, teamEmployees.length, monthlyShifts.length, loadMonthlyShifts]);
+
+  // Fix Calculator - Recalculate all shifts based on assigned shift durations
+  const fixCalculator = useCallback(async () => {
+    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
+      toast.error('Only admins and managers can fix calculations');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      toast.info('Fixing calculations based on assigned shift durations...');
+
+      console.log('🔧 Starting Fix Calculator...');
+
+      // Get all monthly shifts for the current month
+      const startDate = startOfMonth(selectedDate);
+      const endDate = endOfMonth(selectedDate);
+      
+      const { data: monthlyShiftsData, error: fetchError } = await supabase
+        .from('monthly_shifts')
+        .select(`
+          *,
+          shifts:shift_id(name, start_time, end_time, all_time_overtime)
+        `)
+        .gte('work_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('work_date', format(endDate, 'yyyy-MM-dd'))
+        .in('user_id', teamEmployees.map(emp => emp.id));
+
+      if (fetchError) throw fetchError;
+
+      console.log(`📊 Found ${monthlyShiftsData?.length || 0} shifts to recalculate`);
+
+      let updatedCount = 0;
+      let errorCount = 0;
+
+      // Process each shift
+      for (const shift of monthlyShiftsData || []) {
+        try {
+          // Skip day offs
+          if (shift.is_day_off) {
+            console.log(`⏭️ Skipping day off: ${shift.work_date}`);
+            continue;
+          }
+
+          // Skip if no shift assigned
+          if (!shift.shift_id || !shift.shifts) {
+            console.log(`⏭️ Skipping no shift: ${shift.work_date}`);
+            continue;
+          }
+
+          const shiftData = shift.shifts;
+          const workedHours = (shift.regular_hours || 0) + (shift.overtime_hours || 0);
+          
+          // Calculate expected hours from assigned shift
+          const expectedHours = calculateShiftDuration(shiftData.start_time, shiftData.end_time);
+          
+          // Recalculate regular and overtime hours
+          let newRegularHours = 0;
+          let newOvertimeHours = 0;
+
+          if (workedHours > 0) {
+            newRegularHours = Math.min(workedHours, expectedHours);
+            newOvertimeHours = Math.max(0, workedHours - expectedHours);
+          }
+
+          // Calculate new delay minutes based on missing work
+          let newDelayMinutes = 0;
+          if (workedHours < expectedHours) {
+            const missingHours = expectedHours - workedHours;
+            newDelayMinutes = missingHours * 60;
+          }
+
+          console.log(`🔄 Recalculating ${shift.work_date}:`, {
+            shiftName: shiftData.name,
+            startTime: shiftData.start_time,
+            endTime: shiftData.end_time,
+            expectedHours,
+            oldRegular: shift.regular_hours,
+            oldOvertime: shift.overtime_hours,
+            newRegular: newRegularHours,
+            newOvertime: newOvertimeHours,
+            oldDelay: shift.delay_minutes,
+            newDelay: newDelayMinutes
+          });
+
+          // Update the shift record
+          const { error: updateError } = await supabase
+            .from('monthly_shifts')
+            .update({
+              regular_hours: newRegularHours,
+              overtime_hours: newOvertimeHours,
+              delay_minutes: newDelayMinutes,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', shift.id);
+
+          if (updateError) {
+            console.error(`❌ Error updating shift ${shift.id}:`, updateError);
+            errorCount++;
+          } else {
+            updatedCount++;
+          }
+
+        } catch (shiftError) {
+          console.error(`❌ Error processing shift ${shift.id}:`, shiftError);
+          errorCount++;
+        }
+      }
+
+      console.log(`✅ Fix Calculator completed: ${updatedCount} updated, ${errorCount} errors`);
+
+      // Refresh the data
+      await loadMonthlyShifts(false);
+
+      if (errorCount === 0) {
+        toast.success(`✅ Fixed calculations for ${updatedCount} shifts!`);
+      } else {
+        toast.warning(`⚠️ Fixed ${updatedCount} shifts, ${errorCount} errors occurred`);
+      }
+
+    } catch (error) {
+      console.error('❌ Fix Calculator error:', error);
+      toast.error('Failed to fix calculations');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, selectedDate, teamEmployees, loadMonthlyShifts]);
+
+  // Helper function to recalculate hours based on new shift
+  const recalculateHoursForShift = (
+    currentRegularHours: number,
+    currentOvertimeHours: number,
+    newShiftDuration: number,
+    workedHours: number
+  ): { regularHours: number; overtimeHours: number } => {
+    const totalWorkedHours = currentRegularHours + currentOvertimeHours;
+    
+    // If no work was done, reset to 0
+    if (workedHours <= 0) {
+      return { regularHours: 0, overtimeHours: 0 };
+    }
+
+    // Calculate new regular hours (up to shift duration)
+    const newRegularHours = Math.min(workedHours, newShiftDuration);
+    
+    // Calculate new overtime hours (anything beyond shift duration)
+    const newOvertimeHours = Math.max(0, workedHours - newShiftDuration);
+
+    return { regularHours: newRegularHours, overtimeHours: newOvertimeHours };
+  };
+
+  // Handle shift change for admin
+  const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
+    console.log('🔄 handleShiftChange called:', { userId, workDate, newShiftId, userRole: user?.role });
+    
+    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
+      console.log('❌ Permission denied - user role:', user?.role);
+      return;
+    }
+
+    const updateKey = `${userId}-${format(workDate, 'yyyy-MM-dd')}`;
+    
+    try {
+      // Add to updating set
+      setUpdatingShifts(prev => new Set(prev).add(updateKey));
+      
+      const workDateStr = format(workDate, 'yyyy-MM-dd');
+      const isDayOff = newShiftId === 'none' || newShiftId === 'dayoff';
+      const shiftId = isDayOff ? null : newShiftId;
+
+      // Get current shift data to recalculate hours
+      const currentShift = monthlyShifts.find(s => s.userId === userId && isSameDay(s.workDate, workDate));
+      const newShift = shifts.find(s => s.id === newShiftId);
+      
+      console.log('📊 Shift Change Data:', {
+        currentShift: currentShift ? {
+          id: currentShift.id,
+          shiftName: currentShift.shiftName,
+          regularHours: currentShift.regularHours,
+          overtimeHours: currentShift.overtimeHours
+        } : null,
+        newShift: newShift ? {
+          id: newShift.id,
+          name: newShift.name,
+          startTime: newShift.startTime,
+          endTime: newShift.endTime
+        } : null,
+        monthlyShiftsLength: monthlyShifts.length,
+        shiftsLength: shifts.length
+      });
+      
+      let newRegularHours = 0;
+      let newOvertimeHours = 0;
+
+      if (!isDayOff && currentShift && newShift) {
+        // Calculate worked hours (total time worked)
+        const workedHours = currentShift.regularHours + currentShift.overtimeHours;
+        
+        // Calculate new shift duration
+        const newShiftDuration = calculateShiftDuration(newShift.startTime, newShift.endTime);
+        
+        // Recalculate hours based on new shift
+        const recalculated = recalculateHoursForShift(
+          currentShift.regularHours,
+          currentShift.overtimeHours,
+          newShiftDuration,
+          workedHours
+        );
+        
+        newRegularHours = recalculated.regularHours;
+        newOvertimeHours = recalculated.overtimeHours;
+        
+        console.log('🔄 Shift Change Recalculation:', {
+          userId,
+          workDate: workDateStr,
+          oldShift: currentShift.shiftName,
+          newShift: newShift.name,
+          oldRegularHours: currentShift.regularHours,
+          oldOvertimeHours: currentShift.overtimeHours,
+          newShiftDuration,
+          workedHours,
+          newRegularHours,
+          newOvertimeHours
+        });
+      }
+
+      console.log('💾 Updating shift_assignments table:', {
+        employee_id: userId,
+        work_date: workDateStr,
+        assigned_shift_id: shiftId,
+        is_day_off: isDayOff
+      });
+
+      // Update shift assignment in shift_assignments table
+      const { error: assignmentError } = await supabase
+        .from('shift_assignments')
+        .upsert({
+          employee_id: userId,
+          work_date: workDateStr,
+          assigned_shift_id: shiftId,
+          is_day_off: isDayOff,
+          assigned_by: user.id,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'employee_id,work_date'
+        });
+
+      if (assignmentError) {
+        console.error('❌ shift_assignments update error:', assignmentError);
+        throw assignmentError;
+      }
+      
+      console.log('✅ shift_assignments updated successfully');
+
+      console.log('💾 Updating monthly_shifts table:', {
+        user_id: userId,
+        work_date: workDateStr,
+        shift_id: shiftId,
+        is_day_off: isDayOff,
+        regular_hours: newRegularHours,
+        overtime_hours: newOvertimeHours
+      });
+
+      // Update monthly shift record with recalculated hours
+      const { error: monthlyError } = await supabase
+        .from('monthly_shifts')
+        .upsert({
+          user_id: userId,
+          work_date: workDateStr,
+          shift_id: shiftId,
+          is_day_off: isDayOff,
+          regular_hours: newRegularHours,
+          overtime_hours: newOvertimeHours,
+          delay_minutes: currentShift?.delayMinutes || 0,
+          check_in_time: currentShift?.checkInTime || null,
+          check_out_time: currentShift?.checkOutTime || null,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,work_date'
+        });
+
+      if (monthlyError) {
+        console.error('❌ monthly_shifts update error:', monthlyError);
+        throw monthlyError;
+      }
+      
+      console.log('✅ monthly_shifts updated successfully');
+
+      // Find the shift name for the toast message
+      const selectedShift = shifts.find(s => s.id === newShiftId);
+      const shiftName = isDayOff ? 'Day Off' : selectedShift?.name || 'Unknown Shift';
+      
+      toast.success(`Shift updated: ${shiftName} - ${format(workDate, 'MMM dd, yyyy')}`);
+      
+      // Refresh the data to show the changes
+      await loadMonthlyShifts();
+      
+    } catch (error) {
+      console.error('Error updating shift:', error);
+      toast.error('Failed to update shift');
+    } finally {
+      // Remove from updating set
+      setUpdatingShifts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(updateKey);
+        return newSet;
+      });
+    }
+  }, [user, shifts, monthlyShifts, loadMonthlyShifts]);
 
   const handleExportCSV = async () => {
     setIsExporting(true);
@@ -905,8 +1223,46 @@ const TeamShiftsPage = () => {
            </Card>
          </div>
 
-         {/* Smart Offsetting Summary */}
-         <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-900/20 shadow-sm w-full mb-6">
+                 {/* Fix Calculator Button */}
+        {user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role) && (
+          <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 shadow-sm w-full mb-6">
+            <CardContent className="p-4">
+              <div className="text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                    <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                    Fix Calculator
+                  </h3>
+                </div>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  Recalculate all shifts based on their assigned shift durations from the database
+                </p>
+                <Button 
+                  onClick={fixCalculator} 
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Fixing Calculations...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Fix Calculator
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Smart Offsetting Summary */}
+        <Card className="border-2 border-green-200 bg-green-50 dark:bg-green-900/20 shadow-sm w-full mb-6">
            <CardContent className="p-4">
              <div className="text-center space-y-3">
                <div className="flex items-center justify-center gap-2">
@@ -965,9 +1321,16 @@ const TeamShiftsPage = () => {
 
         {/* Shifts Table */}
         <Card>
-          <CardHeader>
-            <CardTitle>{t.monthlyShifts}</CardTitle>
-          </CardHeader>
+                      <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>{t.monthlyShifts}</CardTitle>
+                {user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role) && (
+                  <div className="text-sm text-muted-foreground">
+                    💡 Click on shift dropdowns to change assignments and auto-recalculate hours
+                  </div>
+                )}
+              </div>
+            </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -1009,11 +1372,39 @@ const TeamShiftsPage = () => {
                             </div>
                           </div>
                         </TableCell>
-                                                 <TableCell>
-                           <Badge variant={shift.isDayOff ? "secondary" : "default"}>
-                             {shift.isDayOff ? 'Day Off' : shift.shiftName}
-                           </Badge>
-                         </TableCell>
+                                                                           <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Select 
+                                value={shift.isDayOff ? 'dayoff' : (shift.shiftId || 'none')} 
+                                onValueChange={(value) => {
+                                  console.log('🎯 Dropdown changed:', { 
+                                    userId: shift.userId, 
+                                    workDate: shift.workDate, 
+                                    oldValue: shift.shiftId || 'none', 
+                                    newValue: value 
+                                  });
+                                  handleShiftChange(shift.userId, shift.workDate, value);
+                                }} 
+                                disabled={updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`)}
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue placeholder="Select Shift" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No Shift</SelectItem>
+                                  <SelectItem value="dayoff">Day Off</SelectItem>
+                                  {shifts.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                      {s.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) && (
+                                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                              )}
+                            </div>
+                          </TableCell>
                         <TableCell>
                           {shift.checkInTime ? format(shift.checkInTime, 'HH:mm') : '-'}
                         </TableCell>

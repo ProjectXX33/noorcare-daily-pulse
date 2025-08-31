@@ -86,6 +86,17 @@ const AdminShiftManagement = () => {
     allTimeOvertime: false
   });
 
+  // Bulk assignment state
+  const [isBulkAssignmentDialogOpen, setIsBulkAssignmentDialogOpen] = useState(false);
+  const [bulkAssignmentData, setBulkAssignmentData] = useState({
+    selectedEmployeeId: '',
+    selectedShiftId: '',
+    selectedMonth: new Date().getMonth(),
+    selectedYear: new Date().getFullYear(),
+    fridayAsDayOff: true
+  });
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
   const translations = {
     en: {
       shiftManagement: "Shift Management",
@@ -330,11 +341,42 @@ const AdminShiftManagement = () => {
     }
   };
 
+  // Helper function to calculate shift duration in hours
+  const calculateShiftDuration = (startTime: string, endTime: string): number => {
+    const start = new Date(`2000-01-01 ${startTime}`);
+    const end = new Date(`2000-01-01 ${endTime}`);
+    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+    return durationMinutes / 60; // Convert to hours
+  };
+
+  // Helper function to recalculate hours based on new shift
+  const recalculateHoursForShift = (
+    currentRegularHours: number,
+    currentOvertimeHours: number,
+    newShiftDuration: number,
+    workedHours: number
+  ): { regularHours: number; overtimeHours: number } => {
+    const totalWorkedHours = currentRegularHours + currentOvertimeHours;
+    
+    // If no work was done, reset to 0
+    if (workedHours <= 0) {
+      return { regularHours: 0, overtimeHours: 0 };
+    }
+
+    // Calculate new regular hours (up to shift duration)
+    const newRegularHours = Math.min(workedHours, newShiftDuration);
+    
+    // Calculate new overtime hours (anything beyond shift duration)
+    const newOvertimeHours = Math.max(0, workedHours - newShiftDuration);
+
+    return { regularHours: newRegularHours, overtimeHours: newOvertimeHours };
+  };
+
   const updateAssignment = async (employeeId: string, date: Date, shiftId: string | null, isDayOff: boolean) => {
     try {
       const workDate = format(date, 'yyyy-MM-dd');
       
-      console.log('Updating assignment:', {
+      console.log('🔄 Updating assignment:', {
         employeeId,
         workDate,
         shiftId,
@@ -342,11 +384,56 @@ const AdminShiftManagement = () => {
         adminId: user?.id
       });
 
-      // Immediately update UI state for responsive feedback
+      // Get current shift data to recalculate hours
       const selectedShift = shiftId ? shifts.find(s => s.id === shiftId) : null;
       const shiftName = selectedShift ? selectedShift.name : undefined;
       const employee = employees.find(e => e.id === employeeId);
 
+      // Get current monthly shift data for recalculation
+      const { data: currentMonthlyShift, error: fetchError } = await supabase
+        .from('monthly_shifts')
+        .select('*')
+        .eq('user_id', employeeId)
+        .eq('work_date', workDate)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('❌ Error fetching current monthly shift:', fetchError);
+      }
+
+      let newRegularHours = 0;
+      let newOvertimeHours = 0;
+
+      // Recalculate hours if we have a new shift and existing work data
+      if (!isDayOff && selectedShift && currentMonthlyShift) {
+        const workedHours = (currentMonthlyShift.regular_hours || 0) + (currentMonthlyShift.overtime_hours || 0);
+        const newShiftDuration = calculateShiftDuration(selectedShift.startTime, selectedShift.endTime);
+        
+        const recalculated = recalculateHoursForShift(
+          currentMonthlyShift.regular_hours || 0,
+          currentMonthlyShift.overtime_hours || 0,
+          newShiftDuration,
+          workedHours
+        );
+        
+        newRegularHours = recalculated.regularHours;
+        newOvertimeHours = recalculated.overtimeHours;
+        
+        console.log('🔄 Shift Change Recalculation:', {
+          employeeId,
+          workDate,
+          oldShift: currentMonthlyShift.shift_id,
+          newShift: selectedShift.name,
+          oldRegularHours: currentMonthlyShift.regular_hours,
+          oldOvertimeHours: currentMonthlyShift.overtime_hours,
+          newShiftDuration,
+          workedHours,
+          newRegularHours,
+          newOvertimeHours
+        });
+      }
+
+      // Immediately update UI state for responsive feedback
       setAssignments(prev => {
         const updated = [...prev];
         const index = updated.findIndex(a => 
@@ -385,6 +472,8 @@ const AdminShiftManagement = () => {
         updated_at: new Date().toISOString()
       };
 
+      console.log('💾 Updating shift_assignments table:', assignmentData);
+
       const { data, error } = await supabase
         .from('shift_assignments')
         .upsert(assignmentData, {
@@ -393,12 +482,43 @@ const AdminShiftManagement = () => {
 
       if (error) throw error;
 
-      console.log('Assignment updated successfully');
+      console.log('✅ shift_assignments updated successfully');
+
+      // Update monthly_shifts table with recalculated hours
+      const monthlyShiftData = {
+        user_id: employeeId,
+        work_date: workDate,
+        shift_id: isDayOff ? null : shiftId,
+        is_day_off: isDayOff,
+        regular_hours: newRegularHours,
+        overtime_hours: newOvertimeHours,
+        delay_minutes: currentMonthlyShift?.delay_minutes || 0,
+        check_in_time: currentMonthlyShift?.check_in_time || null,
+        check_out_time: currentMonthlyShift?.check_out_time || null,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('💾 Updating monthly_shifts table:', monthlyShiftData);
+
+      const { error: monthlyError } = await supabase
+        .from('monthly_shifts')
+        .upsert(monthlyShiftData, {
+          onConflict: 'user_id,work_date'
+        });
+
+      if (monthlyError) {
+        console.error('❌ monthly_shifts update error:', monthlyError);
+        throw monthlyError;
+      }
+
+      console.log('✅ monthly_shifts updated successfully');
       
       // Show success feedback
-      toast.success('Shift assignment updated!');
+      const shiftDisplayName = isDayOff ? 'Day Off' : (selectedShift?.name || 'Unknown Shift');
+      toast.success(`Shift updated: ${shiftDisplayName} - ${format(date, 'MMM dd, yyyy')}`);
+      
     } catch (error) {
-      console.error('Error updating assignment:', error);
+      console.error('❌ Error updating assignment:', error);
       toast.error('Failed to update assignment');
     }
   };
@@ -581,6 +701,174 @@ const AdminShiftManagement = () => {
       allTimeOvertime: shift.allTimeOvertime || false
     });
     setIsEditShiftDialogOpen(true);
+  };
+
+  // Bulk assignment function
+  const handleBulkAssignment = async () => {
+    if (!bulkAssignmentData.selectedEmployeeId || !bulkAssignmentData.selectedShiftId) {
+      toast.error('Please select both employee and shift');
+      return;
+    }
+
+    try {
+      setIsBulkAssigning(true);
+      toast.info('Assigning shifts for the entire month...');
+
+      console.log('🔄 Starting bulk assignment:', bulkAssignmentData);
+
+      const selectedShift = shifts.find(s => s.id === bulkAssignmentData.selectedShiftId);
+      const selectedEmployee = employees.find(e => e.id === bulkAssignmentData.selectedEmployeeId);
+
+      if (!selectedShift || !selectedEmployee) {
+        toast.error('Selected shift or employee not found');
+        return;
+      }
+
+      // Get all days in the selected month
+      const startDate = new Date(bulkAssignmentData.selectedYear, bulkAssignmentData.selectedMonth, 1);
+      const endDate = new Date(bulkAssignmentData.selectedYear, bulkAssignmentData.selectedMonth + 1, 0);
+      
+      const daysInMonth = [];
+      const currentDate = new Date(startDate);
+      
+      while (currentDate <= endDate) {
+        daysInMonth.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      console.log(`📅 Assigning shifts for ${daysInMonth.length} days in ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`);
+
+      let assignedCount = 0;
+      let dayOffCount = 0;
+      let errorCount = 0;
+
+      // Process each day
+      for (const date of daysInMonth) {
+        try {
+          const isFriday = date.getDay() === 5; // Friday = 5
+          const isDayOff = bulkAssignmentData.fridayAsDayOff && isFriday;
+          
+          const workDate = format(date, 'yyyy-MM-dd');
+          
+          console.log(`📅 Processing ${workDate}: ${isDayOff ? 'Day Off (Friday)' : selectedShift.name}`);
+
+          // Update shift_assignments table
+          const assignmentData = {
+            employee_id: bulkAssignmentData.selectedEmployeeId,
+            work_date: workDate,
+            assigned_shift_id: isDayOff ? null : bulkAssignmentData.selectedShiftId,
+            is_day_off: isDayOff,
+            assigned_by: user?.id,
+            updated_at: new Date().toISOString()
+          };
+
+          const { error: assignmentError } = await supabase
+            .from('shift_assignments')
+            .upsert(assignmentData, {
+              onConflict: 'employee_id,work_date'
+            });
+
+          if (assignmentError) {
+            console.error(`❌ Error updating shift_assignments for ${workDate}:`, assignmentError);
+            errorCount++;
+            continue;
+          }
+
+          // Update monthly_shifts table with recalculated hours
+          let newRegularHours = 0;
+          let newOvertimeHours = 0;
+
+          if (!isDayOff) {
+            // Get current monthly shift data for recalculation
+            const { data: currentMonthlyShift } = await supabase
+              .from('monthly_shifts')
+              .select('*')
+              .eq('user_id', bulkAssignmentData.selectedEmployeeId)
+              .eq('work_date', workDate)
+              .single();
+
+            if (currentMonthlyShift) {
+              const workedHours = (currentMonthlyShift.regular_hours || 0) + (currentMonthlyShift.overtime_hours || 0);
+              const newShiftDuration = calculateShiftDuration(selectedShift.startTime, selectedShift.endTime);
+              
+              const recalculated = recalculateHoursForShift(
+                currentMonthlyShift.regular_hours || 0,
+                currentMonthlyShift.overtime_hours || 0,
+                newShiftDuration,
+                workedHours
+              );
+              
+              newRegularHours = recalculated.regularHours;
+              newOvertimeHours = recalculated.overtimeHours;
+            }
+          }
+
+          const monthlyShiftData = {
+            user_id: bulkAssignmentData.selectedEmployeeId,
+            work_date: workDate,
+            shift_id: isDayOff ? null : bulkAssignmentData.selectedShiftId,
+            is_day_off: isDayOff,
+            regular_hours: newRegularHours,
+            overtime_hours: newOvertimeHours,
+            updated_at: new Date().toISOString()
+          };
+
+          const { error: monthlyError } = await supabase
+            .from('monthly_shifts')
+            .upsert(monthlyShiftData, {
+              onConflict: 'user_id,work_date'
+            });
+
+          if (monthlyError) {
+            console.error(`❌ Error updating monthly_shifts for ${workDate}:`, monthlyError);
+            errorCount++;
+            continue;
+          }
+
+          if (isDayOff) {
+            dayOffCount++;
+          } else {
+            assignedCount++;
+          }
+
+        } catch (dayError) {
+          console.error(`❌ Error processing day ${format(date, 'yyyy-MM-dd')}:`, dayError);
+          errorCount++;
+        }
+      }
+
+      console.log(`✅ Bulk assignment completed: ${assignedCount} shifts, ${dayOffCount} days off, ${errorCount} errors`);
+
+      // Show success message
+      const monthName = startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const employeeName = selectedEmployee.name;
+      const shiftName = selectedShift.name;
+      
+      if (errorCount === 0) {
+        toast.success(`✅ Assigned ${shiftName} to ${employeeName} for ${monthName} (${assignedCount} days + ${dayOffCount} Fridays off)`);
+      } else {
+        toast.warning(`⚠️ Assigned ${shiftName} to ${employeeName} for ${monthName} (${assignedCount} days + ${dayOffCount} Fridays off, ${errorCount} errors)`);
+      }
+
+      // Reset form and close dialog
+      setBulkAssignmentData({
+        selectedEmployeeId: '',
+        selectedShiftId: '',
+        selectedMonth: new Date().getMonth(),
+        selectedYear: new Date().getFullYear(),
+        fridayAsDayOff: true
+      });
+      setIsBulkAssignmentDialogOpen(false);
+
+      // Refresh data
+      await loadAssignments();
+
+    } catch (error) {
+      console.error('❌ Bulk assignment error:', error);
+      toast.error('Failed to assign shifts for the month');
+    } finally {
+      setIsBulkAssigning(false);
+    }
   };
 
   const filteredEmployees = selectedEmployee === 'all' 
@@ -916,9 +1204,135 @@ const AdminShiftManagement = () => {
             <Card>
               <CardHeader className="pb-3 sm:pb-4">
                 <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                      <div className="flex items-center gap-3">
-                  <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-base sm:text-lg">{t.weeklyShiftAssignments}</span>
+                    <Dialog open={isBulkAssignmentDialogOpen} onOpenChange={setIsBulkAssignmentDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Users className="h-4 w-4" />
+                          Bulk Assign Month
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Bulk Assign Shifts for Month</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="bulk-employee">Select Employee *</Label>
+                            <Select 
+                              value={bulkAssignmentData.selectedEmployeeId} 
+                              onValueChange={(value) => setBulkAssignmentData(prev => ({...prev, selectedEmployeeId: value}))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose employee" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {employees.map(employee => (
+                                  <SelectItem key={employee.id} value={employee.id}>
+                                    {employee.name} ({employee.position})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="bulk-shift">Select Shift *</Label>
+                            <Select 
+                              value={bulkAssignmentData.selectedShiftId} 
+                              onValueChange={(value) => setBulkAssignmentData(prev => ({...prev, selectedShiftId: value}))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose shift" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {shifts.map(shift => (
+                                  <SelectItem key={shift.id} value={shift.id}>
+                                    {shift.name} ({shift.startTime} - {shift.endTime})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="bulk-month">Select Month</Label>
+                            <Select 
+                              value={bulkAssignmentData.selectedMonth.toString()} 
+                              onValueChange={(value) => setBulkAssignmentData(prev => ({...prev, selectedMonth: parseInt(value)}))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({length: 12}, (_, i) => (
+                                  <SelectItem key={i} value={i.toString()}>
+                                    {new Date(2024, i).toLocaleDateString('en-US', { month: 'long' })}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="bulk-year">Select Year</Label>
+                            <Select 
+                              value={bulkAssignmentData.selectedYear.toString()} 
+                              onValueChange={(value) => setBulkAssignmentData(prev => ({...prev, selectedYear: parseInt(value)}))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({length: 5}, (_, i) => {
+                                  const year = new Date().getFullYear() + i;
+                                  return (
+                                    <SelectItem key={year} value={year.toString()}>
+                                      {year}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="friday-dayoff" 
+                              checked={bulkAssignmentData.fridayAsDayOff}
+                              onCheckedChange={(checked) => setBulkAssignmentData(prev => ({...prev, fridayAsDayOff: checked as boolean}))}
+                            />
+                            <Label htmlFor="friday-dayoff" className="text-sm">
+                              Set Fridays as Day Off
+                            </Label>
+                          </div>
+                          
+                          <div className="flex justify-end space-x-2 pt-4">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setIsBulkAssignmentDialogOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              onClick={handleBulkAssignment}
+                              disabled={isBulkAssigning || !bulkAssignmentData.selectedEmployeeId || !bulkAssignmentData.selectedShiftId}
+                            >
+                              {isBulkAssigning ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Assigning...
+                                </>
+                              ) : (
+                                'Assign Shifts'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   
                   {/* Week navigation */}
                   <div className="flex items-center gap-2">

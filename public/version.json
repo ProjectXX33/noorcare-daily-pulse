@@ -1,5 +1,5 @@
 {
-  "version": "7.2.0",
+  "version": "7.3.0",
   "buildTime": "2025-08-25T23:58:06.551Z",
   "buildTimestamp": "1756166286552",
   "buildDate": "8/26/2025",
@@ -15,7 +15,15 @@
     "⚡ Smart Offsetting Summary with detailed breakdown",
     "🎯 Fixed unrealistic hour calculations in CSV exports",
     "🔒 Enhanced data validation and error handling",
-    "🚀 Performance improvements and bug fixes"
+    "🚀 Performance improvements and bug fixes",
+    "🔧 NEW: Fix Calculator - Recalculate all shifts based on assigned shift durations",
+    "🔄 NEW: Shift Change functionality in Team Shifts - Change shifts directly from monthly shifts table",
+    "📅 NEW: Bulk Assignment in Shift Management - Assign shifts for entire months with one click",
+    "⏰ NEW: Automatic Friday Day Off - Set Fridays as day off automatically in bulk assignments",
+    "🎯 NEW: Real-time shift duration calculations - Uses actual shift start/end times from database",
+    "💡 NEW: Auto-recalculation of regular/overtime hours when shifts are changed",
+    "🛡️ Enhanced permission system - Content & Creative Managers can now edit events and Q&A",
+    "📊 Improved shift management efficiency - Bulk operations save hours of manual work"
   ],
   "minimumSupportedVersion": "5.0.0",
   "forceUpdate": false

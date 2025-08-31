@@ -65,9 +65,9 @@ const EventsPage = () => {
   // Only Admins and Content & Creative Managers can edit events - all other employees are view-only
   const canEditEvents = user && (user.role === 'admin' || user.role === 'content_creative_manager');
   
-  // ALL employees can VIEW Q&A, but only admin, copy writing, and content creative manager can edit/add/delete
+  // ALL employees can VIEW Q&A, but only admin, content creator, and content creative manager can edit/add/delete
   const canViewQA = user && (user.role === 'employee' || user.role === 'admin' || user.role === 'content_creative_manager'); // All team members can view
-  const canEditQA = user && (user.role === 'admin' || user.position === 'Copy Writing' || user.role === 'content_creative_manager'); // Only admin, copy writing, and content creative manager can edit
+  const canEditQA = user && (user.role === 'admin' || user.role === 'content_creative_manager' || user.position === 'Content Creator'); // Only admin, content creative manager, and content creator can edit
   
   // Mobile detection
   useEffect(() => {
@@ -231,10 +231,10 @@ const EventsPage = () => {
       return;
     }
 
-    // Additional role check as safety - only Admins and Media Buyers
-    if (user.role !== 'admin' && user.position !== 'Media Buyer') {
+    // Additional role check as safety - only Admins and Content & Creative Managers
+    if (user.role !== 'admin' && user.role !== 'content_creative_manager') {
       toast.error('Access denied: Only Admins and Content & Creative Managers can edit events');
-      console.log('❌ Form submission blocked - not an Admin or Media Buyer');
+      console.log('❌ Form submission blocked - not an Admin or Content & Creative Manager');
       return;
     }
 
@@ -281,9 +281,9 @@ const EventsPage = () => {
       return;
     }
 
-    // Additional role check as safety - only Admins and Media Buyers
+    // Additional role check as safety - only Admins and Content & Creative Managers
     if (user?.role !== 'admin' && user?.role !== 'content_creative_manager') {
-      toast.error('Access denied: Only Admins and Media Buyers can delete events');
+      toast.error('Access denied: Only Admins and Content & Creative Managers can delete events');
       return;
     }
 
@@ -1292,7 +1292,7 @@ const EventsPage = () => {
                       💬 Event Q&A
                       {canEditQA && (
                         <Badge variant="secondary" className="text-xs">
-                          {user?.position === 'Copy Writing' ? 'Copy Writing Access' : 'Admin Access'}
+                          {user?.position === 'Content Creator' ? 'Content Creator Access' : 'Admin Access'}
                         </Badge>
                       )}
                     </h3>
@@ -1516,7 +1516,8 @@ const EventsPage = () => {
                       💬 Event Q&A
                       {canEditQA && (
                         <Badge variant="secondary" className="text-xs">
-                          {user?.position === 'Copy Writing' ? 'Copy Writing Access' : 'Admin Access'}
+                          {user?.role === 'content_creative_manager' ? 'Manager Access' : 
+                           user?.position === 'Content Creator' ? 'Content Creator Access' : 'Admin Access'}
                         </Badge>
                       )}
                     </h3>

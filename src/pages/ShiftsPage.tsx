@@ -416,9 +416,13 @@ const ShiftsPage = () => {
         .order('work_date', { ascending: false });
 
       if (selectedEmployee !== 'all') {
+        console.log('🔍 Filtering by specific employee:', selectedEmployee);
         query = query.eq('user_id', selectedEmployee);
       } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') {
+        console.log('🔍 Filtering by current user:', user.id);
         query = query.eq('user_id', user.id);
+      } else {
+        console.log('🔍 Loading all employees (admin view)');
       }
 
       const { data, error } = await query;
@@ -428,7 +432,15 @@ const ShiftsPage = () => {
         throw error;
       }
 
-      console.log('Monthly shifts data received:', data);
+      console.log('Monthly shifts data received:', {
+        dataLength: data?.length || 0,
+        data: data?.map(item => ({ 
+          id: item.id, 
+          user_id: item.user_id, 
+          work_date: item.work_date,
+          user_name: item.users?.name 
+        }))
+      });
 
       // Fetch break time data separately for the same date range and users
       const userIds = selectedEmployee !== 'all' ? [selectedEmployee] : 
@@ -472,6 +484,7 @@ const ShiftsPage = () => {
         });
       }
 
+      console.log('🔍 Starting to format shifts data...');
       const formattedShifts: MonthlyShift[] = data.map(item => {
         const dateKey = format(new Date(item.work_date), 'yyyy-MM-dd');
         const breakKey = `${item.user_id}-${dateKey}`;
@@ -508,7 +521,19 @@ const ShiftsPage = () => {
         })();
       });
 
-      console.log('Formatted monthly shifts:', formattedShifts);
+      console.log('Formatted monthly shifts:', {
+        formattedShiftsLength: formattedShifts.length,
+        selectedEmployee,
+        formattedShifts: formattedShifts.map(s => ({ 
+          id: s.id, 
+          userId: s.userId, 
+          workDate: s.workDate, 
+          isDayOff: s.isDayOff,
+          regularHours: s.regularHours,
+          overtimeHours: s.overtimeHours,
+          delayMinutes: s.delayMinutes
+        }))
+      });
       setMonthlyShifts(formattedShifts);
     } catch (error) {
       console.error('Error loading monthly shifts:', error);
@@ -579,6 +604,13 @@ const ShiftsPage = () => {
 
   // Memoized calculations for performance
   const summary = useMemo(() => {
+    console.log('🔍 Summary calculation triggered:', {
+      monthlyShiftsLength: monthlyShifts.length,
+      selectedEmployee,
+      userRole: user?.role,
+      monthlyShiftsData: monthlyShifts.map(s => ({ id: s.id, userId: s.userId, workDate: s.workDate, isDayOff: s.isDayOff }))
+    });
+    
     // Exclude day-off records from calculations
     const workingShifts = monthlyShifts.filter(shift => !shift.isDayOff);
     const totalRegular = workingShifts.reduce((sum, shift) => sum + shift.regularHours, 0);
@@ -592,32 +624,26 @@ const ShiftsPage = () => {
 
     const rawDelayToFinishHours = totalDelayMinutes / 60; // Only actual delay minutes
     
-    // Step 2: Apply smart offsetting logic for EMPLOYEE VIEW: Total Overtime Hours - Delay to Finish
+    // Step 2: Apply smart offsetting logic for ALL USERS: Total Overtime Hours - Delay to Finish
     let finalOvertimeHours = 0;
     let finalDelayToFinishHours = 0;
     
-    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') {
-      // EMPLOYEE VIEW: Apply smart offsetting directly to displayed values
-      if (actualOvertimeHours > rawDelayToFinishHours) {
-        // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
-        finalOvertimeHours = actualOvertimeHours - rawDelayToFinishHours;
-        finalDelayToFinishHours = 0; // All Clear
-      } else {
-        // If Delay >= Overtime: Show remaining delay, overtime becomes 0
-        finalDelayToFinishHours = rawDelayToFinishHours - actualOvertimeHours;
-        finalOvertimeHours = 0;
-      }
+    // UNIVERSAL SMART OFFSETTING: Apply to both admin and employee views
+    if (actualOvertimeHours > rawDelayToFinishHours) {
+      // If Overtime > Delay: Show remaining overtime, delay becomes "All Clear"
+      finalOvertimeHours = actualOvertimeHours - rawDelayToFinishHours;
+      finalDelayToFinishHours = 0; // All Clear
     } else {
-      // ADMIN VIEW: Show raw values without smart offsetting
-      finalOvertimeHours = actualOvertimeHours;
-      finalDelayToFinishHours = rawDelayToFinishHours;
+      // If Delay >= Overtime: Show remaining delay, overtime becomes 0
+      finalDelayToFinishHours = rawDelayToFinishHours - actualOvertimeHours;
+      finalOvertimeHours = 0;
     }
 
-    // Smart offsetting metadata (only for employees)
-    const hasSmartOffsetting = user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && actualOvertimeHours > 0 && rawDelayToFinishHours > 0;
+    // Smart offsetting metadata (for both admin and employees)
+    const hasSmartOffsetting = actualOvertimeHours > 0; // Show whenever there's overtime, even if no delay
     const offsettingType = actualOvertimeHours > rawDelayToFinishHours ? 'overtime_covers_delay' : 'delay_covers_overtime';
     
-    console.log('📊 Summary with Smart Offsetting Logic (Employee View):', {
+    console.log('📊 Summary with Universal Smart Offsetting Logic (All Users):', {
       userRole: user?.role,
       totalDelayMinutes,
       totalBreakMinutes: 0,
@@ -628,13 +654,9 @@ const ShiftsPage = () => {
       finalDelayToFinishHours: finalDelayToFinishHours.toFixed(2),
       hasSmartOffsetting,
       offsettingType,
-      smartOffsetingApplied: user?.role !== 'admin' && user?.role !== 'customer_retention_manager',
-      logic: user?.role !== 'admin' && user?.role !== 'customer_retention_manager'
-        ? (actualOvertimeHours > rawDelayToFinishHours ? 'EMPLOYEE: Overtime covers delay' : 'EMPLOYEE: Delay remains after overtime offset')
-        : 'ADMIN: Raw values displayed',
-      formula: user?.role !== 'admin' && user?.role !== 'customer_retention_manager'
-        ? `EMPLOYEE SMART: ${actualOvertimeHours.toFixed(2)}h OT - ${rawDelayToFinishHours.toFixed(2)}h Delay = OT:${finalOvertimeHours.toFixed(2)}h, Delay:${finalDelayToFinishHours.toFixed(2)}h`
-        : `ADMIN RAW: OT=${finalOvertimeHours.toFixed(2)}h, Delay=${finalDelayToFinishHours.toFixed(2)}h`
+      smartOffsetingApplied: true, // Now applied to all users
+      logic: actualOvertimeHours > rawDelayToFinishHours ? 'UNIVERSAL: Overtime covers delay' : 'UNIVERSAL: Delay remains after overtime offset',
+      formula: `UNIVERSAL SMART: ${actualOvertimeHours.toFixed(2)}h OT - ${rawDelayToFinishHours.toFixed(2)}h Delay = OT:${finalOvertimeHours.toFixed(2)}h, Delay:${finalDelayToFinishHours.toFixed(2)}h`
     });
 
     return {
@@ -989,8 +1011,14 @@ const ShiftsPage = () => {
       </div>
 
       <div className="safe-area-padding px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-10 space-y-6 sm:space-y-8 md:space-y-10 w-full max-w-full overflow-x-hidden">
-        {/* Enhanced mobile-responsive summary cards */}
+        {/* Enhanced mobile-responsive summary cards - ALWAYS VISIBLE */}
         <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-5 w-full">
+          {/* DEBUG: Show summary data */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="col-span-full p-2 bg-yellow-100 text-xs">
+              DEBUG: monthlyShifts={monthlyShifts.length}, selectedEmployee={selectedEmployee}, summary={JSON.stringify(summary)}
+            </div>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Card className="border border-border/50 shadow-sm hover:shadow-md transition-all duration-200 w-full cursor-help">
@@ -1022,18 +1050,13 @@ const ShiftsPage = () => {
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
                   {t.totalOvertimeHours}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+                  {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && (
                     <span className="ml-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">✨ SMART</span>
                   )}
                 </p>
                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-500'}`}>
                   {summary.totalOvertime > 0 ? formatHoursAndMinutes(summary.totalOvertime) : '0h 0min'}
-                  {/* DEBUG: Show if smart offsetting is detected */}
-                  {user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
-                    <span className="text-xs bg-yellow-200 px-1 py-0.5 rounded ml-2">
-                      DEBUG: Role={user?.role}, Smart={summary.hasSmartOffsetting ? 'YES' : 'NO'}
-                    </span>
-                  )}
+
                 </div>
                 {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && (
                   <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
@@ -1054,19 +1077,19 @@ const ShiftsPage = () => {
                 </div>
                 <p className="text-xs sm:text-sm md:text-base font-medium text-muted-foreground leading-tight">
                   {t.delayToFinish}
-                  {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+                  {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && (
                     <span className="ml-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded font-bold">✨ SMART</span>
                   )}
                 </p>
                 <div className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold ${summary.delayToFinish > 0 ? 'text-red-600' : 'text-green-600'}`}>
                   {summary.delayToFinish > 0 ? formatHoursAndMinutes(summary.delayToFinish) : 'All Clear'}
                 </div>
-                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+                {summary.hasSmartOffsetting && summary.offsettingType === 'delay_covers_overtime' && (
                   <p className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                     ✨ After {formatHoursAndMinutes(summary.actualOvertimeHours)} overtime offset
                   </p>
                 )}
-                {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && summary.delayToFinish === 0 && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+                {summary.hasSmartOffsetting && summary.offsettingType === 'overtime_covers_delay' && summary.delayToFinish === 0 && (
                   <p className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
                     ✨ Covered by overtime
                   </p>
@@ -1105,8 +1128,8 @@ const ShiftsPage = () => {
           </Card>
         </div>
 
-        {/* Smart Offsetting Summary - Only for Employees */}
-        {summary.hasSmartOffsetting && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+        {/* Smart Offsetting Summary - For All Users */}
+        {summary.hasSmartOffsetting && (
           <Card className="border-2 border-dashed border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10">
             <CardContent className="p-4">
               <div className="text-center space-y-3">
@@ -1120,26 +1143,37 @@ const ShiftsPage = () => {
                   <div className="bg-white/50 p-3 rounded-lg border border-emerald-200">
                     <p className="font-semibold mb-2">Formula: Total Overtime Hours - Delay to Finish</p>
                     <div className="text-xs space-y-1">
-                      <p><strong>Your Overtime:</strong> {formatHoursAndMinutes(summary.actualOvertimeHours)}</p>
-                      <p><strong>Your Delay:</strong> {formatHoursAndMinutes(summary.rawDelayHours)}</p>
+                      <p><strong>Total Overtime:</strong> {formatHoursAndMinutes(summary.actualOvertimeHours)}</p>
+                      <p><strong>Total Delay:</strong> {formatHoursAndMinutes(summary.rawDelayHours)}</p>
                     </div>
                   </div>
-                  {summary.offsettingType === 'overtime_covers_delay' ? (
-                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                      <p className="text-green-800 font-bold text-base">
-                        🎉 Overtime Covers Your Delay!
-                      </p>
-                      <p className="text-green-700 text-sm mt-1">
-                        Net Result: {formatHoursAndMinutes(summary.totalOvertime)} overtime remaining
-                      </p>
-                    </div>
+                  {summary.rawDelayHours > 0 ? (
+                    summary.offsettingType === 'overtime_covers_delay' ? (
+                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                        <p className="text-green-800 font-bold text-base">
+                          🎉 Overtime Covers Delay!
+                        </p>
+                        <p className="text-green-700 text-sm mt-1">
+                          Net Result: {formatHoursAndMinutes(summary.totalOvertime)} overtime remaining
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                        <p className="text-orange-800 font-bold text-base">
+                          ⚠️ Delay Remains After Overtime Offset
+                        </p>
+                        <p className="text-orange-700 text-sm mt-1">
+                          Net Result: {formatHoursAndMinutes(summary.delayToFinish)} delay remaining
+                        </p>
+                      </div>
+                    )
                   ) : (
-                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                      <p className="text-orange-800 font-bold text-base">
-                        ⚠️ Delay Remains After Overtime Offset
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <p className="text-blue-800 font-bold text-base">
+                        🎯 Pure Overtime - No Delays!
                       </p>
-                      <p className="text-orange-700 text-sm mt-1">
-                        Net Result: {formatHoursAndMinutes(summary.delayToFinish)} delay to finish
+                      <p className="text-blue-700 text-sm mt-1">
+                        Net Result: {formatHoursAndMinutes(summary.totalOvertime)} overtime earned
                       </p>
                     </div>
                   )}
