@@ -33,7 +33,8 @@ import {
   Settings,
   CheckCircle,
   XCircle,
-  Truck
+  Truck,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -85,7 +86,8 @@ const AdminTotalOrdersPage: React.FC = () => {
     processing_orders: 0,
     completed_orders: 0,
     shipped_orders: 0,
-    cancelled_orders: 0
+    cancelled_orders: 0,
+    refunded_orders: 0
   });
   const [customerServiceStats, setCustomerServiceStats] = useState<{
     user_id: string;
@@ -941,7 +943,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
       </Card>
 
             {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -1036,6 +1038,23 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
                 <p className="text-sm font-medium text-red-600">{calculateStatusRevenue('cancelled').toFixed(2)} SAR</p>
               </div>
               <XCircle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-105 ${
+            isStatusCardSelected('refunded') ? 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950/20' : ''
+          }`}
+          onClick={() => handleStatsCardClick('refunded')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Refunded</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.refunded_orders}</p>
+                <p className="text-sm font-medium text-purple-600">{calculateStatusRevenue('refunded').toFixed(2)} SAR</p>
+              </div>
+              <RotateCcw className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -1455,6 +1474,14 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
                         {selectedOrder.billing_postcode} {selectedOrder.billing_country}
                       </p>
                     </div>
+                    {selectedOrder.customer_note && (
+                      <div>
+                        <Label className="text-sm font-medium">Customer Note</Label>
+                        <p className="text-sm bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded border border-yellow-200 dark:border-yellow-700">
+                          {selectedOrder.customer_note}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 

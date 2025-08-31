@@ -284,6 +284,7 @@ export const getOrderStatistics = async (userId: string, isAdmin: boolean = fals
   completed_orders: number;
   shipped_orders: number;
   cancelled_orders: number;
+  refunded_orders: number;
 }> => {
   try {
     if (!userId) {
@@ -314,6 +315,7 @@ export const getOrderStatistics = async (userId: string, isAdmin: boolean = fals
       completed_orders: orders.filter(order => order.status === 'completed' || order.status === 'delivered').length,
       shipped_orders: orders.filter(order => order.status === 'shipped').length,
       cancelled_orders: orders.filter(order => order.status === 'cancelled' || order.status === 'tamara-o-canceled').length,
+      refunded_orders: orders.filter(order => order.status === 'refunded').length,
     };
   } catch (error) {
     console.error('Error in getOrderStatistics:', error);

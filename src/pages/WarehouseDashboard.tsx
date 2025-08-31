@@ -47,7 +47,9 @@ import {
   DollarSign,
   Target,
   Download,
-  CreditCard
+  CreditCard,
+  Settings,
+  RotateCcw
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { OrderStatus, OrderNote, OrderStatusHistory } from '@/types';
@@ -130,6 +132,54 @@ const formatTime = (dateString: string | null | undefined): string => {
   }
 };
 
+// Helper function to get month display name
+const getMonthDisplayName = (monthFilter: string): string => {
+  const now = new Date();
+  
+  if (monthFilter === 'current') {
+    return now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } else if (monthFilter === 'previous') {
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return previousMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  } else if (monthFilter === 'all') {
+    return 'All Time';
+  } else {
+    // Specific month (format: "YYYY-MM")
+    const [year, month] = monthFilter.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+};
+
+// Helper function to get orders filtered by month for status cards
+const getMonthFilteredOrders = (orders: OrderSubmission[], monthFilter: string): OrderSubmission[] => {
+  if (monthFilter === 'all') {
+    return orders;
+  }
+  
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date;
+  
+  if (monthFilter === 'current') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (monthFilter === 'previous') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  } else {
+    // Specific month (format: "YYYY-MM")
+    const [year, month] = monthFilter.split('-').map(Number);
+    startDate = new Date(year, month - 1, 1);
+    endDate = new Date(year, month, 0, 23, 59, 59);
+  }
+  
+  return orders.filter((order) => {
+    const orderDate = new Date(order.created_at || '');
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+};
+
 const WarehouseDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   
@@ -154,6 +204,7 @@ const WarehouseDashboard: React.FC = () => {
   const [statusHistory, setStatusHistory] = useState<OrderStatusHistory[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [monthFilter, setMonthFilter] = useState<string>('current'); // 'current', 'previous', 'all', or specific month
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -425,11 +476,11 @@ const WarehouseDashboard: React.FC = () => {
     };
   }, [orders]); // Add orders dependency to access current orders in the callback
 
-  // Filter orders when search term or status filter changes
+  // Filter orders when search term, status filter, or month filter changes
   useEffect(() => {
     filterOrders();
     setCurrentPage(1); // Reset to first page when filters change
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter, monthFilter]);
 
   // Calculate pagination
   const totalOrders = filteredOrders.length;
@@ -1156,6 +1207,33 @@ const WarehouseDashboard: React.FC = () => {
 
   const filterOrders = () => {
     let filtered = [...orders];
+    
+    // Month filtering
+    if (monthFilter !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date;
+      
+      if (monthFilter === 'current') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      } else if (monthFilter === 'previous') {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      } else {
+        // Specific month (format: "YYYY-MM")
+        const [year, month] = monthFilter.split('-').map(Number);
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
+      }
+      
+      filtered = filtered.filter((order) => {
+        const orderDate = new Date(order.created_at || '');
+        return orderDate >= startDate && orderDate <= endDate;
+      });
+    }
+    
+    // Status filtering
     if (statusFilter !== 'all') {
       if (statusFilter === 'delivered') {
         filtered = filtered.filter(
@@ -1169,6 +1247,8 @@ const WarehouseDashboard: React.FC = () => {
         filtered = filtered.filter((order) => order.status === statusFilter);
       }
     }
+    
+    // Search filtering
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase();
       filtered = filtered.filter(
@@ -1180,6 +1260,7 @@ const WarehouseDashboard: React.FC = () => {
           (order.customer_email && order.customer_email.toLowerCase().includes(term))
       );
     }
+    
     setFilteredOrders(filtered);
   };
 
@@ -2297,8 +2378,8 @@ const WarehouseDashboard: React.FC = () => {
   };
 
   // Calculate completion rate for dashboard summary
-  const completionRate = orders.length > 0
-    ? Math.round((orders.filter(o => o.status === 'delivered' || o.status === 'completed').length / orders.length) * 100)
+  const completionRate = getMonthFilteredOrders(orders, monthFilter).length > 0
+    ? Math.round((getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'delivered' || o.status === 'completed').length / getMonthFilteredOrders(orders, monthFilter).length) * 100)
     : 0;
 
   if (!user || user.role !== 'warehouse') {
@@ -2402,21 +2483,40 @@ const WarehouseDashboard: React.FC = () => {
       {/* Mobile-Optimized Main Content */}
       <div className="p-3 sm:p-6 bg-gray-50 dark:bg-gray-900">
         {/* Real-Time Dashboard Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-7 gap-3 sm:gap-4 mb-4 sm:mb-6">
           {/* Total Orders */}
           <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Total Orders</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">{orders.length}</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{getMonthFilteredOrders(orders, monthFilter).length}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-blue-700">
-                    {formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-blue-500" />
                 </div>
               </div>
               <Package className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
+            </div>
+          </Card>
+
+          {/* Processing Orders */}
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Processing</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'processing').length}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs sm:text-sm font-semibold text-blue-700">
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'processing').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                  </span>
+                  <RiyalIcon className="w-3 h-3 text-blue-500" />
+                </div>
+              </div>
+              <Settings className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
             </div>
           </Card>
 
@@ -2426,11 +2526,11 @@ const WarehouseDashboard: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Pending</p>
                 <p className="text-xl sm:text-2xl font-bold text-orange-600">
-                  {orders.filter(o => o.status === 'pending' || o.status === 'processing').length}
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'pending').length}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-orange-700">
-                    {formatPrice(orders.filter(o => o.status === 'pending' || o.status === 'processing').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'pending').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-orange-500" />
                 </div>
@@ -2445,11 +2545,11 @@ const WarehouseDashboard: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Shipped</p>
                 <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                  {orders.filter(o => o.status === 'shipped').length}
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'shipped').length}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-blue-700">
-                    {formatPrice(orders.filter(o => o.status === 'shipped').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'shipped').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-blue-500" />
                 </div>
@@ -2464,11 +2564,11 @@ const WarehouseDashboard: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Delivered</p>
                 <p className="text-xl sm:text-2xl font-bold text-green-600">
-                  {orders.filter(o => o.status === 'delivered' || o.status === 'completed').length}
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'delivered' || o.status === 'completed').length}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-green-700">
-                    {formatPrice(orders.filter(o => o.status === 'delivered' || o.status === 'completed').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'delivered' || o.status === 'completed').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-green-500" />
                 </div>
@@ -2483,16 +2583,35 @@ const WarehouseDashboard: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Cancelled</p>
                 <p className="text-xl sm:text-2xl font-bold text-red-600">
-                  {orders.filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').length}
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').length}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs sm:text-sm font-semibold text-red-700 dark:text-red-400">
-                    {formatPrice(orders.filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'cancelled' || o.status === 'tamara-o-canceled').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
                   </span>
                   <RiyalIcon className="w-3 h-3 text-red-500" />
                 </div>
               </div>
               <XCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
+            </div>
+          </Card>
+
+          {/* Refunded Orders */}
+          <Card className="p-3 sm:p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300">Refunded</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">
+                  {getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'refunded').length}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs sm:text-sm font-semibold text-purple-700">
+                    {formatPrice(getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'refunded').reduce((sum, order) => sum + (order.total_amount || 0), 0))}
+                  </span>
+                  <RiyalIcon className="w-3 h-3 text-purple-500" />
+                </div>
+              </div>
+              <RotateCcw className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
           </Card>
         </div>
@@ -2523,7 +2642,7 @@ const WarehouseDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-300">Total Revenue</p>
-                    <p className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">{formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0))}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-900 dark:text-blue-100">{formatPrice(getMonthFilteredOrders(orders, monthFilter).reduce((sum, order) => sum + (order.total_amount || 0), 0))}</p>
                   </div>
                   <div className="flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-800 p-2 shadow-sm">
                     <RiyalIcon className="w-6 h-6 text-blue-500" />
@@ -2536,7 +2655,7 @@ const WarehouseDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-300">Avg Order Value</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">{orders.length > 0 ? formatPrice(orders.reduce((sum, order) => sum + (order.total_amount || 0), 0) / orders.length) : formatPrice(0)}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-900 dark:text-green-100">{getMonthFilteredOrders(orders, monthFilter).length > 0 ? formatPrice(getMonthFilteredOrders(orders, monthFilter).reduce((sum, order) => sum + (order.total_amount || 0), 0) / getMonthFilteredOrders(orders, monthFilter).length) : formatPrice(0)}</p>
                   </div>
                   <div className="flex items-center justify-center rounded-full bg-green-100 dark:bg-green-800 p-2 shadow-sm">
                     <BarChart2 className="w-6 h-6 text-green-500" />
@@ -2549,7 +2668,7 @@ const WarehouseDashboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs sm:text-sm font-medium text-purple-700 dark:text-purple-300">Today's Orders</p>
-                    <p className="text-xl sm:text-2xl font-bold text-purple-900 dark:text-purple-100">{orders.filter(order => {
+                    <p className="text-xl sm:text-2xl font-bold text-purple-900 dark:text-purple-100">{getMonthFilteredOrders(orders, monthFilter).filter(order => {
                         const orderDate = new Date(order.created_at);
                         const today = new Date();
                         return orderDate.toDateString() === today.toDateString();
@@ -2622,6 +2741,22 @@ const WarehouseDashboard: React.FC = () => {
                 </Select>
               </div>
 
+              {/* Month Filter */}
+              <div className="w-full sm:w-48">
+                <Select value={monthFilter} onValueChange={setMonthFilter}>
+                  <SelectTrigger className="text-sm sm:text-base">
+                    <SelectValue placeholder="Filter by month">
+                      {getMonthDisplayName(monthFilter)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current Month</SelectItem>
+                    <SelectItem value="previous">Previous Month</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
 
 
               {/* Clear Highlights Button */}
@@ -2661,6 +2796,26 @@ const WarehouseDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Clear Filters Button */}
+              {(monthFilter !== 'current' || statusFilter !== 'all' || searchTerm.trim()) && (
+                <div className="w-full sm:w-auto">
+                  <Button
+                    onClick={() => {
+                      setMonthFilter('current');
+                      setStatusFilter('all');
+                      setSearchTerm('');
+                    }}
+                    variant="outline"
+                    className="w-full sm:w-auto bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900/30 hover:border-gray-300 dark:hover:border-gray-600"
+                    disabled={isLoading}
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Clear Filters</span>
+                    <span className="sm:hidden">Clear</span>
+                  </Button>
+                </div>
+              )}
+
               {/* Export Button */}
               <div className="w-full sm:w-auto">
                 <Button
@@ -2687,7 +2842,14 @@ const WarehouseDashboard: React.FC = () => {
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-3">
             <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <span className="text-base sm:text-lg text-gray-900 dark:text-white">Orders ({filteredOrders.length})</span>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-base sm:text-lg text-gray-900 dark:text-white">Orders ({filteredOrders.length})</span>
+                {monthFilter !== 'all' && (
+                  <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                    {getMonthDisplayName(monthFilter)}
+                  </Badge>
+                )}
+              </div>
               <Badge variant="outline" className="self-start sm:self-auto">
                 {isLoading ? 'Loading...' : 'Live Updates'}
               </Badge>
@@ -3147,6 +3309,14 @@ const WarehouseDashboard: React.FC = () => {
                         {selectedOrder.billing_city}, {selectedOrder.billing_country}
                       </p>
                     </div>
+                    {selectedOrder.customer_note && (
+                      <div>
+                        <Label className="text-xs font-medium text-gray-600">Customer Note</Label>
+                        <p className="text-sm bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded border border-yellow-200 dark:border-yellow-700">
+                          {selectedOrder.customer_note}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
