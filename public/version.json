@@ -12,21 +12,7 @@
     "🔧 FIXED: Senior CRM Pharmacist now has full access to Total Orders, My Orders, and Create Orders",
     "🔧 FIXED: Resolved 'Checking permissions...' loop in order management pages",
     "🔧 FIXED: Resolved 'Loading all orders...' loop in Total Orders page",
-    "📅 NEW: Month Filter - Filter orders by month in Total Orders and My Orders pages",
-    "🤖 NEW: Chatbot Access - Senior CRM Pharmacist now has access to the AI chatbot",
-    "📊 NEW: Month-Specific Statistics - View stats now show data for the selected month only",
-    "👨‍💻 NEW: Digital Solution Manager Role - Developer role with full access to all pages and features",
-    "🔧 NEW: Fix Calculator - Recalculate all shifts based on assigned shift durations",
-    "🔄 NEW: Shift Change functionality in Team Shifts - Change shifts directly from monthly shifts table",
-    "📅 NEW: Bulk Assignment in Shift Management - Assign shifts for entire months with one click",
-    "⏰ NEW: Automatic Friday Day Off - Set Fridays as day off automatically in bulk assignments",
-    "🎯 NEW: Real-time shift duration calculations - Uses actual shift start/end times from database",
-    "💡 NEW: Auto-recalculation of regular/overtime hours when shifts are changed",
-    "🛡️ Enhanced permission system - Content & Creative Managers can now edit events and Q&A",
-    "📊 Improved shift management efficiency - Bulk operations save hours of manual work",
-    "👑 NEW: General Manager Role - Executive-level role with same access as Executive Director",
-    "🌟 NEW: Full System Access - General Manager has unlimited access to all pages, dashboards, and features",
-    "🔐 NEW: Enhanced Security - General Manager bypasses all route guards and permission checks"
+    "📅 NEW: Month Filter - Filter orders by month in Total Orders and My Orders pages"
   ],
   "minimumSupportedVersion": "5.0.0",
   "forceUpdate": false
