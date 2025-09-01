@@ -128,7 +128,10 @@ const AdminBreakTimePage = () => {
     });
   };
 
-  if (user?.role !== 'admin') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user?.role !== 'admin') {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Card>

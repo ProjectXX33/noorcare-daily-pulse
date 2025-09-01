@@ -29,8 +29,10 @@ const AdminRecalculateButton: React.FC<AdminRecalculateButtonProps> = ({ onRecal
     errors: number;
   } | null>(null);
 
-  // Only show for admins
-  if (user?.role !== 'admin') {
+  // Only show for admins or Digital Solution Manager
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the button
+  } else if (user?.role !== 'admin') {
     return null;
   }
 

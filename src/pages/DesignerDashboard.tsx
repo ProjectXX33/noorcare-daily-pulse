@@ -343,7 +343,10 @@ const DesignerDashboard = () => {
     );
   }
   
-  if (user.position !== 'Designer') {
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user.position !== 'Designer') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
         <Card className="w-full max-w-md">

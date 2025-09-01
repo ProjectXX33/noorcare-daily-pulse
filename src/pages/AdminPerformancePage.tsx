@@ -8,7 +8,10 @@ const AdminPerformancePage = () => {
   const { user } = useAuth();
   const [currentMonth] = useState('2025-06');
 
-  if (!user || user.role !== 'admin') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (!user || user.role !== 'admin') {
     return null;
   }
 

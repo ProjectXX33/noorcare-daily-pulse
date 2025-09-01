@@ -97,7 +97,10 @@ const SettingsPage = () => {
     };
 
     const loadWorkTimeConfig = async () => {
-      if (!user || user.role !== 'admin') return;
+      // Digital Solution Manager has access to everything
+      if (user?.position === 'Digital Solution Manager') {
+        // Continue to render the page
+      } else if (!user || user.role !== 'admin') return;
 
       try {
         const { data, error } = await supabase
@@ -225,7 +228,10 @@ const SettingsPage = () => {
   };
 
   const handleWorkTimeUpdate = async () => {
-    if (!user || user.role !== 'admin') return;
+    // Digital Solution Manager has access to everything
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to render the page
+    } else if (!user || user.role !== 'admin') return;
     
     setLoading(true);
     try {

@@ -187,7 +187,7 @@ const CreateOrderPage: React.FC = () => {
       return;
     }
     
-    const allowedPositions = ['Junior CRM Specialist'];
+    const allowedPositions = ['Junior CRM Specialist', 'Senior CRM Pharmacist', 'Digital Solution Manager'];
     const allowedRoles = ['admin', 'customer_retention_manager'];
     
     if (!allowedPositions.includes(user.position) && !allowedRoles.includes(user.role as string)) {
@@ -218,14 +218,17 @@ const CreateOrderPage: React.FC = () => {
     );
   }
   
-  if (!['Junior CRM Specialist'].includes(user.position) && !['admin', 'customer_retention_manager'].includes(user.role as string)) {
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (!['Junior CRM Specialist', 'Senior CRM Pharmacist'].includes(user.position) && !['admin', 'customer_retention_manager'].includes(user.role as string)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Access Restricted</h3>
           <p className="text-gray-500 dark:text-gray-400">
-            This page is only accessible to Junior CRM Specialist representatives.
+            This page is only accessible to Customer Service representatives.
           </p>
         </div>
       </div>
@@ -1199,7 +1202,7 @@ const CreateOrderPage: React.FC = () => {
           <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Access Restricted</h3>
           <p className="text-gray-500 dark:text-gray-400">
-            This page is only accessible to Junior CRM Specialist representatives.
+            This page is only accessible to Customer Service representatives.
           </p>
         </div>
       </div>

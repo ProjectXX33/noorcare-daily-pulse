@@ -294,6 +294,11 @@ const getManagerTeamMembers = async (managerId: string): Promise<string[]> => {
         teamQuery = teamQuery.neq('role', 'executive_director');
         break;
       
+      case 'general_manager':
+        // General Manager sees all employees
+        teamQuery = teamQuery.neq('role', 'general_manager');
+        break;
+      
       default:
         return [];
     }

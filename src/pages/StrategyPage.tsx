@@ -187,7 +187,10 @@ const StrategyPage: React.FC = () => {
       return;
     }
     
-    if (user.role !== 'admin' && user.position !== 'Media Buyer') {
+    // Digital Solution Manager has access to everything
+    if (user.position === 'Digital Solution Manager') {
+      // Continue to render the page
+    } else if (user.role !== 'admin' && user.position !== 'Media Buyer') {
       console.warn('Access denied: User is not admin or media buyer');
       navigate('/dashboard', { replace: true });
       return;
@@ -490,7 +493,10 @@ const StrategyPage: React.FC = () => {
     window.open(permalink, '_blank', 'noopener,noreferrer');
   };
 
-  if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (!user || (user.role !== 'admin' && user.position !== 'Media Buyer')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

@@ -14,8 +14,8 @@ const CustomerLoader = () => {
     navigate('/loyal-customers');
   };
 
-  // Only show for Customer Service and Admin users
-      if (!user || (user.position !== 'Junior CRM Specialist' && user.role !== 'admin')) {
+  // Only show for Customer Service, Admin users, and Digital Solution Manager
+  if (!user || (user.position !== 'Junior CRM Specialist' && user.position !== 'Senior CRM Pharmacist' && user.position !== 'Digital Solution Manager' && user.role !== 'admin')) {
     return null;
   }
 

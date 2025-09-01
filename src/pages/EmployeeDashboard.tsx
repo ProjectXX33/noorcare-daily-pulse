@@ -125,7 +125,7 @@ const EmployeeDashboard = () => {
   const checkedInToday = hasCheckedInToday(user.id);
   
   // Check if user has check-in access (Customer Service and Designer)
-  const hasCheckInAccess = ['Junior CRM Specialist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user.position);
+  const hasCheckInAccess = ['Junior CRM Specialist', 'Senior CRM Pharmacist', 'Designer', 'Content Creator', 'Media Buyer', 'Web Developer'].includes(user.position);
   
   // Get today's reports
   const today = new Date();

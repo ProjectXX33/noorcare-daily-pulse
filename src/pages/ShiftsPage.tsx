@@ -418,6 +418,8 @@ const ShiftsPage = () => {
       if (selectedEmployee !== 'all') {
         console.log('🔍 Filtering by specific employee:', selectedEmployee);
         query = query.eq('user_id', selectedEmployee);
+      } else if (user?.position === 'Digital Solution Manager') {
+        console.log('🔍 Digital Solution Manager - loading all employees');
       } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') {
         console.log('🔍 Filtering by current user:', user.id);
         query = query.eq('user_id', user.id);
@@ -444,6 +446,7 @@ const ShiftsPage = () => {
 
       // Fetch break time data separately for the same date range and users
       const userIds = selectedEmployee !== 'all' ? [selectedEmployee] : 
+                     user?.position === 'Digital Solution Manager' ? data.map(item => item.user_id).filter((id, index, self) => self.indexOf(id) === index) :
                      user?.role !== 'admin' && user?.role !== 'customer_retention_manager' ? [user.id] : 
                      data.map(item => item.user_id).filter((id, index, self) => self.indexOf(id) === index);
 
@@ -713,7 +716,9 @@ const ShiftsPage = () => {
 
   // Handle shift change for admin
   const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
-    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') return;
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager') return;
 
     const updateKey = `${userId}-${format(workDate, 'yyyy-MM-dd')}`;
     
@@ -933,12 +938,12 @@ const ShiftsPage = () => {
                   <Button
                     onClick={() => {
                       // Generate CSV data
-                      const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                      const headers = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                         ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                         : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                       
                       const csvData = monthlyShifts.map(shift => {
-                        const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                        const row = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                           ? [
                               format(shift.workDate, 'dd/MM/yyyy'),
                               shift.userName,
@@ -1184,10 +1189,10 @@ const ShiftsPage = () => {
         )}
 
         {/* Admin Recalculation Tools */}
-        {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
+        {(user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager') && <AdminRecalculateButton onRecalculationComplete={() => loadMonthlyShifts(false)} />}
 
         {/* Enhanced mobile filters with better UX - Only show for admin */}
-        {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
+        {(user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
           <div className="space-y-3 w-full">
             {/* Mobile filters sheet with improved design */}
             <div className="block lg:hidden w-full">
@@ -1312,12 +1317,12 @@ const ShiftsPage = () => {
                     <Button
                       onClick={() => {
                         // Generate CSV data
-                        const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                        const headers = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                           ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                           : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                         
                         const csvData = monthlyShifts.map(shift => {
-                          const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                          const row = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                             ? [
                                 format(shift.workDate, 'dd/MM/yyyy'),
                                 shift.userName,
@@ -1370,7 +1375,7 @@ const ShiftsPage = () => {
         )}
 
         {/* Month filter for employees - simplified version */}
-        {user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
+        {user?.position !== 'Digital Solution Manager' && user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && (
           <div className="w-full">
             <Card className="border border-border/50 shadow-sm w-full">
             <CardContent className="p-4">
@@ -1421,7 +1426,7 @@ const ShiftsPage = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base sm:text-lg font-bold truncate">{t.monthlyShifts}</CardTitle>
               <div className="flex items-center gap-2">
-                {(user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
+                {(user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager') && (
                   <Badge variant="secondary" className="text-xs">
                     Admin: Click shifts to edit
                   </Badge>
@@ -1429,12 +1434,12 @@ const ShiftsPage = () => {
                 <Button
                   onClick={() => {
                     // Generate CSV data
-                    const headers = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                    const headers = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                       ? ['Date', 'Employee', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay']
                       : ['Date', 'Shift', 'Check In', 'Check Out', 'Delay', 'Break Time', 'Regular Hours', 'Overtime Hours', 'Delay'];
                     
                     const csvData = monthlyShifts.map(shift => {
-                      const row = (user?.role === 'admin' || user?.role === 'customer_retention_manager')
+                      const row = (user?.position === 'Digital Solution Manager' || user?.role === 'admin' || user?.role === 'customer_retention_manager')
                         ? [
                             format(shift.workDate, 'dd/MM/yyyy'),
                             shift.userName,
@@ -1520,11 +1525,11 @@ const ShiftsPage = () => {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-xs leading-tight text-foreground truncate">{format(shift.workDate, 'EEE, dd/MM/yyyy')}</h4>
-                              {user.role === 'admin' && (
+                              {(user.role === 'admin' || user?.position === 'Digital Solution Manager') && (
                               <p className="text-xs text-muted-foreground mt-1 truncate">{shift.userName}</p>
                               )}
                           </div>
-                          {user.role === 'admin' ? (
+                          {(user.role === 'admin' || user?.position === 'Digital Solution Manager') ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="relative">
@@ -1656,7 +1661,7 @@ const ShiftsPage = () => {
                   <TableHeader>
                     <TableRow className="border-b border-border/50">
                       <TableHead className="font-semibold text-xs">{t.date}</TableHead>
-                      {user.role === 'admin' && <TableHead className="font-semibold text-xs">{t.employee}</TableHead>}
+                      {(user.role === 'admin' || user?.position === 'Digital Solution Manager') && <TableHead className="font-semibold text-xs">{t.employee}</TableHead>}
                       <TableHead className="font-semibold text-xs">{t.shift}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.checkIn}</TableHead>
                       <TableHead className="font-semibold text-xs">{t.checkOut}</TableHead>
@@ -1670,7 +1675,7 @@ const ShiftsPage = () => {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 9 : 8} className="text-center py-12">
+                        <TableCell colSpan={(user.role === 'admin' || user?.position === 'Digital Solution Manager') ? 9 : 8} className="text-center py-12">
                           <div className="flex items-center justify-center space-x-3">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
                             <span className="text-sm font-medium">{t.loading}</span>
@@ -1679,7 +1684,7 @@ const ShiftsPage = () => {
                       </TableRow>
                     ) : monthlyShifts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={user.role === 'admin' ? 9 : 8} className="text-center py-12">
+                        <TableCell colSpan={(user.role === 'admin' || user?.position === 'Digital Solution Manager') ? 9 : 8} className="text-center py-12">
                           <div className="space-y-4">
                             {startOfMonth(selectedDate).getTime() === startOfMonth(new Date()).getTime() ? (
                               <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-200 dark:border-blue-800 max-w-md mx-auto">
@@ -1707,9 +1712,9 @@ const ShiftsPage = () => {
                           <TableCell className="font-medium text-xs">
                             {format(shift.workDate, 'dd/MM/yyyy')}
                           </TableCell>
-                          {user.role === 'admin' && <TableCell className="font-medium text-xs">{shift.userName}</TableCell>}
+                          {(user.role === 'admin' || user?.position === 'Digital Solution Manager') && <TableCell className="font-medium text-xs">{shift.userName}</TableCell>}
                           <TableCell>
-                            {user.role === 'admin' ? (
+                            {(user.role === 'admin' || user?.position === 'Digital Solution Manager') ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="relative">

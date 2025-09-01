@@ -454,7 +454,9 @@ const TeamShiftsPage = () => {
 
   // Fix Calculator - Recalculate all shifts based on assigned shift durations
   const fixCalculator = useCallback(async () => {
-    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
       toast.error('Only admins and managers can fix calculations');
       return;
     }
@@ -606,7 +608,9 @@ const TeamShiftsPage = () => {
   const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
     console.log('🔄 handleShiftChange called:', { userId, workDate, newShiftId, userRole: user?.role });
     
-    if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (user?.role !== 'admin' && user?.role !== 'customer_retention_manager' && user?.role !== 'content_creative_manager') {
       console.log('❌ Permission denied - user role:', user?.role);
       return;
     }
@@ -982,16 +986,19 @@ const TeamShiftsPage = () => {
     return monthlyShifts.filter(shift => shift.userId === selectedEmployee);
   }, [monthlyShifts, selectedEmployee]);
 
-      if (!user || (user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
-          <p className="text-gray-600 mt-2">This page is only accessible to Content & Creative Managers and Customer Retention Managers.</p>
-        </div>
-      </div>
-    );
-  }
+      // Digital Solution Manager has access to everything
+      if (user?.position === 'Digital Solution Manager') {
+        // Continue to render the page
+      } else if (!user || (user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager')) {
+        return (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
+              <p className="text-gray-600 mt-2">This page is only accessible to Content & Creative Managers and Customer Retention Managers.</p>
+            </div>
+          </div>
+        );
+      }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -1224,7 +1231,7 @@ const TeamShiftsPage = () => {
          </div>
 
                  {/* Fix Calculator Button */}
-        {user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role) && (
+        {(user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role)) || user?.position === 'Digital Solution Manager' && (
           <Card className="border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 shadow-sm w-full mb-6">
             <CardContent className="p-4">
               <div className="text-center space-y-3">
@@ -1324,7 +1331,7 @@ const TeamShiftsPage = () => {
                       <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{t.monthlyShifts}</CardTitle>
-                {user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role) && (
+                {(user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role)) || user?.position === 'Digital Solution Manager' && (
                   <div className="text-sm text-muted-foreground">
                     💡 Click on shift dropdowns to change assignments and auto-recalculate hours
                   </div>
@@ -1385,7 +1392,7 @@ const TeamShiftsPage = () => {
                                   });
                                   handleShiftChange(shift.userId, shift.workDate, value);
                                 }} 
-                                disabled={updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`)}
+                                disabled={updatingShifts.has(`${shift.userId}-${format(shift.workDate, 'yyyy-MM-dd')}`) || !((user?.role && ['admin', 'customer_retention_manager', 'content_creative_manager'].includes(user.role)) || user?.position === 'Digital Solution Manager')}
                               >
                                 <SelectTrigger className="w-[180px]">
                                   <SelectValue placeholder="Select Shift" />

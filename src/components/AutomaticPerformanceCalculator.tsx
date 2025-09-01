@@ -19,7 +19,10 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
 
   // Automatic Performance Calculation Function (Justice & Fair)
   const calculatePerformanceAutomatically = async () => {
-    if (!user || user.role !== 'admin') return;
+    // Digital Solution Manager has access to everything
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (!user || user.role !== 'admin') return;
     
     try {
       setIsRunning(true);
@@ -284,7 +287,10 @@ export const AutomaticPerformanceCalculator: React.FC<AutomaticPerformanceCalcul
 
   // Set up automatic calculation interval
   useEffect(() => {
-    if (!enableAutoRecalculation || !user || user.role !== 'admin') return;
+    // Digital Solution Manager has access to everything
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (!enableAutoRecalculation || !user || user.role !== 'admin') return;
 
     // Run immediately on mount
     calculatePerformanceAutomatically();

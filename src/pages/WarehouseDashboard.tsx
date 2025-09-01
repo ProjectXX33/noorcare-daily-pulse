@@ -2382,7 +2382,10 @@ const WarehouseDashboard: React.FC = () => {
     ? Math.round((getMonthFilteredOrders(orders, monthFilter).filter(o => o.status === 'delivered' || o.status === 'completed').length / getMonthFilteredOrders(orders, monthFilter).length) * 100)
     : 0;
 
-  if (!user || user.role !== 'warehouse') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (!user || user.role !== 'warehouse') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="max-w-md">

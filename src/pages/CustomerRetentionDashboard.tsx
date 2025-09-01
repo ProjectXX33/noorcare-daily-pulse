@@ -159,7 +159,27 @@ const CustomerRetentionDashboard = () => {
   const t = translations[language as keyof typeof translations];
 
   // Check if user has access to this dashboard
-  if (!user || user.role !== 'customer_retention_manager') {
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground">
+              You don't have permission to access this dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user.role !== 'customer_retention_manager') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="w-96">
@@ -245,6 +265,7 @@ const CustomerRetentionDashboard = () => {
       'Content & Creative Manager': 'bg-indigo-100 text-indigo-800',
       'IT Manager': 'bg-cyan-100 text-cyan-800',
       'Executive Director': 'bg-amber-100 text-amber-800',
+      'General Manager': 'bg-amber-100 text-amber-800',
       'Warehouse Staff': 'bg-orange-100 text-orange-800'
     };
     

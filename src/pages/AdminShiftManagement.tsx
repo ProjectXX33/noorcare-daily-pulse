@@ -875,7 +875,10 @@ const AdminShiftManagement = () => {
     ? employees 
     : employees.filter(emp => emp.id === selectedEmployee);
 
-  if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
+  // Digital Solution Manager and General Manager have access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    // Continue to render the page
+  } else if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
     return (
       <div className="flex items-center justify-center min-h-[50vh] p-4">
         <Card className="max-w-md w-full">
@@ -1000,6 +1003,9 @@ const AdminShiftManagement = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
+                          <SelectItem value="Senior CRM Pharmacist">Senior CRM Pharmacist</SelectItem>
+                          <SelectItem value="Digital Solution Manager">Digital Solution Manager</SelectItem>
+                          <SelectItem value="General Manager">General Manager</SelectItem>
                           <SelectItem value="Designer">Designer</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1136,6 +1142,9 @@ const AdminShiftManagement = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
+                    <SelectItem value="Senior CRM Pharmacist">Senior CRM Pharmacist</SelectItem>
+                    <SelectItem value="Digital Solution Manager">Digital Solution Manager</SelectItem>
+                    <SelectItem value="General Manager">General Manager</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                   </SelectContent>
                 </Select>

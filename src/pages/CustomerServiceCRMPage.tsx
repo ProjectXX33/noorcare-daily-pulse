@@ -49,7 +49,12 @@ const CustomerServiceCRMPage = () => {
       return;
     }
 
-    if (user.position !== 'Junior CRM Specialist') {
+    // Digital Solution Manager has access to everything
+    if (user.position === 'Digital Solution Manager') {
+      return;
+    }
+
+    if (user.position !== 'Junior CRM Specialist' && user.position !== 'Senior CRM Pharmacist') {
       console.warn('Access denied: User is not Customer Service');
       navigate('/dashboard');
       return;
@@ -84,26 +89,29 @@ const CustomerServiceCRMPage = () => {
         );
       }
       
-      if (user.position !== 'Junior CRM Specialist') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
-              <h3 className="text-lg font-semibold">Access Restricted</h3>
-              <p className="text-gray-600">
-                This page is only accessible to Customer Service representatives.
-              </p>
-              <Button onClick={() => navigate('/dashboard')} className="w-full">
-                Return to Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+      // Digital Solution Manager has access to everything
+      if (user.position === 'Digital Solution Manager') {
+        // Continue to render the page
+      } else if (user.position !== 'Junior CRM Specialist' && user.position !== 'Senior CRM Pharmacist') {
+        return (
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+                  <h3 className="text-lg font-semibold">Access Restricted</h3>
+                  <p className="text-gray-600">
+                    This page is only accessible to Customer Service representatives.
+                  </p>
+                  <Button onClick={() => navigate('/dashboard')} className="w-full">
+                    Return to Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">

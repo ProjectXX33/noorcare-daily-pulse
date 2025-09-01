@@ -33,8 +33,8 @@ const CopyWritingLoader = () => {
     navigate('/copy-writing-products');
   };
 
-  // Only show for Media Buyer and Admin users
-  if (!user || (user.position !== 'Media Buyer' && user.role !== 'admin')) {
+  // Only show for Media Buyer, Admin users, and Digital Solution Manager
+  if (!user || (user.position !== 'Media Buyer' && user.position !== 'Digital Solution Manager' && user.role !== 'admin')) {
     return null;
   }
 

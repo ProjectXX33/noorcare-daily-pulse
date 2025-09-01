@@ -200,7 +200,8 @@ export function getRoleDisplayName(role: string): string {
     'warehouse': 'Warehouse',
     'content_creative_manager': 'Content & Creative Manager',
     'customer_retention_manager': 'Customer Retention Manager',
-    'digital_solution_manager': 'Digital Solution Department Manager'
+    'digital_solution_manager': 'Digital Solution Department Manager',
+    'general_manager': 'General Manager'
   };
   
   return roleMap[role] || role;

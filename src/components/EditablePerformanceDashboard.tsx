@@ -1079,7 +1079,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
   };
 
   const recalculateForAll = async () => {
-    if (!user || user.role !== 'admin') {
+    // Digital Solution Manager has access to everything
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (!user || user.role !== 'admin') {
       toast.error('Only administrators can recalculate performance');
       return;
     }
@@ -1693,7 +1696,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the component
+  } else if (!user || user.role !== 'admin') {
     return null;
   }
 
@@ -1730,7 +1736,10 @@ const EditablePerformanceDashboard: React.FC<EditablePerformanceDashboardProps> 
 
   // NEW: Data Repair Function to fix missing monthly_shifts records
   const repairMissingTimeTrackingData = async () => {
-    if (!user || user.role !== 'admin') {
+    // Digital Solution Manager has access to everything
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (!user || user.role !== 'admin') {
       toast.error('Only administrators can repair time tracking data');
       return;
     }

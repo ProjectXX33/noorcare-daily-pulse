@@ -56,7 +56,14 @@ const EcommerceDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Check if user has the correct role
-  if (!user || user.role !== 'ecommerce_manager') {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user.role !== 'ecommerce_manager') {
     return <Navigate to="/login" replace />;
   }
 

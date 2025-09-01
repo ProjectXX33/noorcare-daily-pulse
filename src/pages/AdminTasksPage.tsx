@@ -964,9 +964,12 @@ const AdminTasksPage = () => {
     }
   };
 
-      if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
-    return null;
-  }
+      // Digital Solution Manager has access to everything
+      if (user?.position === 'Digital Solution Manager') {
+        // Continue to render the page
+      } else if (!user || (user.role !== 'admin' && user.role !== 'content_creative_manager' && user.role !== 'customer_retention_manager' && user.role !== 'ecommerce_manager')) {
+        return null;
+      }
 
   // Calculate task statistics
   const taskStats = {

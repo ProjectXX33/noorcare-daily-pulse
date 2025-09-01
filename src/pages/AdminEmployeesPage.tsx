@@ -269,7 +269,10 @@ const AdminEmployeesPage = () => {
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  // Digital Solution Manager and General Manager have access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    // Continue to render the page
+  } else if (!user || user.role !== 'admin') {
     return null;
   }
 
@@ -745,6 +748,9 @@ const AdminEmployeesPage = () => {
                   <SelectItem value="IT Manager">IT Manager</SelectItem>
                   <SelectItem value="E-commerce Manager">E-commerce Manager</SelectItem>
                   <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
+                  <SelectItem value="Senior CRM Pharmacist">Senior CRM Pharmacist</SelectItem>
+                  <SelectItem value="Digital Solution Manager">Digital Solution Manager</SelectItem>
+                  <SelectItem value="General Manager">General Manager</SelectItem>
                   <SelectItem value="Designer">Designer</SelectItem>
                   <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                   <SelectItem value="Content Creator">Content Creator</SelectItem>
@@ -871,6 +877,9 @@ const AdminEmployeesPage = () => {
                     <SelectItem value="IT Manager">IT Manager</SelectItem>
                     <SelectItem value="E-commerce Manager">E-commerce Manager</SelectItem>
                     <SelectItem value="Junior CRM Specialist">Junior CRM Specialist</SelectItem>
+                    <SelectItem value="Senior CRM Pharmacist">Senior CRM Pharmacist</SelectItem>
+                    <SelectItem value="Digital Solution Manager">Digital Solution Manager</SelectItem>
+                    <SelectItem value="General Manager">General Manager</SelectItem>
                     <SelectItem value="Designer">Designer</SelectItem>
                     <SelectItem value="Media Buyer">Media Buyer</SelectItem>
                     <SelectItem value="Content Creator">Content Creator</SelectItem>

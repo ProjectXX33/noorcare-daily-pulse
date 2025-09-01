@@ -276,7 +276,11 @@ export const deleteOrderSubmission = async (id: number): Promise<void> => {
 };
 
 // Get order statistics for dashboard
-export const getOrderStatistics = async (userId: string, isAdmin: boolean = false): Promise<{
+export const getOrderStatistics = async (
+  userId: string, 
+  isAdmin: boolean = false, 
+  dateFilters?: { date_from?: string; date_to?: string }
+): Promise<{
   total_orders: number;
   total_revenue: number;
   pending_orders: number;
@@ -296,6 +300,15 @@ export const getOrderStatistics = async (userId: string, isAdmin: boolean = fals
     // If not admin, only get current user's orders
     if (!isAdmin) {
       query = query.eq('created_by_user_id', userId);
+    }
+
+    // Apply date filters if provided
+    if (dateFilters?.date_from) {
+      query = query.gte('created_at', dateFilters.date_from);
+    }
+    
+    if (dateFilters?.date_to) {
+      query = query.lte('created_at', dateFilters.date_to);
     }
 
     const { data, error } = await query;
@@ -324,7 +337,9 @@ export const getOrderStatistics = async (userId: string, isAdmin: boolean = fals
 };
 
 // Get customer service representatives with order counts (Admin only)
-export const getCustomerServiceOrderStats = async (): Promise<{
+export const getCustomerServiceOrderStats = async (
+  dateFilters?: { date_from?: string; date_to?: string }
+): Promise<{
   user_id: string;
   user_name: string;
   order_count: number;
@@ -334,9 +349,20 @@ export const getCustomerServiceOrderStats = async (): Promise<{
     // Note: This function is designed to be called only by admin users
     // Access control should be handled by the calling component
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('order_submissions')
       .select('created_by_user_id, created_by_name, total_amount');
+
+    // Apply date filters if provided
+    if (dateFilters?.date_from) {
+      query = query.gte('created_at', dateFilters.date_from);
+    }
+    
+    if (dateFilters?.date_to) {
+      query = query.lte('created_at', dateFilters.date_to);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching customer service stats:', error);

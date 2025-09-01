@@ -401,6 +401,8 @@ const ShiftsPage = () => {
 
       if (selectedEmployee !== 'all') {
         query = query.eq('user_id', selectedEmployee);
+      } else if (user?.position === 'Digital Solution Manager') {
+        // Digital Solution Manager can see all shifts
       } else if (user?.role !== 'admin') {
         query = query.eq('user_id', user.id);
       }
@@ -416,6 +418,7 @@ const ShiftsPage = () => {
 
       // Fetch break time data separately for the same date range and users
       const userIds = selectedEmployee !== 'all' ? [selectedEmployee] : 
+                     user?.position === 'Digital Solution Manager' ? data.map(item => item.user_id).filter((id, index, self) => self.indexOf(id) === index) :
                      user?.role !== 'admin' ? [user.id] : 
                      data.map(item => item.user_id).filter((id, index, self) => self.indexOf(id) === index);
 
@@ -663,9 +666,11 @@ const ShiftsPage = () => {
     }
   }, [loadShifts, loadCustomerServiceEmployees, loadMonthlyShifts]);
 
-  // Handle shift change for admin
+  // Handle shift change for admin or Digital Solution Manager
   const handleShiftChange = useCallback(async (userId: string, workDate: Date, newShiftId: string) => {
-    if (user?.role !== 'admin') return;
+    if (user?.position === 'Digital Solution Manager') {
+      // Continue to execute the function
+    } else if (user?.role !== 'admin') return;
 
     const updateKey = `${userId}-${format(workDate, 'yyyy-MM-dd')}`;
     
@@ -1128,7 +1133,7 @@ const ShiftsPage = () => {
         )}
 
         {/* Month filter for employees - simplified version */}
-        {user?.role !== 'admin' && (
+        {user?.position !== 'Digital Solution Manager' && user?.role !== 'admin' && (
           <div className="w-full">
             <Card className="border border-border/50 shadow-sm w-full">
               <CardContent className="p-4">

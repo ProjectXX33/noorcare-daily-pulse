@@ -105,6 +105,12 @@ const AdminTotalOrdersPage: React.FC = () => {
     date_to: ''
   });
 
+  // Month filter state
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
   // View mode
   const [viewMode, setViewMode] = useState<'orders' | 'stats'>('orders');
 
@@ -120,7 +126,7 @@ const AdminTotalOrdersPage: React.FC = () => {
     }
     
     const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
-    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist', 'Senior CRM Pharmacist'];
     
     // Only redirect if user is loaded and doesn't have access
     if (user.id && !allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) {
@@ -130,38 +136,62 @@ const AdminTotalOrdersPage: React.FC = () => {
     }
   }, [user, navigate]);
 
-  // Fetch orders and statistics (current month only)
+  // Fetch orders and statistics (selected month)
   const fetchData = async (showRefreshMessage = false) => {
     try {
       setIsRefreshing(showRefreshMessage);
       
-      // Get current month date range
-      const now = new Date();
-      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      // Parse selected month (format: YYYY-MM)
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const startOfSelectedMonth = new Date(year, month - 1, 1);
+      const endOfSelectedMonth = new Date(year, month, 0, 23, 59, 59);
       
-      // Add current month filter to existing filters
+      // Debug: Log the date range to verify
+      console.log(`🔍 Date range for ${selectedMonth}:`, {
+        start: startOfSelectedMonth.toISOString(),
+        end: endOfSelectedMonth.toISOString(),
+        startDate: startOfSelectedMonth.toLocaleDateString(),
+        endDate: endOfSelectedMonth.toLocaleDateString()
+      });
+      
+      // Add selected month filter to existing filters
       const monthlyFilters = {
         ...filters,
-        date_from: startOfCurrentMonth.toISOString().split('T')[0], // YYYY-MM-DD format
-        date_to: endOfCurrentMonth.toISOString().split('T')[0]
+        date_from: startOfSelectedMonth.toISOString(), // Full ISO string with time
+        date_to: endOfSelectedMonth.toISOString() // Full ISO string with time
       };
       
       const [ordersData, statsData, csStatsData] = await Promise.all([
         getAllOrderSubmissions(monthlyFilters),
-        getOrderStatistics(user?.id || '', true),
-        getCustomerServiceOrderStats()
+        getOrderStatistics(user?.id || '', true, {
+          date_from: startOfSelectedMonth.toISOString(),
+          date_to: endOfSelectedMonth.toISOString()
+        }),
+        getCustomerServiceOrderStats({
+          date_from: startOfSelectedMonth.toISOString(),
+          date_to: endOfSelectedMonth.toISOString()
+        })
       ]);
+      
+      // Debug: Log first few orders to check their dates
+      if (ordersData.length > 0) {
+        console.log(`🔍 First 3 orders for ${selectedMonth}:`, ordersData.slice(0, 3).map(order => ({
+          orderNumber: order.order_number,
+          createdAt: order.created_at,
+          createdAtDate: new Date(order.created_at || '').toLocaleDateString(),
+          createdAtTime: new Date(order.created_at || '').toLocaleTimeString()
+        })));
+      }
       
       setOrders(ordersData);
       setFilteredOrders(ordersData);
       setStats(statsData);
       setCustomerServiceStats(csStatsData);
       
-      if (showRefreshMessage) {
-        const monthName = startOfCurrentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        toast.success(`${monthName} orders refreshed successfully (${ordersData.length} orders)`);
-      }
+              if (showRefreshMessage) {
+          const monthName = startOfSelectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          toast.success(`${monthName} orders refreshed successfully (${ordersData.length} orders)`);
+        }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load orders');
@@ -513,7 +543,7 @@ const AdminTotalOrdersPage: React.FC = () => {
   // Auto-sync functionality
   useEffect(() => {
     const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
-    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist', 'Digital Solution Manager'];
     if (!autoSyncEnabled || !user) return;
     
     if (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) return;
@@ -529,11 +559,18 @@ const AdminTotalOrdersPage: React.FC = () => {
   // Initial data load
   useEffect(() => {
     const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
-    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist', 'Senior CRM Pharmacist', 'Digital Solution Manager'];
     if (user && (allowedRoles.includes(user.role as string) || allowedPositions.includes(user.position))) {
       fetchData();
     }
   }, [user]);
+
+  // Refetch data when selected month changes
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [selectedMonth]);
 
   // Apply filters
   useEffect(() => {
@@ -622,9 +659,35 @@ const AdminTotalOrdersPage: React.FC = () => {
     }, 100);
   };
 
+  // Calculate real statistics from filtered orders
+  const calculateRealStats = () => {
+    const totalOrders = filteredOrders.length;
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const pendingOrders = filteredOrders.filter(order => order.status === 'pending').length;
+    const processingOrders = filteredOrders.filter(order => order.status === 'processing').length;
+    const completedOrders = filteredOrders.filter(order => order.status === 'completed' || order.status === 'delivered').length;
+    const shippedOrders = filteredOrders.filter(order => order.status === 'shipped').length;
+    const cancelledOrders = filteredOrders.filter(order => order.status === 'cancelled' || order.status === 'tamara-o-canceled').length;
+    const refundedOrders = filteredOrders.filter(order => order.status === 'refunded').length;
+
+    return {
+      total_orders: totalOrders,
+      total_revenue: totalRevenue,
+      pending_orders: pendingOrders,
+      processing_orders: processingOrders,
+      completed_orders: completedOrders,
+      shipped_orders: shippedOrders,
+      cancelled_orders: cancelledOrders,
+      refunded_orders: refundedOrders
+    };
+  };
+
+  // Get real statistics
+  const realStats = calculateRealStats();
+
   // Calculate revenue for each status category
   const calculateStatusRevenue = (status: string) => {
-    return orders
+    return filteredOrders
       .filter(order => {
         if (status === 'completed_and_delivered') {
           return order.status === 'completed' || order.status === 'delivered';
@@ -810,7 +873,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
 
   // Don't render if user doesn't have access
       const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
-    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist'];
+    const allowedPositions = ['Media Buyer', 'Junior CRM Specialist', 'Senior CRM Pharmacist', 'Digital Solution Manager'];
     if (!user) {
       return (
         <div className="min-h-screen flex items-center justify-center">
@@ -822,16 +885,19 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
       );
     }
     
-    if (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking permissions...</p>
+    // Digital Solution Manager has access to everything
+    if (user.position === 'Digital Solution Manager') {
+      // Continue to render the page
+    } else if (!allowedRoles.includes(user.role as string) && !allowedPositions.includes(user.position)) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Checking permissions...</p>
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
   if (isLoading) {
     return (
@@ -852,14 +918,42 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
           <div className="flex-1">
             <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2 md:gap-3">
               <SARIcon className="h-6 w-6 md:h-8 md:w-8" />
-              Total Orders - {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              Total Orders - {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h1>
             <p className="mt-1 md:mt-2 text-purple-100 dark:text-purple-200 text-sm md:text-base">
-              Admin dashboard - Current month order submissions ({filteredOrders.length} orders)
+              Admin dashboard - {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} order submissions ({filteredOrders.length} orders)
               {totalPages > 1 && ` • Page ${currentPage} of ${totalPages}`}
             </p>
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:gap-2 w-full sm:w-auto sm:items-center sm:justify-end mt-3 sm:mt-0">
+            {/* Month Filter */}
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white hover:bg-white/20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(() => {
+                  const months = [];
+                  const now = new Date();
+                  const currentYear = now.getFullYear();
+                  const currentMonth = now.getMonth();
+                  
+                  // Generate last 24 months (current month and 23 previous months)
+                  for (let i = 0; i <= 23; i++) {
+                    const date = new Date(currentYear, currentMonth - i, 1);
+                    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    months.push({ value, label });
+                  }
+                  // Reverse to show current month first
+                  return months.reverse().map(month => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ));
+                })()}
+              </SelectContent>
+            </Select>
             <Button
               onClick={() => setViewMode(viewMode === 'orders' ? 'stats' : 'orders')}
               variant="outline"
@@ -949,8 +1043,8 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.total_orders}</p>
-                <p className="text-sm font-medium text-blue-600">{stats.total_revenue.toFixed(2)} SAR</p>
+                <p className="text-2xl font-bold text-blue-600">{realStats.total_orders}</p>
+                <p className="text-sm font-medium text-blue-600">{realStats.total_revenue.toFixed(2)} SAR</p>
               </div>
               <Package className="h-8 w-8 text-blue-600" />
             </div>
@@ -966,7 +1060,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Delivered</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed_orders}</p>
+                <p className="text-2xl font-bold text-green-600">{realStats.completed_orders}</p>
                 <p className="text-sm font-medium text-green-600">{calculateStatusRevenue('completed_and_delivered').toFixed(2)} SAR</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -983,7 +1077,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Processing</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.processing_orders}</p>
+                <p className="text-2xl font-bold text-blue-600">{realStats.processing_orders}</p>
                 <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('processing').toFixed(2)} SAR</p>
               </div>
               <Settings className="h-8 w-8 text-blue-600" />
@@ -1000,7 +1094,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.pending_orders}</p>
+                <p className="text-2xl font-bold text-orange-600">{realStats.pending_orders}</p>
                 <p className="text-sm font-medium text-orange-600">{calculateStatusRevenue('pending').toFixed(2)} SAR</p>
               </div>
               <Clock className="h-8 w-8 text-orange-600" />
@@ -1017,7 +1111,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Shipped</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.shipped_orders}</p>
+                <p className="text-2xl font-bold text-blue-600">{realStats.shipped_orders}</p>
                 <p className="text-sm font-medium text-blue-600">{calculateStatusRevenue('shipped').toFixed(2)} SAR</p>
               </div>
               <Truck className="h-8 w-8 text-blue-600" />
@@ -1034,7 +1128,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Cancelled</p>
-                <p className="text-2xl font-bold text-red-600">{stats.cancelled_orders}</p>
+                <p className="text-2xl font-bold text-red-600">{realStats.cancelled_orders}</p>
                 <p className="text-sm font-medium text-red-600">{calculateStatusRevenue('cancelled').toFixed(2)} SAR</p>
               </div>
               <XCircle className="h-8 w-8 text-red-600" />
@@ -1051,7 +1145,7 @@ ${(order.total_amount || 0).toFixed(0)} ريال سعودي`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Refunded</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.refunded_orders}</p>
+                <p className="text-2xl font-bold text-purple-600">{realStats.refunded_orders}</p>
                 <p className="text-sm font-medium text-purple-600">{calculateStatusRevenue('refunded').toFixed(2)} SAR</p>
               </div>
               <RotateCcw className="h-8 w-8 text-purple-600" />

@@ -118,7 +118,7 @@ const TeamReportsPage = () => {
        const teamEmployees = employeesData.filter(emp => 
          (emp.team === 'Content & Creative Department' || 
          ['Content Creator', 'Designer', 'Media Buyer'].includes(emp.position)) &&
-         !['Executive Director', 'Content & Creative Manager'].includes(emp.position)
+         !['Executive Director', 'General Manager', 'Content & Creative Manager'].includes(emp.position)
        );
       
       console.log('👥 Team Members Found:', teamEmployees.length);
@@ -231,7 +231,21 @@ const TeamReportsPage = () => {
     setCurrentPage(page);
   };
 
-  if (!user || user.role !== 'content_creative_manager') {
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
+          <p className="text-gray-600 mt-2">This page is only accessible to Content & Creative Managers.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user.role !== 'content_creative_manager') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

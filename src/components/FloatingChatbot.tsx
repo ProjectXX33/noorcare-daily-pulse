@@ -3823,31 +3823,31 @@ Would you like help implementing any of these recommendations?`;
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
               onMouseEnter={() => {
-                // Allow hover effects for Junior CRM Specialist and Media Buyer users
-                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
+                // Allow hover effects for Junior CRM Specialist, Senior CRM Pharmacist, Media Buyer, Digital Solution Manager, and General Manager users
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Senior CRM Pharmacist' || user?.position === 'Media Buyer' || user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
                   setIsHovered(true);
                 }
               }}
               onMouseLeave={() => {
-                // Allow hover effects for Junior CRM Specialist and Media Buyer users
-                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
+                // Allow hover effects for Junior CRM Specialist, Senior CRM Pharmacist, Media Buyer, Digital Solution Manager, and General Manager users
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Senior CRM Pharmacist' || user?.position === 'Media Buyer' || user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
                   setIsHovered(false);
                 }
               }}
               onClick={() => {
-                // Allow Junior CRM Specialist and Media Buyer users to open the chatbot
-                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer') {
+                // Allow Junior CRM Specialist, Senior CRM Pharmacist, Media Buyer, Digital Solution Manager, and General Manager users to open the chatbot
+                if (user?.position === 'Junior CRM Specialist' || user?.position === 'Senior CRM Pharmacist' || user?.position === 'Media Buyer' || user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
                   setIsOpen(true);
                 } else {
                   // Show a toast notification for other users
-                  toast.info('🤖 Chatbot is only available for Junior CRM Specialist and Media Buyer users.', {
+                  toast.info('🤖 Chatbot is only available for Junior CRM Specialist, Senior CRM Pharmacist, Media Buyer, Digital Solution Manager, and General Manager users.', {
                     description: 'This chatbot is designed for product search, customer support, and marketing activities. Please contact your administrator if you need access.',
                     duration: 3000,
                   });
                 }
               }}
               className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r ${roleColors.gradient} shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 active:scale-95 border-2 border-white ${
-                user?.position === 'Junior CRM Specialist' || user?.position === 'Media Buyer'
+                user?.position === 'Junior CRM Specialist' || user?.position === 'Senior CRM Pharmacist' || user?.position === 'Media Buyer' || user?.position === 'Digital Solution Manager' || user?.position === 'General Manager'
                   ? 'cursor-pointer hover:scale-110' 
                   : 'cursor-not-allowed opacity-60'
               }`}

@@ -1566,13 +1566,16 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
   const filteredNavGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
+      // Digital Solution Manager has access to everything - bypass all restrictions
+      if (user?.position === 'Digital Solution Manager') return true;
+      
       if (item.adminOnly && user?.role !== 'admin') return false;
       if (item.employeeOnly && user?.role === 'admin') return false;
       if (item.managerRole && user?.role !== item.managerRole) return false;
       if (item.customerServiceAndDesignerOnly && user?.position !== 'Junior CRM Specialist' && user?.position !== 'Designer') return false;
-      if (item.customerServiceOnly && user?.position !== 'Junior CRM Specialist' && user?.role !== 'customer_retention_manager' && user?.position !== 'Executive Director') return false;
-      // For Executive Director, only show Total Orders, hide other customer service tools
-      if (user?.position === 'Executive Director' && item.customerServiceOnly && item.name !== 'Total Orders') return false;
+      if (item.customerServiceOnly && user?.position !== 'Junior CRM Specialist' && user?.position !== 'Senior CRM Pharmacist' && user?.role !== 'customer_retention_manager' && user?.position !== 'Executive Director') return false;
+      // For Executive Director and General Manager, only show Total Orders, hide other customer service tools
+      if ((user?.position === 'Executive Director' || (user?.position as string) === 'General Manager') && item.customerServiceOnly && item.name !== 'Total Orders') return false;
       // Hide Dashboard for Customer Retention Manager only
       if (item.name === 'Dashboard' && user?.role === 'customer_retention_manager') return false;
       if (item.shiftsAccess && !(user?.role === 'admin' || user?.role === 'employee' || user?.role === 'customer_retention_manager')) return false;
@@ -1596,8 +1599,13 @@ const SidebarNavigation = ({ children }: SidebarNavigationProps) => {
       return true;
     })
       })).filter(group => {
-        // Hide Employee Management group for Designer users, Junior CRM Specialist, and E-commerce Manager
-        if (group.label === 'Employee Management' && (user?.position === 'Designer' || user?.position === 'Junior CRM Specialist' || user?.role === 'ecommerce_manager')) {
+        // Digital Solution Manager can see all groups
+        if (user?.position === 'Digital Solution Manager') {
+          return group.items.length > 0; // Only show groups that have items
+        }
+        
+        // Hide Employee Management group for Designer users, Junior CRM Specialist, Senior CRM Pharmacist, and E-commerce Manager
+        if (group.label === 'Employee Management' && (user?.position === 'Designer' || user?.position === 'Junior CRM Specialist' || user?.position === 'Senior CRM Pharmacist' || user?.role === 'ecommerce_manager')) {
           return false;
         }
         // Hide Communication group for E-commerce Manager

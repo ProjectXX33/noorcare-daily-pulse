@@ -47,7 +47,10 @@ const AdminReportsPage = () => {
     setReports(workReports);
   }, [workReports]);
 
-  if (!user || user.role !== 'admin') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (!user || user.role !== 'admin') {
     return null;
   }
 

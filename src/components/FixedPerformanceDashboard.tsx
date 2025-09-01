@@ -590,7 +590,10 @@ const FixedPerformanceDashboard: React.FC<FixedPerformanceDashboardProps> = ({
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  // Digital Solution Manager has access to everything
+  if (user?.position === 'Digital Solution Manager') {
+    // Continue to render the component
+  } else if (!user || user.role !== 'admin') {
     return null;
   }
 

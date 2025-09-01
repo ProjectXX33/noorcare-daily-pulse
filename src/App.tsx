@@ -173,6 +173,13 @@ const PrivateRoute = ({ children, allowedRoles }: { children: React.ReactNode, a
 
 // Admin route component to protect routes that require admin role
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   return (
     <PrivateRoute allowedRoles={['admin']}>
       {children}
@@ -182,6 +189,13 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Employee route component to protect routes that require employee role
 const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   return (
     <PrivateRoute allowedRoles={['employee', 'content_creative_manager', 'customer_retention_manager', 'ecommerce_manager']}>
       {children}
@@ -189,16 +203,21 @@ const EmployeeRoute = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// Employee Dashboard route - for regular employees (not Junior CRM Specialist)
+// Employee Dashboard route - for regular employees (not Junior CRM Specialist or Senior CRM Pharmacist)
 const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  // Junior CRM Specialist users should stay on this dashboard
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
+  // Junior CRM Specialist and Senior CRM Pharmacist users should stay on this dashboard
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   
-  if (user.position === 'Junior CRM Specialist') {
+  if (user.position === 'Junior CRM Specialist' || user.position === 'Senior CRM Pharmacist') {
     return (
       <PrivateRoute allowedRoles={['employee']}>
         {children}
@@ -217,13 +236,18 @@ const EmployeeDashboardRoute = ({ children }: { children: React.ReactNode }) => 
 const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }
   
-  if (user.position !== 'Junior CRM Specialist') {
+  if (user.position !== 'Junior CRM Specialist' && user.position !== 'Senior CRM Pharmacist') {
     if (user?.role === 'admin') {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/login" replace />;
     } else if ((user as any).position === 'Content Creator') {
       return <Navigate to="/copy-writing-dashboard" replace />;
     } else {
@@ -238,7 +262,12 @@ const CustomerServiceRoute = ({ children }: { children: React.ReactNode }) => {
 const CustomerServiceAndRetentionRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
-  const allowedPositions = ['Junior CRM Specialist'];
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
+  const allowedPositions = ['Junior CRM Specialist', 'Senior CRM Pharmacist'];
   const allowedRoles = ['admin', 'customer_retention_manager', 'executive_director'];
   
   if (!user) {
@@ -262,6 +291,11 @@ const CustomerServiceAndRetentionRoute = ({ children }: { children: React.ReactN
 const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -282,6 +316,11 @@ const MediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
 // Designer route component for designer-only access
 const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
+  
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
   
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -304,6 +343,11 @@ const DesignerRoute = ({ children }: { children: React.ReactNode }) => {
 const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -318,6 +362,11 @@ const CopyWritingRoute = ({ children }: { children: React.ReactNode }) => {
 // Strategy route component for admin and media buyer access
 const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
+  
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
   
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -334,6 +383,11 @@ const StrategyRoute = ({ children }: { children: React.ReactNode }) => {
 const AdminAndMediaBuyerRoute = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -347,6 +401,13 @@ const AdminAndMediaBuyerRoute = ({ children }: { children: React.ReactNode }) =>
 
 // Warehouse route component for warehouse role access
 const WarehouseRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  
+  // Digital Solution Manager and General Manager have full access to everything
+  if (user?.position === 'Digital Solution Manager' || user?.position === 'General Manager') {
+    return <>{children}</>;
+  }
+  
   return (
     <PrivateRoute allowedRoles={['warehouse']}>
       {children}

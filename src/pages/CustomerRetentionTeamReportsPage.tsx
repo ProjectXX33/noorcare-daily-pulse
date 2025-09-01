@@ -95,7 +95,7 @@ const CustomerRetentionTeamReportsPage = () => {
       const teamEmployees = employeesData.filter(emp => 
         (emp.team === 'Customer Retention Department' || 
         ['Junior CRM Specialist', 'Customer Retention Specialist'].includes(emp.position)) &&
-        !['Executive Director', 'Customer Retention Manager'].includes(emp.position)
+        !['Executive Director', 'General Manager', 'Customer Retention Manager'].includes(emp.position)
       );
       
       console.log('👥 Team Members Found:', teamEmployees.length);
@@ -180,7 +180,27 @@ const CustomerRetentionTeamReportsPage = () => {
 
   const totalPages = Math.ceil(filteredReports.length / reportsPerPage);
 
-  if (!user || user.role !== 'customer_retention_manager') {
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground">
+              You don't have permission to access this page.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Digital Solution Manager has access to everything
+  if (user.position === 'Digital Solution Manager') {
+    // Continue to render the page
+  } else if (user.role !== 'customer_retention_manager') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card className="w-96">
