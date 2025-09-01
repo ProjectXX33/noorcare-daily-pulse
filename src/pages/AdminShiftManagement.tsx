@@ -229,17 +229,17 @@ const AdminShiftManagement = () => {
         // More flexible filtering for Customer Retention Manager
         filteredEmployees = (data || []).filter(emp => 
           (emp.team === 'Customer Retention Department' || emp.team === null) && 
-          ['Junior CRM Specialist'].includes(emp.position)
+          ['Junior CRM Specialist', 'Senior CRM Pharmacist', 'Customer Retention Specialist'].includes(emp.position)
         );
         console.log('🔍 Customer Retention Manager - All employees:', data);
         console.log('🔍 Customer Retention Manager - Filtered employees:', filteredEmployees);
         
-        // If no team-specific employees found, show all Junior CRM Specialists
+        // If no team-specific employees found, show all CRM positions
         if (filteredEmployees.length === 0) {
           filteredEmployees = (data || []).filter(emp => 
-            ['Junior CRM Specialist'].includes(emp.position)
+            ['Junior CRM Specialist', 'Senior CRM Pharmacist', 'Customer Retention Specialist'].includes(emp.position)
           );
-          console.log('🔍 Customer Retention Manager - Fallback to all Junior CRM Specialists:', filteredEmployees);
+          console.log('🔍 Customer Retention Manager - Fallback to all CRM positions:', filteredEmployees);
         }
       }
       

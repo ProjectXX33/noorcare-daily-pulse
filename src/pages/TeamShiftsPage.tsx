@@ -251,13 +251,66 @@ const TeamShiftsPage = () => {
       // Filter by team based on user role
       if (user?.role === 'content_creative_manager') {
         query = query.or('team.eq.Content & Creative Department,position.in.(Copy Writing,Designer,Media Buyer)');
+        console.log('🔍 Content Creative Manager filter applied');
       } else if (user?.role === 'customer_retention_manager') {
-        query = query.or('team.eq.Customer Retention Department,position.in.(Junior CRM Specialist,Customer Retention Specialist)');
+        // More flexible filter for Customer Retention Manager
+        query = query.or('team.eq.Customer Retention Department,position.in.(Junior CRM Specialist,Senior CRM Pharmacist,Customer Retention Specialist)');
+        console.log('🔍 Customer Retention Manager filter applied - looking for positions: Junior CRM Specialist, Senior CRM Pharmacist, Customer Retention Specialist');
+        
+        // Also try to find any CRM-related positions that might not be in the team
+        console.log('🔍 Additional debug: Checking if any CRM positions exist outside the team filter');
+        
+        // Debug: Let's also check what positions actually exist in the database
+        try {
+          const { data: positionData, error: positionError } = await supabase
+            .from('users')
+            .select('position')
+            .eq('role', 'employee');
+          
+          if (positionError) {
+            console.error('🔍 Position debug query error:', positionError);
+          } else {
+            const uniquePositions = [...new Set(positionData?.map(p => p.position) || [])];
+            console.log('🔍 All available positions in database:', uniquePositions);
+          }
+        } catch (positionErr) {
+          console.error('🔍 Position debug query failed:', positionErr);
+        }
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
+
+      console.log('🔍 Team employees query result:', {
+        userRole: user?.role,
+        totalEmployees: data?.length || 0,
+        employees: data?.map(emp => ({
+          name: emp.name,
+          position: emp.position,
+          team: emp.team,
+          role: emp.role
+        }))
+      });
+
+      // Debug: Check if Dr. Khloud exists in the database at all
+      if (user?.role === 'customer_retention_manager' && data?.length === 0) {
+        console.log('🔍 No employees found - checking if Dr. Khloud exists in database...');
+        try {
+          const { data: debugData, error: debugError } = await supabase
+            .from('users')
+            .select('name, position, team, role')
+            .or('name.ilike.%khloud%,name.ilike.%Khloud%');
+          
+          if (debugError) {
+            console.error('🔍 Debug query error:', debugError);
+          } else {
+            console.log('🔍 Debug query result for Khloud:', debugData);
+          }
+        } catch (debugErr) {
+          console.error('🔍 Debug query failed:', debugErr);
+        }
+      }
 
       const employees: User[] = data.map(item => ({
         id: item.id,
