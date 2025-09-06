@@ -1,5 +1,35 @@
 import { supabase } from '@/lib/supabase';
 import { User, Task } from '@/types';
+import { OrderSubmission } from '@/lib/orderSubmissionsApi';
+
+// Month filtering function (same as Warehouse Dashboard)
+const getMonthFilteredOrders = (orders: any[], monthFilter: string): any[] => {
+  if (monthFilter === 'all') {
+    return orders;
+  }
+  
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date;
+  
+  if (monthFilter === 'current') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (monthFilter === 'previous') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  } else {
+    // Specific month (format: "YYYY-MM")
+    const [year, month] = monthFilter.split('-').map(Number);
+    startDate = new Date(year, month - 1, 1);
+    endDate = new Date(year, month, 0, 23, 59, 59);
+  }
+  
+  return orders.filter((order) => {
+    const orderDate = new Date(order.created_at || '');
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+};
 
 export interface ContentCreativeStats {
   totalMembers: number;
@@ -83,8 +113,12 @@ export async function getContentCreativeTeamMembers(): Promise<User[]> {
   }
 }
 
-// Get team statistics for Content & Creative Department
-export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
+// Get team statistics for Content & Creative Department with optional date filtering
+export async function getContentCreativeStats(dateFilters?: { 
+  from?: string; 
+  to?: string;
+  monthFilter?: string; // Add month filter option like Warehouse Dashboard
+}): Promise<ContentCreativeStats> {
   console.log('🚀 getContentCreativeStats function called!');
   try {
     console.log('🔍 Getting team members...');
@@ -121,23 +155,38 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
           console.log('🔍 Active check-ins found:', activeCheckIns?.length || 0);
       console.log('🔍 Active check-ins details:', activeCheckIns);
     
-    // Get current month date range for WooCommerce data
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    // Get date range for order filtering
+    let firstDayOfMonth: string;
+    let lastDayOfMonth: string;
     
-    // For August 2025, use hardcoded dates to ensure we get the right data
-    const firstDayOfMonth = '2025-08-01';
-    const lastDayOfMonth = '2025-08-31';
+    if (dateFilters?.from && dateFilters?.to) {
+      firstDayOfMonth = dateFilters.from;
+      lastDayOfMonth = dateFilters.to;
+      console.log('📅 Using provided date filters:', { firstDayOfMonth, lastDayOfMonth });
+    } else {
+      // Fallback to current month if no filters provided
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+      lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+      console.log('📅 Using current month as fallback:', { firstDayOfMonth, lastDayOfMonth });
+    }
     
-    console.log('📅 Date range for August:', { firstDayOfMonth, lastDayOfMonth, currentMonth, currentYear });
+    // Verify the complete month range
+    const startDate = new Date(firstDayOfMonth);
+    const endDate = new Date(lastDayOfMonth);
+    const daysInRange = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
-    // For debugging, let's also check what month we're actually in
-    console.log('📅 Current date info:', {
-      now: now.toISOString(),
-      currentMonth: currentMonth,
-      currentYear: currentYear,
-      monthName: now.toLocaleString('default', { month: 'long' })
+    console.log('📅 Complete Month Range Verification:', {
+      startDate: firstDayOfMonth,
+      endDate: lastDayOfMonth,
+      startDay: startDate.getDate(),
+      endDay: endDate.getDate(),
+      daysInRange: daysInRange,
+      month: startDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      queryRange: `${firstDayOfMonth}T00:00:00 to ${lastDayOfMonth}T23:59:59`,
+      capturesCompleteMonth: startDate.getDate() === 1 && endDate.getDate() >= 28
     });
     
     // Get tasks for team members
@@ -219,14 +268,102 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
       let completedOrdersData: any[] = [];
       try {
         console.log('🔍 Building Supabase query...');
+        console.log('🔍 Content & Creative Team Member IDs:', teamMemberIds);
+        
+        // Query ALL order submissions in the date range first to see what we have
+        console.log('🔍 Step 1: Getting ALL orders in date range for analysis...');
+        const allOrdersQuery = supabase
+          .from('order_submissions')
+          .select('total_amount, status, created_at, woocommerce_order_id, created_by_user_id, created_by_name, order_number')
+          .gte('created_at', `${firstDayOfMonth}T00:00:00`)
+          .lte('created_at', `${lastDayOfMonth}T23:59:59`);
+          
+        const { data: allOrdersData, error: allOrdersError } = await allOrdersQuery;
+        
+        if (allOrdersError) {
+          console.error('❌ All Orders error:', allOrdersError);
+          throw allOrdersError;
+        }
+        
+        console.log('📊 ALL ORDERS ANALYSIS:');
+        console.log('  📦 Total orders in date range:', allOrdersData?.length || 0);
+        
+        if (allOrdersData && allOrdersData.length > 0) {
+          // Analyze all orders by status
+          const statusBreakdown = allOrdersData.reduce((acc, order) => {
+            acc[order.status] = (acc[order.status] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('  📈 Status breakdown (ALL orders):', statusBreakdown);
+          
+          // Analyze orders by who created them
+          const creatorBreakdown = allOrdersData.reduce((acc, order) => {
+            const creator = order.created_by_name || 'Unknown';
+            acc[creator] = (acc[creator] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('  👤 Creator breakdown (ALL orders):', creatorBreakdown);
+          
+          // Show completed/delivered orders specifically
+          const completedInRange = allOrdersData.filter(order => 
+            ['completed', 'delivered'].includes(order.status)
+          );
+          console.log('  ✅ Completed/Delivered orders in range:', completedInRange.length);
+          
+          // Show ALL completed orders for detailed analysis
+          console.log('  📋 ALL COMPLETED ORDERS DETAILS:');
+          completedInRange.forEach((order, index) => {
+            console.log(`    ${index + 1}. Order #${order.order_number}:`);
+            console.log(`       Status: ${order.status}`);
+            console.log(`       Creator: ${order.created_by_name || 'Unknown'}`);
+            console.log(`       Amount: ${order.total_amount} SAR`);
+            console.log(`       WooCommerce ID: ${order.woocommerce_order_id || 'Not synced'}`);
+            console.log(`       Created: ${order.created_at}`);
+          });
+          
+          // Check which orders have WooCommerce IDs vs don't
+          const syncedOrders = completedInRange.filter(o => o.woocommerce_order_id);
+          const unsyncedOrders = completedInRange.filter(o => !o.woocommerce_order_id);
+          
+          console.log('  🔄 SYNC ANALYSIS:');
+          console.log(`    📤 Orders synced to WooCommerce: ${syncedOrders.length}`);
+          console.log(`    ⏳ Orders NOT synced to WooCommerce: ${unsyncedOrders.length}`);
+          
+          if (unsyncedOrders.length > 0) {
+            console.log('  📋 UNSYNCED ORDERS:');
+            unsyncedOrders.forEach((order, index) => {
+              console.log(`    ${index + 1}. Order #${order.order_number} - ${order.status} - ${order.created_by_name}`);
+            });
+          }
+          
+          // Check if there are orders with different statuses that might be considered "completed"
+          const statusCounts = {
+            completed: allOrdersData.filter(o => o.status === 'completed').length,
+            delivered: allOrdersData.filter(o => o.status === 'delivered').length,
+            processing: allOrdersData.filter(o => o.status === 'processing').length,
+            pending: allOrdersData.filter(o => o.status === 'pending').length,
+            shipped: allOrdersData.filter(o => o.status === 'shipped').length,
+            cancelled: allOrdersData.filter(o => o.status === 'cancelled').length,
+            'tamara-o-canceled': allOrdersData.filter(o => o.status === 'tamara-o-canceled').length
+          };
+          
+          console.log('  📊 DETAILED STATUS BREAKDOWN:');
+          Object.entries(statusCounts).forEach(([status, count]) => {
+            if (count > 0) {
+              console.log(`    ${status}: ${count} orders`);
+            }
+          });
+        }
+        
+        // Now query ALL orders first (like Warehouse Dashboard), then filter in memory
+        console.log('🔍 Step 2: Getting ALL orders to filter like Warehouse Dashboard...');
+        console.log('💡 Using same approach as Warehouse Dashboard - load all orders then filter');
+        
         const query = supabase
           .from('order_submissions')
-          .select('total_amount, status, created_at, woocommerce_order_id')
-          .gte('created_at', `${firstDayOfMonth}T00:00:00`)
-          .lte('created_at', `${lastDayOfMonth}T23:59:59`)
-          .in('status', ['completed', 'delivered']); // Use the exact statuses from your database
+          .select('total_amount, status, created_at, woocommerce_order_id, created_by_user_id, created_by_name, order_number');
           
-        console.log('🔍 Executing query...');
+        console.log('🔍 Executing completed & synced orders query...');
         const { data, error: ordersError } = await query;
           
         if (ordersError) {
@@ -234,9 +371,43 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
           throw ordersError;
         }
         
-        completedOrdersData = data || [];
-        console.log('✅ Completed orders fetched successfully');
-        console.log('📊 Completed orders data:', completedOrdersData);
+        const allOrdersForAnalysis = data || [];
+        console.log('✅ ALL orders fetched successfully');
+        console.log('📊 ALL ORDERS LOADED (like Warehouse Dashboard):', allOrdersForAnalysis?.length || 0);
+        
+        // Use the same month filtering logic as Warehouse Dashboard
+        const monthFilter = dateFilters?.monthFilter || 'current';
+        console.log('🔍 Applying month filter:', monthFilter);
+        
+        const monthFilteredOrders = getMonthFilteredOrders(allOrdersForAnalysis, monthFilter);
+        console.log('📊 Month filtered orders:', monthFilteredOrders?.length || 0);
+        
+        // Apply the same status filtering as Warehouse Dashboard: delivered OR completed
+        completedOrdersData = monthFilteredOrders.filter(o => 
+          o.status === 'delivered' || o.status === 'completed'
+        );
+        
+        console.log('📊 WAREHOUSE DASHBOARD STYLE FILTERING:');
+        console.log('  📦 Month filtered orders:', monthFilteredOrders?.length || 0);
+        console.log('  ✅ Delivered + Completed orders:', completedOrdersData?.length || 0);
+        console.log('  🎯 This should match Warehouse Dashboard delivered count');
+        
+        if (completedOrdersData && completedOrdersData.length > 0) {
+          console.log('  📋 Delivered + Completed orders details:', completedOrdersData.map(o => ({
+            orderNumber: o.order_number,
+            status: o.status,
+            creator: o.created_by_name,
+            amount: o.total_amount,
+            woocommerce_id: o.woocommerce_order_id || 'Not synced'
+          })));
+          
+          const totalRevenue = completedOrdersData.reduce((sum, order) => 
+            sum + (order.total_amount || 0), 0
+          );
+          console.log('  💰 Revenue from delivered + completed orders:', totalRevenue);
+        } else {
+          console.log('  ⚠️ No delivered + completed orders found');
+        }
       } catch (ordersCatchError) {
         console.error('❌ Orders catch error:', ordersCatchError);
         // Don't throw, just set to empty array
@@ -272,11 +443,11 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
         processingOrders = 0;
         pendingOrders = 0;
         
-        console.log('🎯 Data Source: Order Submissions Table (Completed Orders Only)');
+        console.log('🎯 Data Source: Order Submissions Table (Warehouse Dashboard Style)');
         
-        console.log('📊 REAL-TIME ORDER SUBMISSIONS ANALYTICS:');
-        console.log('  🛍️ Delivered & Completed Orders (Real-time):', totalOrders);
-        console.log('  💰 Total Revenue from Delivered & Completed Orders (Real-time): SAR', totalRevenue);
+        console.log('📊 WAREHOUSE STYLE ANALYTICS:');
+        console.log('  🛍️ Delivered + Completed Orders:', totalOrders);
+        console.log('  💰 Revenue from Delivered + Completed Orders: SAR', totalRevenue);
         console.log('  📈 Order Status Breakdown:', {
           completed: completedOrders,
           processing: processingOrders,
@@ -363,10 +534,10 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
     const completedTasks = tasks?.filter(task => task.status === 'Complete').length || 0;
     const pendingTasks = tasks?.filter(task => task.status !== 'Complete').length || 0;
     
-    console.log('💰 FINAL ORDER SUBMISSIONS ANALYTICS:');
-    console.log('🛍️ Delivered & Completed Orders:', totalOrders);
-    console.log('💵 Net Sales from Delivered & Completed Orders: SAR', totalRevenue);
-    console.log('🎯 Data Source: Order Submissions Table (Delivered & Completed Orders)');
+    console.log('💰 FINAL ANALYTICS (WAREHOUSE DASHBOARD STYLE):');
+    console.log('🛍️ Delivered + Completed Orders:', totalOrders);
+    console.log('💵 Revenue from Delivered + Completed Orders: SAR', totalRevenue);
+    console.log('🎯 Data Source: Order Submissions (Warehouse Dashboard Style)');
     
     // Filter active check-ins to only include team members
     const teamActiveCheckIns = activeCheckIns?.filter(checkIn => 
@@ -521,11 +692,11 @@ export async function getContentCreativeStats(): Promise<ContentCreativeStats> {
       }
     };
     
-    console.log('📊 Final Stats Breakdown:');
-    console.log('  👥 Total Members:', teamMembers.length);
-    console.log('  ✅ Active Today (check-ins):', teamActiveCheckInsDirect.length);
-    console.log('  📦 Completed Orders:', completedOrders);
-    console.log('  💰 Total Revenue:', totalRevenue);
+    console.log('📊 Final Dashboard Stats Breakdown:');
+    console.log('  👥 Content & Creative Team Members:', teamMembers.length);
+    console.log('  ✅ Team Members Active Today:', teamActiveCheckInsDirect.length);
+    console.log('  📦 Delivered + Completed Orders (Warehouse Style):', completedOrders);
+    console.log('  💰 Revenue (From Delivered + Completed):', totalRevenue);
     console.log('  🔍 Team Members Found:', teamMembers.map(m => m.name));
     console.log('  🔍 Team Member IDs:', teamMemberIds);
     

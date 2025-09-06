@@ -61,6 +61,7 @@ import { useAutoSync } from '@/hooks/useAutoShiftsCalculation';
 import NotificationsMenu from '@/components/NotificationsMenu';
 import { createNotification } from '@/lib/notifications';
 import { playNotificationSound } from '@/lib/notifications';
+import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 
 
 // Riyal SVG Icon
@@ -214,6 +215,12 @@ const WarehouseDashboard: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncNewOrders, setLastSyncNewOrders] = useState(0);
   const [autoSyncActive, setAutoSyncActive] = useState(false);
+  
+  // Product details modal state
+  const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<number | undefined>();
+  const [selectedProductSku, setSelectedProductSku] = useState<string | undefined>();
+  const [selectedProductName, setSelectedProductName] = useState<string | undefined>();
   const [lastAutoSyncTime, setLastAutoSyncTime] = useState<Date | null>(null);
   const syncIntervalRef = useRef<{ newOrders: NodeJS.Timeout; regular: NodeJS.Timeout } | null>(null);
   const autoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1853,6 +1860,14 @@ const WarehouseDashboard: React.FC = () => {
     }
   };
 
+  const openProductDetails = (productId?: number, productSku?: string, productName?: string) => {
+    console.log('🔍 Opening product details for:', { productId, productSku, productName });
+    setSelectedProductId(productId);
+    setSelectedProductSku(productSku);
+    setSelectedProductName(productName);
+    setIsProductDetailsOpen(true);
+  };
+
   const getStatusBadge = (status: string = 'pending') => {
     // Map 'completed' to 'delivered' and 'tamara-o-canceled' to 'cancelled' for display
     let displayStatus = status;
@@ -3305,7 +3320,7 @@ const WarehouseDashboard: React.FC = () => {
                     )}
                     <div>
                       <Label className="text-xs font-medium text-gray-600">Address</Label>
-                      <p>
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {selectedOrder.billing_address_1}
                         {selectedOrder.billing_address_2 && `, ${selectedOrder.billing_address_2}`}
                         <br />
@@ -3445,9 +3460,20 @@ const WarehouseDashboard: React.FC = () => {
                           {item.sku && <p className="text-sm text-gray-600">SKU: {item.sku}</p>}
                           <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatPrice(parseFloat(item.price) * item.quantity)}</p>
-                          <p className="text-sm text-gray-600">{formatPrice(parseFloat(item.price))} each</p>
+                        <div className="text-right flex flex-col items-end gap-2">
+                          <div>
+                            <p className="font-medium">{formatPrice(parseFloat(item.price) * item.quantity)}</p>
+                            <p className="text-sm text-gray-600">{formatPrice(parseFloat(item.price))} each</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openProductDetails(item.product_id, item.sku, item.product_name)}
+                            className="flex items-center gap-1 text-xs"
+                          >
+                            <Info className="w-3 h-3" />
+                            View Details
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -3716,6 +3742,15 @@ const WarehouseDashboard: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal
+        isOpen={isProductDetailsOpen}
+        onClose={() => setIsProductDetailsOpen(false)}
+        productId={selectedProductId}
+        productSku={selectedProductSku}
+        productName={selectedProductName}
+      />
     </div>
   );
 };

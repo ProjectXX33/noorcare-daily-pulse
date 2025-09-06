@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { 
   Users, 
@@ -101,6 +102,91 @@ const ContentCreativeDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [language, setLanguage] = useState('en');
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>('current'); // 'current', 'previous', or specific month
+
+  // Helper function to get date range for selected month
+  const getDateRange = (monthFilter: string) => {
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+
+    if (monthFilter === 'previous') {
+      month -= 1;
+      if (month < 0) {
+        month = 11;
+        year -= 1;
+      }
+    } else if (monthFilter !== 'current') {
+      // Specific month format: 'YYYY-MM'
+      const [specificYear, specificMonth] = monthFilter.split('-').map(Number);
+      year = specificYear;
+      month = specificMonth - 1; // JavaScript months are 0-indexed
+    }
+
+    // First day of the month (always day 1)
+    const firstDay = new Date(year, month, 1);
+    
+    // Last day of the month - automatically handles 28/29/30/31 days
+    // new Date(year, month + 1, 0) gives us the last day of the current month
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // Get the day number to verify we have the complete month
+    const daysInMonth = lastDay.getDate();
+    
+    const dateRange = {
+      from: firstDay.toISOString().split('T')[0],
+      to: lastDay.toISOString().split('T')[0],
+      monthName: firstDay.toLocaleString('default', { month: 'long', year: 'numeric' }),
+      daysInMonth: daysInMonth
+    };
+    
+    // Log to verify we're getting the complete month
+    console.log('📅 Date Range Calculation:', {
+      monthFilter,
+      year,
+      month: month + 1, // Display as 1-12 for clarity
+      monthName: dateRange.monthName,
+      from: dateRange.from,
+      to: dateRange.to,
+      daysInMonth: daysInMonth,
+      isComplete: `Month has ${daysInMonth} days - from day 1 to day ${daysInMonth}`
+    });
+    
+    // Verify the date range includes complete month
+    const fromDate = new Date(dateRange.from);
+    const toDate = new Date(dateRange.to);
+    
+    console.log('📅 Date Range Verification:', {
+      fromDay: fromDate.getDate(), // Should always be 1
+      toDay: toDate.getDate(), // Should be the last day of month
+      fromMonth: fromDate.getMonth() + 1,
+      toMonth: toDate.getMonth() + 1,
+      isFirstDayOfMonth: fromDate.getDate() === 1,
+      isLastDayOfMonth: toDate.getDate() === daysInMonth,
+      rangeIsValid: fromDate.getDate() === 1 && toDate.getDate() === daysInMonth
+    });
+    
+    return dateRange;
+  };
+
+  // Test function to verify month calculations (runs once on component mount)
+  const testMonthCalculations = () => {
+    console.log('🧪 Testing Month Length Calculations:');
+    
+    const testMonths = [
+      '2024-02', // February 2024 (29 days - leap year)
+      '2025-02', // February 2025 (28 days - non-leap year)
+      '2025-04', // April 2025 (30 days)
+      '2025-01', // January 2025 (31 days)
+      '2025-06', // June 2025 (30 days)
+      '2025-12'  // December 2025 (31 days)
+    ];
+    
+    testMonths.forEach(month => {
+      const range = getDateRange(month);
+      console.log(`  ${month}: ${range.from} to ${range.to} (${range.daysInMonth} days)`);
+    });
+  };
 
   // Translation object
   const translations = {
@@ -190,12 +276,27 @@ const ContentCreativeDashboard = () => {
   const loadTeamStats = async () => {
     try {
       console.log('🚀 Starting to load team stats...');
-      const stats = await getContentCreativeStats();
+      const dateRange = getDateRange(selectedMonth);
+      console.log('📅 Using date range:', dateRange);
+      
+      const stats = await getContentCreativeStats({
+        from: dateRange.from,
+        to: dateRange.to,
+        monthFilter: selectedMonth // Pass the month filter like Warehouse Dashboard
+      });
       console.log('📊 Received stats:', stats);
       setTeamStats(stats);
       console.log('✅ Team stats set successfully');
     } catch (error) {
       console.error("❌ Error loading team stats:", error);
+      setTeamStats({
+        totalMembers: 0,
+        activeToday: 0,
+        completedTasks: 0,
+        pendingTasks: 0,
+        totalRevenue: 0,
+        totalOrders: 0
+      });
     }
   };
 
@@ -281,8 +382,19 @@ const ContentCreativeDashboard = () => {
     if (storedLang && (storedLang === 'en' || storedLang === 'ar')) {
       setLanguage(storedLang);
     }
+    
+    // Test month calculations to verify complete month ranges
+    testMonthCalculations();
+    
     loadDashboardData();
   }, []);
+
+  // Reload stats when month filter changes
+  useEffect(() => {
+    if (selectedMonth) {
+      loadTeamStats();
+    }
+  }, [selectedMonth]);
 
   const t = translations[language as keyof typeof translations];
 
@@ -346,6 +458,47 @@ const ContentCreativeDashboard = () => {
           </p>
         </div>
 
+        {/* Month Filter */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold">Revenue Overview</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Filter by Month:</label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current Month</SelectItem>
+                <SelectItem value="previous">Previous Month</SelectItem>
+                <SelectItem value="2025-01">January 2025</SelectItem>
+                <SelectItem value="2025-02">February 2025</SelectItem>
+                <SelectItem value="2025-03">March 2025</SelectItem>
+                <SelectItem value="2025-04">April 2025</SelectItem>
+                <SelectItem value="2025-05">May 2025</SelectItem>
+                <SelectItem value="2025-06">June 2025</SelectItem>
+                <SelectItem value="2025-07">July 2025</SelectItem>
+                <SelectItem value="2025-08">August 2025</SelectItem>
+                <SelectItem value="2025-09">September 2025</SelectItem>
+                <SelectItem value="2025-10">October 2025</SelectItem>
+                <SelectItem value="2025-11">November 2025</SelectItem>
+                <SelectItem value="2025-12">December 2025</SelectItem>
+                <SelectItem value="2024-01">January 2024</SelectItem>
+                <SelectItem value="2024-02">February 2024</SelectItem>
+                <SelectItem value="2024-03">March 2024</SelectItem>
+                <SelectItem value="2024-04">April 2024</SelectItem>
+                <SelectItem value="2024-05">May 2024</SelectItem>
+                <SelectItem value="2024-06">June 2024</SelectItem>
+                <SelectItem value="2024-07">July 2024</SelectItem>
+                <SelectItem value="2024-08">August 2024</SelectItem>
+                <SelectItem value="2024-09">September 2024</SelectItem>
+                <SelectItem value="2024-10">October 2024</SelectItem>
+                <SelectItem value="2024-11">November 2024</SelectItem>
+                <SelectItem value="2024-12">December 2024</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -377,12 +530,12 @@ const ContentCreativeDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Completed Orders ({new Date().toLocaleString('default', { month: 'long' })})
+                    Completed Orders ({getDateRange(selectedMonth).monthName})
                   </p>
                   <p className="text-2xl font-bold text-blue-600">
                     {teamStats.totalOrders.toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Orders from order submissions</p>
+                  <p className="text-xs text-muted-foreground">Delivered + completed orders (like Warehouse)</p>
                 </div>
                 <ShoppingCart className="h-8 w-8 text-blue-600" />
               </div>
@@ -394,12 +547,12 @@ const ContentCreativeDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
-                    Completed Revenue ({new Date().toLocaleString('default', { month: 'long' })})
+                    Completed Revenue ({getDateRange(selectedMonth).monthName})
                   </p>
                   <p className="text-2xl font-bold text-purple-600">
                     <RiyalIcon className="inline mr-1" />{teamStats.totalRevenue.toLocaleString()}
                   </p>
-                  <p className="text-xs text-muted-foreground">Revenue from completed orders</p>
+                  <p className="text-xs text-muted-foreground">Revenue from delivered + completed orders</p>
                 </div>
                 <RiyalIcon className="h-8 w-8 text-purple-600" />
               </div>

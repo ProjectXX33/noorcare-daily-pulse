@@ -1,18 +1,18 @@
 {
-  "version": "7.5.1",
-  "buildTime": "2025-08-25T23:58:06.551Z",
+  "version": "7.6.0",
+  "buildTime": "2025-01-27T23:58:06.551Z",
   "buildTimestamp": "1756166286552",
-  "buildDate": "8/26/2025",
+  "buildDate": "1/28/2025",
   "gitCommit": "unknown",
   "environment": "production",
   "releaseNotes": [
-    "👨‍⚕️ NEW: Senior CRM Pharmacist Role - New role with same permissions as Junior CRM Specialist",
-    "🔧 FIXED: Position dropdowns in admin interface now include Senior CRM Pharmacist",
-    "🔧 UPDATED: Senior CRM Pharmacist cannot see Employee Management group and Dashboard",
-    "🔧 FIXED: Senior CRM Pharmacist now has full access to Total Orders, My Orders, and Create Orders",
-    "🔧 FIXED: Resolved 'Checking permissions...' loop in order management pages",
-    "🔧 FIXED: Resolved 'Loading all orders...' loop in Total Orders page",
-    "📅 NEW: Month Filter - Filter orders by month in Total Orders and My Orders pages"
+    "🔧 FIXED: Weekly Shift Assignments async state issue - passes employees directly to avoid race conditions",
+    "⚡ IMPROVED: loadEmployees now returns data directly for immediate use in loadAssignments",
+    "🔍 ENHANCED: Better logging for shift assignment filtering and async state debugging",
+    "💡 IMPROVED: Reduced excessive console logging for better performance",
+    "🔧 FIXED: Content & Creative Dashboard now matches Warehouse Dashboard - uses same filtering logic",
+    "📊 UPDATED: Content & Creative shows delivered + completed orders (same as Warehouse)",
+    "📅 ENHANCED: Complete Month Range Calculation - Properly handles 28/29/30/31 day months"
   ],
   "minimumSupportedVersion": "5.0.0",
   "forceUpdate": false

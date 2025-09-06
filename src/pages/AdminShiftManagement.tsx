@@ -56,9 +56,14 @@ const AdminShiftManagement = () => {
   const [employees, setEmployees] = useState<User[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
+  const [employeesLoaded, setEmployeesLoaded] = useState(false);
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(() => {
     const today = new Date();
-    return startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    console.log('🗓️ Initial Week Calculation:');
+    console.log('  📅 Today:', today.toISOString().split('T')[0]);
+    console.log('  📅 Week Start (Monday):', weekStart.toISOString().split('T')[0]);
+    return weekStart;
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +174,14 @@ const AdminShiftManagement = () => {
         (payload) => {
           console.log('Real-time shift assignment change:', payload);
           // Reload assignments when changes occur from other sources
-          loadAssignments();
+          // Only reload if employees are already loaded to avoid race condition
+          if (employeesLoaded) {
+            console.log('🔄 Real-time update: Reloading assignments...');
+            loadAssignments();
+          } else {
+            console.log('⚠️ Real-time update: Skipping reload, employees not loaded yet');
+            console.log('  🔍 Employees loaded flag:', employeesLoaded);
+          }
         }
       )
       .subscribe();
@@ -179,19 +191,30 @@ const AdminShiftManagement = () => {
       subscription.unsubscribe();
       }
     };
-  }, [user?.id]); // Only depend on user.id to avoid unnecessary re-subscriptions
+  }, [user?.id, employeesLoaded]); // Depend on user.id and employeesLoaded flag
 
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
+    setEmployeesLoaded(false); // Reset the flag when starting new data load
     console.log('🔍 AdminShiftManagement: Loading data for user:', user?.role);
     
     try {
-      await Promise.all([
+      // Load employees and shifts in parallel first
+      const [loadedEmployees] = await Promise.all([
         loadEmployees(),
-        loadShifts(),
-        loadAssignments()
+        loadShifts()
       ]);
+      
+      // Then load assignments after employees are loaded (assignments filtering depends on employees)
+      console.log('🔍 Employees and shifts loaded, now loading assignments...');
+      console.log('🔍 Pre-assignment check - employeesLoaded flag:', employeesLoaded);
+      console.log('🔍 Pre-assignment check - employees count:', employees.length);
+      console.log('🔍 Loaded employees count (from return):', loadedEmployees.length);
+      console.log('🔍 Calling loadAssignments with fresh employee data...');
+      // Pass freshly loaded employees directly to avoid async state issues
+      await loadAssignments(loadedEmployees);
+      
       console.log('AdminShiftManagement: Data loaded successfully');
     } catch (error) {
       console.error('AdminShiftManagement: Error loading data:', error);
@@ -202,7 +225,7 @@ const AdminShiftManagement = () => {
     }
   };
 
-  const loadEmployees = async () => {
+  const loadEmployees = async (): Promise<User[]> => {
     try {
       console.log('🔍 Loading employees for user role:', user?.role);
       const { data, error } = await supabase
@@ -244,7 +267,16 @@ const AdminShiftManagement = () => {
       }
       
       console.log('Employees loaded:', filteredEmployees?.length || 0);
+      console.log('🔍 Setting employees and flag...');
       setEmployees(filteredEmployees);
+      setEmployeesLoaded(true);
+      console.log('✅ Employees loading completed, flag set to true');
+      console.log('✅ Employees state:', filteredEmployees.map(e => ({ id: e.id, name: e.name, team: e.team, position: e.position })));
+      
+      // Trigger assignments loading with the updated employee data
+      console.log('🔄 Triggering assignment reload with updated employees...');
+      
+      return filteredEmployees;
     } catch (error) {
       console.error('Error loading employees:', error);
       throw error;
@@ -287,10 +319,61 @@ const AdminShiftManagement = () => {
     }
   };
 
-  const loadAssignments = async () => {
+  const loadAssignments = async (employeesToUse?: User[]) => {
           try {
         console.log('Loading assignments...');
+        
+        console.log('🔍 Assignment loading check:');
+        console.log('  👤 User role:', user?.role);
+        console.log('  🏢 Employees loaded flag:', employeesLoaded);
+        console.log('  📊 Employees count:', employees.length);
+        
+        // Only proceed if we have employees loaded (for role-based filtering)
+        // Use employeesToUse parameter if provided, otherwise check state
+        const hasEmployees = employeesToUse ? employeesToUse.length > 0 : employeesLoaded;
+        if ((user?.role === 'content_creative_manager' || user?.role === 'customer_retention_manager') && !hasEmployees) {
+          console.log('⚠️ Skipping assignment loading - employees not loaded yet for role-based filtering');
+          console.log('  🔍 employeesToUse provided:', !!employeesToUse);
+          console.log('  🔍 employeesToUse length:', employeesToUse?.length || 0);
+          return;
+        }
+        
         const weekEnd = addDays(selectedWeekStart, 6);
+        
+        console.log('🗓️ Date Range for Assignments:');
+        console.log('  📅 Week Start:', format(selectedWeekStart, 'yyyy-MM-dd'));
+        console.log('  📅 Week End:', format(weekEnd, 'yyyy-MM-dd'));
+        console.log('  📅 Formatted for query: >= ' + format(selectedWeekStart, 'yyyy-MM-dd') + ' AND <= ' + format(weekEnd, 'yyyy-MM-dd'));
+      
+      // First, check if ANY assignments exist in the database for this date range
+      const { data: allAssignmentsInRange, error: countError } = await supabase
+        .from('shift_assignments')
+        .select('id, employee_id, work_date, assigned_shift_id')
+        .gte('work_date', format(selectedWeekStart, 'yyyy-MM-dd'))
+        .lte('work_date', format(weekEnd, 'yyyy-MM-dd'));
+        
+      console.log('🔍 TOTAL assignments in database for this week:', allAssignmentsInRange?.length || 0);
+      if (allAssignmentsInRange && allAssignmentsInRange.length > 0) {
+        console.log('📋 All assignments in range:', allAssignmentsInRange.map(a => ({
+          id: a.id,
+          employee_id: a.employee_id,
+          work_date: a.work_date,
+          shift_id: a.assigned_shift_id
+        })));
+      } else {
+        // Check if ANY assignments exist in the database at all
+        const { data: anyAssignments } = await supabase
+          .from('shift_assignments')
+          .select('id, work_date')
+          .limit(5);
+        console.log('🔍 ANY assignments in database (sample):', anyAssignments?.length || 0);
+        if (anyAssignments && anyAssignments.length > 0) {
+          console.log('📋 Sample assignments:', anyAssignments.map(a => ({ id: a.id, work_date: a.work_date })));
+        } else {
+          console.log('❌ NO assignments found in the entire database');
+          console.log('💡 TIP: You can create assignments by selecting shifts from the dropdown menus');
+        }
+      }
       
       const { data, error } = await supabase
         .from('shift_assignments')
@@ -318,22 +401,40 @@ const AdminShiftManagement = () => {
 
       // Filter assignments for Content & Creative Manager and Customer Retention Manager
       let filteredAssignments = formattedAssignments;
+      const employeesForFiltering = employeesToUse || employees;
+      console.log('🔍 Before filtering - Total assignments:', formattedAssignments.length);
+      console.log('🔍 Available employees for filtering:', employeesForFiltering.length);
+      console.log('🔍 Using employees from parameter:', !!employeesToUse);
+      
       if (user?.role === 'content_creative_manager') {
-        const teamEmployeeIds = employees.map(emp => emp.id);
+        const teamEmployeeIds = employeesForFiltering.map(emp => emp.id);
+        console.log('🎯 Content & Creative Employee IDs:', teamEmployeeIds);
+        console.log('🎯 All assignment employee IDs:', [...new Set(formattedAssignments.map(a => a.employeeId))]);
+        console.log('🎯 Matching employee IDs:', formattedAssignments.filter(a => teamEmployeeIds.includes(a.employeeId)).map(a => a.employeeId));
         filteredAssignments = formattedAssignments.filter(assignment => 
           teamEmployeeIds.includes(assignment.employeeId)
         );
         console.log('🎯 Content & Creative Shift Assignments:', filteredAssignments.length);
       } else if (user?.role === 'customer_retention_manager') {
-        const teamEmployeeIds = employees.map(emp => emp.id);
+        const teamEmployeeIds = employeesForFiltering.map(emp => emp.id);
+        console.log('🎯 Customer Retention Employee IDs:', teamEmployeeIds);
         filteredAssignments = formattedAssignments.filter(assignment => 
           teamEmployeeIds.includes(assignment.employeeId)
         );
         console.log('🎯 Customer Retention Shift Assignments:', filteredAssignments.length);
-        console.log('🎯 Customer Retention Employee IDs:', teamEmployeeIds);
+        console.log('🎯 Assignment Employee IDs:', formattedAssignments.map(a => a.employeeId));
+      } else if (user?.role === 'admin' || user?.role === 'ecommerce_manager') {
+        console.log('🎯 Admin/Ecommerce - Showing all assignments:', filteredAssignments.length);
       }
       
       console.log('Assignments loaded:', filteredAssignments.length);
+      console.log('🔍 Setting assignments state with:', filteredAssignments.map(a => ({
+        id: a.id,
+        employeeId: a.employeeId,
+        workDate: format(a.workDate, 'yyyy-MM-dd'),
+        shiftName: a.shiftName,
+        isDayOff: a.isDayOff
+      })));
       setAssignments(filteredAssignments);
     } catch (error) {
       console.error('Error loading assignments:', error);
@@ -528,10 +629,18 @@ const AdminShiftManagement = () => {
   };
 
   const getAssignmentForEmployeeAndDate = (employeeId: string, date: Date) => {
-    return assignments.find(a => 
+    const assignment = assignments.find(a => 
       a.employeeId === employeeId && 
       isSameDay(a.workDate, date)
     );
+    
+    // Minimal debug logging for first employee on first day only
+    if (employeeId && date && employeeId === employees[0]?.id && format(date, 'yyyy-MM-dd') === format(selectedWeekStart, 'yyyy-MM-dd')) {
+      console.log(`🔍 Sample assignment lookup for first employee on first day:`, assignment ? 'FOUND' : 'NOT FOUND');
+      console.log(`🔍 Total assignments in state:`, assignments.length);
+    }
+    
+    return assignment;
   };
 
   const getWeekDays = () => {
